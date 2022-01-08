@@ -1,22 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+
 # IDE
 .idea/
 .vscode/
-.vs/
 *.iml
 
-# Yarn
-yarn.lock
-node_modules/
-package-lock.json
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
+# Rust
+/target/
+**/target/
 
-# Build
-Thumbs.db
-.DS_Store
-docs/.build/
-*.ps1
-*.nb
-*.m
+# Node
+node_modules/
+dist/
+pnpm-lock.yaml
+*.log
+
+# Secrets / local env
+.env
+.env.*
+*.pem
+
+# Accidental local `iris generate` outputs in this repo
+iris.lock
+**/.cache/iris/

@@ -1,0 +1,40 @@
+{
+    "$schema": "https://biomejs.dev/schemas/2.4.8/schema.json",
+    "formatter": {
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 144,
+        "lineEnding": "lf"
+    },
+    "javascript": {
+        "formatter": {
+            "quoteStyle": "double",
+            "semicolons": "always",
+            "trailingCommas": "all",
+            "arrowParentheses": "always"
+        }
+    },
+    "json": {
+        "formatter": {
+            "trailingCommas": "none"
+        }
+    },
+    "linter": {
+        "enabled": false
+    },
+    "files": {
+        "includes": [
+            "package.json",
+            "biome.json",
+            "pnpm-workspace.yaml",
+            "scripts/**",
+            "projects/iris.ts/**",
+            "!**/node_modules/**",
+            "!**/dist/**",
+            "!**/target/**",
+            "!**/pnpm-lock.yaml",
+            "!**/*.md"
+        ]
+    }
+}
