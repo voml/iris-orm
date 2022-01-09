@@ -1,0 +1,15 @@
+[package]
+name = "iris"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Iris ORM -- public Rust facade for VOS data access"
+readme = "../../../readme.md"
+publish = false
+
+[dependencies]
+iris-types = { workspace = true }
+iris-ir = { workspace = true }
+
+[dev-dependencies]

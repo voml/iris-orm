@@ -1,0 +1,16 @@
+[package]
+name = "iris-types"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Iris session, planner, capability, and runtime types"
+publish = false
+
+[dependencies]
+iris-ir = { workspace = true }
+vos = { workspace = true }
+von = { workspace = true }
+serde = { workspace = true }
+blake3 = { workspace = true }
+glob = "0.3"
