@@ -1,0 +1,18 @@
+[package]
+name = "iris-adapter-postgres"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Isolated PostgreSQL foreign-store adapter for Iris"
+publish = false
+
+[dependencies]
+iris-types = { workspace = true }
+iris-ir = { workspace = true }
+vos = { workspace = true }
+serde = { workspace = true }
+postgres = { workspace = true }
+r2d2 = { workspace = true }
+r2d2_postgres = { workspace = true }
+bytes = "1"

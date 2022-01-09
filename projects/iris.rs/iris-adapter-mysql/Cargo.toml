@@ -1,0 +1,15 @@
+[package]
+name = "iris-adapter-mysql"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Isolated MySQL foreign-store adapter for Iris"
+publish = false
+
+[dependencies]
+iris-types = { workspace = true }
+iris-ir = { workspace = true }
+vos = { workspace = true }
+serde = { workspace = true }
+mysql = { workspace = true }

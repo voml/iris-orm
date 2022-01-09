@@ -1,0 +1,15 @@
+[package]
+name = "iris-adapter-sqlite"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Isolated SQLite foreign-store adapter for Iris"
+publish = false
+
+[dependencies]
+iris-types = { workspace = true }
+iris-ir = { workspace = true }
+vos = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
