@@ -1,0 +1,14 @@
+<%- loop table in tables %>
+#[derive(Clone, Debug, PartialEq)]
+pub struct <% table.rust_type %> {
+<%- loop field in table.fields %>
+    pub <% field.name %>: <% field.rust_ty %>,
+<%- end loop %>
+}
+
+<%- end loop %>
+/// Schema fingerprint locked into this generation.
+pub const SCHEMA_FINGERPRINT: &str = "<% schema_fingerprint %>";
+
+/// Generator version that produced this file.
+pub const GENERATOR_VERSION: &str = "<% generator_version %>";

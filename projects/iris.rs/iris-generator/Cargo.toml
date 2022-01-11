@@ -1,0 +1,24 @@
+[package]
+name = "iris-generator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Iris GenerationModel + Dejavu-backed emitters"
+publish = false
+
+[features]
+default = ["aot"]
+aot = []
+
+[dependencies]
+vos = { workspace = true }
+dejavu = { workspace = true }
+once_cell = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+dejavu = { workspace = true }
+serde_json = { workspace = true }

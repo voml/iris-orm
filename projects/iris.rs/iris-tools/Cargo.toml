@@ -1,0 +1,28 @@
+[package]
+name = "iris-tools"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Iris CLI"
+publish = false
+
+[lib]
+name = "iris_tools"
+path = "src/lib.rs"
+
+[[bin]]
+name = "iris"
+path = "src/main.rs"
+
+[dependencies]
+iris = { workspace = true }
+iris-generator = { workspace = true }
+iris-connector-yyds = { workspace = true }
+iris-adapter-sqlite = { workspace = true }
+iris-adapter-postgres = { workspace = true }
+iris-adapter-mysql = { workspace = true }
+iris-adapter-redis = { workspace = true }
+clap = { workspace = true }
+von = { workspace = true }
+serde = { workspace = true }
