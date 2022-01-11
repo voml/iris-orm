@@ -1,0 +1,13 @@
+[package]
+name = "iris-connector-yyds"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Native VOS connector for YYDS (readiness-gated until VOS executor ships)"
+publish = false
+
+[dependencies]
+iris-types = { workspace = true }
+iris-ir = { workspace = true }
+serde = { workspace = true }

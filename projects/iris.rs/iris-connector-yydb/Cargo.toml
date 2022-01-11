@@ -1,0 +1,13 @@
+[package]
+name = "iris-connector-yydb"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Native VOS connector for YYDB"
+publish = false
+
+[dependencies]
+iris-types = { workspace = true }
+iris-ir = { workspace = true }
+yydb = { workspace = true }
