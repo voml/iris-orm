@@ -1,0 +1,34 @@
+{
+    "name": "@yydb/iris-adapter-web",
+    "version": "0.1.0",
+    "description": "Iris browser local-store adapter — IndexedDB + OPFS (not desktop YYDB)",
+    "type": "module",
+    "license": "MPL-2.0",
+    "sideEffects": false,
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./src/index.ts",
+            "default": "./src/index.ts"
+        }
+    },
+    "files": [
+        "src",
+        "README.md",
+        "documentation"
+    ],
+    "scripts": {
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "dependencies": {
+        "@yydb/iris-types": "workspace:*"
+    },
+    "devDependencies": {
+        "typescript": "^5.9.2"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

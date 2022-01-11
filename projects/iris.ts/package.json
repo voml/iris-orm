@@ -1,0 +1,6 @@
+{
+    "name": "@yydb/iris-ts-workspace",
+    "private": true,
+    "description": "Iris TypeScript host tree — packages are members of the repo-root pnpm workspace",
+    "type": "module"
+}
