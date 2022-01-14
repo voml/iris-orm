@@ -13,6 +13,10 @@ on:
       - "projects/iris.rs/**"
       - ".github/workflows/iris-rs.yml"
 
+defaults:
+  run:
+    working-directory: projects/iris.rs
+
 env:
   CARGO_TERM_COLOR: always
   IRIS_TEST_POSTGRES_URL: host=127.0.0.1 user=iris password=iris dbname=iris
@@ -48,10 +52,10 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "mysqladmin ping -hiris -piris --silent"
-          --health-interval 5s
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"
+          --health-interval 10s
           --health-timeout 5s
-          --health-retries 30
+          --health-retries 12
       redis:
         image: redis:7
         ports:
@@ -62,10 +66,8 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     steps:
-      - name: Checkout iris-orm
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: iris-orm
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -75,18 +77,15 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: iris-orm/projects/iris.rs -> target
+          workspaces: projects/iris.rs -> target
 
       - name: Format
-        working-directory: iris-orm/projects/iris.rs
         run: cargo fmt --all -- --check
 
       - name: Check
-        working-directory: iris-orm/projects/iris.rs
         run: cargo check --workspace --all-targets
 
       - name: Clippy (Iris crates only; path deps keep capped lints)
-        working-directory: iris-orm/projects/iris.rs
         run: >
           cargo clippy
           -p iris -p iris-types -p iris-ir -p iris-generator -p iris-tools
@@ -96,5 +95,4 @@ jobs:
           --all-targets -- -D warnings
 
       - name: Test
-        working-directory: iris-orm/projects/iris.rs
         run: cargo test --workspace
