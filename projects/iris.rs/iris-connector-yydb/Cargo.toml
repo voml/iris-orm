@@ -11,3 +11,4 @@ publish = false
 iris-types = { workspace = true }
 iris-ir = { workspace = true }
 yydb = { workspace = true }
+serde = { workspace = true }

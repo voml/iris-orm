@@ -1,24 +1,65 @@
-//! Native YYDB connector (Phase 2).
+//! Native YYDB connector (Phase 2 readiness gate).
 //!
-//! Speaks YYDB's native VOS execution surface (`Connection::query` / sessions).
-//! Never routes through `iris-adapter-*` foreign-store adapters.
+//! Iris will speak **formal VOS / shared VOS IR** to YYDB only. Until YYDB's
+//! public `Connection` exposes a versioned VOS executor (`query`, sessions,
+//! prepared plans), this crate wires schema handshake only and refuses DML/query.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-mod convert;
 mod error;
 
 use std::path::{Path, PathBuf};
 
 use iris_ir::IrVersion;
 use iris_types::{CapabilitySet, QueryCaps, WriteCaps};
-use yydb::{Connection, PreparedPlan, SchemaVersion};
+use serde::{Deserialize, Serialize};
+use yydb::{Connection, SchemaVersion};
 
 pub use error::{Error, Result};
 
 /// Connector identifier.
 pub const BACKEND_ID: &str = "yydb";
+
+/// Stable readiness code for tooling and diagnostics.
+pub const READINESS_CODE: &str = "IRIS-YYDB-VOS-EXECUTOR-NOT-READY";
+
+/// What Iris requires from YYDB before enabling native VOS execution.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReadinessReport {
+    /// Connector id.
+    pub backend_id: String,
+    /// True when schema install / read works on the public facade.
+    pub schema_handshake_ready: bool,
+    /// False until YYDB publishes VOS `query` + session APIs on `Connection`.
+    pub vos_executor_ready: bool,
+    /// Stable diagnostic code.
+    pub code: String,
+    /// Human-readable blocker summary (no secrets).
+    pub message: String,
+}
+
+impl ReadinessReport {
+    /// Probe current readiness against the pinned `yydb` git dependency.
+    pub fn probe() -> Self {
+        let schema_handshake_ready = Connection::open_in_memory().is_ok();
+        let vos_executor_ready = false;
+        Self {
+            backend_id: BACKEND_ID.into(),
+            schema_handshake_ready,
+            vos_executor_ready,
+            code: READINESS_CODE.into(),
+            message: "YYDB formal VOS executor (query / sessions / prepared plans) is not yet \
+                      exported on the public Connection facade; Iris refuses DML/query until then"
+                .into(),
+        }
+    }
+
+    /// True only when every readiness bit is set.
+    pub fn is_ready(&self) -> bool {
+        self.schema_handshake_ready && self.vos_executor_ready
+    }
+}
 
 /// Schema handshake snapshot after open / ensure.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,7 +68,7 @@ pub struct SchemaHandshake {
     pub backend_id: &'static str,
     /// Stored schema version when present.
     pub schema_version: Option<u32>,
-    /// YYDB DDL revision (session / prepared staleness).
+    /// Placeholder until YYDB exposes DDL revision on the public facade.
     pub ddl_revision: u64,
     /// Whether a VOS document is installed.
     pub has_document: bool,
@@ -59,6 +100,18 @@ impl YydbSource {
             write: WriteCaps::full(),
             budget: iris_types::CompensationBudget::default(),
         }
+    }
+
+    /// Current readiness probe.
+    pub fn readiness() -> ReadinessReport {
+        ReadinessReport::probe()
+    }
+
+    fn require_vos_executor(&self) -> Result<()> {
+        if !Self::readiness().is_ready() {
+            return Err(Error::NotReady(Self::readiness()));
+        }
+        Ok(())
     }
 
     /// Open an in-memory YYDB (tests / ephemeral).
@@ -94,52 +147,52 @@ impl YydbSource {
         Ok(())
     }
 
-    /// Read schema + revision handshake data.
+    /// Read schema handshake data available on the current YYDB facade.
     pub fn schema_handshake(&self) -> Result<SchemaHandshake> {
         let schema: Option<SchemaVersion> = self.conn.schema()?;
-        let has_document = self.conn.parsed_schema()?.is_some();
+        let has_document = schema.is_some();
         Ok(SchemaHandshake {
             backend_id: BACKEND_ID,
-            schema_version: schema.map(|s| s.version),
-            ddl_revision: self.conn.ddl_revision()?,
+            schema_version: schema.as_ref().map(|s| s.version),
+            ddl_revision: schema.map(|s| u64::from(s.version)).unwrap_or(0),
             has_document,
         })
     }
 
     /// Execute a VOS operation program on the native YYDB executor.
-    pub fn execute_vos(&self, program: &str) -> Result<Vec<iris_types::Row>> {
-        let rows = self.conn.query(program)?;
-        Ok(rows.into_iter().map(convert::from_yydb_row).collect())
+    pub fn execute_vos(&self, _program: &str) -> Result<Vec<iris_types::Row>> {
+        self.require_vos_executor()?;
+        Err(Error::Policy(
+            "readiness cleared but VOS client binding is not implemented yet".into(),
+        ))
     }
 
     /// Prepare a VOS program against the current DDL revision.
-    pub fn prepare(&self, program: &str) -> Result<PreparedVos> {
-        Ok(PreparedVos {
-            inner: PreparedPlan::prepare(&self.conn, program)?,
-        })
+    pub fn prepare(&self, _program: &str) -> Result<PreparedVos> {
+        self.require_vos_executor()?;
+        Err(Error::Policy(
+            "readiness cleared but prepared VOS binding is not implemented yet".into(),
+        ))
     }
 
     /// Begin a data transaction.
     pub fn begin(&self) -> Result<()> {
-        self.conn.begin()?;
-        Ok(())
+        self.require_vos_executor()
     }
 
     /// Commit the open data transaction.
     pub fn commit(&self) -> Result<()> {
-        self.conn.commit()?;
-        Ok(())
+        self.require_vos_executor()
     }
 
     /// Roll back the open data transaction.
     pub fn rollback(&self) -> Result<()> {
-        self.conn.rollback()?;
-        Ok(())
+        self.require_vos_executor()
     }
 
     /// Whether a data transaction is open.
     pub fn in_transaction(&self) -> bool {
-        self.conn.in_transaction()
+        false
     }
 
     /// Re-open the same file path (drop + open). In-memory sources error.
@@ -154,21 +207,23 @@ impl YydbSource {
     }
 }
 
-/// Prepared VOS plan pinned to a DDL revision.
+/// Prepared VOS plan pinned to a DDL revision (not yet wired).
 #[derive(Debug, Clone)]
 pub struct PreparedVos {
-    inner: PreparedPlan,
+    ddl_revision: u64,
 }
 
 impl PreparedVos {
     /// DDL revision at prepare time.
     pub fn ddl_revision(&self) -> u64 {
-        self.inner.ddl_revision()
+        self.ddl_revision
     }
 
     /// Execute if the database DDL revision still matches.
     pub fn execute(&self, source: &YydbSource) -> Result<Vec<iris_types::Row>> {
-        let rows = self.inner.execute(&source.conn)?;
-        Ok(rows.into_iter().map(convert::from_yydb_row).collect())
+        source.require_vos_executor()?;
+        Err(Error::Policy(
+            "readiness cleared but prepared execute binding is not implemented yet".into(),
+        ))
     }
 }

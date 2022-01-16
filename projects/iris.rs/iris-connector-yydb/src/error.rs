@@ -1,19 +1,26 @@
 //! Error mapping for the YYDB connector.
 
+use crate::ReadinessReport;
+
 /// Connector errors.
 #[derive(Debug)]
 pub enum Error {
-    /// YYDB backend error (includes VOS-SESSION-STALE / PREPARED-STALE / Busy).
+    /// YYDB backend error.
     Yydb(yydb::Error),
+    /// YYDB VOS executor is not ready for Iris.
+    NotReady(ReadinessReport),
     /// Connector-local failure.
     Runtime(String),
+    /// Policy / contract violation.
+    Policy(String),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Yydb(e) => write!(f, "{e}"),
-            Self::Runtime(s) => write!(f, "{s}"),
+            Self::NotReady(r) => write!(f, "{}: {}", r.code, r.message),
+            Self::Runtime(s) | Self::Policy(s) => write!(f, "{s}"),
         }
     }
 }
