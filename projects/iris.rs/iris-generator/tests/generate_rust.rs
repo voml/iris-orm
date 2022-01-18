@@ -49,6 +49,20 @@ fn rust_emit_contains_structs_fingerprint_and_no_sql() {
 }
 
 #[test]
+fn rust_emit_optional_types_are_not_html_escaped() {
+    let schema = r#"
+table Item {
+    @@id: utf8,
+    note: utf8?,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(schema).unwrap();
+    let out = emit_rust_domain(&model).unwrap();
+    assert!(out.contains("Option<String>"));
+    assert!(!out.contains("&lt;"));
+}
+
+#[test]
 fn write_rust_domain_atomic() {
     let dir = std::env::temp_dir().join(format!(
         "iris-gen-{}",

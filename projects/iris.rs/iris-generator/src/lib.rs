@@ -156,7 +156,14 @@ pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
         }),
     )?;
     let body = render("domain_mod", &model.to_json())?;
-    Ok(format!("{header}\n{body}"))
+    Ok(format!("{header}\n{}", unescape_rust_template(&body)))
+}
+
+/// Dejavu template mode HTML-escapes `<`/`>`; Rust types need raw angle brackets.
+fn unescape_rust_template(text: &str) -> String {
+    text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
 }
 
 /// Write Rust domain bindings into `out_dir` atomically (temp + rename).
