@@ -21,6 +21,6 @@ export class MysqlSource {
     constructor(readonly options: MysqlAdapterOptions) {}
 
     placeholder(): IrisPlaceholder {
-        return { __irisTypes: "native-ts-skeleton" };
+        return { __irisTypes: "rust-binding-skeleton" };
     }
 }

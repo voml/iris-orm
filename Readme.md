@@ -8,19 +8,27 @@ Applications use:
 - VOS schema / operations / queries — on-disk extension **`.iris`**
 - the typed Iris session API for **this language**
 
-This repository is a **multi-language mono**. Each host implements Iris
-**natively** — not a bindgen/FFI wrapper around another host — because
-foreign-store adapters must follow each ecosystem’s derive/ORM/driver idioms.
+This repository has one runtime semantic implementation: the **Rust Iris
+core**. JavaScript hosts expose that core through host-specific bindings while
+keeping ecosystem-specific driver and storage integration outside the core.
+Node.js uses N-API; browsers use browser-safe WebAssembly plus TypeScript Web
+API adapters. WASI is not currently a supported host contract.
+
+Public binding packages use coarse host/CPU names: `@yydb/iris-win32-x64`,
+`@yydb/iris-linux-x64`, and `@yydb/iris-unknown-wasm32`. Toolchain details such
+as MSVC, GNU, and musl remain internal build targets rather than public import
+names. The WASM package is browser-safe WebAssembly, not WASI.
 
 | Tree | User facade | Role |
 | --- | --- | --- |
-| `projects/iris.rs` | `iris::*` | Rust reference runtime + host CLI / generate (Rust Dejavu) |
-| `projects/iris.ts` | `@yydb/iris` | Native TypeScript full runtime + `iris` CLI (`cac`) + `@yydb/iris-adapter-*` (JS/WASM peers) |
+| `projects/iris.rs` | `iris::*` | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
+| `projects/iris.ts` | `@yydb/iris` | Node/Web facades, `iris` CLI, binding loaders, TypeScript codegen surface, and host adapters |
 | `projects/iris.ts/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`) |
 
-Codegen shares `.dejavu` templates; each host runs generate locally so TS users
-do not need the Rust `iris` binary. TypeScript Iris depends on
-`@game-gpt/vos` (not `@yydb/vos`) — same rule as Rust depending on the `vos` crate.
+Codegen shares `.dejavu` templates; each host facade runs generate locally so
+TS users do not need the Rust `iris` executable. TypeScript must not implement
+a second VOS parser, semantic planner, optimizer, consistency model, or
+diagnostic system.
 
 Backends (per host):
 

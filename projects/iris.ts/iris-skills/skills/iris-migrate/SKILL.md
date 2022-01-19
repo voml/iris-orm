@@ -17,8 +17,8 @@ description: >-
 plan -> review -> apply
 ```
 
-Apply requires plan hash, schema fingerprint, adapter/capability fingerprints,
-and short-lived authorization. Input change invalidates the plan.
+Apply requires plan hash, schema fingerprint, adapter/capability fingerprints, and short-lived authorization. Input
+change invalidates the plan.
 
 ## Rules
 

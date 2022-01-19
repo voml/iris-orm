@@ -11,19 +11,19 @@ Agents edit VOS and Iris plans — **not** SQL. Parallel package:
 
 ## First-batch skills
 
-| Skill | Role | Delivery |
-| --- | --- | --- |
-| `iris-schema` | schema check | docs-only |
-| `iris-operation` | VOS op/query + semantic check | docs-only |
-| `iris-generate` | Dejavu generate / fingerprint | cli-stub |
-| `iris-migrate` | migration plan/review/apply | docs-only |
-| `iris-explain` | capability / physical / composite plan | docs-only |
-| `iris-topology` | topology + projection verify | docs-only |
-| `iris-diagnose` | doctor / drift | cli-stub |
-| `iris-conformance` | conformance.run | docs-only |
+| Skill              | Role                                   | Delivery  |
+|--------------------|----------------------------------------|-----------|
+| `iris-schema`      | schema check                           | docs-only |
+| `iris-operation`   | VOS op/query + semantic check          | docs-only |
+| `iris-generate`    | Dejavu generate / fingerprint          | cli-stub  |
+| `iris-migrate`     | migration plan/review/apply            | docs-only |
+| `iris-explain`     | capability / physical / composite plan | docs-only |
+| `iris-topology`    | topology + projection verify           | docs-only |
+| `iris-diagnose`    | doctor / drift                         | cli-stub  |
+| `iris-conformance` | conformance.run                        | docs-only |
 
-**Gate:** freeze shared Iris tool DTOs (CLI/MCP/HTTP), then mark skills `tool-live`.
-Do not prompt-fake missing commands.
+**Gate:** freeze shared Iris tool DTOs (CLI/MCP/HTTP), then mark skills `tool-live`. Do not prompt-fake missing
+commands.
 
 ## Install
 

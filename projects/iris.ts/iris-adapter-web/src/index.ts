@@ -484,7 +484,7 @@ export class WebSource {
   }
 
   placeholder(): IrisPlaceholder {
-    return { __irisTypes: "native-ts-skeleton" };
+    return { __irisTypes: "rust-binding-skeleton" };
   }
 }
 

@@ -22,6 +22,6 @@ export class PostgresSource {
     constructor(readonly options: PostgresAdapterOptions) {}
 
     placeholder(): IrisPlaceholder {
-        return { __irisTypes: "native-ts-skeleton" };
+        return { __irisTypes: "rust-binding-skeleton" };
     }
 }

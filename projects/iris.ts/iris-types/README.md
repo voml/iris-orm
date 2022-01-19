@@ -1,7 +1,7 @@
 # `@yydb/iris-types`
 
-Native TypeScript counterpart of Rust `iris-types`.
+TypeScript declarations for the Rust Iris binding surface.
 
-Not a public application dependency — apps use [`@yydb/iris`](../iris/). This
-package will hold session / planner / capability types once the TS runtime is
-implemented.
+Not a public application dependency — apps use [`@yydb/iris`](../iris/). This package describes session, plan,
+capability, and diagnostic values crossing the N-API / browser-WASM boundary. It must not become a parallel runtime or
+semantic source of truth.

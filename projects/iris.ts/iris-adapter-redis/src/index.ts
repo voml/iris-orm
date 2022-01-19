@@ -21,6 +21,6 @@ export class RedisSource {
     constructor(readonly options: RedisAdapterOptions) {}
 
     placeholder(): IrisPlaceholder {
-        return { __irisTypes: "native-ts-skeleton" };
+        return { __irisTypes: "rust-binding-skeleton" };
     }
 }

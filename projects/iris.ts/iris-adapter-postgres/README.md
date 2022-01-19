@@ -2,8 +2,8 @@
 
 Foreign-store adapter for PostgreSQL. SQL stays **private** inside this package.
 
-| Prefer | Avoid |
-| --- | --- |
+| Prefer                                                         | Avoid                      |
+|----------------------------------------------------------------|----------------------------|
 | [`postgres`](https://www.npmjs.com/package/postgres) (pure JS) | `pg-native` / libpq addons |
 
 ```bash

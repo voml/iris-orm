@@ -1,11 +1,11 @@
 /**
- * `@yydb/iris-types` — native TypeScript types layer.
+ * `@yydb/iris-types` — declarations for the Rust Iris binding surface.
  *
- * Mirrors Rust `iris-types` (session / planner / capability / runtime) without
- * sharing ABI. Do not import Rust crates or N-API bindings here.
+ * Rust owns runtime semantics. This package only describes values crossing the
+ * Node N-API or browser-WASM boundary and must not grow a parallel planner.
  */
 
 /** Marker type until the native runtime is implemented. */
 export type IrisPlaceholder = {
-    readonly __irisTypes: "native-ts-skeleton";
+    readonly __irisTypes: "rust-binding-skeleton";
 };

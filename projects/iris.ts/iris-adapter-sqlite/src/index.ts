@@ -26,6 +26,6 @@ export class SqliteSource {
 
     /** Smoke hook until real open lands. */
     placeholder(): IrisPlaceholder {
-        return { __irisTypes: "native-ts-skeleton" };
+        return { __irisTypes: "rust-binding-skeleton" };
     }
 }

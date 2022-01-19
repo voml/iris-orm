@@ -1,7 +1,7 @@
 {
     "name": "@yydb/iris-types",
     "version": "0.1.0",
-    "description": "Iris TypeScript types — pairs with Rust iris-types (native, not FFI)",
+    "description": "Iris TypeScript declarations for the Rust N-API and browser-WASM binding surfaces",
     "type": "module",
     "license": "MPL-2.0",
     "sideEffects": false,

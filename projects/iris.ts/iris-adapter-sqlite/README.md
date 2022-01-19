@@ -2,8 +2,8 @@
 
 Foreign-store adapter for SQLite. SQL stays **private** inside this package.
 
-| Prefer | Avoid |
-| --- | --- |
+| Prefer                                                  | Avoid                                  |
+|---------------------------------------------------------|----------------------------------------|
 | [`sql.js`](https://www.npmjs.com/package/sql.js) (WASM) | `better-sqlite3` / other native addons |
 
 ```bash
