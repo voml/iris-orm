@@ -8,8 +8,8 @@ use mysql::PooledConn;
 use mysql::prelude::*;
 use mysql::{Params, Value as MysqlValue};
 
-use crate::uuid_util::{try_parse_uuid_bytes, uuid_bytes_to_str};
 use crate::Result;
+use crate::uuid_util::{try_parse_uuid_bytes, uuid_bytes_to_str};
 
 pub(crate) fn execute_plan(
     conn: &mut PooledConn,
@@ -153,12 +153,7 @@ pub(crate) fn update_row(
         .filter(|(k, _)| *k != &write.primary_key)
         .map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields))
         .collect();
-    params.push(to_mysql(
-        key,
-        &write.table,
-        &write.primary_key,
-        uuid_fields,
-    ));
+    params.push(to_mysql(key, &write.table, &write.primary_key, uuid_fields));
     conn.exec_drop(sql, Params::Positional(params))?;
     Ok(conn.affected_rows())
 }
@@ -173,12 +168,7 @@ pub(crate) fn delete_row(
     let sql = format!("DELETE FROM `{table}` WHERE `{primary_key}` = ?");
     conn.exec_drop(
         sql,
-        Params::Positional(vec![to_mysql(
-            key,
-            table,
-            primary_key,
-            uuid_fields,
-        )]),
+        Params::Positional(vec![to_mysql(key, table, primary_key, uuid_fields)]),
     )?;
     Ok(conn.affected_rows())
 }

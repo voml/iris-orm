@@ -88,8 +88,8 @@ fn default_generate_omitted_from_von() {
 
 #[test]
 fn cache_paths_anchor_at_workspace_root() {
-    use std::path::Path;
     use iris_types::{DEFAULT_GENERATE_DIR, find_workspace_root, resolve_path};
+    use std::path::Path;
 
     let farm_db = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../../vmz-circle-farm/backends/farm-database");

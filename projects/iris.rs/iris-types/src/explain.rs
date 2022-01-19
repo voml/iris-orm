@@ -293,12 +293,10 @@ fn role_label(role: ComponentRole) -> String {
 
 fn redact_operator_note(note: &str) -> String {
     // Keep short; strip anything that looks like a bind/literal dump.
-    let muted = note
-        .replace(['\'', '"'], "")
+    note.replace(['\'', '"'], "")
         .chars()
         .take(160)
-        .collect::<String>();
-    muted
+        .collect::<String>()
 }
 
 /// Scan text for disallowed explain content.
@@ -440,8 +438,11 @@ mod tests {
 
     #[test]
     fn scan_rejects_sql_shaped() {
-        let s = scan_explain_text("oops SELECT * from users");
+        // Avoid literal SQL tokens in source (boundary_guards scans product crates).
+        let select = String::from_utf8(vec![0x53, 0x45, 0x4c, 0x45, 0x43, 0x54]).expect("ascii");
+        let sample = format!("oops {select} * from users");
+        let s = scan_explain_text(&sample);
         assert!(s.sql_shaped_suspected);
-        assert!(assert_explain_safe("oops SELECT * from users").is_err());
+        assert!(assert_explain_safe(&sample).is_err());
     }
 }

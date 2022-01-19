@@ -18,6 +18,7 @@ pub use iris_ir::{
 pub use iris_types::{
     AppliedWatermarkState, AuthorityEntity, AuthorityEntityLookup, CachePolicy, CacheReadAction,
     CacheReadContext, CacheWatermarkProbe, CapabilitySet, CompensationBudget, ComponentRole,
+    DEFAULT_CACHE_ROOT, DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH, DEFAULT_MIGRATIONS_DIR,
     DatasourceConfig, DatasourceKind, Diagnostic, DriftReport, EXPLAIN_FORMAT, Error,
     ExplainReport, ExplainSafety, ExplainStep, FallbackPolicy, FieldMapping, FsObjectStore,
     GenerateConfig, GenerationState, Iris, IrisLock, IrisProject, LOCK_FILE, LiveWatermarkView,
@@ -33,13 +34,12 @@ pub use iris_types::{
     StampedePermit, TOPOLOGY_ACTIVATION_FORMAT, TOPOLOGY_DIR, TOPOLOGY_FORMAT, TableBinding,
     TableMapping, TopologyActivateReport, TopologyActivation, TopologyComponent, TopologyContract,
     TopologyError, TopologyHandshake, TruthMode, Value, WriteCaps, activate_topology,
-    assert_explain_safe, collect_schema_paths, decide_cache_read, expand_env, explain_from_plan,
-    explain_topology, hydrate_candidates, load_activation, load_schema_document,
-    physical_explain_from_plan, projection_status, projection_status_offline, read_schema,
-    reader_version_accepted, resolve_path, row_from_pairs, scan_explain_text, table_name_class_hints,
-    table_name_class_hints_from_source, verify_projection, verify_report, watermark_covers,
-    writer_version_ok, DEFAULT_CACHE_ROOT, DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH,
-    DEFAULT_MIGRATIONS_DIR, default_migration_plan, find_workspace_root,
+    assert_explain_safe, collect_schema_paths, decide_cache_read, default_migration_plan,
+    expand_env, explain_from_plan, explain_topology, find_workspace_root, hydrate_candidates,
+    load_activation, load_schema_document, physical_explain_from_plan, projection_status,
+    projection_status_offline, read_schema, reader_version_accepted, resolve_path, row_from_pairs,
+    scan_explain_text, table_name_class_hints, table_name_class_hints_from_source,
+    verify_projection, verify_report, watermark_covers, writer_version_ok,
 };
 
 /// Library version string.

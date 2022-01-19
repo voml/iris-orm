@@ -208,7 +208,10 @@ pub fn classify_type(vos_type: &str, physical: &str) -> (MappingQuality, Option<
         return (MappingQuality::Exact, None);
     }
     if v.contains("uuid") && p == "binary" {
-        return (MappingQuality::Exact, Some("uuid stored as BINARY(16)".into()));
+        return (
+            MappingQuality::Exact,
+            Some("uuid stored as BINARY(16)".into()),
+        );
     }
     if v.contains("uuid") && p.contains("char") {
         return (

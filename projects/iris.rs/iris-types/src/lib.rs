@@ -14,11 +14,11 @@ mod lower;
 mod object_store;
 mod planner;
 mod project;
-mod schema;
 mod projection_status;
 mod projection_store;
 mod projection_verify;
 mod reference;
+mod schema;
 mod session;
 mod topology;
 mod topology_activate;
@@ -48,14 +48,10 @@ pub use object_store::{
 };
 pub use planner::Planner;
 pub use project::{
-    DatasourceConfig, DatasourceKind, GenerateConfig, IrisLock, IrisProject, LOCK_FILE,
-    PROJECT_FILE, PROJECT_FORMAT, ProjectError, TruthMode, DEFAULT_CACHE_ROOT, DEFAULT_GENERATE_DIR,
-    DEFAULT_LOCK_PATH, DEFAULT_MIGRATIONS_DIR, DEFAULT_SCHEMA, default_migration_plan,
+    DEFAULT_CACHE_ROOT, DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH, DEFAULT_MIGRATIONS_DIR,
+    DEFAULT_SCHEMA, DatasourceConfig, DatasourceKind, GenerateConfig, IrisLock, IrisProject,
+    LOCK_FILE, PROJECT_FILE, PROJECT_FORMAT, ProjectError, TruthMode, default_migration_plan,
     expand_env, find_workspace_root, resolve_path,
-};
-pub use schema::{
-    collect_schema_paths, load_schema_document, read_schema, table_name_class_hints,
-    table_name_class_hints_from_source,
 };
 pub use projection_status::{
     CacheWatermarkProbe, LiveWatermarkView, PROJECTION_STATUS_FORMAT, ProjectionComponentStatus,
@@ -70,6 +66,10 @@ pub use projection_verify::{
     PROJECTION_VERIFY_FORMAT, ProjectionVerifyCheck, ProjectionVerifyReport, verify_projection,
 };
 pub use reference::{ReferenceStore, row_from_pairs};
+pub use schema::{
+    collect_schema_paths, load_schema_document, read_schema, table_name_class_hints,
+    table_name_class_hints_from_source,
+};
 pub use session::{Iris, Session};
 pub use topology::{
     CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy,

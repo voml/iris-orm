@@ -41,10 +41,7 @@ fn mysql_type_mapping_is_dialect_specific() {
     );
     assert_eq!(classify_type("utf8", "text").0, MappingQuality::Exact);
     assert_eq!(classify_type("uuid", "char").0, MappingQuality::Compatible);
-    assert_eq!(
-        classify_type("uuid", "binary").0,
-        MappingQuality::Exact
-    );
+    assert_eq!(classify_type("uuid", "binary").0, MappingQuality::Exact);
 }
 
 #[test]

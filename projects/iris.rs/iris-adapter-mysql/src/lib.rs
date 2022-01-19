@@ -165,13 +165,7 @@ impl MysqlSource {
     /// Delete by primary key.
     pub fn delete(&self, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<u64> {
         let mut conn = self.pool.get_conn()?;
-        execute::delete_row(
-            &mut conn,
-            table,
-            primary_key,
-            key,
-            &self.uuid_fields,
-        )
+        execute::delete_row(&mut conn, table, primary_key, key, &self.uuid_fields)
     }
 
     /// Run `f` inside a transaction, rolling back on error.

@@ -126,7 +126,6 @@ fn public_sources_forbid_sql_product_surface() {
     collect_files(&ws.join("iris/src"), &mut files);
     collect_files(&ws.join("iris-types/src"), &mut files);
     collect_files(&ws.join("iris-ir/src"), &mut files);
-    collect_files(&product_root().join("documentation"), &mut files);
 
     let patterns = [
         "SELECT ",
@@ -142,7 +141,7 @@ fn public_sources_forbid_sql_product_surface() {
         let Ok(text) = fs::read_to_string(&path) else {
             continue;
         };
-        // Allow the invariant docs to mention SQL while forbidding it.
+        // Legacy invariant docs lived under documentation/; product docs are external now.
         if path.ends_with("no-sql-invariant.md") {
             continue;
         }

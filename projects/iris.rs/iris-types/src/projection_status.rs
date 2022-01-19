@@ -198,10 +198,9 @@ pub fn projection_status(
                 },
                 ConsistencyIntent::Eventual,
                 None,
-            ) {
-                if let Some(label) = plan.required_watermarks.get(id) {
-                    notes.push(format!("plan_required_watermark={label}"));
-                }
+            ) && let Some(label) = plan.required_watermarks.get(id)
+            {
+                notes.push(format!("plan_required_watermark={label}"));
             }
         }
         if required_watermark_label.is_none() && comp.role == ComponentRole::Cache {

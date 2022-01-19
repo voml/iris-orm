@@ -138,7 +138,9 @@ fn map_field_type(field: &Field) -> Result<(String, bool)> {
         | TypeExpr::Builtin(BuiltinType::I16)
         | TypeExpr::Builtin(BuiltinType::U16) => "SMALLINT".into(),
         TypeExpr::Builtin(BuiltinType::I32) | TypeExpr::Builtin(BuiltinType::U32) => "INT".into(),
-        TypeExpr::Builtin(BuiltinType::I64) | TypeExpr::Builtin(BuiltinType::U64) => "BIGINT".into(),
+        TypeExpr::Builtin(BuiltinType::I64) | TypeExpr::Builtin(BuiltinType::U64) => {
+            "BIGINT".into()
+        }
         TypeExpr::Builtin(BuiltinType::F32) => "FLOAT".into(),
         TypeExpr::Builtin(BuiltinType::F64) => "DOUBLE".into(),
         TypeExpr::Builtin(BuiltinType::Utf8)

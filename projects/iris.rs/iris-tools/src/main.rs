@@ -12,12 +12,12 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use iris::{
     AccessKind, CacheWatermarkProbe, CapabilitySet, ComponentRole, ConsistencyIntent,
-    DatasourceConfig, DatasourceKind, DriftReport, FsObjectStore, IrisLock, IrisProject, LOCK_FILE,
-    LocalProjectionStore, LogicalMigrationPlan, MappingManifest, OBJECT_HASH_ALG_BLAKE3,
+    DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH, DatasourceConfig, DatasourceKind, FsObjectStore,
+    IrisLock, IrisProject, LocalProjectionStore, MappingManifest, OBJECT_HASH_ALG_BLAKE3,
     ObjectPolicy, ObservedCatalog, PROJECT_FILE, PhysicalExplain, Planner, ProjectionDocument,
     TOPOLOGY_DIR, TopologyContract, TruthMode, activate_topology, assert_explain_safe, expand_env,
     explain_topology, physical_explain_from_plan, projection_status, projection_status_offline,
-    resolve_path, verify_projection, verify_report, DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH,
+    resolve_path, verify_projection, verify_report,
 };
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
@@ -638,7 +638,7 @@ fn cmd_check_source(source: &str) -> Result<(), String> {
     for hint in iris::table_name_class_hints_from_source(source)? {
         eprintln!("hint: {hint}");
     }
-    let model = GenerationModel::from_vos_schema(&source).map_err(|e| e.to_string())?;
+    let model = GenerationModel::from_vos_schema(source).map_err(|e| e.to_string())?;
     println!(
         "ok: {} table(s), fingerprint={}, generator={}",
         model.tables.len(),
@@ -697,10 +697,7 @@ fn cmd_generate_source(
     let model = GenerationModel::from_vos_schema(source).map_err(|e| e.to_string())?;
     let path = iris_generator::write_rust_domain(&model, out).map_err(|e| e.to_string())?;
     let lock = IrisLock::new(&model.schema_fingerprint, &model.generator_version, target);
-    let lock_path = resolve_path(
-        project_dir.unwrap_or(Path::new(".")),
-        DEFAULT_LOCK_PATH,
-    );
+    let lock_path = resolve_path(project_dir.unwrap_or(Path::new(".")), DEFAULT_LOCK_PATH);
     write_von_file(&lock_path, &lock.to_von().map_err(|e| e.to_string())?)?;
     println!(
         "generated {} (fingerprint={})",
@@ -1073,6 +1070,7 @@ fn cmd_topology_plan(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_explain(
     project_dir: Option<&Path>,
     project: Option<&IrisProject>,
@@ -1148,7 +1146,8 @@ fn caps_for_adapter_sketch(adapter: &str) -> CapabilitySet {
         "mysql" => MysqlSource::capabilities(),
         "redis" => RedisSource::capabilities(),
         // YYDB sketch uses reference-full caps; CLI does not link the native connector here.
-        "yydb" | _ => CapabilitySet::reference_full(),
+        "yydb" => CapabilitySet::reference_full(),
+        _ => CapabilitySet::reference_full(),
     }
 }
 
@@ -1178,10 +1177,10 @@ fn cmd_projection_status(
             if comp.role != iris::ComponentRole::Cache {
                 continue;
             }
-            if let Some(filter) = component {
-                if id != filter {
-                    continue;
-                }
+            if let Some(filter) = component
+                && id != filter
+            {
+                continue;
             }
             let Some(ds_name) = comp.datasource.as_deref() else {
                 continue;
@@ -1339,6 +1338,7 @@ struct ProjectionSeedFile {
     documents: Vec<ProjectionDocument>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_projection_rebuild(
     project_dir: Option<&Path>,
     project: Option<&IrisProject>,

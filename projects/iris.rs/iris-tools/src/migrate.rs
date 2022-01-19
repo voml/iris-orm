@@ -10,9 +10,7 @@ use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
 use iris_adapter_sqlite::SqliteSource;
 
-use crate::project::{
-    expand_endpoint, load_project, read_schema, write_file,
-};
+use crate::project::{expand_endpoint, load_project, read_schema, write_file};
 
 /// Tables created by a successful `migrate_apply`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,11 +48,7 @@ fn print_drift(source: &str, drift: &DriftReport) -> Result<(), String> {
 }
 
 /// Plan a managed-push migration; returns the plan path written.
-pub fn migrate_plan(
-    config: &Path,
-    source: &str,
-    out: Option<&Path>,
-) -> Result<PathBuf, String> {
+pub fn migrate_plan(config: &Path, source: &str, out: Option<&Path>) -> Result<PathBuf, String> {
     let (project_dir, project) = load_project(config)?;
     let ds = project.datasource(source).map_err(|e| e.to_string())?;
     refuse_redis_migrate(ds.kind)?;
@@ -88,9 +82,9 @@ pub fn migrate_plan(
             ));
         }
     };
-    let out_path = out.map(Path::to_path_buf).unwrap_or_else(|| {
-        default_migration_plan(&project_dir, source)
-    });
+    let out_path = out
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| default_migration_plan(&project_dir, source));
     let text = von::to_string_indented(&plan).map_err(|e| e.to_string())?;
     write_file(&out_path, &text)?;
     Ok(out_path)

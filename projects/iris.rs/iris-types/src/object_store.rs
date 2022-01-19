@@ -133,10 +133,10 @@ impl FsObjectStore {
             meta.length = bytes.len() as u64;
         }
         let actual = hash_bytes(&bytes, self.hash_alg());
-        if let Some(expected) = expected_hash {
-            if expected.as_str() != actual.as_str() {
-                return Err(ObjectError::HashMismatch);
-            }
+        if let Some(expected) = expected_hash
+            && expected.as_str() != actual.as_str()
+        {
+            return Err(ObjectError::HashMismatch);
         }
         meta.content_hash = Some(actual);
         meta.state = ObjectLifecycleState::Verified;

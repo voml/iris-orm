@@ -289,15 +289,14 @@ impl LocalProjectionStore {
         meta.notes = Some("active via alias switch".into());
         self.write_gen_meta(&handle.component, handle.generation.as_str(), &meta)?;
 
-        if let Some(prev_gen) = prev {
-            if prev_gen != handle.generation.as_str() {
-                if let Ok(mut old) = self.load_gen_meta(&handle.component, &prev_gen) {
-                    old.state = GenerationState::Retired;
-                    old.updated_unix_ms = now_unix_ms;
-                    old.notes = Some("retired after alias switch".into());
-                    let _ = self.write_gen_meta(&handle.component, &prev_gen, &old);
-                }
-            }
+        if let Some(prev_gen) = prev
+            && prev_gen != handle.generation.as_str()
+            && let Ok(mut old) = self.load_gen_meta(&handle.component, &prev_gen)
+        {
+            old.state = GenerationState::Retired;
+            old.updated_unix_ms = now_unix_ms;
+            old.notes = Some("retired after alias switch".into());
+            let _ = self.write_gen_meta(&handle.component, &prev_gen, &old);
         }
         self.gc_retired(&handle.component)?;
         Ok(())
@@ -450,10 +449,10 @@ impl LocalProjectionStore {
                     continue;
                 };
                 generations.push(gen_id.to_string());
-                if let Ok(meta) = self.load_gen_meta(component, gen_id) {
-                    if meta.state == GenerationState::Building {
-                        building = Some(gen_id.to_string());
-                    }
+                if let Ok(meta) = self.load_gen_meta(component, gen_id)
+                    && meta.state == GenerationState::Building
+                {
+                    building = Some(gen_id.to_string());
                 }
             }
         }
@@ -483,16 +482,16 @@ impl LocalProjectionStore {
             let Some(gen_id) = name.to_str() else {
                 continue;
             };
-            if let Ok(meta) = self.load_gen_meta(component, gen_id) {
-                if matches!(
+            if let Ok(meta) = self.load_gen_meta(component, gen_id)
+                && matches!(
                     meta.state,
                     GenerationState::Retired | GenerationState::Failed
-                ) {
-                    retired.push((gen_id.to_string(), meta.updated_unix_ms));
-                }
+                )
+            {
+                retired.push((gen_id.to_string(), meta.updated_unix_ms));
             }
         }
-        retired.sort_by(|a, b| b.1.cmp(&a.1));
+        retired.sort_by_key(|b| std::cmp::Reverse(b.1));
         for (gen_id, _) in retired.into_iter().skip(keep) {
             let _ = fs::remove_dir_all(self.gen_dir(component, &gen_id));
         }

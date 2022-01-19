@@ -8,7 +8,10 @@ use vos::ast::Document;
 use crate::project::resolve_path;
 
 /// Collect schema file paths from a single file, directory tree, or glob pattern.
-pub fn collect_schema_paths(project_dir: &Path, schema_pattern: &str) -> Result<Vec<PathBuf>, String> {
+pub fn collect_schema_paths(
+    project_dir: &Path,
+    schema_pattern: &str,
+) -> Result<Vec<PathBuf>, String> {
     let resolved = resolve_path(project_dir, schema_pattern);
     if schema_pattern.contains('*') || schema_pattern.contains('?') {
         let pattern = resolved.to_string_lossy().replace('\\', "/");
@@ -19,9 +22,7 @@ pub fn collect_schema_paths(project_dir: &Path, schema_pattern: &str) -> Result<
             .collect();
         paths.sort();
         if paths.is_empty() {
-            return Err(format!(
-                "no `.iris` files matched `{schema_pattern}`"
-            ));
+            return Err(format!("no `.iris` files matched `{schema_pattern}`"));
         }
         return Ok(paths);
     }
@@ -55,9 +56,7 @@ pub fn read_schema(project_dir: &Path, schema_pattern: &str) -> Result<String, S
     let paths = collect_schema_paths(project_dir, schema_pattern)?;
     let mut parts = Vec::with_capacity(paths.len());
     for path in paths {
-        parts.push(std::fs::read_to_string(&path).map_err(|e| {
-            format!("{}: {e}", path.display())
-        })?);
+        parts.push(std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?);
     }
     Ok(parts.join("\n\n"))
 }
@@ -67,14 +66,13 @@ pub fn load_schema_document(project_dir: &Path, schema_pattern: &str) -> Result<
     let paths = collect_schema_paths(project_dir, schema_pattern)?;
     let mut parts = Vec::with_capacity(paths.len());
     for path in &paths {
-        let text = std::fs::read_to_string(path)
-            .map_err(|e| format!("{}: {e}", path.display()))?;
+        let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
         vos::parser::parse_document(&text).map_err(|d| format_schema_diag(path, &d))?;
         parts.push(text);
     }
     let merged = parts.join("\n\n");
-    let document =
-        vos::parser::parse_document(&merged).map_err(|d| format_schema_diag(Path::new(schema_pattern), &d))?;
+    let document = vos::parser::parse_document(&merged)
+        .map_err(|d| format_schema_diag(Path::new(schema_pattern), &d))?;
     validate_unique_tables(&document)?;
     Ok(document)
 }
@@ -107,10 +105,7 @@ pub fn table_name_class_hints(doc: &Document) -> Vec<String> {
     let mut hints = Vec::new();
     for table in doc.tables() {
         let name = &table.name;
-        let pascal = name
-            .chars()
-            .next()
-            .is_some_and(|c| c.is_ascii_uppercase())
+        let pascal = name.chars().next().is_some_and(|c| c.is_ascii_uppercase())
             && name.chars().all(|c| c.is_ascii_alphanumeric())
             && !name.is_empty();
         if !pascal {

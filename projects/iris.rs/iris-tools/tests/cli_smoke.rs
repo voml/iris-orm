@@ -246,7 +246,13 @@ table User {
         .unwrap();
     assert!(out.status.success(), "{:?}", out);
     assert!(dir.join(".cache").join("iris").join("iris.lock").exists());
-    assert!(dir.join(".cache").join("iris").join("generate").join("mod.rs").exists());
+    assert!(
+        dir.join(".cache")
+            .join("iris")
+            .join("generate")
+            .join("mod.rs")
+            .exists()
+    );
 
     let _ = std::fs::remove_dir_all(dir);
 }

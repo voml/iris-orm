@@ -2,9 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use iris::{
-    DatasourceConfig, IrisProject, PROJECT_FILE, expand_env,
-};
+use iris::{DatasourceConfig, IrisProject, PROJECT_FILE, expand_env};
 
 /// Load `iris.von` and return `(project_dir, project)`.
 pub fn load_project(config: &Path) -> Result<(PathBuf, IrisProject), String> {

@@ -92,10 +92,16 @@ pub struct DatasourceConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GenerateConfig {
     /// Output directory (default [`DEFAULT_GENERATE_DIR`], workspace-local).
-    #[serde(default = "default_generate_out", skip_serializing_if = "is_default_generate_out")]
+    #[serde(
+        default = "default_generate_out",
+        skip_serializing_if = "is_default_generate_out"
+    )]
     pub out: String,
     /// Target language.
-    #[serde(default = "default_generate_target", skip_serializing_if = "is_default_generate_target")]
+    #[serde(
+        default = "default_generate_target",
+        skip_serializing_if = "is_default_generate_target"
+    )]
     pub target: String,
 }
 

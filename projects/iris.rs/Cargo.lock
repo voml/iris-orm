@@ -1310,6 +1310,7 @@ version = "0.1.0"
 dependencies = [
  "iris-ir",
  "iris-types",
+ "serde",
  "yydb",
 ]
 
