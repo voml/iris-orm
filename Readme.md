@@ -70,8 +70,7 @@ projects/iris.rs/
   iris-adapter-*        foreign-store adapters
 
 projects/iris.ts/
-  iris/                 @yydb/iris public facade + iris CLI
-  iris-types/           @yydb/iris-types (pairs with Rust iris-types)
+  iris/                 @yydb/iris — Web default + /node + /types + iris CLI
   iris-adapter-sqlite/  @yydb/iris-adapter-sqlite -> @yydb/sqlite (planned driver reuse)
   iris-adapter-postgres/@yydb/iris-adapter-postgres -> @yydb/postgres (planned driver reuse)
   iris-adapter-mysql/   @yydb/iris-adapter-mysql -> @yydb/mysql (planned driver reuse)

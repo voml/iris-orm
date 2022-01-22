@@ -5,7 +5,7 @@
  * Redis commands stay private to this package.
  */
 
-import type { IrisPlaceholder } from "@yydb/iris-types";
+import type { IrisPlaceholder } from "@yydb/iris/types";
 
 /** Pairs with Rust `iris-adapter-redis`. */
 export const BACKEND_ID = "redis" as const;

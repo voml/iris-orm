@@ -9,7 +9,7 @@
  * Planner: structured web intents → WebPhysicalPlan → execute (not VOS parser).
  */
 
-import type { IrisPlaceholder } from "@yydb/iris-types";
+import type { IrisPlaceholder } from "@yydb/iris/types";
 import { BACKEND_ID } from "./backend-id.ts";
 import { WebCatalog, type CatalogSnapshot, type InstallSchemaOptions } from "./catalog.ts";
 import { WebCoordinator, type CoordEvent, type CoordListener } from "./coord.ts";

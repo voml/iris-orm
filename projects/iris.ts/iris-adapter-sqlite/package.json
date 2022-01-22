@@ -22,7 +22,7 @@
         "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
-        "@yydb/iris-types": "workspace:*"
+        "@yydb/iris": "workspace:*"
     },
     "peerDependencies": {
         "sql.js": "^1.13.0"

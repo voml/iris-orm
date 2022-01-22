@@ -23,7 +23,7 @@
         "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "dependencies": {
-        "@yydb/iris-types": "workspace:*"
+        "@yydb/iris": "workspace:*"
     },
     "devDependencies": {
         "typescript": "^5.9.2"

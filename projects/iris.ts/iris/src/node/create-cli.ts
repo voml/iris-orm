@@ -3,10 +3,10 @@
  */
 import cac from "cac";
 
-const VERSION = "0.1.0";
+import { version } from "../types/version.ts";
 
 function notImplemented(name: string): void {
-    console.error(`iris ${name}: not implemented yet in @yydb/iris (TypeScript host skeleton)`);
+    console.error(`iris ${name}: not implemented yet in @yydb/iris/node (TypeScript host skeleton)`);
     process.exitCode = 1;
 }
 
@@ -14,7 +14,7 @@ function notImplemented(name: string): void {
 export function createIrisCli() {
     const cli = cac("iris");
 
-    cli.version(VERSION);
+    cli.version(version);
     cli.help();
 
     cli.command("check [schema]", "Parse and validate a .iris schema")

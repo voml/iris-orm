@@ -5,7 +5,7 @@
  * Backend commands stay private to this package; never expose SQL on the Iris facade.
  */
 
-import type { IrisPlaceholder } from "@yydb/iris-types";
+import type { IrisPlaceholder } from "@yydb/iris/types";
 
 /** Pairs with Rust `iris-adapter-sqlite`. */
 export const BACKEND_ID = "sqlite" as const;

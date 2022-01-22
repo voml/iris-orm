@@ -5,7 +5,7 @@
  * not `pg-native` / libpq bindings. SQL stays private to this package.
  */
 
-import type { IrisPlaceholder } from "@yydb/iris-types";
+import type { IrisPlaceholder } from "@yydb/iris/types";
 
 /** Pairs with Rust `iris-adapter-postgres`. */
 export const BACKEND_ID = "postgres" as const;

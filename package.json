@@ -10,7 +10,7 @@
         "check:rs": "node scripts/check-rs.mjs",
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
-        "iris": "pnpm --filter @yydb/iris exec node ./src/cli.ts"
+        "iris": "pnpm --filter @yydb/iris exec node ./src/node/cli.ts"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",

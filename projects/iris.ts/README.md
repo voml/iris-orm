@@ -13,8 +13,7 @@ pnpm run iris -- --help
 
 | Package                       | Role                                                                                     |
 |-------------------------------|------------------------------------------------------------------------------------------|
-| `@yydb/iris`                  | User facade + **`iris` CLI** (`cac`)                                                     |
-| `@yydb/iris-types`            | Internal types (pairs with Rust `iris-types`)                                            |
+| `@yydb/iris`                  | Host facade (browser default + `/node` + `/types`) + **`iris` CLI**                    |
 | `@yydb/iris-adapter-sqlite`   | SQLite via **sql.js** (WASM; not better-sqlite3)                                         |
 | `@yydb/iris-adapter-postgres` | PostgreSQL (peer → prefer `@yydb/postgres` when ready)                                   |
 | `@yydb/iris-adapter-mysql`    | MySQL (peer → prefer `@yydb/mysql` when ready)                                           |
@@ -35,14 +34,12 @@ Drivers are **peerDependencies** — install only the adapters you need.
 
 ## `@yydb/iris` entry points (target)
 
-Formal docs and codegen should use **explicit subpaths** (not runtime `window` checks):
+Formal docs and codegen:
 
 ```ts
+import type { IrisRuntime } from "@yydb/iris/types";
+import { createIris, initIris } from "@yydb/iris";
 import { createIris } from "@yydb/iris/node";
-import { createIris, initIris } from "@yydb/iris/web";
-import type { IrisRuntime } from "@yydb/iris";
 ```
 
-Binding binaries ship as optional platform packages (`@yydb/iris-win32-x64`, `@yydb/iris-linux-x64`, `@yydb/iris-unknown-wasm32`). Full `exports` contract lives in the maintainer monorepo doc `决策和进度表/iris-orm-architecture.md` (not shipped inside this git tree).
-
-Current workspace skeleton still uses a single `./src/index.ts` export until N-API / WASM loaders land.
+Adapters import `@yydb/iris/types` only (no loader). No separate `@yydb/iris-core` npm package.

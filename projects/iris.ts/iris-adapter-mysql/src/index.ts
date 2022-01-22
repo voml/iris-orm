@@ -5,7 +5,7 @@
  * SQL stays private to this package.
  */
 
-import type { IrisPlaceholder } from "@yydb/iris-types";
+import type { IrisPlaceholder } from "@yydb/iris/types";
 
 /** Pairs with Rust `iris-adapter-mysql`. */
 export const BACKEND_ID = "mysql" as const;
