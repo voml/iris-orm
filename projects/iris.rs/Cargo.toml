@@ -5,6 +5,8 @@ members = [
     "iris-types",
     "iris-ir",
     "iris-generator",
+    "iris-napi",
+    "iris-wasm",
     "iris-tools",
     "iris-connector-yydb",
     "iris-connector-yyds",
@@ -53,3 +55,7 @@ iris-adapter-mysql = { path = "iris-adapter-mysql" }
 iris-adapter-postgres = { path = "iris-adapter-postgres" }
 iris-adapter-sqlite = { path = "iris-adapter-sqlite" }
 iris-adapter-redis = { path = "iris-adapter-redis" }
+napi = { version = "3.12", default-features = false, features = ["napi9"] }
+napi-derive = "3.6"
+napi-build = "2"
+wasm-bindgen = "0.2"

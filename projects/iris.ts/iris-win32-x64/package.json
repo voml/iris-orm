@@ -1,0 +1,14 @@
+{
+    "name": "@yydb/iris-win32-x64",
+    "version": "0.1.0",
+    "description": "Windows x64 N-API binary for @yydb/iris",
+    "license": "MPL-2.0",
+    "os": ["win32"],
+    "cpu": ["x64"],
+    "main": "iris.win32-x64-msvc.node",
+    "files": ["iris.win32-x64-msvc.node", "index.d.ts"],
+    "types": "index.d.ts",
+    "publishConfig": {
+        "access": "public"
+    }
+}

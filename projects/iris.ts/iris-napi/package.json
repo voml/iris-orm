@@ -1,0 +1,23 @@
+{
+    "name": "@yydb/iris-napi",
+    "private": true,
+    "version": "0.1.0",
+    "description": "Private N-API build workspace for @yydb/iris (not published)",
+    "license": "MPL-2.0",
+    "scripts": {
+        "build": "napi build --platform --release --manifest-path ../../iris.rs/Cargo.toml --package iris-napi --output-dir ../iris-win32-x64",
+        "build:debug": "napi build --platform --manifest-path ../../iris.rs/Cargo.toml --package iris-napi --output-dir ../iris-win32-x64",
+        "test": "node ./scripts/smoke.mjs"
+    },
+    "napi": {
+        "binaryName": "iris",
+        "packageName": "@yydb/iris",
+        "targets": ["x86_64-pc-windows-msvc"]
+    },
+    "devDependencies": {
+        "@napi-rs/cli": "^3.0.0"
+    },
+    "engines": {
+        "node": ">=18"
+    }
+}

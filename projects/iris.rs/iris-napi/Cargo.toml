@@ -1,0 +1,20 @@
+[package]
+name = "iris-napi"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "N-API binding for Iris ORM (Node semantic core)"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+iris = { workspace = true }
+iris-generator = { workspace = true }
+napi = { workspace = true }
+napi-derive = { workspace = true }
+
+[build-dependencies]
+napi-build = { workspace = true }
