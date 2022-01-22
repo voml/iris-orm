@@ -13,7 +13,7 @@ pnpm run iris -- --help
 
 | Package                       | Role                                                                                     |
 |-------------------------------|------------------------------------------------------------------------------------------|
-| `@yydb/iris`                  | Host facade (browser default + `/node` + `/types`) + **`iris` CLI**                    |
+| `@yydb/iris`                  | Host facade (browser default + `/node` + `/types`) + **`iris` CLI**                      |
 | `@yydb/iris-adapter-sqlite`   | SQLite via **sql.js** (WASM; not better-sqlite3)                                         |
 | `@yydb/iris-adapter-postgres` | PostgreSQL (peer → prefer `@yydb/postgres` when ready)                                   |
 | `@yydb/iris-adapter-mysql`    | MySQL (peer → prefer `@yydb/mysql` when ready)                                           |
@@ -37,9 +37,9 @@ Drivers are **peerDependencies** — install only the adapters you need.
 Formal docs and codegen:
 
 ```ts
-import type { IrisRuntime } from "@yydb/iris/types";
-import { createIris, initIris } from "@yydb/iris";
-import { createIris } from "@yydb/iris/node";
+import type {IrisRuntime} from "@yydb/iris/types";
+import {createIris, initIris} from "@yydb/iris";
+import {createIris} from "@yydb/iris/node";
 ```
 
 Adapters import `@yydb/iris/types` only (no loader). No separate `@yydb/iris-core` npm package.
