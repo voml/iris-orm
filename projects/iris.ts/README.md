@@ -13,6 +13,7 @@ pnpm run iris -- --help
 
 | Package                       | Role                                                                                     |
 |-------------------------------|------------------------------------------------------------------------------------------|
+| `@yydb/iris-homepage`         | VMZ 0.1.8 official site (`projects/iris.ts/homepage`)                                  |
 | `@yydb/iris`                  | Host facade (browser default + `/node` + `/types`) + **`iris` CLI**                      |
 | `@yydb/iris-adapter-sqlite`   | SQLite via **sql.js** (WASM; not better-sqlite3)                                         |
 | `@yydb/iris-adapter-postgres` | PostgreSQL (peer → prefer `@yydb/postgres` when ready)                                   |
@@ -32,14 +33,20 @@ Drivers are **peerDependencies** — install only the adapters you need.
   consistency model, fingerprint algorithm, or diagnostic system.
 - Adapter SQL/Redis commands stay **private** to adapter packages.
 
-## `@yydb/iris` entry points (target)
+## `@yydb/iris` entry points
 
-Formal docs and codegen:
+| Import | Host | Contents |
+|--------|------|----------|
+| `@yydb/iris` | Browser / Worker (default) | `initIris()` → `createIris()`; WASM lives inside optional `@yydb/iris-unknown-wasm32` |
+| `@yydb/iris/node` | Node only (`node` export condition) | `createIris()`, `loadProject()`, `loadNativeBinding()`, `createIrisCli()`; non-Node resolves to `unsupported.ts` |
+| `@yydb/iris/types` | Any (no loader) | `IrisRuntime`, `checkSource`, `version` |
+
+CLI: `iris` bin → `@yydb/iris/node` (`check` uses TS `checkSource`; `doctor` prints host diagnostics; `generate`/`capabilities` stub until N-API).
 
 ```ts
-import type {IrisRuntime} from "@yydb/iris/types";
-import {createIris, initIris} from "@yydb/iris";
-import {createIris} from "@yydb/iris/node";
+import type { IrisRuntime } from "@yydb/iris/types";
+import { createIris, initIris } from "@yydb/iris";
+import { createIris } from "@yydb/iris/node";
 ```
 
-Adapters import `@yydb/iris/types` only (no loader). No separate `@yydb/iris-core` npm package.
+Adapters import `@yydb/iris/types` only. No `@yydb/iris/web`, `@yydb/iris/wasm`, or `@yydb/iris-core`.

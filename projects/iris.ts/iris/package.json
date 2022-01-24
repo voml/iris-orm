@@ -32,13 +32,13 @@
         "iris": "node ./src/node/cli.ts"
     },
     "dependencies": {
-        "@game-gpt/vos-parser": "file:../../../../vos-language/projects/vos.ts/vos-parser",
+        "@game-gpt/vos-parser": "^0.1.0",
         "cac": "^6.7.14"
     },
     "optionalDependencies": {
         "@yydb/iris-linux-x64": "0.1.0",
-        "@yydb/iris-unknown-wasm32": "0.1.0",
-        "@yydb/iris-win32-x64": "0.1.0"
+        "@yydb/iris-unknown-wasm32": "workspace:*",
+        "@yydb/iris-win32-x64": "workspace:*"
     },
     "devDependencies": {
         "@types/node": "^22.15.0",

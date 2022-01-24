@@ -10,7 +10,14 @@
         "check:rs": "node scripts/check-rs.mjs",
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
-        "iris": "pnpm --filter @yydb/iris exec node ./src/node/cli.ts"
+        "iris": "pnpm --filter @yydb/iris exec node ./src/node/cli.ts",
+        "napi:build": "pnpm --filter @yydb/iris-napi build",
+        "napi:test": "pnpm --filter @yydb/iris-napi test",
+        "wasm:build": "pnpm --filter @yydb/iris-wasm build",
+        "wasm:test": "pnpm --filter @yydb/iris-wasm test",
+        "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
+        "homepage:build": "pnpm --filter @yydb/iris-homepage build",
+        "homepage:check": "pnpm --filter @yydb/iris-homepage check"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",

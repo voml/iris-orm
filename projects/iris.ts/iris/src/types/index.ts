@@ -1,9 +1,12 @@
 /**
- * `@yydb/iris/types` — protocol and binding DTOs (no loaders / CLI).
+ * `@yydb/iris/types` — protocol, binding DTOs, VOS check helpers.
+ *
+ * No N-API loader, WASM loader, or CLI. Safe for adapters and codegen.
  */
 
-export type { IrisPlaceholder } from "./placeholder.ts";
+export { IrisFacadeError } from "./errors.ts";
 export type { IrisCapabilities, IrisHost, IrisRuntime } from "./protocol.ts";
+export type { IrisPlaceholder } from "./placeholder.ts";
 export { version } from "./version.ts";
 
 export { checkSource } from "@game-gpt/vos-parser";

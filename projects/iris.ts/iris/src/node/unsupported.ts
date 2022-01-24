@@ -1,15 +1,16 @@
-const message =
+import { IrisFacadeError } from "../types/errors.ts";
+
+const HOST_MESSAGE =
     "@yydb/iris/node is only available on Node.js. Use @yydb/iris for browser hosts.";
 
-/** Throws when a non-Node resolver loads the `/node` default export. */
-export function createIris(): never {
-    throw new Error(message);
+function unsupported(): never {
+    throw new IrisFacadeError("node-host-required", HOST_MESSAGE);
 }
 
-export function loadProject(): never {
-    throw new Error(message);
-}
-
-export function createIrisCli(): never {
-    throw new Error(message);
-}
+export const createIris = unsupported;
+export const loadProject = unsupported;
+export const createIrisCli = unsupported;
+export const loadNativeBinding = unsupported;
+export const resolvePlatformPackageName = unsupported;
+export const checkSchemaFile = unsupported;
+export const printDoctorReport = unsupported;

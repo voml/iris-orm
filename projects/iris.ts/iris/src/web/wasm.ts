@@ -1,7 +1,6 @@
-/**
- * Browser WASM loader — consumes `@yydb/iris-unknown-wasm32` internally.
- * No public `@yydb/iris/wasm` subpath.
- */
+import { IrisFacadeError } from "../types/errors.ts";
+
+const WASM_PACKAGE = "@yydb/iris-unknown-wasm32";
 
 /** Explicit WASM bytes or module handle for hosts with custom asset pipelines. */
 export type WasmSource =
@@ -17,9 +16,25 @@ export type InitIrisOptions = {
     module?: WasmSource;
 };
 
+let initDone = false;
+
 /** One-time WASM init before `createIris` on browser hosts. */
 export async function initIris(_options: InitIrisOptions = {}): Promise<void> {
-    throw new Error(
-        "@yydb/iris: browser WASM binding not implemented yet (expected @yydb/iris-unknown-wasm32)",
+    if (initDone) {
+        return;
+    }
+    throw new IrisFacadeError(
+        "wasm-not-implemented",
+        `@yydb/iris: browser WASM loader not implemented yet (optional ${WASM_PACKAGE})`,
     );
+}
+
+/** @internal */
+export function assertWasmInitialized(): void {
+    if (!initDone) {
+        throw new IrisFacadeError(
+            "wasm-not-initialized",
+            "@yydb/iris: call initIris() before createIris()",
+        );
+    }
 }
