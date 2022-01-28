@@ -1,0 +1,146 @@
+<template>
+  <div class="site landing">
+    <SiteHeader />
+    <main>
+      <section class="hero" aria-label="Introduction">
+        <div class="hero-inner">
+          <div>
+            <p class="kicker">{heroKickerLabel}</p>
+            <h1>{heroTitleLabel}</h1>
+            <p class="lede">{heroLedeLabel}</p>
+            <div class="cta-row">
+              <Button type="button" onClick={() => this.go(guideHref)}>{ctaInstallLabel}</Button>
+              <Button type="button" variant="text" onClick={() => this.go(docsRootHref)}>{ctaDocsLabel}</Button>
+              <Button type="button" variant="text" onClick={() => this.openGithub()}>{ctaGithubLabel}</Button>
+            </div>
+          </div>
+          <aside class="hero-panel" aria-label="Import paths">
+            <p class="hero-panel__title">@yydb/iris</p>
+            <CodeBlock code={codeSample} language="typescript" title="hosts" />
+          </aside>
+        </div>
+      </section>
+
+      <section class="hosts" aria-labelledby="hosts-title">
+        <h2 id="hosts-title">{hostsTitleLabel}</h2>
+        <div class="hosts-grid">
+          <article>
+            <h3>{hostsNodeLabel}</h3>
+            <p>{hostsNodeDescLabel}</p>
+          </article>
+          <article>
+            <h3>{hostsWebLabel}</h3>
+            <p>{hostsWebDescLabel}</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="pipeline" aria-labelledby="pipeline-title">
+        <h2 id="pipeline-title">{pipelineTitleLabel}</h2>
+        <ol class="pipeline-flow">
+          <li><strong>{pipelineSchemaLabel}</strong></li>
+          <li aria-hidden="true">→</li>
+          <li class="is-core"><strong>{pipelineCoreLabel}</strong></li>
+          <li aria-hidden="true">→</li>
+          <li><strong>{pipelineNodeLabel}</strong> / <strong>{pipelineWasmLabel}</strong></li>
+        </ol>
+        <p class="pipeline-note">{pipelineNoteLabel}</p>
+      </section>
+    </main>
+    <SiteFooter />
+  </div>
+</template>
+
+<script client>
+import {
+  heroKicker,
+  heroTitle,
+  heroLede,
+  ctaDocs,
+  ctaGithub,
+  ctaInstall,
+  hostsTitle,
+  hostsNode,
+  hostsNodeDesc,
+  hostsWeb,
+  hostsWebDesc,
+  pipelineTitle,
+  pipelineSchema,
+  pipelineCore,
+  pipelineNode,
+  pipelineWasm,
+  pipelineNote,
+} from '#locales/common';
+import { githubUrl } from '../lib/site.ts';
+import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.ts';
+
+export default class IndexPage {
+  heroKickerLabel = '';
+  heroTitleLabel = '';
+  heroLedeLabel = '';
+  ctaDocsLabel = '';
+  ctaGithubLabel = '';
+  ctaInstallLabel = '';
+  hostsTitleLabel = '';
+  hostsNodeLabel = '';
+  hostsNodeDescLabel = '';
+  hostsWebLabel = '';
+  hostsWebDescLabel = '';
+  pipelineTitleLabel = '';
+  pipelineSchemaLabel = '';
+  pipelineCoreLabel = '';
+  pipelineNodeLabel = '';
+  pipelineWasmLabel = '';
+  pipelineNoteLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  guideHref = '/d/zh-hans/guide/getting-started';
+  codeSample =
+    'import type { IrisRuntime } from "@yydb/iris/types";\n\n// browser default\nimport { createIris } from "@yydb/iris";\n\n// node / SSR / CLI\nimport { createIris } from "@yydb/iris/node";';
+  _unwatchLocale = null;
+
+  onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.heroKickerLabel = heroKicker();
+    this.heroTitleLabel = heroTitle();
+    this.heroLedeLabel = heroLede();
+    this.ctaDocsLabel = ctaDocs();
+    this.ctaGithubLabel = ctaGithub();
+    this.ctaInstallLabel = ctaInstall();
+    this.hostsTitleLabel = hostsTitle();
+    this.hostsNodeLabel = hostsNode();
+    this.hostsNodeDescLabel = hostsNodeDesc();
+    this.hostsWebLabel = hostsWeb();
+    this.hostsWebDescLabel = hostsWebDesc();
+    this.pipelineTitleLabel = pipelineTitle();
+    this.pipelineSchemaLabel = pipelineSchema();
+    this.pipelineCoreLabel = pipelineCore();
+    this.pipelineNodeLabel = pipelineNode();
+    this.pipelineWasmLabel = pipelineWasm();
+    this.pipelineNoteLabel = pipelineNote();
+    const paths = docsPaths(readLocaleId());
+    this.docsRootHref = paths.docsRootHref;
+    this.guideHref = paths.guideHref;
+  }
+
+  applyLocaleCopy(preferred) {
+    withLocaleHint(readLocaleId(preferred), () => this.refreshCopy());
+  }
+
+  go(href) {
+    if (typeof window !== 'undefined') window.location.assign(href);
+  }
+
+  openGithub() {
+    if (typeof window !== 'undefined') window.open(githubUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+</script>

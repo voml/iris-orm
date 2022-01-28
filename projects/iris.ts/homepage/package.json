@@ -1,0 +1,25 @@
+{
+    "private": true,
+    "name": "@yydb/iris-homepage",
+    "version": "0.0.0",
+    "description": "Iris ORM official site — VMZ homepage + documents at /d/",
+    "type": "module",
+    "license": "MPL-2.0",
+    "scripts": {
+        "check": "vmz check .",
+        "dev": "vmz dev .",
+        "build": "vmz build .",
+        "serve": "vmz serve .",
+        "document:check": "vmz document check . --strict"
+    },
+    "dependencies": {
+        "@vmz/core": "^0.1.8",
+        "@vmz/ui": "^0.1.8",
+        "@vmz/ui-icons": "^0.1.8"
+    },
+    "devDependencies": {
+        "@vmz/plugin-markdown-it": "^0.1.8",
+        "@vmz/vmz": "^0.1.8",
+        "typescript": "^5.9.2"
+    }
+}

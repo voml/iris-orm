@@ -1,0 +1,111 @@
+<template>
+  <header class={headerClass}>
+    <a class="site-brand" href="/" aria-label={navHomeLabel}>
+      <span class="site-brand__mark" aria-hidden="true">◈</span>
+      {brandLabel}
+    </a>
+    <nav class="site-nav" aria-label="Primary">
+      <a href="/" aria-current={home ? 'page' : null}>{navHomeLabel}</a>
+      <a href={docsRootHref}>{navDocsLabel}</a>
+      <details class="site-language">
+        <summary aria-label={selectLanguageLabel}>
+          <Icon name="tool.locale" size="sm" />
+        </summary>
+        <div class="site-language__menu">
+          <button
+            type="button"
+            aria-current={localeId === 'zh-hans' ? 'true' : null}
+            onClick={() => this.switchLocale('zh-hans')}
+          >
+            {langZhLabel}
+          </button>
+          <button
+            type="button"
+            aria-current={localeId === 'en-us' ? 'true' : null}
+            onClick={() => this.switchLocale('en-us')}
+          >
+            {langEnLabel}
+          </button>
+        </div>
+      </details>
+      <a class="site-nav__cta" href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</a>
+    </nav>
+  </header>
+</template>
+
+<script client>
+import {
+  brand,
+  navHome,
+  navDocs,
+  navGithub,
+  selectLanguage,
+  langZh,
+  langEn,
+} from '#locales/common';
+import { githubUrl } from '../lib/site.ts';
+import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.ts';
+
+export default class SiteHeader {
+  home = false;
+  headerClass = 'site-header';
+  localeId = 'zh-hans';
+  brandLabel = '';
+  navHomeLabel = '';
+  navDocsLabel = '';
+  navGithubLabel = '';
+  selectLanguageLabel = '';
+  langZhLabel = '';
+  langEnLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  githubUrl = githubUrl;
+  _unwatchLocale = null;
+
+  onMount() {
+    this.syncHome();
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  syncHome() {
+    if (typeof window === 'undefined') return;
+    this.home = window.location.pathname === '/';
+    this.headerClass = this.home ? 'site-header home' : 'site-header';
+  }
+
+  refreshCopy() {
+    this.brandLabel = brand();
+    this.navHomeLabel = navHome();
+    this.navDocsLabel = navDocs();
+    this.navGithubLabel = navGithub();
+    this.selectLanguageLabel = selectLanguage();
+    this.langZhLabel = langZh();
+    this.langEnLabel = langEn();
+    this.docsRootHref = docsPaths(this.localeId).docsRootHref;
+  }
+
+  applyLocaleCopy(preferred) {
+    this.localeId = readLocaleId(preferred);
+    withLocaleHint(this.localeId, () => this.refreshCopy());
+  }
+
+  async switchLocale(to) {
+    if (typeof window === 'undefined') return;
+    const fn = window.__vmzTransitionLocale;
+    if (typeof fn !== 'function') {
+      this.applyLocaleCopy(to);
+      return;
+    }
+    const r = await fn(to);
+    if (r && r.status === 'committed') {
+      this.applyLocaleCopy(to);
+      queueMicrotask(() => this.applyLocaleCopy(to));
+    }
+  }
+}
+</script>

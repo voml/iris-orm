@@ -1,0 +1,66 @@
+<template>
+  <footer class="site-footer">
+    <div class="site-footer__inner">
+      <div>
+        <p class="site-footer__tag"><span class="site-brand__mark" aria-hidden="true">◈</span> {footerTagLabel}</p>
+        <p>{footerCopyrightLabel}</p>
+      </div>
+      <nav aria-label="Footer">
+        <a href={docsRootHref}>{navDocsLabel}</a>
+        <a href={guideHref}>{ctaInstallLabel}</a>
+        <a href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</a>
+      </nav>
+    </div>
+  </footer>
+</template>
+
+<script client>
+import {
+  footerTag,
+  footerCopyright,
+  navDocs,
+  navGithub,
+  ctaInstall,
+} from '#locales/common';
+import { githubUrl } from '../lib/site.ts';
+import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.ts';
+
+export default class SiteFooter {
+  localeId = 'zh-hans';
+  footerTagLabel = '';
+  footerCopyrightLabel = '';
+  navDocsLabel = '';
+  navGithubLabel = '';
+  ctaInstallLabel = '';
+  docsRootHref = '/d/zh-hans/';
+  guideHref = '/d/zh-hans/guide/getting-started';
+  githubUrl = githubUrl;
+  _unwatchLocale = null;
+
+  onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  refreshCopy() {
+    this.footerTagLabel = footerTag();
+    this.footerCopyrightLabel = footerCopyright();
+    this.navDocsLabel = navDocs();
+    this.navGithubLabel = navGithub();
+    this.ctaInstallLabel = ctaInstall();
+    const paths = docsPaths(this.localeId);
+    this.docsRootHref = paths.docsRootHref;
+    this.guideHref = paths.guideHref;
+  }
+
+  applyLocaleCopy(preferred) {
+    this.localeId = readLocaleId(preferred);
+    withLocaleHint(this.localeId, () => this.refreshCopy());
+  }
+}
+</script>
