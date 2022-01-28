@@ -22,7 +22,7 @@
   pipelineCore: 'Rust Iris core',
   pipelineNode: 'N-API',
   pipelineWasm: 'WASM',
-  pipelineNote: 'Rust iris-connector-* 与 iris-adapter-* 在 Rust 工作区执行 lowering；公开 npm 面只有 @yydb/iris 与平台 N-API / WASM 包，不再宣传 TS iris-adapter-* stub。',
+  pipelineNote: 'Rust iris-connector-* 与 iris-adapter-* 在 projects/iris.rs；公开 npm 只有 @yydb/iris 与平台 N-API / WASM 包。',
   footerTag: 'Iris ORM · VOS replaces SQL',
   footerCopyright: '© 2026 YY Database',
 }

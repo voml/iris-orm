@@ -22,7 +22,7 @@
   pipelineCore: 'Rust Iris core',
   pipelineNode: 'N-API',
   pipelineWasm: 'WASM',
-  pipelineNote: 'Rust iris-connector-* and iris-adapter-* live in the Rust workspace for lowering; the public npm surface is @yydb/iris plus platform N-API / WASM packages — not legacy TS iris-adapter-* stubs.',
+  pipelineNote: 'Rust iris-connector-* and iris-adapter-* live in projects/iris.rs; public npm is @yydb/iris plus platform N-API / WASM packages only.',
   footerTag: 'Iris ORM · VOS replaces SQL',
   footerCopyright: '© 2026 YY Database',
 }

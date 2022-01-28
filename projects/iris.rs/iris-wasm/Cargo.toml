@@ -11,9 +11,11 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-iris = { workspace = true }
 iris-generator = { workspace = true }
 wasm-bindgen = { workspace = true }
+
+[dev-dependencies]
+iris = { workspace = true }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

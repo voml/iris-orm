@@ -11,42 +11,36 @@ pnpm run iris -- --help
 
 ## Publish surface
 
-| Package                       | Role                                                                                     |
-|-------------------------------|------------------------------------------------------------------------------------------|
-| `@yydb/iris-homepage`         | VMZ 0.1.8 official site (`projects/iris.ts/homepage`)                                  |
-| `@yydb/iris`                  | Host facade (browser default + `/node` + `/types`) + **`iris` CLI**                      |
-| `@yydb/iris-adapter-sqlite`   | SQLite via **sql.js** (WASM; not better-sqlite3)                                         |
-| `@yydb/iris-adapter-postgres` | PostgreSQL (peer → prefer `@yydb/postgres` when ready)                                   |
-| `@yydb/iris-adapter-mysql`    | MySQL (peer → prefer `@yydb/mysql` when ready)                                           |
-| `@yydb/iris-adapter-redis`    | Redis (peer → prefer `@yydb/redis` when ready)                                           |
-| `@yydb/iris-adapter-web`      | Browser **Local Web Backend** (IndexedDB + OPFS); W0 skeleton — not YYDB, not SQL/SQLite |
+| Package                     | Role                                                                |
+|-----------------------------|---------------------------------------------------------------------|
+| `@yydb/iris-homepage`       | VMZ official site (`projects/iris.ts/homepage`)                     |
+| `@yydb/iris`                | Host facade (browser default + `/node` + `/types`) + **`iris` CLI** |
+| `@yydb/iris-win32-x64`      | Optional Windows x64 N-API binary                                   |
+| `@yydb/iris-linux-x64`      | Optional Linux x64 N-API binary                                     |
+| `@yydb/iris-unknown-wasm32` | Optional browser WASM binary                                        |
+| `@yydb/iris-skills`         | Agent Skills catalog                                                |
 
-Drivers are **peerDependencies** — install only the adapters you need.
+There are **no** `@yydb/iris-adapter-*` npm packages. Foreign-store lowering and drivers live in the **Rust** workspace
+(`projects/iris.rs/iris-adapter-*`) and are reached through **N-API / WASM**, not parallel TypeScript adapters.
 
 - Rust Iris is the sole runtime semantic implementation.
-- Node uses an N-API binding behind the `@yydb/iris` facade and `iris` CLI; users do not need the standalone Rust `iris`
-  executable.
-- Browsers use browser-safe WebAssembly for semantic computation. IndexedDB, OPFS, Web Locks, BroadcastChannel, quota,
-  and lifecycle integration remain TypeScript host responsibilities.
-- WASI is not a supported target. Do not design browser APIs around WASI filesystem or networking assumptions.
-- TypeScript may expose VOS types and codegen surfaces, but must not implement a parallel parser, planner, optimizer,
-  consistency model, fingerprint algorithm, or diagnostic system.
-- Adapter SQL/Redis commands stay **private** to adapter packages.
+- Node uses N-API (`@yydb/iris/node` + optional platform `.node` packages) and the `iris` CLI.
+- Browsers use `@yydb/iris` (default) + optional `@yydb/iris-unknown-wasm32` WASM.
+- TypeScript must not implement a parallel parser, planner, optimizer, consistency model, fingerprint algorithm, or
+  diagnostic system.
 
 ## `@yydb/iris` entry points
 
-| Import | Host | Contents |
-|--------|------|----------|
-| `@yydb/iris` | Browser / Worker (default) | `initIris()` → `createIris()`; WASM lives inside optional `@yydb/iris-unknown-wasm32` |
-| `@yydb/iris/node` | Node only (`node` export condition) | `createIris()`, `loadProject()`, `loadNativeBinding()`, `createIrisCli()`; non-Node resolves to `unsupported.ts` |
-| `@yydb/iris/types` | Any (no loader) | `IrisRuntime`, `checkSource`, `version` |
-
-CLI: `iris` bin → `@yydb/iris/node` (`check` uses TS `checkSource`; `doctor` prints host diagnostics; `generate`/`capabilities` stub until N-API).
+| Import             | Host                       | Contents                                                                              |
+|--------------------|----------------------------|---------------------------------------------------------------------------------------|
+| `@yydb/iris`       | Browser / Worker (default) | `initIris()` → `createIris()`; WASM via `@yydb/iris-unknown-wasm32`                   |
+| `@yydb/iris/node`  | Node only                  | `createIris()`, `loadNativeBinding()`, `createIrisCli()`; non-Node → `unsupported.ts` |
+| `@yydb/iris/types` | Any (no loader)            | `IrisRuntime`, `checkSource`, `version`                                               |
 
 ```ts
-import type { IrisRuntime } from "@yydb/iris/types";
-import { createIris, initIris } from "@yydb/iris";
-import { createIris } from "@yydb/iris/node";
+import type {IrisRuntime} from "@yydb/iris/types";
+import {createIris, initIris} from "@yydb/iris";
+import {createIris} from "@yydb/iris/node";
 ```
 
-Adapters import `@yydb/iris/types` only. No `@yydb/iris/web`, `@yydb/iris/wasm`, or `@yydb/iris-core`.
+No `@yydb/iris/web`, `@yydb/iris/wasm`, `@yydb/iris-core`, or `@yydb/iris-adapter-*`.

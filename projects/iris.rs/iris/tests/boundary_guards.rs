@@ -245,6 +245,25 @@ fn redis_adapter_is_keyspace_only() {
 }
 
 #[test]
+fn typescript_tree_has_no_iris_adapter_packages() {
+    let ts_root = product_root().join("projects/iris.ts");
+    assert!(
+        ts_root.is_dir(),
+        "expected TypeScript tree at {}",
+        ts_root.display()
+    );
+    for entry in fs::read_dir(&ts_root).expect("read projects/iris.ts") {
+        let entry = entry.expect("iris.ts dir entry");
+        let name = entry.file_name().to_string_lossy().into_owned();
+        assert!(
+            !name.starts_with("iris-adapter-"),
+            "TypeScript iris-adapter packages are retired; remove `{}`",
+            entry.path().display()
+        );
+    }
+}
+
+#[test]
 fn yyds_connector_stays_gated_without_sql() {
     let manifest = fs::read_to_string(workspace_root().join("iris-connector-yyds/Cargo.toml"))
         .expect("yyds connector Cargo.toml");

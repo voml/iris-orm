@@ -17,7 +17,9 @@
         "wasm:test": "pnpm --filter @yydb/iris-wasm test",
         "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
         "homepage:build": "pnpm --filter @yydb/iris-homepage build",
-        "homepage:check": "pnpm --filter @yydb/iris-homepage check"
+        "homepage:check": "pnpm --filter @yydb/iris-homepage check",
+        "verify:iris-exports": "pnpm --filter @yydb/iris run verify:exports",
+        "verify:homepage-hosts": "pnpm --filter @yydb/iris-homepage run verify:hosts"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",

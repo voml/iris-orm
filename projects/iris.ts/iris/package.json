@@ -7,9 +7,9 @@
     "sideEffects": false,
     "exports": {
         ".": {
-            "types": "./src/web/index.ts",
-            "browser": "./src/web/index.ts",
-            "default": "./src/web/index.ts"
+            "types": "./src/browser/index.ts",
+            "browser": "./src/browser/index.ts",
+            "default": "./src/browser/index.ts"
         },
         "./node": {
             "types": "./src/node/index.ts",
@@ -29,14 +29,15 @@
     ],
     "scripts": {
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "iris": "node ./src/node/cli.ts"
+        "iris": "node ./src/node/cli.ts",
+        "verify:exports": "node --experimental-strip-types ./scripts/verify-exports.mjs"
     },
     "dependencies": {
         "@game-gpt/vos-parser": "^0.1.0",
         "cac": "^6.7.14"
     },
     "optionalDependencies": {
-        "@yydb/iris-linux-x64": "0.1.0",
+        "@yydb/iris-linux-x64": "workspace:*",
         "@yydb/iris-unknown-wasm32": "workspace:*",
         "@yydb/iris-win32-x64": "workspace:*"
     },

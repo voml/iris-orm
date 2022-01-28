@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 /**
- * Local N-API smoke: load @yydb/iris-win32-x64 and call irisVersion / checkSource.
+ * Local N-API smoke: load the current host @yydb/iris-* platform package.
  */
 import { createRequire } from "node:module";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
-const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-const bindingPath = process.env.NAPI_RS_NATIVE_LIBRARY_PATH;
-const binding = bindingPath
-    ? require(bindingPath)
-    : require(join(root, "iris-win32-x64", "iris.win32-x64-msvc.node"));
+const artifactOut = spawnSync(process.execPath, [join(pkgRoot, "scripts", "resolve-platform-dir.mjs"), "--artifact"], {
+    encoding: "utf8",
+});
+if (artifactOut.status !== 0) {
+    console.error(artifactOut.stderr || artifactOut.stdout);
+    process.exit(artifactOut.status ?? 1);
+}
+
+const bindingPath = process.env.NAPI_RS_NATIVE_LIBRARY_PATH ?? artifactOut.stdout.trim();
+const binding = require(bindingPath);
 
 const version = binding.irisVersion();
 console.log(`iris_version: ${version}`);

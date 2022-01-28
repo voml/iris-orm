@@ -12,4 +12,4 @@ pnpm --filter @yydb/iris-homepage build
 - Landing: `/`
 - Documents: `/d/zh-hans/` · `/d/en-us/`
 
-Product messaging follows the Rust-core + N-API binding model. Legacy TypeScript `iris-adapter-*` packages are not part of the public surface.
+Product messaging follows the Rust-core + N-API binding model. TypeScript `@yydb/iris-adapter-*` packages have been removed from the repo.

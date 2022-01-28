@@ -4,13 +4,16 @@
 
 #![deny(clippy::all)]
 
-use iris_generator::GenerationModel;
+mod core;
+
+pub use core::{SchemaCheck, check_schema_source, iris_version};
+
 use wasm_bindgen::prelude::*;
 
-/// Library version (matches `iris::version()` / Cargo package version).
+/// Library version (matches workspace `@yydb/iris` semver).
 #[wasm_bindgen(js_name = irisVersion)]
-pub fn iris_version() -> String {
-    iris::version().to_string()
+pub fn wasm_iris_version() -> String {
+    iris_version()
 }
 
 /// Result of validating a VOS / `.iris` schema source via the Rust core.
@@ -21,6 +24,18 @@ pub struct CheckSourceResult {
     schema_fingerprint: String,
     generator_version: String,
     error: Option<String>,
+}
+
+impl From<SchemaCheck> for CheckSourceResult {
+    fn from(value: SchemaCheck) -> Self {
+        Self {
+            ok: value.ok,
+            table_count: value.table_count,
+            schema_fingerprint: value.schema_fingerprint,
+            generator_version: value.generator_version,
+            error: value.error,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -54,20 +69,5 @@ impl CheckSourceResult {
 /// Parse and validate schema source (same semantics as `iris-tools check`).
 #[wasm_bindgen(js_name = checkSource)]
 pub fn check_source(source: &str) -> CheckSourceResult {
-    match GenerationModel::from_vos_schema(source) {
-        Ok(model) => CheckSourceResult {
-            ok: true,
-            table_count: u32::try_from(model.tables.len()).unwrap_or(u32::MAX),
-            schema_fingerprint: model.schema_fingerprint,
-            generator_version: model.generator_version,
-            error: None,
-        },
-        Err(err) => CheckSourceResult {
-            ok: false,
-            table_count: 0,
-            schema_fingerprint: String::new(),
-            generator_version: String::new(),
-            error: Some(err.to_string()),
-        },
-    }
+    check_schema_source(source).into()
 }

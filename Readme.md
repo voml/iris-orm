@@ -11,8 +11,7 @@ Applications use:
 This repository has one runtime semantic implementation: the **Rust Iris
 core**. JavaScript hosts expose that core through host-specific bindings while
 keeping ecosystem-specific driver and storage integration outside the core.
-Node.js uses N-API; browsers use browser-safe WebAssembly plus TypeScript Web
-API adapters. WASI is not currently a supported host contract.
+Node.js uses N-API; browsers use browser-safe WebAssembly. WASI is not currently a supported host contract.
 
 Public binding packages use coarse host/CPU names: `@yydb/iris-win32-x64`,
 `@yydb/iris-linux-x64`, and `@yydb/iris-unknown-wasm32`. Toolchain details such
@@ -22,7 +21,7 @@ names. The WASM package is browser-safe WebAssembly, not WASI.
 | Tree | User facade | Role |
 | --- | --- | --- |
 | `projects/iris.rs` | `iris::*` | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
-| `projects/iris.ts` | `@yydb/iris` | Node/Web facades, `iris` CLI, binding loaders, TypeScript codegen surface, and host adapters |
+| `projects/iris.ts` | `@yydb/iris` | Node/browser facades, `iris` CLI, N-API/WASM loaders, platform packages |
 | `projects/iris.ts/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`) |
 
 Codegen shares `.dejavu` templates; each host facade runs generate locally so
@@ -70,14 +69,14 @@ projects/iris.rs/
   iris-adapter-*        foreign-store adapters
 
 projects/iris.ts/
-  iris/                 @yydb/iris — Web default + /node + /types + iris CLI
-  iris-adapter-sqlite/  @yydb/iris-adapter-sqlite -> @yydb/sqlite (planned driver reuse)
-  iris-adapter-postgres/@yydb/iris-adapter-postgres -> @yydb/postgres (planned driver reuse)
-  iris-adapter-mysql/   @yydb/iris-adapter-mysql -> @yydb/mysql (planned driver reuse)
-  iris-adapter-redis/   @yydb/iris-adapter-redis -> @yydb/redis (planned driver reuse)
-  iris-adapter-web/     @yydb/iris-adapter-web — browser Local Web Backend
-                        (IndexedDB+OPFS; W0 skeleton; not YYDB / not SQL)
-
+  iris/                 @yydb/iris — browser default + /node + /types + iris CLI
+  iris-win32-x64/       optional N-API platform package
+  iris-linux-x64/       optional N-API platform package
+  iris-unknown-wasm32/  optional browser WASM platform package
+  iris-napi/            private napi-rs build workspace
+  iris-wasm/            private wasm-pack build workspace
+  iris-skills/          @yydb/iris-skills
+  homepage/             official site
 ```
 
 VOS language sources are **not** vendored. The Rust workspace depends on the

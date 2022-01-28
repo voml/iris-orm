@@ -12,7 +12,7 @@ Iris is the **VOS data-access layer** — not a database and not a new schema la
 - **Rust Iris core** owns runtime semantics (parser, planner, capability, consistency, …) — implemented once.
 - **Node.js** exposes N-API via `@yydb/iris/node` plus optional platform packages (e.g. `@yydb/iris-win32-x64`).
 - **Browsers** use the default `@yydb/iris` facade with an embedded **WASM** core; storage APIs stay in the Web host layer.
-- **Do not** treat TypeScript `iris-adapter-*` stubs as the public product surface; lowering lives in Rust `iris-adapter-*` / `iris-connector-*`.
+- **No** TypeScript `@yydb/iris-adapter-*` npm packages; foreign-store lowering lives in Rust `iris-adapter-*` / `iris-connector-*` and is exposed through N-API / WASM.
 
 ## Start here
 

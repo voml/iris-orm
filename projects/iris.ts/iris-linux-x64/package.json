@@ -1,0 +1,14 @@
+{
+    "name": "@yydb/iris-linux-x64",
+    "version": "0.1.0",
+    "description": "Linux x64 N-API binary for @yydb/iris",
+    "license": "MPL-2.0",
+    "os": ["linux"],
+    "cpu": ["x64"],
+    "main": "iris.linux-x64-gnu.node",
+    "files": ["iris.linux-x64-gnu.node", "index.d.ts"],
+    "types": "index.d.ts",
+    "publishConfig": {
+        "access": "public"
+    }
+}

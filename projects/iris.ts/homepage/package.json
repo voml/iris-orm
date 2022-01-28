@@ -10,7 +10,8 @@
         "dev": "vmz dev .",
         "build": "vmz build .",
         "serve": "vmz serve .",
-        "document:check": "vmz document check . --strict"
+        "document:check": "vmz document check . --strict",
+        "verify:hosts": "node ./scripts/verify-host-exports.mjs"
     },
     "dependencies": {
         "@vmz/core": "^0.1.8",
