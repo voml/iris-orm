@@ -10,8 +10,5 @@ export type CreateIrisBrowserOptions = {
 /** Create a browser Iris runtime (WASM semantic core). Requires `initIris()` first. */
 export async function createIris(_options: CreateIrisBrowserOptions = {}): Promise<IrisRuntime> {
     assertWasmInitialized();
-    throw new IrisFacadeError(
-        "wasm-not-implemented",
-        "@yydb/iris: createIris is not implemented yet on the browser host",
-    );
+    throw new IrisFacadeError("wasm-not-implemented", "@yydb/iris: createIris is not implemented yet on the browser host");
 }
