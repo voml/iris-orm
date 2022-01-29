@@ -15,13 +15,9 @@ execFileSync("cargo", ["check", "--workspace", "--all-targets"], {
     shell: process.platform === "win32",
 });
 
-execFileSync(
-    "cargo",
-    ["build", "-p", "iris-wasm", "--target", "wasm32-unknown-unknown", "--release"],
-    {
-        cwd: rustDir,
-        stdio: "inherit",
-        env: process.env,
-        shell: process.platform === "win32",
-    },
-);
+execFileSync("cargo", ["build", "-p", "iris-wasm", "--target", "wasm32-unknown-unknown", "--release"], {
+    cwd: rustDir,
+    stdio: "inherit",
+    env: process.env,
+    shell: process.platform === "win32",
+});

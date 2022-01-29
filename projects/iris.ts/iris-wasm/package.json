@@ -6,9 +6,8 @@
     "license": "MPL-2.0",
     "type": "module",
     "scripts": {
-        "build": "wasm-pack build --release --target web --out-name iris.unknown-wasm32 --out-dir ../iris-unknown-wasm32/pkg-staging ../../iris.rs/iris-wasm && node ./scripts/copy-artifacts.mjs",
-        "build:debug": "wasm-pack build --target web --out-name iris.unknown-wasm32 --out-dir ../iris-unknown-wasm32/pkg-staging ../../iris.rs/iris-wasm && node ./scripts/copy-artifacts.mjs",
-        "test": "node ./scripts/smoke.mjs"
+        "build": "node ./scripts/build.mjs --release",
+        "build:debug": "node ./scripts/build.mjs"
     },
     "engines": {
         "node": ">=18"

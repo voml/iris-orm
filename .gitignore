@@ -27,3 +27,6 @@ pnpm-lock.yaml
 # Accidental local `iris generate` outputs in this repo
 iris.lock
 **/.cache/iris/
+
+# wasm-pack mis-targeted output (use projects/iris.ts/iris-unknown-wasm32)
+projects/iris.rs/iris-unknown-wasm32/
