@@ -6,6 +6,8 @@ Packages under this tree are **members of the repo-root pnpm workspace**
 ```bash
 pnpm install
 pnpm run typecheck:ts
+pnpm run napi:build && pnpm run wasm:build
+pnpm run test:ts
 pnpm run iris -- --help
 ```
 
@@ -35,7 +37,7 @@ There are **no** `@yydb/iris-adapter-*` npm packages. Foreign-store lowering and
 |--------------------|----------------------------|---------------------------------------------------------------------------------------|
 | `@yydb/iris`       | Browser / Worker (default) | `initIris()` → `createIris()`; WASM via `@yydb/iris-unknown-wasm32`                   |
 | `@yydb/iris/node`  | Node only                  | `createIris()`, `loadNativeBinding()`, `createIrisCli()`; non-Node → `unsupported.ts` |
-| `@yydb/iris/types` | Any (no loader)            | `IrisRuntime`, `checkSource`, `version`                                               |
+| `@yydb/iris/types` | Any (no loader)            | protocol types + `version` (no semantic `checkSource`; use bindings)                  |
 
 ```ts
 import type {IrisRuntime} from "@yydb/iris/types";

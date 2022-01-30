@@ -1,13 +1,11 @@
 /**
- * `@yydb/iris/types` — protocol, binding DTOs, VOS check helpers.
+ * `@yydb/iris/types` — protocol and binding DTOs.
  *
- * No N-API loader, WASM loader, or CLI. Safe for adapters and codegen.
+ * No N-API loader, WASM loader, or CLI. Semantic validation runs in Rust bindings only.
  */
 
 export { IrisFacadeError } from "./errors.ts";
 export type { IrisCapabilities, IrisHost, IrisRuntime } from "./protocol.ts";
 export type { IrisPlaceholder } from "./placeholder.ts";
+export type { CheckSourceResult } from "./check-source.ts";
 export { version } from "./version.ts";
-
-export { checkSource } from "@game-gpt/vos-parser";
-export type { VosCheckResult, VosDiagnostic } from "@game-gpt/vos-parser";

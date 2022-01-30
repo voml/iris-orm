@@ -15,7 +15,7 @@ export async function printDoctorReport(): Promise<void> {
         "Entry points:",
         "  @yydb/iris          browser / Worker (WASM inside)",
         "  @yydb/iris/node     Node N-API + iris CLI",
-        "  @yydb/iris/types    protocol / checkSource only",
+        "  @yydb/iris/types    protocol types only (no loader)",
         "",
         "Node N-API platform package:",
         platformPkg
@@ -28,19 +28,9 @@ export async function printDoctorReport(): Promise<void> {
 
     try {
         const { packageName, module } = await loadNativeBinding();
-        lines.push(
-            "",
-            "N-API binding:",
-            `  loaded: ${packageName}`,
-            `  iris_version: ${module.irisVersion()}`,
-        );
+        lines.push("", "N-API binding:", `  loaded: ${packageName}`, `  iris_version: ${module.irisVersion()}`);
     } catch (error) {
-        const note =
-            error instanceof IrisFacadeError
-                ? error.message
-                : error instanceof Error
-                  ? error.message
-                  : String(error);
+        const note = error instanceof IrisFacadeError ? error.message : error instanceof Error ? error.message : String(error);
         lines.push("", "N-API binding:", `  not loaded: ${note}`);
     }
 
