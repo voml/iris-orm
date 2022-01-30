@@ -2,17 +2,21 @@
     "name": "@yydb/iris-napi",
     "private": true,
     "version": "0.1.0",
+    "type": "module",
     "description": "Private N-API build workspace for @yydb/iris (not published)",
     "license": "MPL-2.0",
     "scripts": {
         "build": "node ./scripts/build.mjs --release",
         "build:debug": "node ./scripts/build.mjs",
-        "test": "node ./scripts/smoke.mjs"
+        "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "napi": {
         "binaryName": "iris",
         "packageName": "@yydb/iris",
-        "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+        "targets": [
+            "x86_64-pc-windows-msvc",
+            "x86_64-unknown-linux-gnu"
+        ]
     },
     "devDependencies": {
         "@napi-rs/cli": "^3.0.0"
