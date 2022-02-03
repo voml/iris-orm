@@ -16,10 +16,7 @@ const require = createRequire(import.meta.url);
 let cached: NativeBinding | null = null;
 
 /** Resolve the optional platform package name for the current host. */
-export function resolvePlatformPackageName(
-    platform: NodeJS.Platform = process.platform,
-    arch: NodeJS.Arch = process.arch,
-): string | null {
+export function resolvePlatformPackageName(platform: NodeJS.Platform = process.platform, arch: NodeJS.Arch = process.arch): string | null {
     if (platform === "win32" && arch === "x64") {
         return "@yydb/iris-win32-x64";
     }
@@ -34,10 +31,7 @@ function loadModuleFromPackage(packageName: string): IrisNativeModule {
         return require(packageName) as IrisNativeModule;
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new IrisFacadeError(
-            "native-load-failed",
-            `@yydb/iris/node: failed to load ${packageName}: ${message}`,
-        );
+        throw new IrisFacadeError("native-load-failed", `@yydb/iris/node: failed to load ${packageName}: ${message}`);
     }
 }
 
@@ -67,10 +61,7 @@ export async function loadNativeBinding(): Promise<NativeBinding> {
 
     const packageName = resolvePlatformPackageName(platform, arch);
     if (!packageName) {
-        throw new IrisFacadeError(
-            "native-unsupported-platform",
-            `@yydb/iris/node: no optional native package for ${platform}-${arch}`,
-        );
+        throw new IrisFacadeError("native-unsupported-platform", `@yydb/iris/node: no optional native package for ${platform}-${arch}`);
     }
     if (!isOptionalPackageInstalled(packageName)) {
         throw new IrisFacadeError(

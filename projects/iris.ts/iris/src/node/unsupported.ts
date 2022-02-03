@@ -1,7 +1,6 @@
 import { IrisFacadeError } from "../types/errors.ts";
 
-const HOST_MESSAGE =
-    "@yydb/iris/node is only available on Node.js. Use @yydb/iris for browser hosts.";
+const HOST_MESSAGE = "@yydb/iris/node is only available on Node.js. Use @yydb/iris for browser hosts.";
 
 function unsupported(): never {
     throw new IrisFacadeError("node-host-required", HOST_MESSAGE);

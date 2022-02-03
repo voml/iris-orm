@@ -12,13 +12,7 @@ export async function loadProject(projectPath: string): Promise<{ readonly root:
     try {
         await access(config);
     } catch {
-        throw new IrisFacadeError(
-            "project-missing",
-            `@yydb/iris/node: ${PROJECT_FILE} not found under ${root}`,
-        );
+        throw new IrisFacadeError("project-missing", `@yydb/iris/node: ${PROJECT_FILE} not found under ${root}`);
     }
-    throw new IrisFacadeError(
-        "project-not-implemented",
-        `@yydb/iris/node: project loader not implemented yet (${config})`,
-    );
+    throw new IrisFacadeError("project-not-implemented", `@yydb/iris/node: project loader not implemented yet (${config})`);
 }

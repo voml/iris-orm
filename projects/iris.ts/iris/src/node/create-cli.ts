@@ -8,9 +8,7 @@ import { checkSchemaFile } from "./check.ts";
 import { printDoctorReport } from "./doctor.ts";
 
 function notImplemented(name: string): void {
-    console.error(
-        `iris ${name}: not implemented in @yydb/iris/node yet — use Rust iris-tools for full semantics`,
-    );
+    console.error(`iris ${name}: not implemented in @yydb/iris/node yet — use Rust iris-tools for full semantics`);
     process.exitCode = 1;
 }
 
