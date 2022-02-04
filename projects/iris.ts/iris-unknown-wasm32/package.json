@@ -11,11 +11,11 @@
             "import": "./src/index.ts",
             "default": "./src/index.ts"
         },
-        "./wasm": "./iris.unknown-wasm32.wasm"
+        "./wasm": "./lib/iris.unknown-wasm32.wasm"
     },
     "files": [
         "src",
-        "iris.unknown-wasm32.wasm",
+        "lib",
         "iris.unknown-wasm32.js",
         "iris.unknown-wasm32.d.ts"
     ],

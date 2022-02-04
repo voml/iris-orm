@@ -13,7 +13,7 @@ export interface CheckSourceResult {
 export type WasmInitInput = URL | Request | Response | ArrayBuffer | Uint8Array | WebAssembly.Module;
 
 export type InitWasmOptions = {
-    /** When omitted, loads the bundled `iris.unknown-wasm32.wasm` asset. */
+    /** When omitted, loads the bundled `lib/iris.unknown-wasm32.wasm` asset. */
     module?: WasmInitInput;
 };
 
@@ -47,7 +47,7 @@ function toCheckResult(raw: GlueCheckSourceResult): CheckSourceResult {
 }
 
 async function resolveDefaultWasmBytes(): Promise<ArrayBuffer | Uint8Array | URL> {
-    const wasmUrl = new URL("../iris.unknown-wasm32.wasm", import.meta.url);
+    const wasmUrl = new URL("../lib/iris.unknown-wasm32.wasm", import.meta.url);
     if (typeof process !== "undefined" && process.versions?.node) {
         const { readFileSync } = await import("node:fs");
         const { fileURLToPath } = await import("node:url");

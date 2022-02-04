@@ -7,8 +7,8 @@ import { INVALID_SCHEMA, USER_SCHEMA, USER_SCHEMA_FINGERPRINT } from "./fixtures
 
 const entry = new URL("../src/index.ts", import.meta.url).href;
 
-test("wasm artifact exists", () => {
-    readFileSync(fileURLToPath(new URL("../iris.unknown-wasm32.wasm", import.meta.url)));
+test("wasm artifact lives under lib/", () => {
+    readFileSync(fileURLToPath(new URL("../lib/iris.unknown-wasm32.wasm", import.meta.url)));
 });
 
 test("initWasm + checkSource validate fixture schema", async () => {
