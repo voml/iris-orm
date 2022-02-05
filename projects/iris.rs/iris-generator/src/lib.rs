@@ -61,6 +61,18 @@ pub struct FieldModel {
     pub primary: bool,
     /// Optional / nullable.
     pub optional: bool,
+    /// Target entity for `&T` reference fields (`None` for scalars).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference_target: Option<String>,
+}
+
+/// One VOS macro in the generation model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MacroModel {
+    /// Macro name in schema.
+    pub name: String,
+    /// Return type label (VOS surface).
+    pub return_type: String,
 }
 
 /// One VOS table in the generation model.
@@ -83,6 +95,9 @@ pub struct GenerationModel {
     pub schema_fingerprint: String,
     /// Tables.
     pub tables: Vec<TableModel>,
+    /// Schema macros (always emitted in generated TS regardless of backend capability).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub macros: Vec<MacroModel>,
 }
 
 impl GenerationModel {
@@ -102,31 +117,46 @@ impl GenerationModel {
     /// Build from a parsed VOS document.
     pub fn from_document(document: &Document) -> Result<Self> {
         let mut tables = Vec::new();
+        let mut macros = Vec::new();
         for item in &document.items {
-            let Item::Table(table) = item else {
-                continue;
-            };
-            let mut fields = Vec::new();
-            for field in &table.fields {
-                let (rust_ty, vos_type, optional) = map_rust_type(&field.ty)?;
-                fields.push(FieldModel {
-                    name: field.name.clone(),
-                    rust_ty,
-                    vos_type,
-                    primary: field.is_primary(),
-                    optional,
-                });
+            match item {
+                Item::Table(table) => {
+                    let mut fields = Vec::new();
+                    for field in &table.fields {
+                        let mapped = map_field_type(&field.ty)?;
+                        fields.push(FieldModel {
+                            name: field.name.clone(),
+                            rust_ty: mapped.rust_ty,
+                            vos_type: mapped.vos_type,
+                            primary: field.is_primary(),
+                            optional: mapped.optional,
+                            reference_target: mapped.reference_target,
+                        });
+                    }
+                    tables.push(TableModel {
+                        name: table.name.clone(),
+                        rust_type: table.name.clone(),
+                        fields,
+                    });
+                }
+                Item::Macro(macro_def) => {
+                    macros.push(MacroModel {
+                        name: macro_def.name.clone(),
+                        return_type: macro_def
+                            .return_ty
+                            .as_ref()
+                            .map(type_label)
+                            .unwrap_or_else(|| "unit".into()),
+                    });
+                }
+                _ => {}
             }
-            tables.push(TableModel {
-                name: table.name.clone(),
-                rust_type: table.name.clone(),
-                fields,
-            });
         }
         Ok(Self {
             generator_version: env!("CARGO_PKG_VERSION").into(),
             schema_fingerprint: fingerprint_document(document),
             tables,
+            macros,
         })
     }
 
@@ -180,40 +210,97 @@ pub fn write_rust_domain(
     Ok(target)
 }
 
-fn map_rust_type(ty: &TypeExpr) -> Result<(String, String, bool)> {
+struct MappedFieldType {
+    rust_ty: String,
+    vos_type: String,
+    optional: bool,
+    reference_target: Option<String>,
+}
+
+fn type_label(ty: &TypeExpr) -> String {
+    match ty {
+        TypeExpr::Builtin(b) => format!("{b:?}").to_ascii_lowercase(),
+        TypeExpr::Named(n) => n.clone(),
+        TypeExpr::Optional(inner) => format!("{}?", type_label(inner)),
+        TypeExpr::List(inner) => format!("[{}]", type_label(inner)),
+        TypeExpr::Reference(inner) => format!("&{}", type_label(inner)),
+        TypeExpr::Vector { dim } => format!("vector<{dim}>"),
+        TypeExpr::File => "file".into(),
+        other => format!("{other:?}"),
+    }
+}
+
+fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
     match ty {
         TypeExpr::Optional(inner) => {
-            let (inner_ty, vos, _) = map_rust_type(inner)?;
-            Ok((format!("Option<{inner_ty}>"), format!("{vos}?"), true))
+            let mut mapped = map_field_type(inner)?;
+            mapped.optional = true;
+            mapped.vos_type = format!("{}?", mapped.vos_type);
+            mapped.rust_ty = format!("Option<{}>", mapped.rust_ty);
+            Ok(mapped)
+        }
+        TypeExpr::Reference(inner) => {
+            let target = reference_target_name(inner)?;
+            Ok(MappedFieldType {
+                rust_ty: format!("{target}Ref"),
+                vos_type: format!("&{target}"),
+                optional: false,
+                reference_target: Some(target),
+            })
         }
         TypeExpr::Builtin(b) => {
-            let (rust, vos) = match b {
-                BuiltinType::Bool => ("bool", "bool"),
-                BuiltinType::I8 => ("i8", "i8"),
-                BuiltinType::I16 => ("i16", "i16"),
-                BuiltinType::I32 => ("i32", "i32"),
-                BuiltinType::I64 => ("i64", "i64"),
-                BuiltinType::U8 => ("u8", "u8"),
-                BuiltinType::U16 => ("u16", "u16"),
-                BuiltinType::U32 => ("u32", "u32"),
-                BuiltinType::U64 => ("u64", "u64"),
-                BuiltinType::F32 => ("f32", "f32"),
-                BuiltinType::F64 => ("f64", "f64"),
-                BuiltinType::Utf8 | BuiltinType::Utf16 => ("String", "utf8"),
-                BuiltinType::Uuid => ("String", "uuid"),
-                BuiltinType::Decimal => ("String", "decimal"),
-                BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => {
-                    ("String", "datetime")
-                }
-                BuiltinType::Bytes => ("Vec<u8>", "bytes"),
-                _ => {
-                    return Err(Error::UnsupportedType(format!("{b:?}")));
-                }
-            };
-            Ok((rust.into(), vos.into(), false))
+            let (rust, vos) = map_builtin(b)?;
+            Ok(MappedFieldType {
+                rust_ty: rust.into(),
+                vos_type: vos.into(),
+                optional: false,
+                reference_target: None,
+            })
         }
+        TypeExpr::Named(name) => Ok(MappedFieldType {
+            rust_ty: name.clone(),
+            vos_type: name.clone(),
+            optional: false,
+            reference_target: None,
+        }),
         other => Err(Error::UnsupportedType(format!("{other:?}"))),
     }
+}
+
+fn reference_target_name(ty: &TypeExpr) -> Result<String> {
+    match ty {
+        TypeExpr::Named(name) => Ok(name.clone()),
+        TypeExpr::Builtin(b) => Ok(format!("{b:?}").to_ascii_lowercase()),
+        other => Err(Error::UnsupportedType(format!("reference target `{other:?}`"))),
+    }
+}
+
+fn map_builtin(b: &BuiltinType) -> Result<(&'static str, &'static str)> {
+    match b {
+        BuiltinType::Bool => Ok(("bool", "bool")),
+        BuiltinType::I8 => Ok(("i8", "i8")),
+        BuiltinType::I16 => Ok(("i16", "i16")),
+        BuiltinType::I32 => Ok(("i32", "i32")),
+        BuiltinType::I64 => Ok(("i64", "i64")),
+        BuiltinType::U8 => Ok(("u8", "u8")),
+        BuiltinType::U16 => Ok(("u16", "u16")),
+        BuiltinType::U32 => Ok(("u32", "u32")),
+        BuiltinType::U64 => Ok(("u64", "u64")),
+        BuiltinType::F32 => Ok(("f32", "f32")),
+        BuiltinType::F64 => Ok(("f64", "f64")),
+        BuiltinType::Utf8 | BuiltinType::Utf16 => Ok(("String", "utf8")),
+        BuiltinType::Uuid => Ok(("String", "uuid")),
+        BuiltinType::Decimal => Ok(("String", "decimal")),
+        BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => Ok(("String", "datetime")),
+        BuiltinType::Bytes => Ok(("Vec<u8>", "bytes")),
+        _ => Err(Error::UnsupportedType(format!("{b:?}"))),
+    }
+}
+
+#[allow(dead_code)]
+fn map_rust_type(ty: &TypeExpr) -> Result<(String, String, bool)> {
+    let mapped = map_field_type(ty)?;
+    Ok((mapped.rust_ty, mapped.vos_type, mapped.optional))
 }
 
 fn fingerprint_document(document: &Document) -> String {
