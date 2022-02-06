@@ -13,8 +13,15 @@ crate-type = ["cdylib"]
 [dependencies]
 iris = { workspace = true }
 iris-generator = { workspace = true }
+iris-tools = { workspace = true }
+iris-wasm = { workspace = true }
+iris-adapter-sqlite = { workspace = true }
+iris-adapter-postgres = { workspace = true }
+iris-adapter-mysql = { workspace = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [build-dependencies]
 napi-build = { workspace = true }

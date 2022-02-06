@@ -49,6 +49,8 @@ iris = { path = "iris" }
 iris-types = { path = "iris-types" }
 iris-ir = { path = "iris-ir" }
 iris-generator = { path = "iris-generator" }
+iris-tools = { path = "iris-tools" }
+iris-wasm = { path = "iris-wasm" }
 iris-connector-yydb = { path = "iris-connector-yydb" }
 iris-connector-yyds = { path = "iris-connector-yyds" }
 iris-adapter-mysql = { path = "iris-adapter-mysql" }

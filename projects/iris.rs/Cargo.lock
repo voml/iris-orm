@@ -1411,10 +1411,17 @@ name = "iris-napi"
 version = "0.1.0"
 dependencies = [
  "iris",
+ "iris-adapter-mysql",
+ "iris-adapter-postgres",
+ "iris-adapter-sqlite",
  "iris-generator",
+ "iris-tools",
+ "iris-wasm",
  "napi",
  "napi-build",
  "napi-derive",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1451,6 +1458,7 @@ version = "0.1.0"
 dependencies = [
  "iris",
  "iris-generator",
+ "serde_json",
  "wasm-bindgen",
 ]
 
