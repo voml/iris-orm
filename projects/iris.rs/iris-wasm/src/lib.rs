@@ -5,8 +5,10 @@
 #![deny(clippy::all)]
 
 mod core;
+mod session;
 
-pub use core::{SchemaCheck, check_schema_source, iris_version};
+pub use core::{SchemaCheck, check_schema_source, introspect_schema_json, iris_version};
+pub use session::{MemorySession, execute_vos_memory};
 
 use wasm_bindgen::prelude::*;
 
@@ -70,4 +72,16 @@ impl CheckSourceResult {
 #[wasm_bindgen(js_name = checkSource)]
 pub fn check_source(source: &str) -> CheckSourceResult {
     check_schema_source(source).into()
+}
+
+/// Read-only schema introspection JSON (`GenerationModel` shape).
+#[wasm_bindgen(js_name = introspectSchema)]
+pub fn introspect_schema(source: &str) -> String {
+    introspect_schema_json(source)
+}
+
+/// Execute VOS on a fresh in-memory reference adapter; returns JSON `{ ok, rows, error }`.
+#[wasm_bindgen(js_name = executeVosMemory)]
+pub fn execute_vos(source: &str) -> String {
+    execute_vos_memory(source)
 }

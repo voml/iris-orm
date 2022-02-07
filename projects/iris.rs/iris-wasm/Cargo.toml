@@ -11,7 +11,9 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+iris = { workspace = true }
 iris-generator = { workspace = true }
+serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
