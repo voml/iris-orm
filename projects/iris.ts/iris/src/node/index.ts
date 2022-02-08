@@ -8,7 +8,9 @@
 export { checkSchemaFile } from "./check.ts";
 export { createIris, type CreateIrisNodeOptions } from "./create.ts";
 export { createIrisCli } from "./create-cli.ts";
+export { createIrisExecutor, createIrisDbBinding, createIrisBindingHost } from "./executor.ts";
+export { generateTypescriptClient } from "./generate-typescript.ts";
 export { printDoctorReport } from "./doctor.ts";
-export { loadNativeBinding, resolvePlatformPackageName, resetNativeBindingCacheForTests, type NativeBinding } from "./native.ts";
-export type { IrisNativeCheckResult, IrisNativeModule } from "./native-module.ts";
-export { loadProject } from "./project.ts";
+export { loadProject, readProjectSchema } from "./project.ts";
+export { openDatasourceSession } from "./datasource-session.ts";
+export { createIrisTooling } from "./tooling.ts";

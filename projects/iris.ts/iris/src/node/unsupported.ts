@@ -9,7 +9,5 @@ function unsupported(): never {
 export const createIris = unsupported;
 export const loadProject = unsupported;
 export const createIrisCli = unsupported;
-export const loadNativeBinding = unsupported;
-export const resolvePlatformPackageName = unsupported;
 export const checkSchemaFile = unsupported;
 export const printDoctorReport = unsupported;
