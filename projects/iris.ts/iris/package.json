@@ -19,6 +19,11 @@
         "./types": {
             "types": "./src/types/index.ts",
             "default": "./src/types/index.ts"
+        },
+        "./node/tooling": {
+            "types": "./src/node/tooling.ts",
+            "node": "./src/node/tooling.ts",
+            "default": "./src/node/unsupported.ts"
         }
     },
     "bin": {
@@ -42,8 +47,6 @@
     },
     "devDependencies": {
         "@types/node": "^22.15.0",
-        "@yydb/iris-unknown-wasm32": "workspace:*",
-        "@yydb/iris-win32-x64": "workspace:*",
         "typescript": "^5.9.2"
     },
     "engines": {
