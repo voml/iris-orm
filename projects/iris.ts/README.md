@@ -8,7 +8,8 @@ pnpm install
 pnpm run typecheck:ts
 pnpm run napi:build && pnpm run wasm:build
 pnpm run test:ts
-pnpm run iris -- --help
+pnpm run iris -- --help   # workspace 内 CLI（根 package.json script）
+# 裸 `iris` 不在 PATH；可选：pnpm exec iris / pnpm --filter @yydb/iris iris
 ```
 
 ## Publish surface
@@ -35,14 +36,18 @@ There are **no** `@yydb/iris-adapter-*` npm packages. Foreign-store lowering and
 
 | Import             | Host                       | Contents                                                                              |
 |--------------------|----------------------------|---------------------------------------------------------------------------------------|
-| `@yydb/iris`       | Browser / Worker (default) | `initIris()` → `createIris()`; WASM via `@yydb/iris-unknown-wasm32`                   |
-| `@yydb/iris/node`  | Node only                  | `createIris()`, `loadNativeBinding()`, `createIrisCli()`; non-Node → `unsupported.ts` |
-| `@yydb/iris/types` | Any (no loader)            | protocol types + `version` (no semantic `checkSource`; use bindings)                  |
+| `@yydb/iris`       | Browser / Worker (default) | `initIris()` → `createIris()` → `version()` / `checkSource()` / `openSession()` |
+| `@yydb/iris/node`  | Node only                  | `createIris()`, `loadProject()`, CLI helpers; non-Node → `unsupported.ts`       |
+| `@yydb/iris/types` | Any (no loader)            | protocol DTOs + `version` (no semantic implementations)                         |
 
 ```ts
-import type {IrisRuntime} from "@yydb/iris/types";
-import {createIris, initIris} from "@yydb/iris";
-import {createIris} from "@yydb/iris/node";
+import type { IrisRuntime } from "@yydb/iris/types";
+import { createIris, initIris } from "@yydb/iris";
+import { createIris } from "@yydb/iris/node";
+
+await initIris();
+const iris = await createIris();
+iris.checkSource(schemaSource);
 ```
 
 No `@yydb/iris/web`, `@yydb/iris/wasm`, `@yydb/iris-core`, or `@yydb/iris-adapter-*`.
