@@ -1,0 +1,243 @@
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
+import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { USER_SCHEMA, USER_SCHEMA_FINGERPRINT } from "./fixtures.ts";
+import { srcImport } from "./helpers.ts";
+
+const POST_USER_SCHEMA = `
+table User {
+    @@user_id: uuid,
+    user_name: utf8,
+}
+
+table Post {
+    @@post_id: uuid,
+    author: &User,
+    title: utf8,
+}
+`;
+
+function ensureNativeOverride(): void {
+    if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
+        return;
+    }
+    const resolveScript = fileURLToPath(new URL("../../iris-napi/scripts/resolve-platform-dir.mjs", import.meta.url));
+    const artifactOut = spawnSync(process.execPath, [resolveScript, "--artifact"], {
+        encoding: "utf8",
+    });
+    if (artifactOut.status === 0 && artifactOut.stdout.trim()) {
+        process.env.NAPI_RS_NATIVE_LIBRARY_PATH = artifactOut.stdout.trim();
+    }
+}
+
+async function loadCore(t: { skip: (msg?: string) => void }) {
+    ensureNativeOverride();
+    const node = await import(srcImport("src/node/native.ts"));
+    try {
+        return await node.loadSemanticCore();
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
+            t.skip("Node semantic core not installed");
+            return null;
+        }
+        throw error;
+    }
+}
+
+test("emitTypescriptClient writes generated db client files", async (t) => {
+    const codegen = await import(srcImport("src/codegen/emit-typescript.ts"));
+    const core = await loadCore(t);
+    if (!core) {
+        return;
+    }
+
+    const introspection = JSON.parse(core.introspectSchema(USER_SCHEMA));
+    const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-"));
+    const result = await codegen.emitTypescriptClient({ outDir, introspection });
+    assert.equal(result.files.length, 8);
+
+    const index = await readFile(join(outDir, "generated", "index.ts"), "utf8");
+    assert.match(index, /export \{ DbClient, createClient \}/);
+    assert.doesNotMatch(index, /export \{ db \}/);
+
+    const dbSource = await readFile(join(outDir, "generated", "db.ts"), "utf8");
+    assert.match(dbSource, /\$query<T = unknown>/);
+    assert.match(dbSource, /synthesizeCreate/);
+    assert.doesNotMatch(dbSource, /@yydb\/iris\/node/);
+    assert.doesNotMatch(dbSource, /include/);
+    assert.doesNotMatch(dbSource, /::insert\(\{ \.\.\. \}\)/);
+
+    const synthesize = await readFile(join(outDir, "generated", "synthesize.ts"), "utf8");
+    assert.match(synthesize, /compileWherePredicates/);
+    assert.match(synthesize, /synthesizeCreate/);
+
+    const metadata = await readFile(join(outDir, "generated", "metadata.ts"), "utf8");
+    assert.ok(metadata.includes(USER_SCHEMA_FINGERPRINT));
+});
+
+test("generated multi-table + reference client typechecks under tsc", async (t) => {
+    const codegen = await import(srcImport("src/codegen/emit-typescript.ts"));
+    const core = await loadCore(t);
+    if (!core) {
+        return;
+    }
+
+    const introspection = JSON.parse(core.introspectSchema(POST_USER_SCHEMA));
+    assert.equal(introspection.ok, true);
+
+    const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-tsc-"));
+    await codegen.emitTypescriptClient({ outDir, introspection });
+    const generatedRoot = join(outDir, "generated");
+
+    const typesRoot = fileURLToPath(new URL("../src/types", import.meta.url));
+    const stubDir = join(outDir, "stubs");
+    await mkdir(stubDir, { recursive: true });
+    await writeFile(
+        join(stubDir, "iris-types.ts"),
+        `export type IrisDbBinding = {
+  query(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<unknown>;
+  execute(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<void>;
+  close(): Promise<void>;
+};
+`,
+        "utf8",
+    );
+
+    await writeFile(
+        join(outDir, "tsconfig.generated.json"),
+        JSON.stringify(
+            {
+                compilerOptions: {
+                    target: "ES2022",
+                    module: "ESNext",
+                    moduleResolution: "bundler",
+                    strict: true,
+                    noEmit: true,
+                    skipLibCheck: true,
+                    paths: {
+                        "@yydb/iris/types": [join(stubDir, "iris-types.ts").replace(/\\/g, "/")],
+                    },
+                    baseUrl: ".",
+                },
+                include: ["./generated/**/*.ts"],
+            },
+            null,
+            2,
+        ),
+        "utf8",
+    );
+
+    // Also verify consumer usage compiles against generated types.
+    await writeFile(
+        join(generatedRoot, "consumer.ts"),
+        `import { createClient } from "./index.js";
+import type { IrisDbBinding } from "@yydb/iris/types";
+
+declare const binding: IrisDbBinding;
+const db = createClient(binding);
+
+async function run() {
+  const posts = await db.post.findMany({
+    where: {
+      author: {
+        user_name: { not: "" },
+      },
+    },
+    select: {
+      post_id: true,
+      title: true,
+      author: {
+        user_id: true,
+        user_name: true,
+      },
+    },
+  });
+  const _title: string = posts[0]!.title;
+  const _name: string = posts[0]!.author.user_name;
+  void _title;
+  void _name;
+}
+void run;
+`,
+        "utf8",
+    );
+
+    const tsc = spawnSync(
+        process.execPath,
+        [fileURLToPath(new URL("../../../../node_modules/typescript/bin/tsc", import.meta.url)), "--noEmit", "-p", join(outDir, "tsconfig.generated.json")],
+        { encoding: "utf8" },
+    );
+    if (tsc.status !== 0) {
+        // fallback: workspace typescript
+        const tsc2 = spawnSync("pnpm", ["exec", "tsc", "--noEmit", "-p", join(outDir, "tsconfig.generated.json")], {
+            encoding: "utf8",
+            cwd: fileURLToPath(new URL("../../../..", import.meta.url)),
+            shell: true,
+        });
+        assert.equal(tsc2.status, 0, tsc2.stdout + tsc2.stderr + (typesRoot ?? ""));
+        return;
+    }
+    assert.equal(tsc.status, 0, tsc.stdout + tsc.stderr);
+});
+
+test("createIrisDbBinding binds parameters through Rust", async (t) => {
+    const node = await import(srcImport("src/node/index.ts"));
+    let binding;
+    try {
+        binding = await node.createIrisDbBinding({
+            profile: "sqlite",
+            sqlitePath: ":memory:",
+            schema: USER_SCHEMA,
+        });
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
+            t.skip("Node semantic core not installed");
+            return;
+        }
+        throw error;
+    }
+
+    const rows = await binding.query("User.filter(x => x.active == $active).collect()", {
+        active: true,
+    });
+    assert.equal(Array.isArray(rows), true);
+
+    await assert.rejects(
+        () => binding.query("User.filter(x => x.active == $active).collect()", {}),
+        /unbound/i,
+    );
+
+    await binding.close();
+});
+
+test("createIrisDbBinding splits DML query and DDL execute", async (t) => {
+    const node = await import(srcImport("src/node/index.ts"));
+
+    let binding;
+    try {
+        binding = await node.createIrisDbBinding({
+            profile: "sqlite",
+            sqlitePath: ":memory:",
+            schema: USER_SCHEMA,
+        });
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
+            t.skip("Node semantic core not installed");
+            return;
+        }
+        throw error;
+    }
+
+    const rows = await binding.query("User.filter(x => x.active).collect()");
+    assert.equal(Array.isArray(rows), true);
+
+    const unit = await binding.execute("User.filter(x => x.active).collect()");
+    assert.equal(unit, undefined);
+
+    await binding.close();
+});
