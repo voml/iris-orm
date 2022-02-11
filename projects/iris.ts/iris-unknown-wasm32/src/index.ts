@@ -1,4 +1,4 @@
-import initGlue, { checkSource as glueCheckSource, irisVersion as glueIrisVersion } from "../iris.unknown-wasm32.js";
+import initGlue, * as glue from "../iris.unknown-wasm32.js";
 
 /** Result of validating a VOS / `.iris` schema source via the Rust core. */
 export interface CheckSourceResult {
@@ -26,11 +26,24 @@ type GlueCheckSourceResult = {
     free(): void;
 };
 
+type GlueMemorySession = {
+    executeVos(source: string): string;
+    close(): void;
+};
+
+const glueApi = glue as {
+    checkSource?: (source: string) => GlueCheckSourceResult;
+    irisVersion?: () => string;
+    introspectSchema?: (source: string) => string;
+    executeVosMemory?: (source: string) => string;
+    MemorySession?: new () => GlueMemorySession;
+};
+
 let ready = false;
 
 function assertReady(): void {
     if (!ready) {
-        throw new Error("@yydb/iris-unknown-wasm32: call initWasm() before irisVersion() or checkSource()");
+        throw new Error("@yydb/iris-unknown-wasm32: call initWasm() before semantic core methods");
     }
 }
 
@@ -73,7 +86,7 @@ async function normalizeInitInput(input: WasmInitInput | undefined): Promise<Was
     throw new Error(`@yydb/iris-unknown-wasm32: unsupported WASM init input (${typeof input})`);
 }
 
-/** One-time WASM init. Required before `irisVersion` / `checkSource`. */
+/** One-time WASM init. Required before semantic core methods. */
 export async function initWasm(options: InitWasmOptions = {}): Promise<void> {
     if (ready) {
         return;
@@ -86,13 +99,46 @@ export async function initWasm(options: InitWasmOptions = {}): Promise<void> {
 /** Library version (matches `iris::version()` / Cargo package version). */
 export function irisVersion(): string {
     assertReady();
-    return glueIrisVersion();
+    if (!glueApi.irisVersion) {
+        throw new Error("@yydb/iris-unknown-wasm32: irisVersion export missing; rebuild wasm artifacts");
+    }
+    return glueApi.irisVersion();
 }
 
 /** Parse and validate schema source (same semantics as `iris-tools check`). */
 export function checkSource(source: string): CheckSourceResult {
     assertReady();
-    return toCheckResult(glueCheckSource(source));
+    if (!glueApi.checkSource) {
+        throw new Error("@yydb/iris-unknown-wasm32: checkSource export missing; rebuild wasm artifacts");
+    }
+    return toCheckResult(glueApi.checkSource(source));
+}
+
+/** Read-only schema introspection JSON. */
+export function introspectSchema(source: string): string {
+    assertReady();
+    if (!glueApi.introspectSchema) {
+        throw new Error("@yydb/iris-unknown-wasm32: introspectSchema export missing; rebuild wasm artifacts");
+    }
+    return glueApi.introspectSchema(source);
+}
+
+/** Stateless in-memory execute helper. */
+export function executeVosMemory(source: string): string {
+    assertReady();
+    if (!glueApi.executeVosMemory) {
+        throw new Error("@yydb/iris-unknown-wasm32: executeVosMemory export missing; rebuild wasm artifacts");
+    }
+    return glueApi.executeVosMemory(source);
+}
+
+/** Stateful in-memory reference session. */
+export function openMemorySession(): GlueMemorySession {
+    assertReady();
+    if (!glueApi.MemorySession) {
+        throw new Error("@yydb/iris-unknown-wasm32: MemorySession export missing; rebuild wasm artifacts");
+    }
+    return new glueApi.MemorySession();
 }
 
 /** @internal Reset init gate (binding tests only). */

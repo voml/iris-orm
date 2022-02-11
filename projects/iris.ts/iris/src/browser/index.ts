@@ -7,3 +7,4 @@
 
 export { createIris, type CreateIrisBrowserOptions } from "./create.ts";
 export { initIris, type InitIrisOptions, type WasmSource } from "./wasm.ts";
+export { openLocalStore, type LocalStore, type LocalStoreBackend, type OpenLocalStoreOptions } from "./local-store.ts";

@@ -1,14 +1,15 @@
-import { IrisFacadeError } from "../types/errors.ts";
-import type { IrisRuntime } from "../types/protocol.ts";
-import { assertWasmInitialized } from "./wasm.ts";
+import type { IrisBindingHost } from "../types/binding.ts";
+import { getWasmSemanticCore } from "./wasm.ts";
+import { buildRuntime } from "../runtime/build-runtime.ts";
 
 export type CreateIrisBrowserOptions = {
     /** Inline VOS / project source for browser-only hosts. */
     source?: unknown;
 };
 
-/** Create a browser Iris runtime (WASM semantic core). Requires `initIris()` first. */
-export async function createIris(_options: CreateIrisBrowserOptions = {}): Promise<IrisRuntime> {
-    assertWasmInitialized();
-    throw new IrisFacadeError("wasm-not-implemented", "@yydb/iris: createIris is not implemented yet on the browser host");
+/**
+ * @deprecated Use generated `IrisClient` + browser executor wiring. WASM init only.
+ */
+export async function createIris(_options: CreateIrisBrowserOptions = {}): Promise<IrisBindingHost> {
+    return buildRuntime("web", getWasmSemanticCore());
 }
