@@ -157,6 +157,34 @@ export { IRIS_SCHEMA_FINGERPRINT, IRIS_GENERATOR_VERSION } from "./metadata.js";
 `;
 }
 
+function emitNodeEntry(): string {
+    return `import { createIrisDbBinding } from "@yydb/iris/node";
+import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
+import { createClient, type DbClient } from "./db.js";
+
+/** Node host: construct a generated client with N-API binding. */
+export async function createDb(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
+    return createClient(await createIrisDbBinding(options));
+}
+
+export { createClient, DbClient } from "./db.js";
+`;
+}
+
+function emitBrowserEntry(): string {
+    return `import { createBrowserIrisDbBinding } from "@yydb/iris";
+import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
+import { createClient, type DbClient } from "./db.js";
+
+/** Browser host: construct a generated client (call initIris() before createDb). */
+export async function createDb(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
+    return createClient(await createBrowserIrisDbBinding(options));
+}
+
+export { createClient, DbClient } from "./db.js";
+`;
+}
+
 async function loadSynthesizeSource(): Promise<string> {
     const here = dirname(fileURLToPath(import.meta.url));
     return await readFile(join(here, "synthesize-vos.ts"), "utf8");
@@ -180,6 +208,8 @@ export async function emitTypescriptClient(options: EmitTypescriptOptions): Prom
         "macros.ts": emitMacros(macros),
         "synthesize.ts": synthesizeSource,
         "db.ts": emitDb(options.introspection.tables),
+        "node.ts": emitNodeEntry(),
+        "browser.ts": emitBrowserEntry(),
         "index.ts": emitIndex(),
     };
 

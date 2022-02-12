@@ -59,11 +59,19 @@ test("emitTypescriptClient writes generated db client files", async (t) => {
     const introspection = JSON.parse(core.introspectSchema(USER_SCHEMA));
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-"));
     const result = await codegen.emitTypescriptClient({ outDir, introspection });
-    assert.equal(result.files.length, 8);
+    assert.equal(result.files.length, 10);
 
     const index = await readFile(join(outDir, "generated", "index.ts"), "utf8");
     assert.match(index, /export \{ DbClient, createClient \}/);
     assert.doesNotMatch(index, /export \{ db \}/);
+
+    const nodeEntry = await readFile(join(outDir, "generated", "node.ts"), "utf8");
+    assert.match(nodeEntry, /createIrisDbBinding/);
+    assert.match(nodeEntry, /export async function createDb/);
+
+    const browserEntry = await readFile(join(outDir, "generated", "browser.ts"), "utf8");
+    assert.match(browserEntry, /createBrowserIrisDbBinding/);
+    assert.match(browserEntry, /export async function createDb/);
 
     const dbSource = await readFile(join(outDir, "generated", "db.ts"), "utf8");
     assert.match(dbSource, /\$query<T = unknown>/);
@@ -104,6 +112,31 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
   execute(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<void>;
   close(): Promise<void>;
 };
+export type CreateIrisDbBindingOptions = {
+  profile?: "memory" | "sqlite" | "project";
+  sqlitePath?: string;
+  project?: string;
+  source?: string;
+  schema?: string;
+};
+`,
+        "utf8",
+    );
+    await writeFile(
+        join(stubDir, "iris-node.ts"),
+        `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
+export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
+  throw new Error("stub");
+}
+`,
+        "utf8",
+    );
+    await writeFile(
+        join(stubDir, "iris-browser.ts"),
+        `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
+export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
+  throw new Error("stub");
+}
 `,
         "utf8",
     );
@@ -121,6 +154,8 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
                     skipLibCheck: true,
                     paths: {
                         "@yydb/iris/types": [join(stubDir, "iris-types.ts").replace(/\\/g, "/")],
+                        "@yydb/iris/node": [join(stubDir, "iris-node.ts").replace(/\\/g, "/")],
+                        "@yydb/iris": [join(stubDir, "iris-browser.ts").replace(/\\/g, "/")],
                     },
                     baseUrl: ".",
                 },
