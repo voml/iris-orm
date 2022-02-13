@@ -3,80 +3,42 @@ import { buildRuntime } from "../runtime/build-runtime.ts";
 import { IrisFacadeError } from "../types/errors.ts";
 import { getWasmSemanticCore } from "./wasm.ts";
 
-/** Local Web Backend storage profile. */
-export type LocalStoreBackend = "memory" | "indexeddb" | "opfs";
+/**
+ * Local Web Backend storage profile.
+ *
+ * IndexedDB / OPFS 持久化尚未接入 WASM 执行链；在 TS Web adapter 将结构化 storage
+ * 调用提供给 Rust core 之前，公开面只允许 `memory`。
+ */
+export type LocalStoreBackend = "memory";
 
 export type OpenLocalStoreOptions = {
-    backend: LocalStoreBackend;
+    backend?: LocalStoreBackend;
     name: string;
 };
 
-/** Browser-local persistence handle (Local Web Backend; not YYDB). */
+/** Browser-local store handle (Local Web Backend; not YYDB). */
 export interface LocalStore {
     readonly backend: LocalStoreBackend;
     readonly name: string;
-    /** Open a memory-backed Iris session bound to this store profile. */
+    /** Open a WASM memory-backed Iris session (no browser persistence yet). */
     openSession(): IrisSession;
     close(): Promise<void>;
 }
 
-const IDB_NAME = "yydb-iris-local";
-const IDB_STORE = "tables";
-
-async function openIndexedDb(name: string): Promise<IDBDatabase> {
-    return await new Promise((resolve, reject) => {
-        const request = indexedDB.open(`${IDB_NAME}:${name}`, 1);
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains(IDB_STORE)) {
-                db.createObjectStore(IDB_STORE);
-            }
-        };
-        request.onerror = () => reject(request.error ?? new Error("indexedDB open failed"));
-        request.onsuccess = () => resolve(request.result);
-    });
-}
-
-async function openOpfsRoot(name: string): Promise<FileSystemDirectoryHandle> {
-    const root = await navigator.storage.getDirectory();
-    return await root.getDirectoryHandle(name, { create: true });
-}
-
-/** Open a browser Local Web Backend store (memory / IndexedDB / OPFS metadata). */
+/** Open a browser Local Web Backend store. Only `memory` is supported until persistence is wired. */
 export async function openLocalStore(options: OpenLocalStoreOptions): Promise<LocalStore> {
-    if (options.backend === "memory") {
-        return {
-            backend: "memory",
-            name: options.name,
-            openSession: () => buildRuntime("web", getWasmSemanticCore()).openSession(),
-            close: async () => {},
-        };
+    const backend = options.backend ?? "memory";
+    if (backend !== "memory") {
+        throw new IrisFacadeError(
+            "local-store-unsupported",
+            `@yydb/iris: Local Web Backend "${backend}" is not wired yet; use backend "memory"`,
+        );
     }
 
-    if (options.backend === "indexeddb") {
-        const db = await openIndexedDb(options.name);
-        return {
-            backend: "indexeddb",
-            name: options.name,
-            openSession: () => buildRuntime("web", getWasmSemanticCore()).openSession(),
-            close: async () => {
-                db.close();
-            },
-        };
-    }
-
-    if (options.backend === "opfs") {
-        if (!globalThis.navigator?.storage?.getDirectory) {
-            throw new IrisFacadeError("opfs-unavailable", "@yydb/iris: OPFS is not available in this browser host");
-        }
-        await openOpfsRoot(options.name);
-        return {
-            backend: "opfs",
-            name: options.name,
-            openSession: () => buildRuntime("web", getWasmSemanticCore()).openSession(),
-            close: async () => {},
-        };
-    }
-
-    throw new IrisFacadeError("local-store-unsupported", `@yydb/iris: unsupported local store backend ${options.backend}`);
+    return {
+        backend: "memory",
+        name: options.name,
+        openSession: () => buildRuntime("web", getWasmSemanticCore()).openSession(),
+        close: async () => {},
+    };
 }
