@@ -1,0 +1,2 @@
+export const IRIS_SCHEMA_FINGERPRINT = "<% schema_fingerprint %>";
+export const IRIS_GENERATOR_VERSION = "<% generator_version %>";

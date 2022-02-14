@@ -38,6 +38,9 @@ pub enum Error {
     /// Unsupported VOS type for the Rust emitter.
     #[error("unsupported VOS type for Rust emit: {0}")]
     UnsupportedType(String),
+    /// Unsupported generate target.
+    #[error("unsupported generate target `{0}` (use rust or typescript)")]
+    UnsupportedTarget(String),
     /// I/O while writing generated files.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -46,7 +49,11 @@ pub enum Error {
 /// Result alias.
 pub type Result<T> = std::result::Result<T, Error>;
 
+mod typescript;
+
 include!(concat!(env!("OUT_DIR"), "/aot_registry.rs"));
+
+pub use typescript::{emit_typescript_client, write_typescript_client};
 
 /// One VOS field in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -210,6 +217,30 @@ pub fn write_rust_domain(
     Ok(target)
 }
 
+/// Generate bindings for `target` (`rust` | `typescript`) under `out_dir`.
+pub fn generate(
+    model: &GenerationModel,
+    target: &str,
+    out_dir: &std::path::Path,
+) -> Result<Vec<std::path::PathBuf>> {
+    match target {
+        "rust" => Ok(vec![write_rust_domain(model, out_dir)?]),
+        "typescript" | "ts" => write_typescript_client(model, out_dir),
+        other => Err(typescript::unsupported_target(other)),
+    }
+}
+
+/// Parse schema source and generate bindings for `target`.
+pub fn generate_from_source(
+    source: &str,
+    target: &str,
+    out_dir: &std::path::Path,
+) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
+    let model = GenerationModel::from_vos_schema(source)?;
+    let paths = generate(&model, target, out_dir)?;
+    Ok((model, paths))
+}
+
 struct MappedFieldType {
     rust_ty: String,
     vos_type: String,
@@ -271,7 +302,9 @@ fn reference_target_name(ty: &TypeExpr) -> Result<String> {
     match ty {
         TypeExpr::Named(name) => Ok(name.clone()),
         TypeExpr::Builtin(b) => Ok(format!("{b:?}").to_ascii_lowercase()),
-        other => Err(Error::UnsupportedType(format!("reference target `{other:?}`"))),
+        other => Err(Error::UnsupportedType(format!(
+            "reference target `{other:?}`"
+        ))),
     }
 }
 
@@ -291,7 +324,9 @@ fn map_builtin(b: &BuiltinType) -> Result<(&'static str, &'static str)> {
         BuiltinType::Utf8 | BuiltinType::Utf16 => Ok(("String", "utf8")),
         BuiltinType::Uuid => Ok(("String", "uuid")),
         BuiltinType::Decimal => Ok(("String", "decimal")),
-        BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => Ok(("String", "datetime")),
+        BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => {
+            Ok(("String", "datetime"))
+        }
         BuiltinType::Bytes => Ok(("Vec<u8>", "bytes")),
         _ => Err(Error::UnsupportedType(format!("{b:?}"))),
     }

@@ -1,0 +1,10 @@
+import { createBrowserIrisDbBinding } from "@yydb/iris";
+import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
+import { createClient, type DbClient } from "./db.js";
+
+/** Browser host: construct a generated client (call initIris() before createDb). */
+export async function createDb(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
+    return createClient(await createBrowserIrisDbBinding(options));
+}
+
+export { createClient, DbClient } from "./db.js";
