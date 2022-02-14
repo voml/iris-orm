@@ -1,5 +1,5 @@
 /**
- * Iris CLI (`cac`) — Node-only; bin entry is `src/node/cli.ts`.
+ * Iris CLI (`cac`) — Node-only; bin entry is `bin/iris.ts`.
  */
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";

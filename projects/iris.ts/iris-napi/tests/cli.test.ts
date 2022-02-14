@@ -11,7 +11,7 @@ import { INVALID_SCHEMA, USER_SCHEMA } from "./fixtures.ts";
 
 const require = createRequire(import.meta.url);
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const irisCli = join(pkgRoot, "../iris/src/node/cli.ts");
+const irisCli = join(pkgRoot, "../iris/bin/iris.ts");
 const nodeBin = process.execPath;
 
 function ensureNativeOverride(): void {

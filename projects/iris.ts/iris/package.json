@@ -27,14 +27,15 @@
         }
     },
     "bin": {
-        "iris": "./src/node/cli.ts"
+        "iris": "./bin/iris.ts"
     },
     "files": [
+        "bin",
         "src"
     ],
     "scripts": {
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "iris": "node ./src/node/cli.ts",
+        "iris": "node ./bin/iris.ts",
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "dependencies": {

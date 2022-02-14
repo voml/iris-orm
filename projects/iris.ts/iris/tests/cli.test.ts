@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const pkgRoot = fileURLToPath(new URL("..", import.meta.url));
-const cli = join(pkgRoot, "src/node/cli.ts");
+const cli = join(pkgRoot, "bin/iris.ts");
 const nodeBin = process.execPath;
 
 function runCli(args: string[]) {

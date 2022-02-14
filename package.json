@@ -10,7 +10,7 @@
         "check:rs": "node scripts/check-rs.mjs",
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
-        "iris": "pnpm --filter @yydb/iris exec node ./src/node/cli.ts",
+        "iris": "pnpm --filter @yydb/iris exec node ./bin/iris.ts",
         "napi:build": "pnpm --filter @yydb/iris-napi build",
         "wasm:build": "pnpm --filter @yydb/iris-wasm build",
         "test:ts": "pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 --filter @yydb/iris-napi run test",
