@@ -65,16 +65,21 @@ pub struct LoadProjectResult {
     pub root: String,
     pub config: String,
     pub schema_glob: String,
+    pub generate_out: String,
+    pub generate_target: String,
 }
 
 /// Load `iris.von` from a config path.
 #[napi]
 pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
-    let (root, project) = project::load_project(Path::new(&config_path)).map_err(|e| Error::from_reason(e))?;
+    let (root, project) =
+        project::load_project(Path::new(&config_path)).map_err(|e| Error::from_reason(e))?;
     Ok(LoadProjectResult {
         root: root.display().to_string(),
         config: config_path,
         schema_glob: project.schema,
+        generate_out: project.generate.out,
+        generate_target: project.generate.target,
     })
 }
 
@@ -94,31 +99,40 @@ pub struct GenerateResult {
     pub ok: bool,
     pub output_path: String,
     pub schema_fingerprint: String,
+    pub files: Vec<String>,
     pub error: Option<String>,
 }
 
-/// Generate Rust domain bindings (same as `iris-tools generate --target rust`).
+/// Generate client bindings (`rust` | `typescript`) from merged schema source.
 #[napi]
-pub fn generate_rust(source: String, out_dir: String) -> Result<GenerateResult> {
-    match GenerationModel::from_vos_schema(&source) {
-        Ok(model) => match iris_generator::write_rust_domain(&model, Path::new(&out_dir)) {
-            Ok(path) => Ok(GenerateResult {
+pub fn generate(source: String, target: String, out_dir: String) -> Result<GenerateResult> {
+    match iris_generator::generate_from_source(&source, &target, Path::new(&out_dir)) {
+        Ok((model, paths)) => {
+            let output_path = if target == "rust" || target == "typescript" || target == "ts" {
+                if target == "rust" {
+                    out_dir
+                } else {
+                    Path::new(&out_dir).join("generated").display().to_string()
+                }
+            } else {
+                out_dir.clone()
+            };
+            Ok(GenerateResult {
                 ok: true,
-                output_path: path.display().to_string(),
+                output_path,
                 schema_fingerprint: model.schema_fingerprint,
+                files: paths
+                    .into_iter()
+                    .map(|path| path.display().to_string())
+                    .collect(),
                 error: None,
-            }),
-            Err(err) => Ok(GenerateResult {
-                ok: false,
-                output_path: String::new(),
-                schema_fingerprint: String::new(),
-                error: Some(err.to_string()),
-            }),
-        },
+            })
+        }
         Err(err) => Ok(GenerateResult {
             ok: false,
             output_path: String::new(),
             schema_fingerprint: String::new(),
+            files: vec![],
             error: Some(err.to_string()),
         }),
     }
@@ -134,7 +148,11 @@ pub struct MigratePlanResult {
 
 /// Plan a managed-push migration (same as `iris-tools migrate plan`).
 #[napi]
-pub fn migrate_plan_cmd(config_path: String, source: String, out_dir: Option<String>) -> Result<MigratePlanResult> {
+pub fn migrate_plan_cmd(
+    config_path: String,
+    source: String,
+    out_dir: Option<String>,
+) -> Result<MigratePlanResult> {
     let out = out_dir.as_deref().map(Path::new);
     match migrate_plan(Path::new(&config_path), &source, out) {
         Ok(path) => Ok(MigratePlanResult {
@@ -187,21 +205,21 @@ pub fn open_session(options: Option<OpenSessionOptions>) -> Result<MemorySession
             MemorySession::open_sqlite(path)
         }
         "postgres" => {
-            let url = opts
-                .postgres_url
-                .ok_or_else(|| Error::from_reason("open_session(profile=postgres): postgres_url is required"))?;
+            let url = opts.postgres_url.ok_or_else(|| {
+                Error::from_reason("open_session(profile=postgres): postgres_url is required")
+            })?;
             MemorySession::open_postgres(url)
         }
         "mysql" => {
-            let url = opts
-                .mysql_url
-                .ok_or_else(|| Error::from_reason("open_session(profile=mysql): mysql_url is required"))?;
+            let url = opts.mysql_url.ok_or_else(|| {
+                Error::from_reason("open_session(profile=mysql): mysql_url is required")
+            })?;
             MemorySession::open_mysql(url)
         }
         "project" => {
-            let config = opts
-                .project_config
-                .ok_or_else(|| Error::from_reason("open_session(profile=project): project_config is required"))?;
+            let config = opts.project_config.ok_or_else(|| {
+                Error::from_reason("open_session(profile=project): project_config is required")
+            })?;
             let source = opts.datasource.unwrap_or_else(|| "default".into());
             MemorySession::open_project(config, source)
         }

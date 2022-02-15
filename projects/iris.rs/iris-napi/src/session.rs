@@ -129,7 +129,8 @@ impl MemorySession {
     }
 
     pub(crate) fn open_postgres(url: String) -> Result<Self> {
-        let db = PostgresSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?;
+        let db =
+            PostgresSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?;
         Ok(Self::new_store(SessionStore::Postgres(db)))
     }
 
@@ -146,7 +147,10 @@ impl MemorySession {
             .map_err(|err| Error::from_reason(err.to_string()))?;
         let store = match ds.kind {
             DatasourceKind::Sqlite => {
-                let path = resolve_path(&project_dir, &expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?);
+                let path = resolve_path(
+                    &project_dir,
+                    &expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?,
+                );
                 SessionStore::Sqlite(
                     SqliteSource::open(path).map_err(|err| Error::from_reason(err.to_string()))?,
                 )
@@ -154,13 +158,15 @@ impl MemorySession {
             DatasourceKind::Postgres => {
                 let url = expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
                 SessionStore::Postgres(
-                    PostgresSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?,
+                    PostgresSource::connect(&url)
+                        .map_err(|err| Error::from_reason(err.to_string()))?,
                 )
             }
             DatasourceKind::Mysql => {
                 let url = expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
                 SessionStore::Mysql(
-                    MysqlSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?,
+                    MysqlSource::connect(&url)
+                        .map_err(|err| Error::from_reason(err.to_string()))?,
                 )
             }
             other => {
@@ -182,7 +188,11 @@ impl MemorySession {
     }
 
     #[napi]
-    pub fn execute_vos(&self, source: String, parameters_json: Option<String>) -> Result<ExecuteResult> {
+    pub fn execute_vos(
+        &self,
+        source: String,
+        parameters_json: Option<String>,
+    ) -> Result<ExecuteResult> {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
@@ -218,10 +228,13 @@ impl MemorySession {
         }
         match &self.store {
             SessionStore::Sqlite(db) => {
-                db.managed_push(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
+                db.managed_push(&schema)
+                    .map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
-            _ => Err(Error::from_reason("managed_push is only supported on sqlite sessions")),
+            _ => Err(Error::from_reason(
+                "managed_push is only supported on sqlite sessions",
+            )),
         }
     }
 

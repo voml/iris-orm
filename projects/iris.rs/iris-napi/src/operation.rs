@@ -33,7 +33,11 @@ pub fn encode_operation_json(json: &str) -> Result<String, String> {
 
 fn encode_operation(op: &IrisOperation) -> Result<String, String> {
     match op {
-        IrisOperation::FindMany { entity, filter, take: _ } => {
+        IrisOperation::FindMany {
+            entity,
+            filter,
+            take: _,
+        } => {
             let pipeline = match filter {
                 None => format!("{entity}.collect()"),
                 Some(pred) => format!(

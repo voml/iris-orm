@@ -7,8 +7,8 @@ use serde_json::Value as JsonValue;
 
 /// Substitute `$ident` placeholders in `source` using a JSON object of parameters.
 pub fn bind_parameters(source: &str, parameters_json: &str) -> Result<String, String> {
-    let params: JsonValue =
-        serde_json::from_str(parameters_json).map_err(|err| format!("invalid parameters JSON: {err}"))?;
+    let params: JsonValue = serde_json::from_str(parameters_json)
+        .map_err(|err| format!("invalid parameters JSON: {err}"))?;
     let obj = params
         .as_object()
         .ok_or_else(|| "parameters must be a JSON object".to_string())?;
@@ -24,7 +24,8 @@ pub fn bind_parameters(source: &str, parameters_json: &str) -> Result<String, St
                 end += 1;
             }
             if end > start {
-                let name = std::str::from_utf8(&bytes[start..end]).map_err(|err| err.to_string())?;
+                let name =
+                    std::str::from_utf8(&bytes[start..end]).map_err(|err| err.to_string())?;
                 let value = obj
                     .get(name)
                     .ok_or_else(|| format!("unbound VOS parameter `${name}`"))?;
