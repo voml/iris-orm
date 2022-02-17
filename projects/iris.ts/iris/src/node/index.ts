@@ -7,10 +7,9 @@
 
 export { checkSchemaFile } from "./check.ts";
 export { createIris, type CreateIrisNodeOptions } from "./create.ts";
-export { createIrisCli } from "./create-cli.ts";
 export { createIrisExecutor, createIrisDbBinding, createIrisBindingHost } from "./executor.ts";
-export { generateTypescriptClient } from "./generate-typescript.ts";
 export { printDoctorReport } from "./doctor.ts";
 export { loadProject, readProjectSchema } from "./project.ts";
 export { openDatasourceSession } from "./datasource-session.ts";
 export { createIrisTooling } from "./tooling.ts";
+export { irisCoreVersion, packageVersion } from "./versions.ts";
