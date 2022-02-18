@@ -13,4 +13,3 @@ export type {
     VosParameters,
 } from "./executor.ts";
 export type { IrisTooling } from "./tooling.ts";
-export { version } from "./version.ts";
