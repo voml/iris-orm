@@ -26,8 +26,7 @@ test("createIris throws wasm-not-initialized before initIris", async () => {
 
     await assert.rejects(
         () => browser.createIris(),
-        (error: unknown) =>
-            error instanceof Error && "code" in error && error.code === "wasm-not-initialized",
+        (error: unknown) => error instanceof Error && "code" in error && error.code === "wasm-not-initialized",
     );
 });
 
@@ -109,9 +108,7 @@ test("node createIris opens sqlite session via sqlitePath", async (t) => {
     }
 
     const session = runtime.openSession({ sqlitePath: ":memory:" });
-    const result = session.execute(
-        "User.filter(x => x.active).collect()",
-    );
+    const result = session.execute("User.filter(x => x.active).collect()");
     assert.equal(typeof result.ok, "boolean");
     session.close();
 });
@@ -162,7 +159,6 @@ test("@yydb/iris/node exposes host facade only", async () => {
     assert.equal("createIris" in node, true);
     assert.equal("createIrisDbBinding" in node, true);
     assert.equal("createIrisExecutor" in node, true);
-    assert.equal("generateTypescriptClient" in node, true);
     assert.equal("checkSchemaFile" in node, true);
     assert.equal("printDoctorReport" in node, true);
     assert.equal("openDatasourceSession" in node, true);

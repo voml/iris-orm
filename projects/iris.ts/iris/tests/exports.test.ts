@@ -25,10 +25,7 @@ function resolveExportMap(subpath: string, conditions: string[]) {
 }
 
 test("default export resolves to browser facade", () => {
-    const resolved = import.meta.resolve(
-        "@yydb/iris",
-        new URL("../package.json", import.meta.url).href,
-    );
+    const resolved = import.meta.resolve("@yydb/iris", new URL("../package.json", import.meta.url).href);
     assert.match(fileURLToPath(resolved), /[/\\]src[/\\]browser[/\\]/);
 });
 

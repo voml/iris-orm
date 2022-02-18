@@ -60,7 +60,7 @@ test("introspectSchema returns table metadata", () => {
 test("openMemorySession executes VOS", () => {
     const binding = loadBinding();
     const session = binding.openMemorySession();
-    const result = session.executeVos('table User { @@id: utf8, name: utf8 } select User { id, name }');
+    const result = session.executeVos("table User { @@id: utf8, name: utf8 } select User { id, name }");
     assert.equal(typeof result.ok, "boolean");
     session.close();
 });

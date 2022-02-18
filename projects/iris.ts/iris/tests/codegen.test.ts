@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { USER_SCHEMA, USER_SCHEMA_FINGERPRINT } from "./fixtures.ts";
+import { USER_SCHEMA } from "./fixtures.ts";
 import { srcImport } from "./helpers.ts";
 
 const POST_USER_SCHEMA = `
@@ -49,16 +49,15 @@ async function loadCore(t: { skip: (msg?: string) => void }) {
     }
 }
 
-test("emitTypescriptClient writes generated db client files", async (t) => {
-    const codegen = await import(srcImport("src/codegen/emit-typescript.ts"));
+test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const core = await loadCore(t);
     if (!core) {
         return;
     }
 
-    const introspection = JSON.parse(core.introspectSchema(USER_SCHEMA));
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-"));
-    const result = await codegen.emitTypescriptClient({ outDir, introspection });
+    const result = core.generate(USER_SCHEMA, "typescript", outDir);
+    assert.equal(result.ok, true);
     assert.equal(result.files.length, 10);
 
     const index = await readFile(join(outDir, "generated", "index.ts"), "utf8");
@@ -85,21 +84,18 @@ test("emitTypescriptClient writes generated db client files", async (t) => {
     assert.match(synthesize, /synthesizeCreate/);
 
     const metadata = await readFile(join(outDir, "generated", "metadata.ts"), "utf8");
-    assert.ok(metadata.includes(USER_SCHEMA_FINGERPRINT));
+    assert.ok(metadata.includes(result.schemaFingerprint));
 });
 
 test("generated multi-table + reference client typechecks under tsc", async (t) => {
-    const codegen = await import(srcImport("src/codegen/emit-typescript.ts"));
     const core = await loadCore(t);
     if (!core) {
         return;
     }
 
-    const introspection = JSON.parse(core.introspectSchema(POST_USER_SCHEMA));
-    assert.equal(introspection.ok, true);
-
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-tsc-"));
-    await codegen.emitTypescriptClient({ outDir, introspection });
+    const result = core.generate(POST_USER_SCHEMA, "typescript", outDir);
+    assert.equal(result.ok, true);
     const generatedRoot = join(outDir, "generated");
 
     const typesRoot = fileURLToPath(new URL("../src/types", import.meta.url));
@@ -167,7 +163,6 @@ export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingO
         "utf8",
     );
 
-    // Also verify consumer usage compiles against generated types.
     await writeFile(
         join(generatedRoot, "consumer.ts"),
         `import { createClient } from "./index.js";
@@ -204,17 +199,21 @@ void run;
 
     const tsc = spawnSync(
         process.execPath,
-        [fileURLToPath(new URL("../../../../node_modules/typescript/bin/tsc", import.meta.url)), "--noEmit", "-p", join(outDir, "tsconfig.generated.json")],
+        [
+            fileURLToPath(new URL("../../../../node_modules/typescript/bin/tsc", import.meta.url)),
+            "--noEmit",
+            "-p",
+            join(outDir, "tsconfig.generated.json"),
+        ],
         { encoding: "utf8" },
     );
     if (tsc.status !== 0) {
-        // fallback: workspace typescript
         const tsc2 = spawnSync("pnpm", ["exec", "tsc", "--noEmit", "-p", join(outDir, "tsconfig.generated.json")], {
             encoding: "utf8",
             cwd: fileURLToPath(new URL("../../../..", import.meta.url)),
             shell: true,
         });
-        assert.equal(tsc2.status, 0, tsc2.stdout + tsc2.stderr + (typesRoot ?? ""));
+        assert.equal(tsc2.status, 0, tsc2.stdout + tsc2.stderr + (typesRoot ?? "") + result.schemaFingerprint);
         return;
     }
     assert.equal(tsc.status, 0, tsc.stdout + tsc.stderr);
@@ -242,10 +241,7 @@ test("createIrisDbBinding binds parameters through Rust", async (t) => {
     });
     assert.equal(Array.isArray(rows), true);
 
-    await assert.rejects(
-        () => binding.query("User.filter(x => x.active == $active).collect()", {}),
-        /unbound/i,
-    );
+    await assert.rejects(() => binding.query("User.filter(x => x.active == $active).collect()", {}), /unbound/i);
 
     await binding.close();
 });
