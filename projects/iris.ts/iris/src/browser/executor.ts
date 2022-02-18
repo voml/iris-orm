@@ -8,9 +8,7 @@ import { getWasmSemanticCore } from "./wasm.ts";
  *
  * Requires prior `initIris()`. Browser host currently uses WASM in-memory ReferenceStore only.
  */
-export async function createBrowserIrisDbBinding(
-    _options: CreateIrisDbBindingOptions = {},
-): Promise<IrisDbBinding> {
+export async function createBrowserIrisDbBinding(_options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
     const session = getWasmSemanticCore().openMemorySession();
 
     return {

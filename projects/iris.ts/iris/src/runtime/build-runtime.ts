@@ -6,10 +6,7 @@ import type { IrisSession, OpenSessionOptions } from "../types/session.ts";
 import { parseExecuteJson, parseIntrospectionJson, parseRowsJson } from "./parse.ts";
 
 export type MemorySessionBinding = {
-    executeVos(
-        source: string,
-        parametersJson?: string | null,
-    ): string | { ok: boolean; rowsJson: string; error?: string | null };
+    executeVos(source: string, parametersJson?: string | null): string | { ok: boolean; rowsJson: string; error?: string | null };
     executeOperation?(operationJson: string): string | { ok: boolean; rowsJson: string; error?: string | null };
     close(): void;
     managedPush?: (schema: string) => void;
@@ -52,9 +49,7 @@ function wrapSession(binding: MemorySessionBinding): IrisSession {
         },
         executeOperation(operation: IrisOperation) {
             const json = JSON.stringify(operation);
-            const raw = binding.executeOperation
-                ? binding.executeOperation(json)
-                : binding.executeVos(json);
+            const raw = binding.executeOperation ? binding.executeOperation(json) : binding.executeVos(json);
             if (typeof raw === "string") {
                 return parseExecuteJson(raw);
             }
@@ -76,7 +71,17 @@ function wrapSession(binding: MemorySessionBinding): IrisSession {
 
 function resolveSessionBinding(host: IrisHost, core: SemanticCoreBinding, options?: OpenSessionOptions): MemorySessionBinding {
     if (host === "node" && core.openSession) {
-        const profile = options?.profile ?? (options?.sqlitePath ? "sqlite" : options?.postgresUrl ? "postgres" : options?.mysqlUrl ? "mysql" : options?.project ? "project" : "memory");
+        const profile =
+            options?.profile ??
+            (options?.sqlitePath
+                ? "sqlite"
+                : options?.postgresUrl
+                  ? "postgres"
+                  : options?.mysqlUrl
+                    ? "mysql"
+                    : options?.project
+                      ? "project"
+                      : "memory");
         return core.openSession({
             profile,
             sqlitePath: options?.sqlitePath,

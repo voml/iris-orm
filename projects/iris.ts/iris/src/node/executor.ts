@@ -5,18 +5,12 @@ import { parseExecuteJson, parseRowsJson } from "../runtime/parse.ts";
 import { loadSemanticCore } from "./native.ts";
 
 type NativeSession = {
-    executeVos(
-        source: string,
-        parametersJson?: string | null,
-    ): { ok: boolean; rowsJson: string; error?: string | null };
+    executeVos(source: string, parametersJson?: string | null): { ok: boolean; rowsJson: string; error?: string | null };
     close(): void;
     managedPush?: (schema: string) => void;
 };
 
-function openNativeSession(
-    core: Awaited<ReturnType<typeof loadSemanticCore>>,
-    options?: CreateIrisDbBindingOptions,
-): NativeSession {
+function openNativeSession(core: Awaited<ReturnType<typeof loadSemanticCore>>, options?: CreateIrisDbBindingOptions): NativeSession {
     const profile = options?.profile ?? (options?.sqlitePath ? "sqlite" : options?.project ? "project" : "memory");
     let session: NativeSession;
     if (profile === "sqlite" && core.openSqliteSession) {
@@ -32,11 +26,7 @@ function openNativeSession(
     return session;
 }
 
-function runVos(
-    session: NativeSession,
-    source: string,
-    parameters?: Readonly<Record<string, unknown>>,
-): ExecutionWireResult {
+function runVos(session: NativeSession, source: string, parameters?: Readonly<Record<string, unknown>>): ExecutionWireResult {
     // Explicit parameters object (even `{}`) goes through Rust binder so unbound `$name` fails.
     const parametersJson = parameters === undefined ? null : JSON.stringify(parameters);
     const raw = session.executeVos(source, parametersJson);

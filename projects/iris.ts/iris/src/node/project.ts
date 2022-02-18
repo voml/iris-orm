@@ -6,7 +6,13 @@ import { loadSemanticCore } from "./native.ts";
 const PROJECT_FILE = "iris.von";
 
 /** Load an on-disk Iris project directory (Node-only). */
-export async function loadProject(projectPath: string): Promise<{ readonly root: string; readonly config: string; readonly schemaGlob: string }> {
+export async function loadProject(projectPath: string): Promise<{
+    readonly root: string;
+    readonly config: string;
+    readonly schemaGlob: string;
+    readonly generateOut: string;
+    readonly generateTarget: string;
+}> {
     const core = await loadSemanticCore();
     const root = resolve(projectPath);
     const config = root.endsWith(PROJECT_FILE) ? root : resolve(root, PROJECT_FILE);
@@ -16,6 +22,8 @@ export async function loadProject(projectPath: string): Promise<{ readonly root:
             root: loaded.root,
             config: loaded.config,
             schemaGlob: loaded.schemaGlob,
+            generateOut: loaded.generateOut,
+            generateTarget: loaded.generateTarget,
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

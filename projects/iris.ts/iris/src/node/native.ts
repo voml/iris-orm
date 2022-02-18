@@ -10,12 +10,15 @@ type LoadProjectResult = {
     root: string;
     config: string;
     schemaGlob: string;
+    generateOut: string;
+    generateTarget: string;
 };
 
 type GenerateResult = {
     ok: boolean;
     outputPath: string;
     schemaFingerprint: string;
+    files: string[];
     error?: string | null;
 };
 
@@ -26,10 +29,7 @@ type MigratePlanResult = {
 };
 
 type NativeMemorySession = {
-    executeVos(
-        source: string,
-        parametersJson?: string | null,
-    ): { ok: boolean; rowsJson: string; error?: string | null };
+    executeVos(source: string, parametersJson?: string | null): { ok: boolean; rowsJson: string; error?: string | null };
     executeOperation?(operationJson: string): { ok: boolean; rowsJson: string; error?: string | null };
     close(): void;
     managedPush?: (schema: string) => void;
@@ -46,8 +46,7 @@ type OpenSessionNapiOptions = {
 
 function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
     const binding: MemorySessionBinding = {
-        executeVos: (source: string, parametersJson?: string | null) =>
-            session.executeVos(source, parametersJson ?? null),
+        executeVos: (source: string, parametersJson?: string | null) => session.executeVos(source, parametersJson ?? null),
         close: () => session.close(),
     };
     if (session.executeOperation) {
@@ -62,7 +61,7 @@ function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
 export type SemanticCore = SemanticCoreBinding & {
     loadProject(configPath: string): LoadProjectResult;
     readSchema(projectRoot: string, schemaGlob: string): string;
-    generateRust(source: string, outDir: string): GenerateResult;
+    generate(source: string, target: string, outDir: string): GenerateResult;
     migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;
 };
 
@@ -115,17 +114,13 @@ function loadModule(specifier: string): SemanticCore {
                 return wrapNativeSession(session);
             },
             openProjectSession: (configPath, source) => {
-                const session = (module.openProjectSession as (c: string, s: string) => NativeMemorySession)(
-                    configPath,
-                    source,
-                );
+                const session = (module.openProjectSession as (c: string, s: string) => NativeMemorySession)(configPath, source);
                 return wrapNativeSession(session);
             },
             loadProject: (configPath) => (module.loadProject as (p: string) => LoadProjectResult)(configPath),
-            readSchema: (projectRoot, schemaGlob) =>
-                String((module.readSchema as (r: string, g: string) => string)(projectRoot, schemaGlob)),
-            generateRust: (source, outDir) =>
-                (module.generateRust as (s: string, o: string) => GenerateResult)(source, outDir),
+            readSchema: (projectRoot, schemaGlob) => String((module.readSchema as (r: string, g: string) => string)(projectRoot, schemaGlob)),
+            generate: (source, target, outDir) =>
+                (module.generate as (s: string, t: string, o: string) => GenerateResult)(source, target, outDir),
             migratePlanCmd: (configPath, source, outDir) =>
                 (module.migratePlanCmd as (c: string, s: string, o?: string | null) => MigratePlanResult)(
                     configPath,
@@ -140,10 +135,7 @@ function loadModule(specifier: string): SemanticCore {
 }
 
 /** Whether the optional Node semantic core resolves for this host. */
-export function isNodeSemanticCoreInstalled(
-    platform: NodeJS.Platform = process.platform,
-    arch: string = process.arch,
-): boolean {
+export function isNodeSemanticCoreInstalled(platform: NodeJS.Platform = process.platform, arch: string = process.arch): boolean {
     const packageName = resolvePlatformPackage(platform, arch);
     return packageName != null && isPackageInstalled(packageName);
 }
@@ -170,10 +162,7 @@ export async function loadSemanticCore(): Promise<SemanticCore> {
 
     const packageName = resolvePlatformPackage(platform, arch);
     if (!packageName) {
-        throw new IrisFacadeError(
-            "native-unsupported-platform",
-            `@yydb/iris/node: no semantic core published for ${platform}-${arch}`,
-        );
+        throw new IrisFacadeError("native-unsupported-platform", `@yydb/iris/node: no semantic core published for ${platform}-${arch}`);
     }
     if (!isPackageInstalled(packageName)) {
         throw new IrisFacadeError(
