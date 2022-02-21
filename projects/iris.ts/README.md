@@ -38,7 +38,7 @@ There are **no** `@yydb/iris-adapter-*` npm packages. Foreign-store lowering and
 |--------------------|----------------------------|---------------------------------------------------------------------------------------|
 | `@yydb/iris`       | Browser / Worker (default) | `initIris()` → `createIris()` → `version()` / `checkSource()` / `openSession()` |
 | `@yydb/iris/node`  | Node only                  | `createIris()`, `loadProject()`, CLI helpers; non-Node → `unsupported.ts`       |
-| `@yydb/iris/types` | Any (no loader)            | protocol DTOs + `version` (no semantic implementations)                         |
+| `@yydb/iris/types` | Any (no loader)            | protocol DTOs only (no semantic implementations)                                |
 
 ```ts
 import type { IrisRuntime } from "@yydb/iris/types";
