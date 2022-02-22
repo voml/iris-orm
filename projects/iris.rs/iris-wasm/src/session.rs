@@ -27,7 +27,9 @@ fn value_to_json(value: &iris::Value) -> JsonValue {
 
 fn execute_result_json(source: &str, iris: &Iris) -> String {
     match iris.session().execute_vos(source) {
-        Ok(rows) => json!({ "ok": true, "rows": rows_to_json(rows), "error": JsonValue::Null }).to_string(),
+        Ok(rows) => {
+            json!({ "ok": true, "rows": rows_to_json(rows), "error": JsonValue::Null }).to_string()
+        }
         Err(err) => json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string(),
     }
 }

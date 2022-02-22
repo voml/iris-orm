@@ -78,15 +78,13 @@ pub fn introspect_schema_json(source: &str) -> String {
             });
             value.to_string()
         }
-        Err(err) => {
-            serde_json::json!({
-                "ok": false,
-                "generatorVersion": "",
-                "schemaFingerprint": "",
-                "tables": [],
-                "error": err.to_string(),
-            })
-            .to_string()
-        }
+        Err(err) => serde_json::json!({
+            "ok": false,
+            "generatorVersion": "",
+            "schemaFingerprint": "",
+            "tables": [],
+            "error": err.to_string(),
+        })
+        .to_string(),
     }
 }

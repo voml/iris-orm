@@ -24,9 +24,7 @@ function pickStagingFile(candidates, fallbackExt) {
         }
     }
     if (fallbackExt) {
-        const match = readdirSync(staging).find(
-            (name) => name.endsWith(fallbackExt) && !name.endsWith(`.wasm${fallbackExt}`),
-        );
+        const match = readdirSync(staging).find((name) => name.endsWith(fallbackExt) && !name.endsWith(`.wasm${fallbackExt}`));
         if (match) {
             return join(staging, match);
         }
@@ -43,12 +41,7 @@ const dtsSrc = pickStagingFile(["iris.unknown-wasm32.d.ts", "iris.d.ts"], ".d.ts
 copyFileSync(wasmSrc, wasmDest);
 
 let glue = readFileSync(jsSrc, "utf8");
-for (const oldName of [
-    "iris.unknown-wasm32_bg.wasm",
-    "iris.unknown-wasm32.wasm",
-    "iris.wasm",
-    "iris_bg.wasm",
-]) {
+for (const oldName of ["iris.unknown-wasm32_bg.wasm", "iris.unknown-wasm32.wasm", "iris.wasm", "iris_bg.wasm"]) {
     glue = glue.replaceAll(oldName, wasmPublicName);
 }
 writeFileSync(jsDest, glue);
