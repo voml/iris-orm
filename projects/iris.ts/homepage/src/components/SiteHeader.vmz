@@ -1,34 +1,38 @@
 <template>
-  <header class={headerClass}>
-    <a class="site-brand" href="/" aria-label={navHomeLabel}>
-      <span class="site-brand__mark" aria-hidden="true">◈</span>
-      {brandLabel}
-    </a>
+  <header class="site-header" data-home={home ? 'true' : 'false'}>
+    <Link href="/">
+      <span class="site-brand">
+        <Icon name="nav.home" size="sm" label={navHomeLabel} />
+        <span>{brandLabel}</span>
+      </span>
+    </Link>
     <nav class="site-nav" aria-label="Primary">
-      <a href="/" aria-current={home ? 'page' : null}>{navHomeLabel}</a>
-      <a href={docsRootHref}>{navDocsLabel}</a>
+      <Link href="/">{navHomeLabel}</Link>
+      <Link href={docsRootHref}>{navDocsLabel}</Link>
       <details class="site-language">
         <summary aria-label={selectLanguageLabel}>
-          <Icon name="tool.locale" size="sm" />
+          <Icon name="tool.ascii" size="sm" label={selectLanguageLabel} />
         </summary>
         <div class="site-language__menu">
-          <button
+          <Button
             type="button"
+            variant="ghost"
             aria-current={localeId === 'zh-hans' ? 'true' : null}
             onClick={() => this.switchLocale('zh-hans')}
           >
             {langZhLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="ghost"
             aria-current={localeId === 'en-us' ? 'true' : null}
             onClick={() => this.switchLocale('en-us')}
           >
             {langEnLabel}
-          </button>
+          </Button>
         </div>
       </details>
-      <a class="site-nav__cta" href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</a>
+      <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</Link>
     </nav>
   </header>
 </template>
@@ -48,7 +52,6 @@ import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '..
 
 export default class SiteHeader {
   home = false;
-  headerClass = 'site-header';
   localeId = 'zh-hans';
   brandLabel = '';
   navHomeLabel = '';
@@ -75,7 +78,6 @@ export default class SiteHeader {
   syncHome() {
     if (typeof window === 'undefined') return;
     this.home = window.location.pathname === '/';
-    this.headerClass = this.home ? 'site-header home' : 'site-header';
   }
 
   refreshCopy() {

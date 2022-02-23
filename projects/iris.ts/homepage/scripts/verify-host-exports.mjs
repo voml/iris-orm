@@ -2,7 +2,7 @@
 /**
  * Homepage-side check: browser VMZ app must not resolve @yydb/iris/node into the client graph.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -55,6 +55,10 @@ if (failed) {
 console.log("\nok: homepage bundler graph would not load N-API from default entry\n");
 
 const verify = join(irisPkgRoot, "scripts", "verify-exports.mjs");
+if (!existsSync(verify)) {
+    console.warn("skip: iris/scripts/verify-exports.mjs not present (homepage browser export probe passed)");
+    process.exit(0);
+}
 const run = spawnSync(process.execPath, ["--experimental-strip-types", verify], {
     stdio: "inherit",
 });

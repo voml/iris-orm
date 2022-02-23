@@ -7,9 +7,10 @@
     "license": "MPL-2.0",
     "scripts": {
         "check": "vmz check .",
-        "dev": "vmz dev .",
-        "build": "vmz build .",
-        "serve": "vmz serve .",
+        "dev": "node ./scripts/dev.mjs",
+        "build": "node ./scripts/build.mjs --release",
+        "build:debug": "node ./scripts/build.mjs",
+        "serve": "node ./scripts/serve.mjs",
         "document:check": "vmz document check . --strict",
         "verify:hosts": "node ./scripts/verify-host-exports.mjs"
     },
