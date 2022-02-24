@@ -9,69 +9,69 @@ importers:
   .:
     dependencies:
       '@vmz/core':
-        specifier: ^0.1.8
-        version: 0.1.8
+        specifier: 0.1.9
+        version: 0.1.9
       '@vmz/ui':
-        specifier: ^0.1.8
-        version: 0.1.8
+        specifier: 0.1.9
+        version: 0.1.9
       '@vmz/ui-icons':
-        specifier: ^0.1.8
-        version: 0.1.8(@vmz/ui@0.1.8)
+        specifier: 0.1.9
+        version: 0.1.9(@vmz/ui@0.1.9)
     devDependencies:
       '@vmz/plugin-markdown-it':
-        specifier: ^0.1.8
-        version: 0.1.8
+        specifier: 0.1.9
+        version: 0.1.9
       '@vmz/vmz':
-        specifier: ^0.1.8
-        version: 0.1.8(@vmz/plugin-markdown-it@0.1.8)(typescript@5.9.3)
+        specifier: 0.1.9
+        version: 0.1.9(@vmz/plugin-markdown-it@0.1.9)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
 
 packages:
 
-  '@vmz/core@0.1.8':
-    resolution: {integrity: sha512-TsjDYZXODJgYtaPRuAhhRkbOYjQD6+Z2TgDmoi+iATdQLwbF+zhT/redGMe20AKwEwfOGPbEi8xO1BVzMKxA0A==}
+  '@vmz/core@0.1.9':
+    resolution: {integrity: sha512-iCshrs55fApIRuxMCrDWvQuCaXRZ6vS2iFvqDMvzFgoFP8Lwg6pijvc9IspHcnWrPZ7vQxusWNxbvXA9ve+cmA==}
 
-  '@vmz/plugin-markdown-it@0.1.8':
-    resolution: {integrity: sha512-PlOAQZSgJxUd6FFhJeslFFbmmiSuGxSX0FtoQfiU8uNcuniofiyC0XcUuJ6okd5t7+TEhQGr4D9zKlPnSalsMg==}
+  '@vmz/plugin-markdown-it@0.1.9':
+    resolution: {integrity: sha512-0KO1+HK4Zj+4g5pn8vtW/rIkjfTtGBPSao2Vc179fKiEhyxVhJfl7SjERj8RdBDxRdfwCUTD89GkwVEozA06Pg==}
 
-  '@vmz/plugin@0.1.8':
-    resolution: {integrity: sha512-mqJaR6Xznqf1J+j21EE+s3U3XsgeNvfExoL2hbBXPWLWWgIyvy8sstSKI49A5EK2vBClfZ4psxD7j2O/VDfdKw==}
+  '@vmz/plugin@0.1.9':
+    resolution: {integrity: sha512-KVjKsHkTHXTTOy2Wlm7SgWdJsnSvISsnN1wOB3qHCp4kev6Sn8N/avdeq/tuPI/VGcAzYdjEEiM9Zp2SAusePA==}
 
-  '@vmz/protocol@0.1.8':
-    resolution: {integrity: sha512-eLL7FSp86vVD4nPbd03HytXY1/MagIiuPRUq4CK2wVVvzEfTIzK7FHlgOtvZKWpGqBXPdrh/B1JL03aseM583A==}
+  '@vmz/protocol@0.1.9':
+    resolution: {integrity: sha512-7g+lTjSDEJq9b4bNIU4wXmFuk/Jsdh1RNw47hWEKdPeHeXtz1wYNyUdjzItbZnhioC9zErFnY5TWb08GfCOn/g==}
     engines: {node: '>=20'}
 
-  '@vmz/ui-icons@0.1.8':
-    resolution: {integrity: sha512-ZT4WCgeajpTRXWnAwrW5V844VV2HqiRvjHfyRq2ihIB+G0NOZqgwbREFa36wmQd9pjyijttX27bPvSJH70ailQ==}
+  '@vmz/ui-icons@0.1.9':
+    resolution: {integrity: sha512-j5SSpLtNRs7XdG2Ok4R0HsxVHeu1hqm+LPD27+TJrNxq2fUYOmAeJO5okWFW5kjQgllRNEFLCJ7YOGk1YzvQdw==}
     peerDependencies:
-      '@vmz/ui': 0.1.8
+      '@vmz/ui': 0.1.9
 
-  '@vmz/ui@0.1.8':
-    resolution: {integrity: sha512-Da7jfDxyC4jxM5NpM0QrSF9VwJ2fbduMG/D/fi9K+WvmqKSSuF/xANJX9YG9XtXcey2lgzTrbb2E1Vw5dHj76Q==}
+  '@vmz/ui@0.1.9':
+    resolution: {integrity: sha512-xpe2x7XtGRI5Nu5koDZEl5Y9GXhaR0r/eZwQDhp5Fp7RMUQmUarmvJRP5CRJNN2NYZ7yVfHblvtD4pMoiABfmA==}
 
-  '@vmz/vmz-darwin-arm64@0.1.8':
-    resolution: {integrity: sha512-UjY/gamymMpTX1hz+SSK/86ZEuhyJjFlwUvPfwS70IzYbEmZfR3YWGlgNQQmpD6O7js8MCxzsMBcpoR0KsMADQ==}
+  '@vmz/vmz-darwin-arm64@0.1.9':
+    resolution: {integrity: sha512-rPGPzSp9POF7Z9yFwYLk5ch22jpeO+uyD6/MxKTXpDgLga3wDhszg6m3Gtw6y4Xhp07U8f/i8A7D5RGl21jQZw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@vmz/vmz-linux-x64@0.1.8':
-    resolution: {integrity: sha512-QyoXeQpN7ftSL3dgu/a/YOs/y4G/u/VTtIMOEsvCZsGdRDiQGW7N1WtFEPactctyzlBs0txjjdSBLr65xVu2mQ==}
+  '@vmz/vmz-linux-x64@0.1.9':
+    resolution: {integrity: sha512-ixYLfyzwWX2ECWAh7qV77jYvDxEoh3HFC2g/blD4n0QExrwkJNYX2ZjuDcC7rKG4FQX8W3lckAnYh0MI05lmsQ==}
     cpu: [x64]
     os: [linux]
 
-  '@vmz/vmz-win32-x64@0.1.8':
-    resolution: {integrity: sha512-qNXReC9//sfzAnduVqlmpOh+AdIg55nZyZN5LbbsLq2O9xLATdDIu7Ypxt+yWxprWan1nPBVM5m4a16RcXoKVA==}
+  '@vmz/vmz-win32-x64@0.1.9':
+    resolution: {integrity: sha512-DJ2Xjn9a1rEUmVBs47tMhVjN2UGjIrhHSxLx7r39uB1AjS5bGlAz5PS5H8YePBkQCQF952p3TFtyuRMAyzwxzQ==}
     cpu: [x64]
     os: [win32]
 
-  '@vmz/vmz@0.1.8':
-    resolution: {integrity: sha512-bYcwXV7AnshV9WQv+YtlaVgJw/sHB3pGuguQqcdIcK2U1zDhGzvl47GpA5Ig/evEo3ZpWg/WC+6eTMrwKadvsQ==}
+  '@vmz/vmz@0.1.9':
+    resolution: {integrity: sha512-LZyyNduLN/Y6K/sXkgS2muaQhnsNSrwDOoDgt6v4tRFch05MEbwdSr7uvKOlt+oQAg2KNf06LHzxxCgTYvhrBw==}
     hasBin: true
     peerDependencies:
-      '@vmz/plugin-markdown-it': 0.1.8
-      '@vmz/test': 0.1.8
+      '@vmz/plugin-markdown-it': 0.1.9
+      '@vmz/test': 0.1.9
       typescript: ^5.8.3
     peerDependenciesMeta:
       '@vmz/plugin-markdown-it':
@@ -195,50 +195,50 @@ packages:
 
 snapshots:
 
-  '@vmz/core@0.1.8':
+  '@vmz/core@0.1.9':
     dependencies:
       linkedom: 0.18.13
     transitivePeerDependencies:
       - canvas
 
-  '@vmz/plugin-markdown-it@0.1.8':
+  '@vmz/plugin-markdown-it@0.1.9':
     dependencies:
-      '@vmz/plugin': 0.1.8
+      '@vmz/plugin': 0.1.9
       markdown-it: 14.3.0
 
-  '@vmz/plugin@0.1.8':
+  '@vmz/plugin@0.1.9':
     dependencies:
-      '@vmz/protocol': 0.1.8
+      '@vmz/protocol': 0.1.9
 
-  '@vmz/protocol@0.1.8': {}
+  '@vmz/protocol@0.1.9': {}
 
-  '@vmz/ui-icons@0.1.8(@vmz/ui@0.1.8)':
+  '@vmz/ui-icons@0.1.9(@vmz/ui@0.1.9)':
     dependencies:
-      '@vmz/ui': 0.1.8
+      '@vmz/ui': 0.1.9
 
-  '@vmz/ui@0.1.8': {}
+  '@vmz/ui@0.1.9': {}
 
-  '@vmz/vmz-darwin-arm64@0.1.8':
+  '@vmz/vmz-darwin-arm64@0.1.9':
     optional: true
 
-  '@vmz/vmz-linux-x64@0.1.8':
+  '@vmz/vmz-linux-x64@0.1.9':
     optional: true
 
-  '@vmz/vmz-win32-x64@0.1.8':
+  '@vmz/vmz-win32-x64@0.1.9':
     optional: true
 
-  '@vmz/vmz@0.1.8(@vmz/plugin-markdown-it@0.1.8)(typescript@5.9.3)':
+  '@vmz/vmz@0.1.9(@vmz/plugin-markdown-it@0.1.9)(typescript@5.9.3)':
     dependencies:
-      '@vmz/core': 0.1.8
-      '@vmz/plugin': 0.1.8
-      '@vmz/protocol': 0.1.8
+      '@vmz/core': 0.1.9
+      '@vmz/plugin': 0.1.9
+      '@vmz/protocol': 0.1.9
       jiti: 2.7.0
       json5: 2.2.3
     optionalDependencies:
-      '@vmz/plugin-markdown-it': 0.1.8
-      '@vmz/vmz-darwin-arm64': 0.1.8
-      '@vmz/vmz-linux-x64': 0.1.8
-      '@vmz/vmz-win32-x64': 0.1.8
+      '@vmz/plugin-markdown-it': 0.1.9
+      '@vmz/vmz-darwin-arm64': 0.1.9
+      '@vmz/vmz-linux-x64': 0.1.9
+      '@vmz/vmz-win32-x64': 0.1.9
       typescript: 5.9.3
     transitivePeerDependencies:
       - canvas

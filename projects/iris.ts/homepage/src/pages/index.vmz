@@ -58,8 +58,8 @@ import {
   pipelineWasm,
   pipelineNote,
 } from '#locales/common';
-import { githubUrl } from '../lib/site.ts';
-import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.ts';
+import { githubUrl } from '../lib/site.js';
+import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.js';
 
 export default class IndexPage {
   heroKickerLabel = '';
@@ -131,7 +131,8 @@ export default class IndexPage {
   }
 
   go(href) {
-    if (typeof window !== 'undefined') window.location.assign(href);
+    const loc = typeof window !== 'undefined' ? window.location : null;
+    if (loc && typeof loc.assign === 'function') loc.assign(href);
   }
 }
 </script>

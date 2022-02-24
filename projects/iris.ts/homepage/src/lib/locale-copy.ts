@@ -1,6 +1,6 @@
 /** Shared homepage locale helpers for #locales message refresh after LocaleTransition. */
 
-import { docsHomePath } from "./site.ts";
+import { docsHomePath } from "./site.js";
 
 export type LocaleId = "zh-hans" | "en-us" | string;
 

@@ -1,8 +1,8 @@
 # Iris homepage (`@yydb/iris-homepage`)
 
-Official Iris ORM site — [VMZ](https://github.com/vmz-framework/vmz-framework) **0.1.8** stack:
+Official Iris ORM site — [VMZ](https://github.com/vmz-framework/vmz-framework) **0.1.9** stack:
 
-- `@vmz/core`, `@vmz/ui`, `@vmz/ui-icons`, `@vmz/plugin-markdown-it`, `@vmz/vmz` (CLI)
+- `@vmz/core`, `@vmz/ui`, `@vmz/ui-icons`, `@vmz/vmz` (CLI); `@vmz/plugin-markdown-it` (dev — document integrate only)
 
 ## Commands
 
@@ -16,7 +16,7 @@ pnpm --filter @yydb/iris-homepage document:check
 pnpm run verify:homepage-hosts
 ```
 
-Build uses delivery profile `web-static` (`vmz.config.ts`). Output folder is **`dist/cdn`** — a vendor-agnostic static artifact for any CDN / Pages host (Cloudflare, Netlify, …).
+Build uses delivery profile **`static`** (`static-cdn` assembly, `vmz.config.ts`). Output folder is **`dist/cdn`** — upload to any CDN / static host (Cloudflare Pages, Netlify, …).
 
 ```text
 dist/cdn/    # upload this tree to CDN / static hosting
@@ -44,7 +44,7 @@ Do **not** enable SPA fallback — routes are pre-rendered HTML.
 
 | Scenario | Rule |
 |----------|------|
-| CI / commits | **npm registry only** — `^0.1.8` in `package.json`, lock resolves registry tarballs |
+| CI / commits | **npm registry only** — pin `@vmz/*@0.1.9`, lock resolves registry tarballs |
 | Local VMZ bugfix | Temporary `pnpm link` or `file:` **on your machine only** — never commit linked `package.json` / lock |
 | After local test | Restore npm deps and re-run `check` + `build` before push |
 
