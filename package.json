@@ -14,8 +14,9 @@
         "napi:build": "pnpm --filter @yydb/iris-napi build",
         "wasm:build": "pnpm --filter @yydb/iris-wasm build",
         "test:ts": "pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 --filter @yydb/iris-napi run test",
+        "homepage": "pnpm --filter @yydb/iris-homepage build",
         "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
-        "homepage:build": "pnpm --filter @yydb/iris-homepage build",
+        "homepage:build": "pnpm homepage",
         "homepage:check": "pnpm --filter @yydb/iris-homepage check",
         "verify:homepage-hosts": "pnpm --filter @yydb/iris-homepage run verify:hosts"
     },
