@@ -2,6 +2,15 @@
     "name": "@yydb/iris",
     "version": "0.1.0",
     "description": "Iris ORM — TypeScript facade + iris CLI for VOS data access",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/iris.ts/iris"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
     "type": "module",
     "license": "MPL-2.0",
     "sideEffects": false,

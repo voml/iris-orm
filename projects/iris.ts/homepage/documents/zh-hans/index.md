@@ -21,4 +21,5 @@ Iris 是 **VOS 数据访问层**：不是数据库，也不是新的 schema 语�
 
 ## 仓库
 
-- [iris-orm on GitHub](https://github.com/yy-database/iris-orm)
+- [官方网站](https://iris-orm.pages.dev/)
+- [GitHub：iris-orm](https://github.com/voml/iris-orm)

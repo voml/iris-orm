@@ -3,6 +3,15 @@
     "name": "@yydb/iris-homepage",
     "version": "0.0.0",
     "description": "Iris ORM official site — VMZ homepage + documents at /d/",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/iris.ts/homepage"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
     "type": "module",
     "license": "MPL-2.0",
     "scripts": {

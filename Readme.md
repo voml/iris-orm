@@ -1,5 +1,7 @@
 # Iris ORM
 
+**Site:** [iris-orm.pages.dev](https://iris-orm.pages.dev/) · **Repo:** [github.com/voml/iris-orm](https://github.com/voml/iris-orm)
+
 Iris is the **VOS data-access layer** for backend applications. It is not a
 database and not a new schema language.
 
@@ -76,7 +78,7 @@ projects/iris.ts/
   iris-napi/            private napi-rs build workspace
   iris-wasm/            private wasm-pack build workspace
   iris-skills/          @yydb/iris-skills
-  homepage/             official site
+  homepage/             official site → https://iris-orm.pages.dev/
 ```
 
 VOS language sources are **not** vendored. The Rust workspace depends on the
