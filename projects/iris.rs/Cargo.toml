@@ -23,6 +23,7 @@ edition = "2024"
 authors = ["Yggdrasill Team <192607617@qq.com>"]
 license = "MPL-2.0"
 repository = "https://github.com/voml/iris-orm"
+homepage = "https://iris-orm.pages.dev/"
 
 [workspace.dependencies]
 # Public VOS/VON/YYDB — git `dev` only (CI / Docker; no sibling path checkouts).
