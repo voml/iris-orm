@@ -2,12 +2,12 @@
 /**
  * Build Iris homepage → dist/<target>/ (default: dist/cdn).
  *
- * VMZ delivery profile (web-static) is the build contract; `cdn` is the
- * upload-facing folder name (any static host / CDN).
+ * VMZ delivery profile (`static` / static-cdn) is the build contract; `cdn` is
+ * the upload-facing folder name (any static host / CDN).
  *
  * Usage:
- *   node scripts/build.mjs [--release] [--target cdn] [--profile web-static]
- *   VMZ_OUT_TARGET=cdn VMZ_PROFILE=web-static node scripts/build.mjs --release
+ *   node scripts/build.mjs [--release] [--target cdn] [--profile static]
+ *   VMZ_OUT_TARGET=cdn VMZ_PROFILE=static node scripts/build.mjs --release
  */
 import { distDirForTarget, DEFAULT_OUT_TARGET, readDefaultProfile } from "./profile-out-dir.mjs";
 import { runVmz } from "./run-vmz.mjs";

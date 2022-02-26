@@ -4,7 +4,7 @@
  *
  * - target `cdn` = static artifact for any CDN / object storage
  *   (Cloudflare Pages, Netlify, GitHub Pages, … — vendor-agnostic)
- * - VMZ --profile stays `web-static` (delivery contract), not the folder name
+ * - VMZ --profile stays `static` (delivery contract), not the folder name
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -23,7 +23,7 @@ export function readDefaultProfile() {
     } catch {
         /* fall through */
     }
-    return "web-static";
+    return "static";
 }
 
 /** dist/<target> — e.g. dist/cdn */

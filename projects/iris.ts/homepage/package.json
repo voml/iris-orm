@@ -15,13 +15,13 @@
         "verify:hosts": "node ./scripts/verify-host-exports.mjs"
     },
     "dependencies": {
-        "@vmz/core": "^0.1.8",
-        "@vmz/ui": "^0.1.8",
-        "@vmz/ui-icons": "^0.1.8"
+        "@vmz/core": "0.1.9",
+        "@vmz/ui": "0.1.9",
+        "@vmz/ui-icons": "0.1.9"
     },
     "devDependencies": {
-        "@vmz/plugin-markdown-it": "^0.1.8",
-        "@vmz/vmz": "^0.1.8",
+        "@vmz/plugin-markdown-it": "0.1.9",
+        "@vmz/vmz": "0.1.9",
         "typescript": "^5.9.2"
     }
 }

@@ -47,8 +47,8 @@ import {
   langZh,
   langEn,
 } from '#locales/common';
-import { githubUrl } from '../lib/site.ts';
-import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.ts';
+import { githubUrl } from '../lib/site.js';
+import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.js';
 
 export default class SiteHeader {
   home = false;
@@ -76,8 +76,10 @@ export default class SiteHeader {
   }
 
   syncHome() {
-    if (typeof window === 'undefined') return;
-    this.home = window.location.pathname === '/';
+    // static-cdn SSR may define `window` without `location`
+    const loc = typeof window !== 'undefined' ? window.location : null;
+    if (!loc || typeof loc.pathname !== 'string') return;
+    this.home = loc.pathname === '/';
   }
 
   refreshCopy() {
