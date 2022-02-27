@@ -1,7 +1,7 @@
 {
     "name": "@yydb/iris",
     "version": "0.1.0",
-    "description": "Iris ORM — TypeScript facade + iris CLI for VOS data access",
+    "description": "Iris ORM — TypeScript facade + iris CLI. Rust semantic core via N-API / WASM. Site: https://iris-orm.pages.dev/",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {
         "type": "git",
