@@ -1,5 +1,7 @@
 # Iris TypeScript (`projects/iris.ts`)
 
+**Site:** [iris-orm.pages.dev](https://iris-orm.pages.dev/)
+
 Packages under this tree are **members of the repo-root pnpm workspace**
 (`iris-orm/pnpm-workspace.yaml` → `projects/iris.ts/*`). Install from the repository root:
 
@@ -16,7 +18,7 @@ pnpm run iris -- --help   # workspace 内 CLI（根 package.json script）
 
 | Package                     | Role                                                                |
 |-----------------------------|---------------------------------------------------------------------|
-| `@yydb/iris-homepage`       | VMZ official site (`projects/iris.ts/homepage`)                     |
+| `@yydb/iris-homepage`       | VMZ official site — [iris-orm.pages.dev](https://iris-orm.pages.dev/) |
 | `@yydb/iris`                | Host facade (browser default + `/node` + `/types`) + **`iris` CLI** |
 | `@yydb/iris-win32-x64`      | Optional Windows x64 N-API binary                                   |
 | `@yydb/iris-linux-x64`      | Optional Linux x64 N-API binary                                     |
