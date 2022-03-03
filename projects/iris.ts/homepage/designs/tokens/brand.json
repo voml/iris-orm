@@ -1,45 +1,45 @@
 {
     "brand": {
-        "primary": "#0d7a62",
-        "energy": "#6ee7b7"
+        "primary": "#B8860B",
+        "energy": "#0F172A"
     },
     "scale": {
-        "50": "#ecfdf5",
-        "100": "#d1fae5",
-        "200": "#a7f3d0",
-        "300": "#6ee7b7",
-        "400": "#34d399",
-        "500": "#10b981",
-        "600": "#059669",
-        "700": "#047857",
-        "800": "#065f46",
-        "900": "#064e3b",
-        "950": "#022c22"
+        "50": "#faf8f3",
+        "100": "#f3ebe0",
+        "200": "#e8dcc8",
+        "300": "#d9c49a",
+        "400": "#c9a86a",
+        "500": "#B8860B",
+        "600": "#9a7209",
+        "700": "#7a5a07",
+        "800": "#5c4305",
+        "900": "#3d2c03",
+        "950": "#221801"
     },
     "surface": {
-        "paper": "#fafffc",
-        "mist": "#ecfdf5",
-        "page": "#f6fbf8",
-        "ink": "#0f241c",
-        "graphite": "#4b6358"
+        "paper": "#fffdf8",
+        "mist": "#f8f4ec",
+        "page": "#fbf7ef",
+        "ink": "#0F172A",
+        "graphite": "#475569"
     },
     "text": {
-        "ink": "#0f241c",
-        "steel": "#4b6358",
-        "on-brand": "#ffffff",
-        "on-ink": "#fafffc"
+        "ink": "#0F172A",
+        "steel": "#475569",
+        "on-brand": "#fffdf8",
+        "on-ink": "#f8fafc"
     },
     "line": {
-        "default": "#cce8dc",
-        "subtle": "#e8f5ef",
-        "strong": "#047857"
+        "default": "#e2d5c0",
+        "subtle": "#f0e8da",
+        "strong": "#7a5a07"
     },
     "status": {
-        "success": "#10b981",
-        "warning": "#f59e0b",
-        "error": "#ef4444",
-        "analysis": "#0d7a62",
-        "runtime": "#047857"
+        "success": "#059669",
+        "warning": "#d97706",
+        "error": "#dc2626",
+        "analysis": "#B8860B",
+        "runtime": "#7a5a07"
     },
     "font": {
         "sans": "\"Noto Sans SC\", \"Inter Tight\", \"Microsoft YaHei\", sans-serif",
