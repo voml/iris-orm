@@ -1,0 +1,185 @@
+<template>
+  <div class="site playground-page">
+    <SiteHeader />
+    <main class="playground">
+      <header class="playground__intro">
+        <Badge tone="brand">{eyebrowLabel}</Badge>
+        <h1>{titleLabel}</h1>
+        <p class="playground__lede">{ledeLabel}</p>
+      </header>
+
+      <div class="playground__grid">
+        <section class="playground__panel" aria-labelledby="schema-label">
+          <TextArea
+            label={schemaLabel}
+            controlId="iris-playground-schema"
+            descriptionId="iris-playground-schema-desc"
+            value={schemaSource}
+            rows={10}
+            onInput={(e) => this.onSchemaInput(e)}
+          />
+        </section>
+        <section class="playground__panel" aria-labelledby="dml-label">
+          <TextArea
+            label={dmlLabel}
+            controlId="iris-playground-dml"
+            descriptionId="iris-playground-dml-desc"
+            value={dmlSource}
+            rows={6}
+            onInput={(e) => this.onDmlInput(e)}
+          />
+        </section>
+      </div>
+
+      <div class="playground__actions">
+        <Button type="button" disabled={busy} onClick={() => this.run()}>{runLabel}</Button>
+        <Button type="button" variant="ghost" disabled={busy} onClick={() => this.reset()}>{resetLabel}</Button>
+        <p class="playground__status" if={statusText}>{statusText}</p>
+      </div>
+
+      <section class="playground__output" aria-labelledby="output-label">
+        <h2 id="output-label">{outputLabel}</h2>
+        <pre class="playground__pre">{outputText}</pre>
+        <p class="playground__note">{sqlNoteLabel}</p>
+      </section>
+    </main>
+    <SiteFooter />
+  </div>
+</template>
+
+<script client>
+import {
+  playgroundEyebrow,
+  playgroundTitle,
+  playgroundLede,
+  playgroundSchemaLabel,
+  playgroundDmlLabel,
+  playgroundOutputLabel,
+  playgroundRunLabel,
+  playgroundResetLabel,
+  playgroundSqlNote,
+  playgroundWasmLoading,
+  playgroundWasmError,
+} from '#locales/common';
+import { initIris, createIris } from '@yydb/iris';
+import { SAMPLE_SCHEMA, SAMPLE_DML } from '../lib/playground-samples.js';
+import { readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.js';
+import { DEFAULT_LOCALE, bootLocaleCopy } from '../lib/boot-locale.js';
+
+function playgroundCopy(localeId) {
+  return bootLocaleCopy(localeId, () => ({
+    eyebrowLabel: playgroundEyebrow(),
+    titleLabel: playgroundTitle(),
+    ledeLabel: playgroundLede(),
+    schemaLabel: playgroundSchemaLabel(),
+    dmlLabel: playgroundDmlLabel(),
+    outputLabel: playgroundOutputLabel(),
+    runLabel: playgroundRunLabel(),
+    resetLabel: playgroundResetLabel(),
+    sqlNoteLabel: playgroundSqlNote(),
+    loadingLabel: playgroundWasmLoading(),
+    errorLabel: playgroundWasmError(),
+  }));
+}
+
+const boot = playgroundCopy(DEFAULT_LOCALE);
+
+export default class PlaygroundPage {
+  eyebrowLabel = boot.eyebrowLabel;
+  titleLabel = boot.titleLabel;
+  ledeLabel = boot.ledeLabel;
+  schemaLabel = boot.schemaLabel;
+  dmlLabel = boot.dmlLabel;
+  outputLabel = boot.outputLabel;
+  runLabel = boot.runLabel;
+  resetLabel = boot.resetLabel;
+  sqlNoteLabel = boot.sqlNoteLabel;
+  loadingLabel = boot.loadingLabel;
+  errorLabel = boot.errorLabel;
+
+  schemaSource = SAMPLE_SCHEMA;
+  dmlSource = SAMPLE_DML;
+  outputText = '';
+  statusText = '';
+  busy = false;
+  runtimeReady = false;
+  _unwatchLocale = null;
+
+  async onMount() {
+    this.applyLocaleCopy();
+    this._unwatchLocale = watchDocumentLocale((id) => this.applyLocaleCopy(id));
+    this.statusText = this.loadingLabel;
+    try {
+      await initIris();
+      await createIris();
+      this.runtimeReady = true;
+      this.statusText = '';
+      this.outputText = this.formatJson({ hint: 'Paste schema + DML, then Run.' });
+    } catch {
+      this.runtimeReady = false;
+      this.statusText = this.errorLabel;
+      this.outputText = '';
+    }
+  }
+
+  onDestroy() {
+    if (typeof this._unwatchLocale === 'function') this._unwatchLocale();
+    this._unwatchLocale = null;
+  }
+
+  applyLocaleCopy(preferred) {
+    withLocaleHint(readLocaleId(preferred), () => {
+      Object.assign(this, playgroundCopy(readLocaleId(preferred)));
+    });
+  }
+
+  onSchemaInput(e) {
+    this.schemaSource = e?.target?.value ?? this.schemaSource;
+  }
+
+  onDmlInput(e) {
+    this.dmlSource = e?.target?.value ?? this.dmlSource;
+  }
+
+  reset() {
+    this.schemaSource = SAMPLE_SCHEMA;
+    this.dmlSource = SAMPLE_DML;
+    this.outputText = this.formatJson({ reset: true });
+    this.statusText = '';
+  }
+
+  async run() {
+    if (!this.runtimeReady || this.busy) return;
+    this.busy = true;
+    this.statusText = '';
+    try {
+      await initIris();
+      const runtime = await createIris();
+      const check = runtime.checkSource(this.schemaSource);
+      const intro = runtime.introspectSchema(this.schemaSource);
+      const session = runtime.openSession();
+      const exec = session.execute(this.dmlSource);
+      session.close();
+      this.outputText = this.formatJson({
+        schema: check,
+        introspection: intro,
+        dml: exec,
+      });
+    } catch (err) {
+      this.outputText = this.formatJson({
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  formatJson(value) {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+}
+</script>
