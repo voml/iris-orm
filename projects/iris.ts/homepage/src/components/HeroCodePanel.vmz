@@ -1,0 +1,26 @@
+<template>
+  <aside class="hero-panel" aria-label={caption}>
+    <div class="hero-panel__head">
+      <p class="hero-panel__caption">{caption}</p>
+      <button type="button" class="hero-panel__copy" onClick={() => this.copy()}>{copyLabel}</button>
+    </div>
+    <Code code={code} lang="typescript" theme="github-dark" />
+  </aside>
+</template>
+
+<script client>
+export default class HeroCodePanel {
+  code = '';
+  caption = '';
+  copyLabel = 'Copy';
+
+  async copy() {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(this.code);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+</script>
