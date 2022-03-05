@@ -1,42 +1,86 @@
 <template>
-  <footer class="site-footer">
+  <footer class="site-footer" data-vmz-fixture="site-footer">
+    <div class="site-footer__accent" aria-hidden="true"></div>
     <div class="site-footer__inner">
-      <div>
-        <p class="site-footer__tag">
-          <Icon name="nav.home" size="sm" label={footerTagLabel} />
-          {footerTagLabel}
-        </p>
-        <p>{footerCopyrightLabel}</p>
+      <div class="site-footer__brand">
+        <p class="site-footer__mark">{brandFullLabel}</p>
+        <p class="site-footer__tagline">{footerTagLabel}</p>
+        <p class="site-footer__scope">{footerScopeLabel}</p>
+        <p class="site-footer__copy">{footerCopyrightLabel}</p>
       </div>
-      <nav class="site-footer__nav" aria-label="Footer">
-        <Link href={docsRootHref}>{navDocsLabel}</Link>
-        <Link href={guideHref}>{ctaInstallLabel}</Link>
-        <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</Link>
-      </nav>
+      <div class="site-footer__columns">
+        <div class="site-footer__col">
+          <p class="site-footer__col-title">{footerColProductLabel}</p>
+          <nav class="site-footer__nav" aria-label="Product">
+            <Link href="/playground">{navPlaygroundLabel}</Link>
+            <Link href={docsRootHref}>{navDocsLabel}</Link>
+            <Link href={guideHref}>{footerGuideLabel}</Link>
+          </nav>
+        </div>
+        <div class="site-footer__col">
+          <p class="site-footer__col-title">{footerColProjectLabel}</p>
+          <nav class="site-footer__nav" aria-label="Project">
+            <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</Link>
+          </nav>
+        </div>
+      </div>
     </div>
   </footer>
 </template>
 
 <script client>
 import {
+  brand,
   footerTag,
+  footerScopeNote,
   footerCopyright,
   navDocs,
   navGithub,
-  ctaInstall,
+  navPlayground,
+  footerGuide,
+  footerColProduct,
+  footerColProject,
 } from '#locales/common';
 import { githubUrl } from '../lib/site.js';
 import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.js';
+import { DEFAULT_LOCALE, bootLocaleCopy } from '../lib/boot-locale.js';
+
+function footerCopy(localeId) {
+  return bootLocaleCopy(localeId, () => {
+    const paths = docsPaths();
+    return {
+      brandFullLabel: `${brand()} ORM`,
+      footerTagLabel: footerTag(),
+      footerScopeLabel: footerScopeNote(),
+      footerCopyrightLabel: footerCopyright(),
+      navDocsLabel: navDocs(),
+      navGithubLabel: navGithub(),
+      navPlaygroundLabel: navPlayground(),
+      footerGuideLabel: footerGuide(),
+      footerColProductLabel: footerColProduct(),
+      footerColProjectLabel: footerColProject(),
+      docsRootHref: paths.docsRootHref,
+      guideHref: paths.guideHref,
+    };
+  });
+}
+
+const boot = footerCopy(DEFAULT_LOCALE);
 
 export default class SiteFooter {
-  localeId = 'zh-hans';
-  footerTagLabel = '';
-  footerCopyrightLabel = '';
-  navDocsLabel = '';
-  navGithubLabel = '';
-  ctaInstallLabel = '';
-  docsRootHref = '/d/zh-hans/';
-  guideHref = '/d/zh-hans/guide/getting-started';
+  localeId = DEFAULT_LOCALE;
+  brandFullLabel = boot.brandFullLabel;
+  footerTagLabel = boot.footerTagLabel;
+  footerScopeLabel = boot.footerScopeLabel;
+  footerCopyrightLabel = boot.footerCopyrightLabel;
+  navDocsLabel = boot.navDocsLabel;
+  navGithubLabel = boot.navGithubLabel;
+  navPlaygroundLabel = boot.navPlaygroundLabel;
+  footerGuideLabel = boot.footerGuideLabel;
+  footerColProductLabel = boot.footerColProductLabel;
+  footerColProjectLabel = boot.footerColProjectLabel;
+  docsRootHref = boot.docsRootHref;
+  guideHref = boot.guideHref;
   githubUrl = githubUrl;
   _unwatchLocale = null;
 
@@ -51,14 +95,7 @@ export default class SiteFooter {
   }
 
   refreshCopy() {
-    this.footerTagLabel = footerTag();
-    this.footerCopyrightLabel = footerCopyright();
-    this.navDocsLabel = navDocs();
-    this.navGithubLabel = navGithub();
-    this.ctaInstallLabel = ctaInstall();
-    const paths = docsPaths(this.localeId);
-    this.docsRootHref = paths.docsRootHref;
-    this.guideHref = paths.guideHref;
+    Object.assign(this, footerCopy(readLocaleId()));
   }
 
   applyLocaleCopy(preferred) {
