@@ -46,4 +46,8 @@ console.log(
 );
 
 const run = runVmz("build", args);
-process.exit(run.status ?? 1);
+if ((run.status ?? 1) !== 0) {
+    process.exit(run.status ?? 1);
+}
+
+await import("./postbuild-site.mjs");
