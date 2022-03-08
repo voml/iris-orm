@@ -1,8 +1,3 @@
----
-title: Hosts & bindings
-order: 2
----
-
 # Hosts & bindings
 
 ## Layers

@@ -2,9 +2,10 @@
 
 **Live:** [https://iris-orm.pages.dev/](https://iris-orm.pages.dev/)
 
-Official Iris ORM site — [VMZ](https://github.com/vmz-framework/vmz-framework) **0.1.9** stack:
+Official Iris ORM site — [VMZ](https://github.com/vmz-framework/vmz-framework) **0.1.12** stack:
 
-- `@vmz/core`, `@vmz/ui`, `@vmz/ui-icons`, `@vmz/vmz` (CLI); `@vmz/plugin-markdown-it` (dev — document integrate only)
+- `@vmz/core`, `@vmz/ui`, `@vmz/plugin-shiki`, `@vmz/vmz` (CLI); `@vmz/plugin-markdown-it` (dev — documents)
+- Integrated `/d/*` uses **`src/layouts/DocumentLayout.vmz`** (compiled SSR chrome — no regex template lowering)
 
 ## Commands
 
@@ -27,7 +28,10 @@ dist/cdn/    # upload this tree to CDN / static hosting
 Override output target: `VMZ_OUT_TARGET=cdn` (default) or `--target cdn` on `scripts/build.mjs`.
 
 - Landing: `/`
-- Documents: `/d/zh-hans/` · `/d/en-us/`
+- Playground: `/playground`（`.iris` DDL + VOS DML，浏览器 WASM 内存执行）
+- Documents: `/d/`（语言为 Host 状态，不在 URL 中）
+
+npm 包使用 **`@yydb`** 作用域；**Iris ORM 与 YY Database 无隶属关系**（见 `#locales` `footerScopeNote`）。
 
 UI components are used as **bare tags** (`<Button>`, `<Card>`, `<Icon>`, …) discovered from npm dependencies — no `import { Button } from '@vmz/ui'`.
 
@@ -46,7 +50,7 @@ Do **not** enable SPA fallback — routes are pre-rendered HTML.
 
 | Scenario | Rule |
 |----------|------|
-| CI / commits | **npm registry only** — pin `@vmz/*@0.1.9`, lock resolves registry tarballs |
+| CI / commits | **npm registry only** — pin `@vmz/*@0.1.12`, lock resolves registry tarballs |
 | Local VMZ bugfix | Temporary `pnpm link` or `file:` **on your machine only** — never commit linked `package.json` / lock |
 | After local test | Restore npm deps and re-run `check` + `build` before push |
 

@@ -1,8 +1,3 @@
----
-title: Getting started
-order: 1
----
-
 # Getting started
 
 ## Install
@@ -45,7 +40,7 @@ The TypeScript host CLI is still a skeleton; full semantic commands come from th
 
 ## Schema
 
-Keep `schemas/**/*.iris` in your repo and an `iris.von` project file for datasources and generate output. See the `farm-database` crate in [vmz-circle-farm](https://github.com/yy-database/vmz-circle-farm) for a worked example.
+Keep `schemas/**/*.iris` in your repo and an `iris.von` project file for datasources and generate output. See the `farm-database` crate in [vmz-circle-farm](https://github.com/voml/iris-orm) for a worked example.
 
 ## vs sql-studio-orm
 

@@ -1,8 +1,3 @@
----
-title: 概览
-order: 0
----
-
 # Iris ORM 文档
 
 Iris 是 **VOS 数据访问层**：不是数据库，也不是新的 schema 语言。权威 schema 使用 **`.iris`**（VOS 语法）。

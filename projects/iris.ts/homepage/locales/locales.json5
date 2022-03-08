@@ -9,8 +9,7 @@
     'en-us': ['zh-hans'],
   },
   routing: {
-    strategy: 'prefix',
-    defaultPrefix: 'omit',
+    strategy: 'none',
   },
   missing: 'warning',
 }
