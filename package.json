@@ -26,7 +26,10 @@
         "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
         "homepage:build": "pnpm homepage",
         "homepage:check": "pnpm --filter @yydb/iris-homepage check",
-        "verify:homepage-hosts": "pnpm --filter @yydb/iris-homepage run verify:hosts"
+        "verify:homepage-hosts": "pnpm --filter @yydb/iris-homepage run verify:hosts",
+        "placeholder": "node scripts/ci/publish-placeholder.mjs",
+        "placeholder:publish": "node scripts/ci/publish-placeholder.mjs publish",
+        "placeholder:trust": "node scripts/ci/publish-placeholder.mjs trust"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",
