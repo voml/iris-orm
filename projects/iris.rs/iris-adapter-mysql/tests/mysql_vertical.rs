@@ -81,6 +81,59 @@ fn adopt_plan_blocks_missing_pk_without_live_db() {
 }
 
 #[test]
+fn plan_push_emits_add_field_for_missing_columns() {
+    use iris_adapter_mysql::plan_push;
+    use iris_types::LogicalChange;
+
+    let catalog = ObservedCatalog {
+        backend_id: BACKEND_ID.into(),
+        tables: vec![ObservedTable {
+            name: "Goods".into(),
+            columns: vec![
+                ObservedColumn {
+                    name: "sku_id".into(),
+                    type_name: "varchar".into(),
+                    nullable: false,
+                    primary_key: true,
+                },
+                ObservedColumn {
+                    name: "name".into(),
+                    type_name: "text".into(),
+                    nullable: false,
+                    primary_key: false,
+                },
+            ],
+        }],
+    };
+    let doc = vos::parser::parse_document(
+        r#"
+        table Goods {
+            @@sku_id: utf8,
+            name: utf8,
+            cover_url: utf8?,
+            status: utf8,
+        }
+        "#,
+    )
+    .expect("parse");
+    let plan = plan_push(&doc, &catalog).expect("plan");
+    let adds: Vec<_> = plan
+        .changes
+        .iter()
+        .filter_map(|c| match c {
+            LogicalChange::AddField {
+                vos_table,
+                vos_field,
+            } => Some((vos_table.as_str(), vos_field.as_str())),
+            _ => None,
+        })
+        .collect();
+    assert!(adds.contains(&("Goods", "cover_url")), "{adds:?}");
+    assert!(adds.contains(&("Goods", "status")), "{adds:?}");
+    assert!(!plan.changes.iter().any(|c| matches!(c, LogicalChange::CreateTable { .. })));
+}
+
+#[test]
 fn live_managed_push_crud_txn_drift_and_pool() {
     let Some(url) = live_url() else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
