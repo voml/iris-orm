@@ -10,13 +10,12 @@
             <p class="lede">{heroLedeLabel}</p>
             <div class="cta-row">
               <Button type="button" onClick={() => this.go(guideHref)}>{ctaInstallLabel}</Button>
+              <Link href="/playground">{ctaPlaygroundLabel}</Link>
               <Link href={docsRootHref}>{ctaDocsLabel}</Link>
               <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{ctaGithubLabel}</Link>
             </div>
           </div>
-          <aside class="hero-panel" aria-label="Import paths">
-            <CodeBlock code={codeSample} caption="@yydb/iris · hosts" />
-          </aside>
+          <HeroCodePanel code={codeSample} caption={codeCaptionLabel} copyLabel={copyLabel} />
         </div>
       </section>
 
@@ -46,6 +45,7 @@ import {
   ctaDocs,
   ctaGithub,
   ctaInstall,
+  ctaPlayground,
   hostsTitle,
   hostsNode,
   hostsNodeDesc,
@@ -57,27 +57,69 @@ import {
   pipelineNode,
   pipelineWasm,
   pipelineNote,
+  copyCode,
 } from '#locales/common';
 import { githubUrl } from '../lib/site.js';
 import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.js';
+import { DEFAULT_LOCALE, bootLocaleCopy } from '../lib/boot-locale.js';
+
+function landingCopy(localeId) {
+  return bootLocaleCopy(localeId, () => {
+    const schema = pipelineSchema();
+    const core = pipelineCore();
+    const node = pipelineNode();
+    const wasm = pipelineWasm();
+    const paths = docsPaths(localeId);
+    return {
+      heroKickerLabel: heroKicker(),
+      heroTitleLabel: heroTitle(),
+      heroLedeLabel: heroLede(),
+      ctaDocsLabel: ctaDocs(),
+      ctaGithubLabel: ctaGithub(),
+      ctaInstallLabel: ctaInstall(),
+      ctaPlaygroundLabel: ctaPlayground(),
+      hostsTitleLabel: hostsTitle(),
+      hostsNodeLabel: hostsNode(),
+      hostsNodeDescLabel: hostsNodeDesc(),
+      hostsWebLabel: hostsWeb(),
+      hostsWebDescLabel: hostsWebDesc(),
+      pipelineTitleLabel: pipelineTitle(),
+      pipelineNoteLabel: pipelineNote(),
+      codeCaptionLabel: 'import paths',
+      copyLabel: copyCode(),
+      pipelineSteps: [
+        { id: 'schema', index: '1', title: schema, status: 'done' },
+        { id: 'core', index: '2', title: core, status: 'current' },
+        { id: 'hosts', index: '3', title: `${node} / ${wasm}`, status: 'upcoming' },
+      ],
+      docsRootHref: paths.docsRootHref,
+      guideHref: paths.guideHref,
+    };
+  });
+}
+
+const boot = landingCopy(DEFAULT_LOCALE);
 
 export default class IndexPage {
-  heroKickerLabel = '';
-  heroTitleLabel = '';
-  heroLedeLabel = '';
-  ctaDocsLabel = '';
-  ctaGithubLabel = '';
-  ctaInstallLabel = '';
-  hostsTitleLabel = '';
-  hostsNodeLabel = '';
-  hostsNodeDescLabel = '';
-  hostsWebLabel = '';
-  hostsWebDescLabel = '';
-  pipelineTitleLabel = '';
-  pipelineNoteLabel = '';
-  pipelineSteps = [];
-  docsRootHref = '/d/zh-hans/';
-  guideHref = '/d/zh-hans/guide/getting-started';
+  heroKickerLabel = boot.heroKickerLabel;
+  heroTitleLabel = boot.heroTitleLabel;
+  heroLedeLabel = boot.heroLedeLabel;
+  ctaDocsLabel = boot.ctaDocsLabel;
+  ctaGithubLabel = boot.ctaGithubLabel;
+  ctaInstallLabel = boot.ctaInstallLabel;
+  ctaPlaygroundLabel = boot.ctaPlaygroundLabel;
+  hostsTitleLabel = boot.hostsTitleLabel;
+  hostsNodeLabel = boot.hostsNodeLabel;
+  hostsNodeDescLabel = boot.hostsNodeDescLabel;
+  hostsWebLabel = boot.hostsWebLabel;
+  hostsWebDescLabel = boot.hostsWebDescLabel;
+  pipelineTitleLabel = boot.pipelineTitleLabel;
+  pipelineNoteLabel = boot.pipelineNoteLabel;
+  codeCaptionLabel = boot.codeCaptionLabel;
+  copyLabel = boot.copyLabel;
+  pipelineSteps = boot.pipelineSteps;
+  docsRootHref = boot.docsRootHref;
+  guideHref = boot.guideHref;
   githubUrl = githubUrl;
   codeSample =
     'import type { IrisRuntime } from "@yydb/iris/types";\n\n// browser default\nimport { createIris } from "@yydb/iris";\n\n// node / SSR / CLI\nimport { createIris } from "@yydb/iris/node";';
@@ -94,36 +136,7 @@ export default class IndexPage {
   }
 
   refreshCopy() {
-    this.heroKickerLabel = heroKicker();
-    this.heroTitleLabel = heroTitle();
-    this.heroLedeLabel = heroLede();
-    this.ctaDocsLabel = ctaDocs();
-    this.ctaGithubLabel = ctaGithub();
-    this.ctaInstallLabel = ctaInstall();
-    this.hostsTitleLabel = hostsTitle();
-    this.hostsNodeLabel = hostsNode();
-    this.hostsNodeDescLabel = hostsNodeDesc();
-    this.hostsWebLabel = hostsWeb();
-    this.hostsWebDescLabel = hostsWebDesc();
-    this.pipelineTitleLabel = pipelineTitle();
-    this.pipelineNoteLabel = pipelineNote();
-    const schema = pipelineSchema();
-    const core = pipelineCore();
-    const node = pipelineNode();
-    const wasm = pipelineWasm();
-    this.pipelineSteps = [
-      { id: 'schema', index: '1', title: schema, status: 'done' },
-      { id: 'core', index: '2', title: core, status: 'current' },
-      {
-        id: 'hosts',
-        index: '3',
-        title: `${node} / ${wasm}`,
-        status: 'upcoming',
-      },
-    ];
-    const paths = docsPaths(readLocaleId());
-    this.docsRootHref = paths.docsRootHref;
-    this.guideHref = paths.guideHref;
+    Object.assign(this, landingCopy(readLocaleId()));
   }
 
   applyLocaleCopy(preferred) {

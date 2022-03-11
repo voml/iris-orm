@@ -1,37 +1,30 @@
 <template>
-  <header class="site-header" data-home={home ? 'true' : 'false'}>
+  <header class="site-header" data-vmz-fixture="site-header" data-home={home ? 'true' : 'false'}>
     <Link href="/">
-      <span class="site-brand">
-        <Icon name="nav.home" size="sm" label={navHomeLabel} />
-        <span>{brandLabel}</span>
-      </span>
+      <span class="site-brand">{brandLabel}</span>
     </Link>
     <nav class="site-nav" aria-label="Primary">
       <Link href="/">{navHomeLabel}</Link>
       <Link href={docsRootHref}>{navDocsLabel}</Link>
-      <details class="site-language">
-        <summary aria-label={selectLanguageLabel}>
-          <Icon name="tool.ascii" size="sm" label={selectLanguageLabel} />
-        </summary>
-        <div class="site-language__menu">
-          <Button
-            type="button"
-            variant="ghost"
-            aria-current={localeId === 'zh-hans' ? 'true' : null}
-            onClick={() => this.switchLocale('zh-hans')}
-          >
-            {langZhLabel}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-current={localeId === 'en-us' ? 'true' : null}
-            onClick={() => this.switchLocale('en-us')}
-          >
-            {langEnLabel}
-          </Button>
-        </div>
-      </details>
+      <Link href="/playground">{navPlaygroundLabel}</Link>
+      <div class="locale-switch" role="group" aria-label={selectLanguageLabel}>
+        <button
+          type="button"
+          class={localeId === 'zh-hans' ? 'locale-switch__btn is-active' : 'locale-switch__btn'}
+          aria-current={localeId === 'zh-hans' ? 'true' : null}
+          onClick={() => this.switchLocale('zh-hans')}
+        >
+          {langZhLabel}
+        </button>
+        <button
+          type="button"
+          class={localeId === 'en-us' ? 'locale-switch__btn is-active' : 'locale-switch__btn'}
+          aria-current={localeId === 'en-us' ? 'true' : null}
+          onClick={() => this.switchLocale('en-us')}
+        >
+          {langEnLabel}
+        </button>
+      </div>
       <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</Link>
     </nav>
   </header>
@@ -42,6 +35,7 @@ import {
   brand,
   navHome,
   navDocs,
+  navPlayground,
   navGithub,
   selectLanguage,
   langZh,
@@ -49,18 +43,36 @@ import {
 } from '#locales/common';
 import { githubUrl } from '../lib/site.js';
 import { docsPaths, readLocaleId, watchDocumentLocale, withLocaleHint } from '../lib/locale-copy.js';
+import { DEFAULT_LOCALE, bootLocaleCopy } from '../lib/boot-locale.js';
+
+function headerCopy(localeId) {
+  return bootLocaleCopy(localeId, () => ({
+    brandLabel: brand(),
+    navHomeLabel: navHome(),
+    navDocsLabel: navDocs(),
+    navPlaygroundLabel: navPlayground(),
+    navGithubLabel: navGithub(),
+    selectLanguageLabel: selectLanguage(),
+    langZhLabel: langZh(),
+    langEnLabel: langEn(),
+    docsRootHref: docsPaths().docsRootHref,
+  }));
+}
+
+const boot = headerCopy(DEFAULT_LOCALE);
 
 export default class SiteHeader {
   home = false;
-  localeId = 'zh-hans';
-  brandLabel = '';
-  navHomeLabel = '';
-  navDocsLabel = '';
-  navGithubLabel = '';
-  selectLanguageLabel = '';
-  langZhLabel = '';
-  langEnLabel = '';
-  docsRootHref = '/d/zh-hans/';
+  localeId = DEFAULT_LOCALE;
+  brandLabel = boot.brandLabel;
+  navHomeLabel = boot.navHomeLabel;
+  navDocsLabel = boot.navDocsLabel;
+  navPlaygroundLabel = boot.navPlaygroundLabel;
+  navGithubLabel = boot.navGithubLabel;
+  selectLanguageLabel = boot.selectLanguageLabel;
+  langZhLabel = boot.langZhLabel;
+  langEnLabel = boot.langEnLabel;
+  docsRootHref = boot.docsRootHref;
   githubUrl = githubUrl;
   _unwatchLocale = null;
 
@@ -76,21 +88,13 @@ export default class SiteHeader {
   }
 
   syncHome() {
-    // static-cdn SSR may define `window` without `location`
     const loc = typeof window !== 'undefined' ? window.location : null;
     if (!loc || typeof loc.pathname !== 'string') return;
     this.home = loc.pathname === '/';
   }
 
   refreshCopy() {
-    this.brandLabel = brand();
-    this.navHomeLabel = navHome();
-    this.navDocsLabel = navDocs();
-    this.navGithubLabel = navGithub();
-    this.selectLanguageLabel = selectLanguage();
-    this.langZhLabel = langZh();
-    this.langEnLabel = langEn();
-    this.docsRootHref = docsPaths(this.localeId).docsRootHref;
+    Object.assign(this, headerCopy(readLocaleId()));
   }
 
   applyLocaleCopy(preferred) {
@@ -101,15 +105,20 @@ export default class SiteHeader {
   async switchLocale(to) {
     if (typeof window === 'undefined') return;
     const fn = window.__vmzTransitionLocale;
-    if (typeof fn !== 'function') {
-      this.applyLocaleCopy(to);
+    if (typeof fn === 'function') {
+      const r = await fn(to, { reload: true });
+      if (r && r.status === 'committed') {
+        this.applyLocaleCopy(to);
+      }
       return;
     }
-    const r = await fn(to);
-    if (r && r.status === 'committed') {
-      this.applyLocaleCopy(to);
-      queueMicrotask(() => this.applyLocaleCopy(to));
+    try {
+      localStorage.setItem('vmz.locale', to);
+      document.cookie = `vmz.locale=${encodeURIComponent(to)}; path=/; max-age=31536000; SameSite=Lax`;
+    } catch {
+      /* ignore */
     }
+    window.location.reload();
   }
 }
 </script>
