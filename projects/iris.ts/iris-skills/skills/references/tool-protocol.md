@@ -1,13 +1,17 @@
 # Tool protocol
 
+## Correct workflow
+
+See [workflow.md](./workflow.md) — CLI (local) vs runtime (deploy).
+
 ## Live today (CLI — use these)
 
-| Command | Skill |
-|---------|--------|
-| `iris check --config iris.von` | `iris-schema` |
-| `iris push --config iris.von --source <id> [--plan]` | `iris-migrate` |
-| `iris generate --config iris.von --target <host>` | `iris-generate` |
-| Host VOS execute / generated client | `iris-operation` |
+| Command | Skill | Where |
+|---------|--------|--------|
+| `iris check --config iris.von` | `iris-schema` | local |
+| `iris push … [--plan]` | `iris-migrate` | local / ops — **never CI** |
+| `iris generate …` | `iris-generate` | local → **commit `generated/`** |
+| Host VOS execute / generated client | `iris-operation` | **runtime** |
 
 See [consumer-hard-rules.md](./consumer-hard-rules.md).
 
@@ -27,8 +31,6 @@ doctor
 conformance.run
 ```
 
-Mutating ops (when live): `plan -> review -> apply` with plan hash + fingerprints + short grant.
-
 ## Parallel product
 
-`@yydb/sql-studio-skills` — SQL Studio only. No VOS↔SQL translation bridge for Iris apps.
+`@yydb/sql-studio-skills` — SQL Studio only. No VOS↔SQL bridge for Iris apps.

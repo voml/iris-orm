@@ -8,7 +8,8 @@ description: >-
 
 # iris-diagnose
 
-Read [../references/consumer-hard-rules.md](../references/consumer-hard-rules.md) first.
+Read [../references/workflow.md](../references/workflow.md) and
+[../references/consumer-hard-rules.md](../references/consumer-hard-rules.md) first.
 
 ## When to use
 
