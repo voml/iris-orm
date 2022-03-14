@@ -14,7 +14,17 @@ Skills must not contradict them.
 | Runtime query | host facade: VOS text / generated client | app server code |
 | UUID PK | `iris::uuid()` / VOS `uuid()` — **v7 only** | app + Iris |
 
-**Compile contract (all hosts):** develop with `iris generate` → generated code is normal source in the language toolchain → **commit generated output**. Do **not** commit `.cache/iris/*` (plans, temp). Do **not** embed raw `.iris` into binaries; generate must emit any runtime metadata (e.g. Rust `UUID_FIELDS`).
+**Compile / deploy contract (all hosts):**
+
+```text
+local tool:  iris check | iris push | iris generate
+commit:      generated/*   (enters language compile)
+ignore:      .cache/iris/*
+deploy bin:  generated + Iris *runtime* libraries only
+             — no Iris CLI, no iris-tools, no .iris source embed
+```
+
+Do **not** embed raw `.iris` into binaries; generate must emit any runtime metadata (e.g. Rust `UUID_FIELDS`).
 
 There is **no** public `query --sql`, raw SQL migration path, or mysql client bypass in the Iris product surface.
 
