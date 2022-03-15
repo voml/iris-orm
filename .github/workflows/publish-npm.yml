@@ -1,0 +1,224 @@
+# Trusted Publisher contract (sole npm trusted workflow — keep this filename):
+#   file = publish-npm.yml
+#   repo = voml/iris-orm
+#   env  = NPM_PUBLISH
+#
+# Triggers:
+#   - push tag v*           (e.g. v0.0.1)
+#   - workflow_dispatch     (manual retry / version input)
+# Do not register Trusted Publisher on any other workflow file.
+
+name: Publish npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version without v prefix (required for workflow_dispatch)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-native:
+    name: Native ${{ matrix.short }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            short: win32-x64
+            artifact: iris.win32-x64-msvc.node
+          - os: ubuntu-latest
+            short: linux-x64
+            artifact: iris.linux-x64-gnu.node
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build N-API (release)
+        run: pnpm napi:build
+
+      - name: Stage native artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="dist/native/${{ matrix.short }}"
+          mkdir -p "$out"
+          src="projects/iris.ts/iris-${{ matrix.short }}/${{ matrix.artifact }}"
+          if [[ ! -f "$src" ]]; then
+            echo "missing native binary: $src" >&2
+            ls -la "projects/iris.ts/iris-${{ matrix.short }}/" || true
+            exit 1
+          fi
+          cp "$src" "$out/${{ matrix.artifact }}"
+          ls -la "$out"
+
+      - name: Upload native artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.short }}
+          path: dist/native/${{ matrix.short }}
+          if-no-files-found: error
+
+  build-wasm:
+    name: WASM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build WASM (release)
+        run: pnpm wasm:build
+
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-unknown-wasm32
+          path: projects/iris.ts/iris-unknown-wasm32
+          if-no-files-found: error
+
+  publish:
+    name: Publish packages
+    needs: [build-native, build-wasm]
+    runs-on: ubuntu-latest
+    environment: NPM_PUBLISH
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            v="${{ inputs.version }}"
+            v="${v#v}"
+            if [[ -z "$v" ]]; then
+              echo "inputs.version required for workflow_dispatch" >&2
+              exit 1
+            fi
+          else
+            ref="${GITHUB_REF#refs/tags/}"
+            v="${ref#v}"
+            if [[ -z "$v" || "$v" == *"/"* ]]; then
+              echo "could not parse version from GITHUB_REF=$GITHUB_REF" >&2
+              exit 1
+            fi
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "resolved version=$v"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Ensure npm supports Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: native-*
+          path: dist/native-artifacts
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-unknown-wasm32
+          path: projects/iris.ts/iris-unknown-wasm32
+
+      - name: Install native binaries into platform packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_native() {
+            local short="$1"
+            local artifact="$2"
+            local dest="projects/iris.ts/iris-${short}/${artifact}"
+            local found=""
+            for candidate in \
+              "dist/native-artifacts/native-${short}/${artifact}" \
+              "dist/native-artifacts/${short}/${artifact}"; do
+              if [[ -f "$candidate" ]]; then
+                found="$candidate"
+                break
+              fi
+            done
+            if [[ -z "$found" ]]; then
+              echo "missing downloaded native artifact for ${short}" >&2
+              find dist/native-artifacts -type f -print || true
+              exit 1
+            fi
+            cp "$found" "$dest"
+            ls -la "$dest"
+          }
+          install_native win32-x64 iris.win32-x64-msvc.node
+          install_native linux-x64 iris.linux-x64-gnu.node
+
+      - name: Strip token-style npmrc (OIDC only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_TOKEN || true
+          for f in "${HOME}/.npmrc" "${NPM_CONFIG_USERCONFIG:-}" "${RUNNER_TEMP:-}/.npmrc"; do
+            [[ -n "${f}" && -f "${f}" ]] || continue
+            if grep -q '_authToken' "${f}"; then
+              grep -v '_authToken' "${f}" > "${f}.oidc" && mv "${f}.oidc" "${f}"
+              echo "stripped _authToken from ${f}"
+            fi
+          done
+
+      - name: Publish real packages
+        env:
+          GITHUB_REF: refs/tags/v${{ steps.ver.outputs.version }}
+          IRIS_SKIP_PREBUILD: '1'
+        run: node scripts/ci/publish-npm.mjs --version=${{ steps.ver.outputs.version }}
