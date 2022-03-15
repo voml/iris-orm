@@ -2,8 +2,8 @@
 name: iris-operation
 description: >-
   Write Iris runtime data access as VOS queries / generated clients
-  (execute_vos, typed APIs). Use instead of SQL, query builders, or raw drivers
-  for Iris-managed tables.
+  (Session::query / db.$query, typed APIs). Use instead of SQL, query builders,
+  or raw drivers for Iris-managed tables.
 ---
 
 # iris-operation
@@ -28,7 +28,10 @@ Agent proposes VOS intent (string or generated client)
 In Rust apps that wrap Iris:
 
 - Prefer **generated** table types + helpers when present.
-- Or `FarmDb`-style `execute_vos("Goods.where(...).collect()")` / insert-update via Iris write APIs.
+- Or thin host wrappers: `query("Goods.where(sku_id == \"r50\").collect()")` /
+  `query("Goods.filter(x => x.sku_id == \"r50\").collect()")` — `.where` ≡ `.filter`.
+- Escape hatch names: Rust `Session::query` / `Session::execute` ↔ TS `db.$query` / `db.$execute`
+  (do **not** invent a third name; legacy `execute_vos` is deprecated).
 - New primary keys: **`iris::uuid()`** (v7), never `Uuid::new_v4()`.
 
 Escape user strings for VOS string literals with the app’s escape helper (e.g. `escape_vos_str`) — do not concatenate raw SQL.
