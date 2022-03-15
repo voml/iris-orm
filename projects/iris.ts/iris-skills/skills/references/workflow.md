@@ -65,7 +65,9 @@ App → generated types / Session::query("…") / db.$query("…") / Iris write 
 ```
 
 - Prefer generated models + Iris APIs.
-- Pipeline predicates: `.filter(x => …)` or `.where(…)` (alias); both lower to the same `Filter` op.
+- Pipeline predicates: prefer **`.filter(x => …)`**. `.where(…)` may lower as a
+  compatibility alias of `.filter`, but **do not teach SQL-style `.where` in new
+  app or skill examples**.
 - Escape hatch: Rust `query`/`execute` ↔ TS `$query`/`$execute` (legacy `execute_vos` deprecated).
 - **No** SQL / `mysql2` / `sqlx` on Iris-managed tables.
 - New `uuid` PKs: **`iris::uuid()`** (v7 only).

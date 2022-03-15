@@ -19,6 +19,7 @@ deploy:   runtime crates + generated only       # no CLI / no migrate / no seed
 Also: [consumer-hard-rules.md](./skills/references/consumer-hard-rules.md) · [tool-protocol.md](./skills/references/tool-protocol.md)
 
 Agents edit **VOS / `.iris`** — **not** SQL. Parallel: `@yydb/sql-studio-skills` (SQL Studio only).
+Runtime VOS pipelines prefer **`.filter(x => …)`**; do not teach SQL-style `.where`.
 
 ## Skills
 
