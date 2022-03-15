@@ -71,7 +71,7 @@ impl SessionStore {
         match self {
             Self::Memory(iris) => iris
                 .session()
-                .execute_vos(source)
+                .query(source)
                 .map_err(|err| err.to_string()),
             Self::Sqlite(db) => {
                 let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
@@ -187,8 +187,9 @@ impl MemorySession {
         Self::open_memory()
     }
 
+    /// Plan + execute VOS DML (returns rows). Aligns with generated `db.$query`.
     #[napi]
-    pub fn execute_vos(
+    pub fn query(
         &self,
         source: String,
         parameters_json: Option<String>,
@@ -204,6 +205,35 @@ impl MemorySession {
             Ok(rows) => Ok(ok_result(rows)),
             Err(err) => Ok(err_result(err)),
         }
+    }
+
+    /// Execute unit-valued / DDL-shaped VOS. Aligns with generated `db.$execute`.
+    #[napi]
+    pub fn execute(
+        &self,
+        source: String,
+        parameters_json: Option<String>,
+    ) -> Result<ExecuteResult> {
+        let result = self.query(source, parameters_json)?;
+        if result.ok {
+            Ok(ExecuteResult {
+                ok: true,
+                rows_json: "[]".into(),
+                error: None,
+            })
+        } else {
+            Ok(result)
+        }
+    }
+
+    /// Plan + execute VOS DML (legacy name).
+    #[napi]
+    pub fn execute_vos(
+        &self,
+        source: String,
+        parameters_json: Option<String>,
+    ) -> Result<ExecuteResult> {
+        self.query(source, parameters_json)
     }
 
     /// Execute a structured Iris operation JSON payload (generated client ABI).

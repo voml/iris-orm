@@ -47,11 +47,11 @@ fn ensure_schema_and_handshake_work_on_public_facade() {
 }
 
 #[test]
-fn execute_vos_refuses_until_yydb_executor_ships() {
+fn query_refuses_until_yydb_executor_ships() {
     let db = YydbSource::open_in_memory().unwrap();
     db.ensure_schema(1, USER_SCHEMA).unwrap();
     let err = db
-        .execute_vos(r#"User.filter(x => true).collect()"#)
+        .query(r#"User.filter(x => true).collect()"#)
         .expect_err("must not query yet");
     assert!(err.to_string().contains(READINESS_CODE));
 }

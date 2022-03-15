@@ -155,10 +155,11 @@ fn lower_pipeline(expr: &Expr) -> Result<Vec<PhysicalOp>> {
 fn push_method(ops: &mut Vec<PhysicalOp>, method: &str, args: &[Expr], span: Span) -> Result<()> {
     match method {
         "all" => Ok(()),
-        "filter" => {
+        // `.where` is a documented alias of `.filter` (same arity / predicate lower).
+        "filter" | "where" => {
             let pred_expr = args.first().ok_or_else(|| {
                 Error::diagnostic(Diagnostic::plan_rejected(
-                    "`.filter` requires a predicate",
+                    format!("`.{method}` requires a predicate"),
                     span,
                     None,
                 ))
@@ -231,7 +232,7 @@ fn push_method(ops: &mut Vec<PhysicalOp>, method: &str, args: &[Expr], span: Spa
         other => Err(Error::diagnostic(Diagnostic::plan_rejected(
             format!("unsupported pipeline method `.{other}`"),
             span,
-            None,
+            Some("use `.filter(x => …)` or `.where(…)` for predicates".into()),
         ))),
     }
 }
@@ -271,7 +272,8 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
             span,
         } => {
             let field = match left.as_ref() {
-                Expr::Member { name, .. } => name.clone(),
+                // `x.sku_id == …` (lambda body) or bare `sku_id == …` (`.where` sugar).
+                Expr::Member { name, .. } | Expr::Name { name, .. } => name.clone(),
                 _ => {
                     return Err(Error::diagnostic(Diagnostic::plan_rejected(
                         "Phase 1 filters must compare a field access on the left",
@@ -321,8 +323,8 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
                 kind,
             })
         }
-        Expr::Member { name, span, .. } => {
-            // Bare `x.active` treated as `x.active == true`.
+        Expr::Member { name, span, .. } | Expr::Name { name, span } => {
+            // Bare `x.active` / `active` treated as `field == true`.
             let _ = span;
             Ok(Pred::FieldBool {
                 field: name.clone(),

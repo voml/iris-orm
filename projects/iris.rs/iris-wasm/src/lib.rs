@@ -8,7 +8,8 @@ mod core;
 mod session;
 
 pub use core::{SchemaCheck, check_schema_source, introspect_schema_json, iris_version};
-pub use session::{MemorySession, execute_vos_memory};
+#[allow(deprecated)]
+pub use session::{MemorySession, execute_vos_memory, query_memory};
 
 use wasm_bindgen::prelude::*;
 
@@ -80,8 +81,15 @@ pub fn introspect_schema(source: &str) -> String {
     introspect_schema_json(source)
 }
 
-/// Execute VOS on a fresh in-memory reference adapter; returns JSON `{ ok, rows, error }`.
+/// Execute VOS DML on a fresh in-memory reference adapter; returns JSON `{ ok, rows, error }`.
+#[wasm_bindgen(js_name = queryMemory)]
+pub fn query_memory_js(source: &str) -> String {
+    query_memory(source)
+}
+
+/// Legacy alias of [`query_memory_js`].
 #[wasm_bindgen(js_name = executeVosMemory)]
 pub fn execute_vos(source: &str) -> String {
+    #[allow(deprecated)]
     execute_vos_memory(source)
 }
