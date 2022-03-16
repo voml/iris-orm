@@ -1,34 +1,39 @@
 # `@yydb/iris-skills`
 
-Official Agent Skills for **Iris / VOS** (architecture §1.3).
+Official Agent Skills for **Iris / VOS** consumers and maintainers.
 
 ```text
-Agent -> iris-skills -> structured Iris tools -> policy -> Iris facade
+Agent → iris-skills (workflow rules) → npm `@yydb/iris` CLI / host Iris facade
 ```
 
-Agents edit VOS and Iris plans — **not** SQL. Parallel package:
-`@yydb/sql-studio-skills` (SQL Studio only).
+Agents edit **VOS / `.iris`** and call Iris — **not** SQL. Parallel package: `@yydb/sql-studio-skills` (SQL Studio only).
 
-## First-batch skills
+## Read first
 
-| Skill              | Role                                   | Delivery  |
-|--------------------|----------------------------------------|-----------|
-| `iris-schema`      | schema check                           | docs-only |
-| `iris-operation`   | VOS op/query + semantic check          | docs-only |
-| `iris-generate`    | Dejavu generate / fingerprint          | cli-stub  |
-| `iris-migrate`     | migration plan/review/apply            | docs-only |
-| `iris-explain`     | capability / physical / composite plan | docs-only |
-| `iris-topology`    | topology + projection verify           | docs-only |
-| `iris-diagnose`    | doctor / drift                         | cli-stub  |
-| `iris-conformance` | conformance.run                        | docs-only |
+- [skills/references/consumer-hard-rules.md](./skills/references/consumer-hard-rules.md) — antiforwards (no SQL bypass, no deploy generate, no path overlay in CI)
+- [skills/references/tool-protocol.md](./skills/references/tool-protocol.md) — live CLI vs planned DTOs
 
-**Gate:** freeze shared Iris tool DTOs (CLI/MCP/HTTP), then mark skills `tool-live`. Do not prompt-fake missing
-commands.
+## Skills
+
+| Skill | Role | Delivery |
+|-------|------|----------|
+| `iris-schema` | Author/check `.iris` | **CLI-backed** (`iris check`) |
+| `iris-migrate` | `iris push` plan/apply | **CLI-backed** |
+| `iris-generate` | Local `iris generate`; commit outputs | **CLI-backed** |
+| `iris-operation` | Runtime VOS / generated client | docs + host API |
+| `iris-explain` | Planner / capability explain | docs / CLI when present |
+| `iris-topology` | Composite topology verify | docs / CLI when present |
+| `iris-diagnose` | Failures & drift; upstream fixes | CLI-backed habits |
+| `iris-conformance` | Host conformance evidence | docs / host tests |
+
+**Gate:** structured Agent tool DTOs (`migration.apply`, …) are **not live**. Teach the real CLI. Do not prompt-fake missing MCP tools.
 
 ## Install
 
 ```bash
 npx skills add @yydb/iris-skills
 # or local checkout:
-npx skills add ./projects/iris.ts/iris-skills
+npx skills add ./projects/iris.ts/iris-skills --skill '*' -y --copy
 ```
+
+App repos typically vendor a copy under `.agents/skills/` from the installed npm package (see app `AGENTS.md`).
