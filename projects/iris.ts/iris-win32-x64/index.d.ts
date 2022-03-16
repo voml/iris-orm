@@ -2,103 +2,115 @@
 /* eslint-disable */
 /** Iris session bound to a reference or foreign adapter. */
 export declare class MemorySession {
-    constructor();
-    executeVos(source: string, parametersJson?: string | undefined | null): ExecuteResult;
-    /** Execute a structured Iris operation JSON payload (generated client ABI). */
-    executeOperation(operationJson: string): ExecuteResult;
-    /** Apply managed-push schema to a SQLite session (`:memory:` or file path). */
-    managedPush(schema: string): void;
-    close(): void;
+  constructor()
+  executeVos(source: string, parametersJson?: string | undefined | null): ExecuteResult
+  /** Execute a structured Iris operation JSON payload (generated client ABI). */
+  executeOperation(operationJson: string): ExecuteResult
+  /** Apply managed-push schema to a SQLite session (`:memory:` or file path). */
+  managedPush(schema: string): void
+  close(): void
 }
 
 /** Parse and validate schema source (same semantics as `iris-tools check`). */
-export declare function checkSource(source: string): CheckSourceResult;
+export declare function checkSource(source: string): CheckSourceResult
 
 /** Result of validating a VOS / `.iris` schema source via the Rust core. */
 export interface CheckSourceResult {
-    ok: boolean;
-    tableCount: number;
-    schemaFingerprint: string;
-    generatorVersion: string;
-    error?: string;
+  ok: boolean
+  tableCount: number
+  schemaFingerprint: string
+  generatorVersion: string
+  error?: string
 }
 
 /** Execute VOS against the bound adapter. */
 export interface ExecuteResult {
-    ok: boolean;
-    /** JSON array of row objects. */
-    rowsJson: string;
-    error?: string;
+  ok: boolean
+  /** JSON array of row objects. */
+  rowsJson: string
+  error?: string
 }
 
 /** Generate client bindings (`rust` | `typescript`) from merged schema source. */
-export declare function generate(source: string, target: string, outDir: string): GenerateResult;
+export declare function generate(source: string, target: string, outDir: string): GenerateResult
 
 /** Codegen output summary. */
 export interface GenerateResult {
-    ok: boolean;
-    outputPath: string;
-    schemaFingerprint: string;
-    files: Array<string>;
-    error?: string;
+  ok: boolean
+  outputPath: string
+  schemaFingerprint: string
+  files: Array<string>
+  error?: string
 }
 
 /** Read-only schema introspection JSON (`GenerationModel` shape). */
-export declare function introspectSchema(source: string): string;
+export declare function introspectSchema(source: string): string
 
 /** Library version (matches `iris::version()` / Cargo package version). */
-export declare function irisVersion(): string;
+export declare function irisVersion(): string
 
 /** Load `iris.von` from a config path. */
-export declare function loadProject(configPath: string): LoadProjectResult;
+export declare function loadProject(configPath: string): LoadProjectResult
 
 /** Loaded on-disk project metadata. */
 export interface LoadProjectResult {
-    root: string;
-    config: string;
-    schemaGlob: string;
-    generateOut: string;
-    generateTarget: string;
+  root: string
+  config: string
+  schemaGlob: string
+  generateOut: string
+  generateTarget: string
 }
 
 /** Plan a managed-push migration (same as `iris-tools migrate plan`). */
-export declare function migratePlanCmd(configPath: string, source: string, outDir?: string | undefined | null): MigratePlanResult;
+export declare function migratePlanCmd(configPath: string, source: string, outDir?: string | undefined | null): MigratePlanResult
 
 /** Migration plan summary. */
 export interface MigratePlanResult {
-    ok: boolean;
-    planPath: string;
-    error?: string;
+  ok: boolean
+  planPath: string
+  error?: string
+}
+
+/** Plan → apply → verify (same as `iris-tools migrate run` / library `migrate_run`). */
+export declare function migrateRunCmd(configPath: string, source: string, planOut: string | undefined | null, planOnly: boolean): MigrateRunResult
+
+/** Full managed-push run summary (plan → apply → verify). */
+export interface MigrateRunResult {
+  ok: boolean
+  planPath: string
+  planOnly: boolean
+  createdTables: Array<string>
+  error?: string
 }
 
 /** Open an in-memory reference session. */
-export declare function openMemorySession(): MemorySession;
+export declare function openMemorySession(): MemorySession
 
 /** Open a MySQL session from a connection URL. */
-export declare function openMysqlSession(url: string): MemorySession;
+export declare function openMysqlSession(url: string): MemorySession
 
 /** Open a PostgreSQL session from a connection URL. */
-export declare function openPostgresSession(url: string): MemorySession;
+export declare function openPostgresSession(url: string): MemorySession
 
 /** Open a session for a datasource declared in `iris.von`. */
-export declare function openProjectSession(configPath: string, source: string): MemorySession;
+export declare function openProjectSession(configPath: string, source: string): MemorySession
 
 /** Open a session for the requested adapter profile. */
-export declare function openSession(options?: OpenSessionOptions | undefined | null): MemorySession;
+export declare function openSession(options?: OpenSessionOptions | undefined | null): MemorySession
 
 /** Session open options (unified N-API entry). */
 export interface OpenSessionOptions {
-    /** `memory` | `sqlite` | `postgres` | `mysql` | `project` */
-    profile?: string;
-    sqlitePath?: string;
-    postgresUrl?: string;
-    mysqlUrl?: string;
-    projectConfig?: string;
-    datasource?: string;
+  /** `memory` | `sqlite` | `postgres` | `mysql` | `project` */
+  profile?: string
+  sqlitePath?: string
+  postgresUrl?: string
+  mysqlUrl?: string
+  projectConfig?: string
+  datasource?: string
 }
 
 /** Open a SQLite session on a filesystem path or `:memory:`. */
-export declare function openSqliteSession(path: string): MemorySession;
+export declare function openSqliteSession(path: string): MemorySession
 
 /** Read merged schema text for a loaded project. */
-export declare function readSchema(projectRoot: string, schemaGlob: string): string;
+export declare function readSchema(projectRoot: string, schemaGlob: string): string

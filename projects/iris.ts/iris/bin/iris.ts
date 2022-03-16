@@ -81,7 +81,22 @@ cli.command("push", "Push local schema to datasource (schema -> database)")
                 console.log(`push plan written: ${result.planPath}`);
                 return;
             }
-            notImplemented("push apply");
+            if (typeof core.migrateRunCmd !== "function") {
+                notImplemented("push apply");
+                return;
+            }
+            const result = core.migrateRunCmd(config, options?.source ?? "default", options?.out ?? null, false);
+            if (!result.ok) {
+                console.error(`error: ${result.error ?? "push failed"}`);
+                process.exitCode = 1;
+                return;
+            }
+            const created = result.createdTables ?? [];
+            console.log(
+                created.length
+                    ? `push ok — created: ${created.join(", ")}`
+                    : "push ok — verify passed (no new tables)",
+            );
         } catch (error) {
             console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
             process.exitCode = 1;
