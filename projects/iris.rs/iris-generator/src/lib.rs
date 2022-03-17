@@ -68,6 +68,9 @@ pub struct FieldModel {
     pub primary: bool,
     /// Optional / nullable.
     pub optional: bool,
+    /// True when the VOS type is `uuid` (including `uuid?`).
+    #[serde(default)]
+    pub is_uuid: bool,
     /// Target entity for `&T` reference fields (`None` for scalars).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reference_target: Option<String>,
@@ -137,6 +140,7 @@ impl GenerationModel {
                             vos_type: mapped.vos_type,
                             primary: field.is_primary(),
                             optional: mapped.optional,
+                            is_uuid: mapped.is_uuid,
                             reference_target: mapped.reference_target,
                         });
                     }
@@ -245,6 +249,7 @@ struct MappedFieldType {
     rust_ty: String,
     vos_type: String,
     optional: bool,
+    is_uuid: bool,
     reference_target: Option<String>,
 }
 
@@ -276,6 +281,7 @@ fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
                 rust_ty: format!("{target}Ref"),
                 vos_type: format!("&{target}"),
                 optional: false,
+                is_uuid: false,
                 reference_target: Some(target),
             })
         }
@@ -285,6 +291,7 @@ fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
                 rust_ty: rust.into(),
                 vos_type: vos.into(),
                 optional: false,
+                is_uuid: matches!(b, BuiltinType::Uuid),
                 reference_target: None,
             })
         }
@@ -292,6 +299,7 @@ fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
             rust_ty: name.clone(),
             vos_type: name.clone(),
             optional: false,
+            is_uuid: false,
             reference_target: None,
         }),
         other => Err(Error::UnsupportedType(format!("{other:?}"))),

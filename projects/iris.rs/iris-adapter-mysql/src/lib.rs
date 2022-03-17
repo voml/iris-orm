@@ -77,6 +77,20 @@ impl MysqlSource {
         Ok(self)
     }
 
+    /// Register uuid columns from generated bindings (`UUID_FIELDS`) without re-parsing `.iris`.
+    pub fn with_uuid_fields<I, T, F>(mut self, fields: I) -> Self
+    where
+        I: IntoIterator<Item = (T, F)>,
+        T: Into<String>,
+        F: Into<String>,
+    {
+        self.uuid_fields = fields
+            .into_iter()
+            .map(|(table, field)| (table.into(), field.into()))
+            .collect();
+        self
+    }
+
     /// Register uuid columns from a parsed VOS document.
     pub fn with_schema_document(mut self, document: &Document) -> Self {
         self.uuid_fields = collect_uuid_fields(document);
