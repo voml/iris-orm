@@ -27,7 +27,7 @@ deploy bin:  generated + Iris *runtime* only
 
 ## Hard antiforwards
 
-1. **Never invent SQL** for Iris apps (DDL or DML). Edit `.iris` / VOS; use Iris push and `Session::query` / `db.$query` (or generated clients).
+1. **Never invent SQL** for Iris apps (DDL or DML). Edit `.iris` / VOS; use Iris push and **generated clients** (`Db` / `db.user`); escape hatch `Session::query` / `db.$query` only when needed.
 2. **Never** `mysql2` / `sqlx` / hand SQL to “finish” Iris migrate or seed. Gap → **fix upstream iris-orm**, then bump the app.
 3. **Never** `link:` / sibling path / `[patch]` to local iris/vos in **deployed** app trees (TCB/`master`).
 4. **`iris generate` is local-only.** Commit `generated/`. Never commit `.cache/iris/*`. Never generate in CI/Docker/server boot. Never embed raw `.iris` as a substitute for generate metadata (`UUID_FIELDS`, etc.).
