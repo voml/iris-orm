@@ -1,7 +1,7 @@
 //! Isolated MySQL foreign-store adapter.
 //!
 //! Backend commands stay **private**. Catalog inspect, type mapping, and DDL
-//! emission are MySQL-specific --?not shared with PostgreSQL/SQLite adapters.
+//! emission are MySQL-specific — not shared with PostgreSQL/SQLite adapters.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -155,34 +155,69 @@ impl MysqlSource {
 
     /// Execute an Iris physical plan (reads).
     pub fn execute_plan(&self, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+        let mut conn = self.pool.get_conn()?;
+        self.execute_plan_on(&mut conn, plan)
+    }
+
+    /// Execute a plan on an existing connection (same session / transaction).
+    pub fn execute_plan_on(
+        &self,
+        conn: &mut mysql::PooledConn,
+        plan: &PhysicalPlan,
+    ) -> Result<Vec<Row>> {
         if plan.is_rejected() {
             return Err(Error::Policy(
                 plan.rejection_note().unwrap_or("plan rejected").to_string(),
             ));
         }
-        let mut conn = self.pool.get_conn()?;
-        execute::execute_plan(&mut conn, plan, &self.uuid_fields)
+        execute::execute_plan(conn, plan, &self.uuid_fields)
     }
 
     /// Insert a row.
     pub fn insert(&self, write: &RowWrite) -> Result<()> {
         let mut conn = self.pool.get_conn()?;
-        execute::insert_row(&mut conn, write, &self.uuid_fields)
+        self.insert_on(&mut conn, write)
+    }
+
+    /// Insert on an existing connection (same session / transaction).
+    pub fn insert_on(&self, conn: &mut mysql::PooledConn, write: &RowWrite) -> Result<()> {
+        execute::insert_row(conn, write, &self.uuid_fields)
     }
 
     /// Update by primary key.
     pub fn update(&self, write: &RowWrite) -> Result<u64> {
         let mut conn = self.pool.get_conn()?;
-        execute::update_row(&mut conn, write, &self.uuid_fields)
+        self.update_on(&mut conn, write)
+    }
+
+    /// Update on an existing connection (same session / transaction).
+    pub fn update_on(&self, conn: &mut mysql::PooledConn, write: &RowWrite) -> Result<u64> {
+        execute::update_row(conn, write, &self.uuid_fields)
     }
 
     /// Delete by primary key.
     pub fn delete(&self, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<u64> {
         let mut conn = self.pool.get_conn()?;
-        execute::delete_row(&mut conn, table, primary_key, key, &self.uuid_fields)
+        self.delete_on(&mut conn, table, primary_key, key)
+    }
+
+    /// Delete on an existing connection (same session / transaction).
+    pub fn delete_on(
+        &self,
+        conn: &mut mysql::PooledConn,
+        table: &str,
+        primary_key: &str,
+        key: &iris_types::Value,
+    ) -> Result<u64> {
+        execute::delete_row(conn, table, primary_key, key, &self.uuid_fields)
     }
 
     /// Run `f` inside a transaction, rolling back on error.
+    ///
+    /// Use [`Self::execute_plan_on`] / [`Self::insert_on`] / … on the provided
+    /// connection so reads/writes share the transaction. Calling the pool-level
+    /// [`Self::execute_plan`] / [`Self::insert`] APIs from `f` checks out a
+    /// **different** connection and will not participate in this transaction.
     pub fn transaction<R>(&self, f: impl FnOnce(&mut mysql::PooledConn) -> Result<R>) -> Result<R> {
         let mut conn = self.pool.get_conn()?;
         conn.query_drop("START TRANSACTION")?;
@@ -196,6 +231,19 @@ impl MysqlSource {
                 Err(e)
             }
         }
+    }
+
+    /// Like [`Self::transaction`], but **always** `ROLLBACK` — for integration
+    /// tests against a shared database (insert fixtures, assert, leave no residue).
+    pub fn with_rollback<R>(
+        &self,
+        f: impl FnOnce(&mut mysql::PooledConn) -> Result<R>,
+    ) -> Result<R> {
+        let mut conn = self.pool.get_conn()?;
+        conn.query_drop("START TRANSACTION")?;
+        let result = f(&mut conn);
+        let _ = conn.query_drop("ROLLBACK");
+        result
     }
 }
 

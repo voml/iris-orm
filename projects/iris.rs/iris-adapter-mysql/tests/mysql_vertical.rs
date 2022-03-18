@@ -262,3 +262,141 @@ fn live_managed_push_crud_txn_drift_and_pool() {
     })
     .unwrap();
 }
+
+#[test]
+fn live_same_connection_txn_visible_and_rolls_back_on_err() {
+    let Some(url) = live_url() else {
+        eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
+        return;
+    };
+    let db = MysqlSource::connect(&url)
+        .expect("connect")
+        .with_vos_schema(USER_SCHEMA)
+        .expect("uuid schema map");
+
+    db.transaction(|conn| {
+        use mysql::prelude::*;
+        conn.query_drop("DROP TABLE IF EXISTS `User`")?;
+        Ok(())
+    })
+    .unwrap();
+    db.managed_push(USER_SCHEMA).expect("push");
+
+    let fixture_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    let write = RowWrite {
+        table: "User".into(),
+        primary_key: "user_id".into(),
+        fields: BTreeMap::from([
+            ("user_id".into(), Value::Str(fixture_id.into())),
+            ("user_name".into(), Value::Str("txn_visible".into())),
+            ("active".into(), Value::Bool(true)),
+        ]),
+    };
+    let plan = Planner::new(MysqlSource::capabilities())
+        .plan_source(&format!(
+            r#"User.filter(x => x.user_id == "{fixture_id}").collect()"#
+        ))
+        .unwrap();
+
+    // Same connection: insert_on then execute_plan_on must see the row before commit.
+    db.transaction(|conn| {
+        db.insert_on(conn, &write)?;
+        let rows = db.execute_plan_on(conn, &plan)?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            rows[0].get("user_name"),
+            Some(&Value::Str("txn_visible".into()))
+        );
+        Ok(())
+    })
+    .unwrap();
+
+    // Committed row is visible on a fresh pool checkout.
+    assert_eq!(db.execute_plan(&plan).unwrap().len(), 1);
+
+    // Error path rolls back: insert_on then Err must leave no residue.
+    let ghost_id = "bbbbbbbb-cccc-dddd-eeee-ffffffffffff";
+    let ghost = RowWrite {
+        table: "User".into(),
+        primary_key: "user_id".into(),
+        fields: BTreeMap::from([
+            ("user_id".into(), Value::Str(ghost_id.into())),
+            ("user_name".into(), Value::Str("ghost".into())),
+            ("active".into(), Value::Bool(false)),
+        ]),
+    };
+    let ghost_plan = Planner::new(MysqlSource::capabilities())
+        .plan_source(&format!(
+            r#"User.filter(x => x.user_id == "{ghost_id}").collect()"#
+        ))
+        .unwrap();
+    let err = db
+        .transaction(|conn| -> iris_adapter_mysql::Result<()> {
+            db.insert_on(conn, &ghost)?;
+            Err(iris_adapter_mysql::Error::Policy("force rollback".into()))
+        })
+        .expect_err("must roll back");
+    assert!(err.to_string().contains("force rollback"));
+    assert!(db.execute_plan(&ghost_plan).unwrap().is_empty());
+
+    db.transaction(|conn| {
+        use mysql::prelude::*;
+        conn.query_drop("DROP TABLE IF EXISTS `User`")?;
+        Ok(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn live_with_rollback_leaves_no_residue_on_success() {
+    let Some(url) = live_url() else {
+        eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
+        return;
+    };
+    let db = MysqlSource::connect(&url)
+        .expect("connect")
+        .with_vos_schema(USER_SCHEMA)
+        .expect("uuid schema map");
+
+    db.transaction(|conn| {
+        use mysql::prelude::*;
+        conn.query_drop("DROP TABLE IF EXISTS `User`")?;
+        Ok(())
+    })
+    .unwrap();
+    db.managed_push(USER_SCHEMA).expect("push");
+
+    let fixture_id = "cccccccc-dddd-eeee-ffff-000000000000";
+    let write = RowWrite {
+        table: "User".into(),
+        primary_key: "user_id".into(),
+        fields: BTreeMap::from([
+            ("user_id".into(), Value::Str(fixture_id.into())),
+            ("user_name".into(), Value::Str("rollback_ok".into())),
+            ("active".into(), Value::Bool(true)),
+        ]),
+    };
+    let plan = Planner::new(MysqlSource::capabilities())
+        .plan_source(&format!(
+            r#"User.filter(x => x.user_id == "{fixture_id}").collect()"#
+        ))
+        .unwrap();
+
+    db.with_rollback(|conn| {
+        db.insert_on(conn, &write)?;
+        let rows = db.execute_plan_on(conn, &plan)?;
+        assert_eq!(rows.len(), 1);
+        Ok(())
+    })
+    .unwrap();
+
+    // Always ROLLBACK — even on Ok — so the shared DB stays clean.
+    assert!(db.execute_plan(&plan).unwrap().is_empty());
+
+    db.transaction(|conn| {
+        use mysql::prelude::*;
+        conn.query_drop("DROP TABLE IF EXISTS `User`")?;
+        Ok(())
+    })
+    .unwrap();
+}
