@@ -36,8 +36,9 @@ Then **commit** the output if the consuming repo’s Docker/`cargo build` expect
 1. **Local developer / maintainer step only.** Deploy and TCB images must **not** install Node just to generate.
 2. Generated code calls **that host’s Iris facade** (`iris::*`, `@yydb/iris`) — not a second ORM.
 3. Do not hand-edit generated files; change schema and regenerate.
-4. Do not invent a “Rust runtime + thin TS wrap” split; each host generates for itself.
-5. If generate fails → fix schema or upstream generator; do not paste SQL types into generated trees.
+4. Generated Rust must include runtime metadata the host needs (e.g. `SCHEMA_FINGERPRINT`, `UUID_FIELDS`) — apps must **not** re-embed `.iris` source into binaries.
+5. Do not invent a “Rust runtime + thin TS wrap” split; each host generates for itself.
+6. If generate fails → fix schema or upstream generator; do not paste SQL types into generated trees.
 
 ## Antiforwards
 
@@ -45,7 +46,8 @@ Then **commit** the output if the consuming repo’s Docker/`cargo build` expect
 |-------|--------|
 | Dockerfile `RUN pnpm generate` | Generate locally → commit → Docker only `cargo build` |
 | Server boot regenerates bindings | Boot uses committed / build-script inputs only |
-| Skip commit because “gitignore generated” | Either commit for deploy, or teach build to generate **at compile time from committed schemas** — still not deploy-time `pnpm generate` |
+| Skip commit because “gitignore generated” | Commit `generated/` for deploy builds that only run `cargo build` |
+| Embed raw `.iris` into `build.rs` for runtime | Extend `iris generate` metadata (e.g. `UUID_FIELDS`); compile that |
 | Path-overlay `@yydb/iris` to get a newer generator in CI | Bump npm / git dep after upstream publish |
 
 ## Planned tools (not live)
