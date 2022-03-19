@@ -159,12 +159,30 @@ impl YydbSource {
         })
     }
 
-    /// Execute a VOS operation program on the native YYDB executor.
-    pub fn execute_vos(&self, _program: &str) -> Result<Vec<iris_types::Row>> {
+    /// Execute a VOS DML program on the native YYDB executor.
+    ///
+    /// Counterpart of `Session::query` / generated `db.$query`.
+    pub fn query(&self, _program: &str) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
         Err(Error::Policy(
             "readiness cleared but VOS client binding is not implemented yet".into(),
         ))
+    }
+
+    /// Execute unit-valued / DDL-shaped VOS on the native YYDB executor.
+    ///
+    /// Counterpart of `Session::execute` / generated `db.$execute`.
+    pub fn execute(&self, _program: &str) -> Result<()> {
+        self.require_vos_executor()?;
+        Err(Error::Policy(
+            "readiness cleared but VOS client binding is not implemented yet".into(),
+        ))
+    }
+
+    /// Execute a VOS operation program on the native YYDB executor.
+    #[deprecated(note = "renamed to YydbSource::query (aligns with Session::query / db.$query)")]
+    pub fn execute_vos(&self, program: &str) -> Result<Vec<iris_types::Row>> {
+        self.query(program)
     }
 
     /// Prepare a VOS program against the current DDL revision.

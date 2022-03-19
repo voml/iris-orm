@@ -42,8 +42,8 @@ User.filter(x => x.active)
     let iris = Runtime::new().open_reference(store);
     let session = iris.session();
 
-    let via_interp = session.interpret_vos(source).expect("interpret");
-    let via_plan = session.execute_vos(source).expect("execute plan");
+    let via_interp = session.interpret(source).expect("interpret");
+    let via_plan = session.query(source).expect("execute plan");
     assert_eq!(via_interp, via_plan);
     assert_eq!(via_plan.len(), 2);
     assert_eq!(
@@ -55,7 +55,7 @@ User.filter(x => x.active)
         Some(&Value::Str("carol".into()))
     );
 
-    let plan = session.plan_vos(source).expect("plan");
+    let plan = session.plan(source).expect("plan");
     assert!(!plan.is_rejected());
     assert!(
         plan.nodes
@@ -69,6 +69,37 @@ User.filter(x => x.active)
 }
 
 #[test]
+fn where_alias_matches_filter_plan_and_rows() {
+    let filter_lambda = r#"User.filter(x => x.user_id == "1").collect()"#;
+    let where_lambda = r#"User.where(x => x.user_id == "1").collect()"#;
+    let where_bare = r#"User.where(user_id == "1").collect()"#;
+    let filter_bare = r#"User.filter(user_id == "1").collect()"#;
+
+    let iris = Runtime::new().open_reference(sample_users());
+    let session = iris.session();
+
+    let plan_filter = session.plan(filter_lambda).expect("filter lambda plan");
+    let plan_where = session.plan(where_lambda).expect("where lambda plan");
+    let plan_bare_where = session.plan(where_bare).expect("where bare plan");
+    let plan_bare_filter = session.plan(filter_bare).expect("filter bare plan");
+
+    assert_eq!(plan_filter.nodes, plan_where.nodes);
+    assert_eq!(plan_filter.nodes, plan_bare_where.nodes);
+    assert_eq!(plan_filter.nodes, plan_bare_filter.nodes);
+
+    let rows_filter = session.query(filter_lambda).expect("filter rows");
+    let rows_where = session.query(where_lambda).expect("where rows");
+    let rows_bare = session.query(where_bare).expect("where bare rows");
+    assert_eq!(rows_filter, rows_where);
+    assert_eq!(rows_filter, rows_bare);
+    assert_eq!(rows_filter.len(), 1);
+    assert_eq!(
+        rows_filter[0].get("user_name"),
+        Some(&Value::Str("alice".into()))
+    );
+}
+
+#[test]
 fn let_bound_pipeline_matches_direct() {
     let source = r#"
 let users = User::filter(x => x.active)
@@ -79,8 +110,8 @@ users
 "#;
     let iris = Runtime::new().open_reference(sample_users());
     let session = iris.session();
-    let a = session.interpret_vos(source).unwrap();
-    let b = session.execute_vos(source).unwrap();
+    let a = session.interpret(source).unwrap();
+    let b = session.query(source).unwrap();
     assert_eq!(a, b);
     assert_eq!(a.len(), 2);
 }
@@ -94,7 +125,7 @@ fn unsupported_filter_rejected_before_execute_with_span() {
     let iris = Iris::new(caps, sample_users());
     let session = iris.session();
     let source = "User.filter(x => x.active).collect()";
-    let err = session.execute_vos(source).expect_err("must reject");
+    let err = session.query(source).expect_err("must reject");
     let span = err.span().expect("spanned diagnostic");
     assert!(span.end >= span.start);
     let msg = err.to_string();
@@ -109,7 +140,7 @@ fn write_method_rejected_at_lower_with_span() {
     let iris = Runtime::new().open_reference(sample_users());
     let err = iris
         .session()
-        .execute_vos("User.filter(x => x.active).delete()")
+        .query("User.filter(x => x.active).delete()")
         .expect_err("writes rejected");
     assert!(err.span().is_some());
 }
@@ -119,7 +150,7 @@ fn version_and_envelope_are_phase1() {
     let iris = Runtime::new().open_reference(sample_users());
     let plan = iris
         .session()
-        .plan_vos("User.take(1).collect()")
+        .plan("User.take(1).collect()")
         .expect("plan");
     assert_eq!(plan.envelope.ir_version, iris::IrVersion::PHASE1);
 }
