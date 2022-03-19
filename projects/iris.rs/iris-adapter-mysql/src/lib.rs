@@ -26,7 +26,7 @@ use vos::ast::Document;
 pub use catalog::{adopt_plan, classify_type};
 pub use migrate::{PushReport, apply_push, plan_push};
 pub use schema_map::collect_uuid_fields;
-/// Connection handle for generated `DbTxn` / same-connection CRUD.
+/// Connection handle for generated `Txn` (adapter-internal checkout; not an app pool).
 pub use mysql::PooledConn;
 
 /// Adapter identifier.
@@ -216,10 +216,10 @@ impl MysqlSource {
 
     /// Run `f` inside a transaction, rolling back on error.
     ///
-    /// Use [`Self::execute_plan_on`] / [`Self::insert_on`] / … on the provided
-    /// connection so reads/writes share the transaction. Calling the pool-level
-    /// [`Self::execute_plan`] / [`Self::insert`] APIs from `f` checks out a
-    /// **different** connection and will not participate in this transaction.
+    /// Prefer generated `Txn` (or these `*_on` helpers) inside `f`. Calling
+    /// [`Self::execute_plan`] / [`Self::insert`] from `f` checks out another
+    /// connection from the adapter pool and will not participate in this transaction.
+    /// The pool itself stays inside this adapter — apps should not build a second pool.
     pub fn transaction<R>(&self, f: impl FnOnce(&mut mysql::PooledConn) -> Result<R>) -> Result<R> {
         let mut conn = self.pool.get_conn()?;
         conn.query_drop("START TRANSACTION")?;
