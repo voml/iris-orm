@@ -190,7 +190,18 @@ fn live_managed_push_crud_txn_drift_and_pool() {
             "#,
         )
         .unwrap();
+    let plan_where = Planner::new(MysqlSource::capabilities())
+        .plan_source(
+            r#"
+            User.where(user_id == "550e8400-e29b-41d4-a716-446655440000")
+                .collect()
+            "#,
+        )
+        .unwrap();
+    assert_eq!(plan.nodes, plan_where.nodes);
     let rows = db.execute_plan(&plan).unwrap();
+    let rows_where = db.execute_plan(&plan_where).unwrap();
+    assert_eq!(rows, rows_where);
     assert_eq!(rows.len(), 1);
     assert_eq!(
         rows[0].get("user_id"),
