@@ -27,12 +27,13 @@
         "homepage:build": "pnpm homepage",
         "homepage:check": "pnpm --filter @yydb/iris-homepage check",
         "verify:homepage-hosts": "pnpm --filter @yydb/iris-homepage run verify:hosts",
-        "placeholder": "node scripts/ci/publish-placeholder.mjs",
-        "placeholder:publish": "node scripts/ci/publish-placeholder.mjs publish",
-        "placeholder:trust": "node scripts/ci/publish-placeholder.mjs trust"
+        "placeholder": "nifty publish --placeholder --dry-run",
+        "placeholder:publish": "nifty publish --placeholder",
+        "placeholder:trust": "nifty trust"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",
+        "@doki-land/nifty": "^0.0.11",
         "typescript": "^5.9.2"
     }
 }
