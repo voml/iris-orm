@@ -103,9 +103,18 @@ fn write_rust_domain_atomic() {
             .as_nanos()
     ));
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
-    let path = iris_generator::write_rust_domain(&model, &dir).unwrap();
-    assert!(path.ends_with("mod.rs"));
-    let text = std::fs::read_to_string(&path).unwrap();
+    let paths = iris_generator::write_rust_domain(&model, &dir).unwrap();
+    let root = dir.join("generated/iris/rust");
+    assert_eq!(paths.len(), 5);
+    assert!(paths.iter().all(|p| p.starts_with(&root)));
+    assert!(root.join("mod.rs").is_file());
+    assert!(root.join("models.rs").is_file());
+    assert!(root.join("operations.rs").is_file());
+    assert!(root.join("metadata.rs").is_file());
+    assert!(root.join("errors.rs").is_file());
+    let text = std::fs::read_to_string(root.join("models.rs")).unwrap();
     assert!(text.contains("pub struct User"));
+    let ops = std::fs::read_to_string(root.join("operations.rs")).unwrap();
+    assert!(ops.contains("pub struct Db"));
     let _ = std::fs::remove_dir_all(dir);
 }

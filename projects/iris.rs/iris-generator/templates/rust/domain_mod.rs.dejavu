@@ -7,20 +7,3 @@ pub struct <% table.rust_type %> {
 }
 
 <%- end loop %>
-/// Schema fingerprint locked into this generation.
-pub const SCHEMA_FINGERPRINT: &str = "<% schema_fingerprint %>";
-
-/// Generator version that produced this file.
-pub const GENERATOR_VERSION: &str = "<% generator_version %>";
-
-/// `(table, field)` pairs typed as VOS `uuid` — for host adapters (e.g. MySQL BINARY(16)).
-/// Apps must not re-parse `.iris` at runtime; use this from `iris generate` output.
-pub const UUID_FIELDS: &[(&str, &str)] = &[
-<%- loop table in tables %>
-<%- loop field in table.fields %>
-<%- if field.is_uuid %>
-    ("<% table.name %>", "<% field.name %>"),
-<%- end if %>
-<%- end loop %>
-<%- end loop %>
-];

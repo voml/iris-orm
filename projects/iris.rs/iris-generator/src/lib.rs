@@ -188,19 +188,79 @@ pub const fn prefers_aot() -> bool {
     cfg!(feature = "aot")
 }
 
-/// Emit Rust domain module text for a generation model.
-pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
-    let header = render(
+/// Relative root for all targets: `{out}/generated/iris/<target>/`.
+pub const GENERATED_IRIS_DIR: &str = "generated/iris";
+
+/// Output directory for the Rust target.
+pub fn rust_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
+    out_dir.join(GENERATED_IRIS_DIR).join("rust")
+}
+
+/// Output directory for the TypeScript target.
+pub fn typescript_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
+    out_dir.join(GENERATED_IRIS_DIR).join("typescript")
+}
+
+fn rust_file_header(model: &GenerationModel) -> Result<String> {
+    render(
         "file_header",
         &json!({
             "generator_version": model.generator_version,
             "schema_fingerprint": model.schema_fingerprint,
         }),
-    )?;
-    let body = render("domain_mod", &model.to_json())?;
-    let domain = format!("{header}\n{}", unescape_rust_template(&body));
-    let client = rust_client::emit_rust_mysql_client(model)?;
-    Ok(format!("{domain}\n{client}"))
+    )
+}
+
+/// Emit Rust domain + client as a single string (tests / inspection).
+pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
+    let files = emit_rust_files(model)?;
+    let mut combined = String::new();
+    for (name, content) in files {
+        combined.push_str(&format!("\n// ===== {name} =====\n"));
+        combined.push_str(&content);
+    }
+    Ok(combined)
+}
+
+/// Emit Rust target files: `mod` / `models` / `operations` / `metadata` / `errors`.
+pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>> {
+    let header = rust_file_header(model)?;
+    let structs = unescape_rust_template(&render("domain_mod", &model.to_json())?);
+    let models_body = rust_client::emit_models_body(model)?;
+    let models = format!("{header}\n{structs}\n{models_body}");
+    let metadata = format!(
+        "{header}\n{}\n",
+        rust_client::emit_metadata(model)
+    );
+    let errors = format!("{header}\n{}\n", rust_client::emit_errors());
+    let operations = format!(
+        "{header}\n{}\n",
+        rust_client::emit_operations(model)?
+    );
+    let index = format!(
+        r#"{header}
+//! Public entry for generated Iris Rust bindings.
+//! Layout: `generated/iris/rust/` — models / operations / metadata / errors.
+
+pub mod errors;
+pub mod metadata;
+pub mod models;
+pub mod operations;
+
+pub use errors::{{Error, Result}};
+pub use metadata::{{GENERATOR_VERSION, SCHEMA_FINGERPRINT, UUID_FIELDS}};
+pub use models::*;
+pub use operations::{{Db, Txn}};
+"#
+    );
+
+    Ok(vec![
+        ("mod.rs".into(), index),
+        ("models.rs".into(), models),
+        ("operations.rs".into(), operations),
+        ("metadata.rs".into(), metadata),
+        ("errors.rs".into(), errors),
+    ])
 }
 
 /// Dejavu template mode HTML-escapes `<`/`>`; Rust types need raw angle brackets.
@@ -210,18 +270,32 @@ fn unescape_rust_template(text: &str) -> String {
         .replace("&gt;", ">")
 }
 
-/// Write Rust domain bindings into `out_dir` atomically (temp + rename).
+fn write_files_atomic(
+    root: &std::path::Path,
+    files: Vec<(String, String)>,
+) -> Result<Vec<std::path::PathBuf>> {
+    std::fs::create_dir_all(root)?;
+    let mut written = Vec::new();
+    for (name, content) in files {
+        let target = root.join(&name);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let tmp = root.join(format!("{name}.tmp"));
+        std::fs::write(&tmp, content)?;
+        std::fs::rename(&tmp, &target)?;
+        written.push(target);
+    }
+    Ok(written)
+}
+
+/// Write Rust bindings into `{out_dir}/generated/iris/rust/`.
 pub fn write_rust_domain(
     model: &GenerationModel,
     out_dir: &std::path::Path,
-) -> Result<std::path::PathBuf> {
-    std::fs::create_dir_all(out_dir)?;
-    let target = out_dir.join("mod.rs");
-    let tmp = out_dir.join("mod.rs.tmp");
-    let text = emit_rust_domain(model)?;
-    std::fs::write(&tmp, text)?;
-    std::fs::rename(&tmp, &target)?;
-    Ok(target)
+) -> Result<Vec<std::path::PathBuf>> {
+    let root = rust_target_dir(out_dir);
+    write_files_atomic(&root, emit_rust_files(model)?)
 }
 
 /// Generate bindings for `target` (`rust` | `typescript`) under `out_dir`.
@@ -231,7 +305,7 @@ pub fn generate(
     out_dir: &std::path::Path,
 ) -> Result<Vec<std::path::PathBuf>> {
     match target {
-        "rust" => Ok(vec![write_rust_domain(model, out_dir)?]),
+        "rust" => write_rust_domain(model, out_dir),
         "typescript" | "ts" => write_typescript_client(model, out_dir),
         other => Err(typescript::unsupported_target(other)),
     }

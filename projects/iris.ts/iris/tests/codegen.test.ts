@@ -60,30 +60,40 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.equal(result.ok, true);
     assert.equal(result.files.length, 10);
 
-    const index = await readFile(join(outDir, "generated", "index.ts"), "utf8");
-    assert.match(index, /export \{ DbClient, createClient \}/);
-    assert.doesNotMatch(index, /export \{ db \}/);
+    const root = join(outDir, "generated", "iris", "typescript");
+    assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris\/typescript$/);
 
-    const nodeEntry = await readFile(join(outDir, "generated", "node.ts"), "utf8");
+    const index = await readFile(join(root, "index.ts"), "utf8");
+    assert.match(index, /export \{ DbClient, createClient \}/);
+    assert.match(index, /from "\.\/operations\.js"/);
+    assert.match(index, /from "\.\/errors\.js"/);
+    assert.doesNotMatch(index, /export \{ db \}/);
+    assert.doesNotMatch(index, /synthesize/);
+
+    const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
     assert.match(nodeEntry, /createIrisDbBinding/);
     assert.match(nodeEntry, /export async function createDb/);
 
-    const browserEntry = await readFile(join(outDir, "generated", "browser.ts"), "utf8");
+    const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /createBrowserIrisDbBinding/);
     assert.match(browserEntry, /export async function createDb/);
 
-    const dbSource = await readFile(join(outDir, "generated", "db.ts"), "utf8");
-    assert.match(dbSource, /\$query<T = unknown>/);
-    assert.match(dbSource, /synthesizeCreate/);
-    assert.doesNotMatch(dbSource, /@yydb\/iris\/node/);
-    assert.doesNotMatch(dbSource, /include/);
-    assert.doesNotMatch(dbSource, /::insert\(\{ \.\.\. \}\)/);
+    const operations = await readFile(join(root, "operations.ts"), "utf8");
+    assert.match(operations, /\$query<T = unknown>/);
+    assert.match(operations, /synthesizeCreate/);
+    assert.match(operations, /\.\/_internal\/synthesize\.js/);
+    assert.doesNotMatch(operations, /@yydb\/iris\/node/);
+    assert.doesNotMatch(operations, /include/);
+    assert.doesNotMatch(operations, /::insert\(\{ \.\.\. \}\)/);
 
-    const synthesize = await readFile(join(outDir, "generated", "synthesize.ts"), "utf8");
+    const synthesize = await readFile(join(root, "_internal", "synthesize.ts"), "utf8");
     assert.match(synthesize, /compileWherePredicates/);
     assert.match(synthesize, /synthesizeCreate/);
 
-    const metadata = await readFile(join(outDir, "generated", "metadata.ts"), "utf8");
+    const errors = await readFile(join(root, "errors.ts"), "utf8");
+    assert.match(errors, /IrisGeneratedError/);
+
+    const metadata = await readFile(join(root, "metadata.ts"), "utf8");
     assert.ok(metadata.includes(result.schemaFingerprint));
 });
 
@@ -96,7 +106,7 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-tsc-"));
     const result = core.generate(POST_USER_SCHEMA, "typescript", outDir);
     assert.equal(result.ok, true);
-    const generatedRoot = join(outDir, "generated");
+    const generatedRoot = join(outDir, "generated", "iris", "typescript");
 
     const typesRoot = fileURLToPath(new URL("../src/types", import.meta.url));
     const stubDir = join(outDir, "stubs");
@@ -155,7 +165,7 @@ export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingO
                     },
                     baseUrl: ".",
                 },
-                include: ["./generated/**/*.ts"],
+                include: ["./generated/iris/typescript/**/*.ts"],
             },
             null,
             2,

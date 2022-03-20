@@ -3,6 +3,11 @@
 /** Iris session bound to a reference or foreign adapter. */
 export declare class MemorySession {
   constructor()
+  /** Plan + execute VOS DML (returns rows). Aligns with generated `db.$query`. */
+  query(source: string, parametersJson?: string | undefined | null): ExecuteResult
+  /** Execute unit-valued / DDL-shaped VOS. Aligns with generated `db.$execute`. */
+  execute(source: string, parametersJson?: string | undefined | null): ExecuteResult
+  /** Plan + execute VOS DML (legacy name). */
   executeVos(source: string, parametersJson?: string | undefined | null): ExecuteResult
   /** Execute a structured Iris operation JSON payload (generated client ABI). */
   executeOperation(operationJson: string): ExecuteResult

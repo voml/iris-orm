@@ -1,28 +1,18 @@
-//! Emit thin Rust `Db` / typed CRUD (TS-parity shim; not knife-B identity IR).
+//! Emit thin Rust `Db` / `Txn` shim (TS-parity; not knife-B identity IR).
 //!
-//! Generated code targets `MysqlSource` + `Planner`, synthesizes VOS `.filter`
-//! pipelines with escaped literals. Pooling stays inside `MysqlSource`; apps see
-//! `Db` and, for a unit of work, `Txn` (same method names).
+//! Pooling stays inside `MysqlSource`; apps see `Db` and, for a unit of work,
+//! `Txn` (same method names).
 
 use crate::{Error, FieldModel, GenerationModel, Result, TableModel};
 
-/// Append typed MySQL client + per-table delegates to a domain `mod.rs` body.
-pub fn emit_rust_mysql_client(model: &GenerationModel) -> Result<String> {
+/// Row decode helpers, `from_row`, and flat `Where` structs for `models.rs`.
+pub fn emit_models_body(model: &GenerationModel) -> Result<String> {
     let mut out = String::new();
     out.push_str(
         r#"
-// --- Thin generated client (TS-parity shim; not knife-B GeneratedCall) ---------
-// Prefer these delegates over hand-written VOS strings / RowWrite. Escape hatch:
-// `Db::query` / `Db::execute` (aligns with Session::query / db.$query).
-// `transaction` / `with_rollback` give a `Txn` with the same CRUD surface;
-// the connection is held by Iris — do not call MysqlSource checkout APIs from `f`.
+use iris::{Row, Value};
 
-use std::collections::BTreeMap;
-
-use iris::{Planner, Row, RowWrite, Value};
-use iris_adapter_mysql::{MysqlSource, Result as MysqlResult};
-
-fn __iris_escape_vos_str(value: &str) -> String {
+pub(crate) fn escape_vos_str(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
         match ch {
@@ -66,8 +56,63 @@ fn __iris_value_i64(row: &Row, key: &str) -> Option<i64> {
         out.push_str(&emit_where_struct(table)?);
     }
 
+    Ok(out)
+}
+
+/// Schema fingerprint, generator version, and uuid column table for `metadata.rs`.
+pub fn emit_metadata(model: &GenerationModel) -> String {
+    let mut uuid_entries = String::new();
+    for table in &model.tables {
+        for field in &table.fields {
+            if field.is_uuid {
+                uuid_entries.push_str(&format!(
+                    "    (\"{}\", \"{}\"),\n",
+                    table.name, field.name
+                ));
+            }
+        }
+    }
+    format!(
+        r#"
+/// Deterministic fingerprint of the VOS schema used to generate these bindings.
+pub const SCHEMA_FINGERPRINT: &str = "{fingerprint}";
+
+/// `iris-generator` crate version that produced these bindings.
+pub const GENERATOR_VERSION: &str = "{version}";
+
+/// `(table, field)` pairs whose VOS type is `uuid` / `uuid?` (MySQL `BINARY(16)`).
+pub const UUID_FIELDS: &[(&str, &str)] = &[
+{uuid_entries}];
+"#,
+        fingerprint = escape_rust_str_lit(&model.schema_fingerprint),
+        version = escape_rust_str_lit(&model.generator_version),
+        uuid_entries = uuid_entries,
+    )
+}
+
+/// Re-export adapter error types for `errors.rs`.
+pub fn emit_errors() -> String {
+    "pub use iris_adapter_mysql::{Error, Result};\n".into()
+}
+
+/// `Db` / `Txn` and per-table delegates for `operations.rs`.
+pub fn emit_operations(model: &GenerationModel) -> Result<String> {
+    let mut out = String::new();
     out.push_str(
         r#"
+use std::collections::BTreeMap;
+
+use iris::{Planner, Row, RowWrite, Value};
+use iris_adapter_mysql::MysqlSource;
+use super::errors::Result as MysqlResult;
+use super::models::{escape_vos_str, *};
+
+// --- Thin generated client (TS-parity shim; not knife-B GeneratedCall) ---------
+// Prefer these delegates over hand-written VOS strings / RowWrite. Escape hatch:
+// `Db::query` / `Db::execute` (aligns with Session::query / db.$query).
+// `transaction` / `with_rollback` give a `Txn` with the same CRUD surface;
+// the connection is held by Iris — do not call MysqlSource checkout APIs from `f`.
+
 /// Generated Iris client bound to a MySQL adapter.
 pub struct Db<'a> {
     source: &'a MysqlSource,
@@ -201,6 +246,21 @@ impl Txn<'_> {
     Ok(out)
 }
 
+fn escape_rust_str_lit(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
 fn scalar_base(rust_ty: &str) -> &str {
     rust_ty
         .trim_start_matches("Option<")
@@ -324,7 +384,7 @@ fn emit_pred_build(table: &TableModel) -> String {
             _ => {
                 pred_build.push_str(&format!(
                     r#"        if let Some(ref v) = where_.{fname} {{
-            preds.push(format!("x.{fname} == \"{{}}\"", __iris_escape_vos_str(v)));
+            preds.push(format!("x.{fname} == \"{{}}\"", escape_vos_str(v)));
         }}
 "#,
                     fname = field.name,

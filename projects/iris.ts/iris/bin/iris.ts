@@ -36,7 +36,7 @@ cli.command("check [schema]", "Validate schema + generated client drift")
 
 cli.command("generate [schema]", "Generate Iris client from .iris schema")
     .option("--config <path>", "Path to iris.von")
-    .option("--out <dir>", "Output project root (typescript writes generated/ under this path)")
+    .option("--out <dir>", "Output project root (writes generated/iris/<target>/ under this path)")
     .option("--target <name>", "Emitter target (defaults to iris.von generate.target or typescript)")
     .action(async (schema?: string, options?: { out?: string; target?: string; config?: string }) => {
         try {
