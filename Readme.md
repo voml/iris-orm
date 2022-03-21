@@ -110,6 +110,22 @@ checkout. VON config uses sibling [`von-language`](https://github.com/voml/von-l
 Phases 0–4, 6–9, and 10-A…G landed (Composite conformance §15.6, topology
 activate, projection verify). Phase 5 YYDS remains readiness-gated.
 
+## Escape hatch naming (TS ↔ Rust)
+
+Public VOS text entry points (not a second query dialect):
+
+| Intent | TypeScript generated client | Rust `Session` (reference) |
+| --- | --- | --- |
+| DML (rows) | `db.$query(vosText, parameters?)` | `session.query(vosText)` |
+| DDL / unit | `db.$execute(vosText, parameters?)` | `session.execute(vosText)` |
+| Plan only | (via binding / explain) | `session.plan(vosText)` |
+
+Pipeline predicates: `.filter(x => …)` and `.where(…)` are aliases (same physical
+`Filter` op). Prefer either form; do not treat `.where` as unsupported.
+
+Legacy Rust names `execute_vos` / `plan_vos` / `interpret_vos` are deprecated
+aliases of `query` / `plan` / `interpret`.
+
 ## Develop / clean checkout smoke
 
 ```bash
