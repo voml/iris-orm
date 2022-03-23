@@ -120,8 +120,9 @@ Public VOS text entry points (not a second query dialect):
 | DDL / unit | `db.$execute(vosText, parameters?)` | `session.execute(vosText)` |
 | Plan only | (via binding / explain) | `session.plan(vosText)` |
 
-Pipeline predicates: `.filter(x => …)` and `.where(…)` are aliases (same physical
-`Filter` op). Prefer either form; do not treat `.where` as unsupported.
+Pipeline predicates: prefer **`.filter(x => …)`**. `.where(…)` is accepted only as a
+compatibility alias of `.filter` (same physical `Filter` op); **do not document or
+generate SQL-style `.where` in new examples**.
 
 Legacy Rust names `execute_vos` / `plan_vos` / `interpret_vos` are deprecated
 aliases of `query` / `plan` / `interpret`.
