@@ -16,7 +16,7 @@ Thumbs.db
 node_modules/
 dist/
 pnpm-lock.yaml
-!projects/iris.ts/homepage/pnpm-lock.yaml
+!projects/packages/homepage/pnpm-lock.yaml
 *.log
 
 # Secrets / local env
@@ -35,5 +35,5 @@ scripts/.placeholder-npm-cache.json
 iris.lock
 **/.cache/iris/
 
-# wasm-pack mis-targeted output (use projects/iris.ts/iris-unknown-wasm32)
-projects/iris.rs/iris-unknown-wasm32/
+# wasm-pack mis-targeted output (use projects/packages/iris-unknown-wasm32)
+projects/crates/iris-unknown-wasm32/

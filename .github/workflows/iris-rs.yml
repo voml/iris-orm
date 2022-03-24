@@ -1,21 +1,21 @@
-name: iris.rs
+name: iris-rs
 
 on:
   workflow_dispatch:
   push:
     branches: [master, dev]
     paths:
-      - "projects/iris.rs/**"
+      - "projects/crates/**"
       - ".github/workflows/iris-rs.yml"
   pull_request:
     branches: [master, dev]
     paths:
-      - "projects/iris.rs/**"
+      - "projects/crates/**"
       - ".github/workflows/iris-rs.yml"
 
 defaults:
   run:
-    working-directory: projects/iris.rs
+    working-directory: .
 
 env:
   CARGO_TERM_COLOR: always
@@ -78,7 +78,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: projects/iris.rs -> target
+          workspaces: . -> target
 
       - name: Format
         run: cargo fmt --all -- --check
