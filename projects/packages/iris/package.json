@@ -1,12 +1,12 @@
 {
     "name": "@yydb/iris",
-    "version": "0.1.0",
+    "version": "0.0.0",
     "description": "Iris ORM — TypeScript facade + iris CLI. Rust semantic core via N-API / WASM. Site: https://iris-orm.pages.dev/",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/voml/iris-orm.git",
-        "directory": "projects/iris.ts/iris"
+        "directory": "projects/packages/iris"
     },
     "bugs": {
         "url": "https://github.com/voml/iris-orm/issues"

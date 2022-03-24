@@ -39,7 +39,7 @@ UI components are used as **bare tags** (`<Button>`, `<Card>`, `<Icon>`, …) di
 
 | Field | Value |
 |-------|--------|
-| Root directory | `projects/iris.ts/homepage` |
+| Root directory | `projects/packages/homepage` |
 | Build command | `pnpm build` |
 | Build output directory | `dist/cdn` |
 | Node version | 20 or 22 |

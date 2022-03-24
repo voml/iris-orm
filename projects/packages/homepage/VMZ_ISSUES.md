@@ -23,7 +23,7 @@ Findings while building `@yydb/iris-homepage` on **npm `@vmz/*@0.1.12`**. Confir
 ```bash
 # Example — do not commit resulting lock/package.json
 cd vmz-framework/packages/ui/vmz-ui && pnpm link --global
-cd iris-orm/projects/iris.ts/homepage && pnpm link --global @vmz/ui
+cd iris-orm/projects/packages/homepage && pnpm link --global @vmz/ui
 
 # Restore before push
 pnpm install   # in homepage — refreshes registry tarballs
