@@ -1,21 +1,10 @@
 [workspace]
 resolver = "2"
-members = [
-    "iris",
-    "iris-types",
-    "iris-ir",
-    "iris-generator",
-    "iris-napi",
-    "iris-wasm",
-    "iris-tools",
-    "iris-connector-yydb",
-    "iris-connector-yyds",
-    "iris-adapter-mysql",
-    "iris-adapter-postgres",
-    "iris-adapter-sqlite",
-    "iris-adapter-redis",
+members = ["projects/crates/*"]
+default-members = [
+    "projects/crates/iris",
+    "projects/crates/iris-tools",
 ]
-default-members = ["iris", "iris-tools"]
 
 [workspace.package]
 version = "0.1.0"
@@ -46,19 +35,23 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 glob = "0.3"
 
-iris = { path = "iris" }
-iris-types = { path = "iris-types" }
-iris-ir = { path = "iris-ir" }
-iris-generator = { path = "iris-generator" }
-iris-tools = { path = "iris-tools" }
-iris-wasm = { path = "iris-wasm" }
-iris-connector-yydb = { path = "iris-connector-yydb" }
-iris-connector-yyds = { path = "iris-connector-yyds" }
-iris-adapter-mysql = { path = "iris-adapter-mysql" }
-iris-adapter-postgres = { path = "iris-adapter-postgres" }
-iris-adapter-sqlite = { path = "iris-adapter-sqlite" }
-iris-adapter-redis = { path = "iris-adapter-redis" }
+iris = { path = "projects/crates/iris" }
+iris-types = { path = "projects/crates/iris-types" }
+iris-ir = { path = "projects/crates/iris-ir" }
+iris-generator = { path = "projects/crates/iris-generator" }
+iris-tools = { path = "projects/crates/iris-tools" }
+iris-wasm = { path = "projects/crates/iris-wasm" }
+iris-connector-yydb = { path = "projects/crates/iris-connector-yydb" }
+iris-connector-yyds = { path = "projects/crates/iris-connector-yyds" }
+iris-adapter-mysql = { path = "projects/crates/iris-adapter-mysql" }
+iris-adapter-postgres = { path = "projects/crates/iris-adapter-postgres" }
+iris-adapter-sqlite = { path = "projects/crates/iris-adapter-sqlite" }
+iris-adapter-redis = { path = "projects/crates/iris-adapter-redis" }
 napi = { version = "3.12", default-features = false, features = ["napi9"] }
 napi-derive = "3.6"
 napi-build = "2"
 wasm-bindgen = "0.2"
+
+[profile.release]
+lto = true
+opt-level = "s"
