@@ -49,6 +49,7 @@ pub enum Error {
 /// Result alias.
 pub type Result<T> = std::result::Result<T, Error>;
 
+mod rust_client;
 mod typescript;
 
 include!(concat!(env!("OUT_DIR"), "/aot_registry.rs"));
@@ -197,7 +198,9 @@ pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
         }),
     )?;
     let body = render("domain_mod", &model.to_json())?;
-    Ok(format!("{header}\n{}", unescape_rust_template(&body)))
+    let domain = format!("{header}\n{}", unescape_rust_template(&body));
+    let client = rust_client::emit_rust_mysql_client(model)?;
+    Ok(format!("{domain}\n{client}"))
 }
 
 /// Dejavu template mode HTML-escapes `<`/`>`; Rust types need raw angle brackets.
