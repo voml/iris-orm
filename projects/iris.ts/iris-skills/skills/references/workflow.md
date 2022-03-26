@@ -59,16 +59,18 @@ If the runtime needs schema-derived metadata (e.g. MySQL uuid column map), **`ir
 ## Runtime data access
 
 ```text
-App → generated types / Session::query("…") / db.$query("…") / Iris write APIs
+App → generated Db / db.user.findMany  (primary)
+    → escape hatch: Session::query / db.$query  (rare)
     → Iris planner + adapter
     → DB
 ```
 
-- Prefer generated models + Iris APIs.
-- Pipeline predicates: prefer **`.filter(x => …)`**. `.where(…)` may lower as a
-  compatibility alias of `.filter`, but **do not teach SQL-style `.where` in new
-  app or skill examples**.
+- **Rust primary path:** `iris generate --target rust` → `Db` / `DbTxn` typed CRUD.
+  Do **not** teach hand-written `query("….filter…")` strings as normal CRUD.
 - Escape hatch: Rust `query`/`execute` ↔ TS `$query`/`$execute` (legacy `execute_vos` deprecated).
+- Pipeline predicates (escape hatch only): prefer **`.filter(x => …)`**. Do not teach SQL-style `.where`.
+- MySQL tests against a shared DB: `Db::with_rollback` / `MysqlSource::with_rollback` + same-connection APIs.
+  Never call pool-level `insert` / `execute_plan` inside a transaction callback.
 - **No** SQL / `mysql2` / `sqlx` on Iris-managed tables.
 - New `uuid` PKs: **`iris::uuid()`** (v7 only).
 
