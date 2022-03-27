@@ -13,36 +13,67 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
     let ctx = model.to_json();
     let entity_names: HashSet<&str> = model.tables.iter().map(|t| t.name.as_str()).collect();
 
+    let macros = emit_macros(&model.macros).replace(
+        "./synthesize.js",
+        "./_internal/synthesize.js",
+    );
+    // Single operations.ts: keep IrisDbBinding import from macros; drop duplicate from db.
+    let db = emit_db(model)
+        .replace("import type { IrisDbBinding } from \"@yydb/iris/types\";\n", "")
+        .replace("import { GeneratedMacros } from \"./macros.js\";\n", "")
+        .replace("./synthesize.js", "./_internal/synthesize.js");
+    let operations = format!("{macros}\n{db}");
+
     let mut files: Vec<(String, String)> = vec![
         ("metadata.ts".into(), render("metadata", &ctx)?),
         ("index.ts".into(), render("index", &ctx)?),
         ("node.ts".into(), render("node", &ctx)?),
         ("browser.ts".into(), render("browser", &ctx)?),
-        ("synthesize.ts".into(), SYNTHESIZE_TS.to_string()),
+        (
+            "_internal/synthesize.ts".into(),
+            SYNTHESIZE_TS.to_string(),
+        ),
         ("references.ts".into(), emit_references(model)),
         ("models.ts".into(), emit_models(model)),
         ("inputs.ts".into(), emit_inputs(model, &entity_names)),
-        ("macros.ts".into(), emit_macros(&model.macros)),
-        ("db.ts".into(), emit_db(model)),
+        ("operations.ts".into(), operations),
+        ("errors.ts".into(), emit_errors_ts()),
     ];
 
     files.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(files)
 }
 
-/// Write TypeScript client files into `{out_dir}/generated/`.
+/// Write TypeScript client files into `{out_dir}/generated/iris/typescript/`.
 pub fn write_typescript_client(model: &GenerationModel, out_dir: &Path) -> Result<Vec<PathBuf>> {
-    let root = out_dir.join("generated");
-    std::fs::create_dir_all(&root)?;
+    let root = crate::typescript_target_dir(out_dir);
+    std::fs::create_dir_all(root.join("_internal"))?;
     let mut written = Vec::new();
     for (name, content) in emit_typescript_client(model)? {
         let target = root.join(&name);
-        let tmp = root.join(format!("{name}.tmp"));
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let tmp_name = name.replace('/', "__");
+        let tmp = root.join(format!("{tmp_name}.tmp"));
         std::fs::write(&tmp, content)?;
         std::fs::rename(&tmp, &target)?;
         written.push(target);
     }
     Ok(written)
+}
+
+fn emit_errors_ts() -> String {
+    r#"/** Target-native error surface (shim until full IrisError mapping). */
+export type IrisGeneratedError = {
+    code: string;
+    message: string;
+    path?: string;
+    span?: { start: number; end: number };
+    cause?: unknown;
+};
+"#
+    .into()
 }
 
 fn camel_case(name: &str) -> String {
