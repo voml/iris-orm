@@ -80,7 +80,9 @@ impl MemorySession {
         }
         match self.iris.session().execute(source) {
             Ok(()) => Ok(json!({ "ok": true, "rows": [], "error": JsonValue::Null }).to_string()),
-            Err(err) => Ok(json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string()),
+            Err(err) => {
+                Ok(json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string())
+            }
         }
     }
 

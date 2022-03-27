@@ -65,10 +65,7 @@ pub fn emit_metadata(model: &GenerationModel) -> String {
     for table in &model.tables {
         for field in &table.fields {
             if field.is_uuid {
-                uuid_entries.push_str(&format!(
-                    "    (\"{}\", \"{}\"),\n",
-                    table.name, field.name
-                ));
+                uuid_entries.push_str(&format!("    (\"{}\", \"{}\"),\n", table.name, field.name));
             }
         }
     }
@@ -262,9 +259,7 @@ fn escape_rust_str_lit(value: &str) -> String {
 }
 
 fn scalar_base(rust_ty: &str) -> &str {
-    rust_ty
-        .trim_start_matches("Option<")
-        .trim_end_matches('>')
+    rust_ty.trim_start_matches("Option<").trim_end_matches('>')
 }
 
 fn emit_from_row(table: &TableModel) -> Result<String> {

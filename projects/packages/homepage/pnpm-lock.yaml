@@ -9,54 +9,50 @@ importers:
   .:
     dependencies:
       '@vmz/core':
-        specifier: 0.1.10
-        version: 0.1.10
+        specifier: 0.1.12
+        version: 0.1.12
+      '@vmz/plugin-shiki':
+        specifier: 0.1.12
+        version: 0.1.12(shiki@3.23.0)
       '@vmz/ui':
-        specifier: 0.1.10
-        version: 0.1.10
+        specifier: 0.1.12
+        version: 0.1.12
+      '@yydb/iris':
+        specifier: link:../iris
+        version: link:../iris
+      shiki:
+        specifier: ^3.0.0
+        version: 3.23.0
     devDependencies:
       '@vmz/plugin-markdown-it':
-        specifier: 0.1.10
-        version: 0.1.10
-      '@vmz/plugin-shiki':
-        specifier: 0.1.10
-        version: 0.1.10(shiki@4.4.3)
+        specifier: 0.1.12
+        version: 0.1.12
       '@vmz/vmz':
-        specifier: 0.1.10
-        version: 0.1.10(@vmz/plugin-markdown-it@0.1.10)(typescript@5.9.3)
+        specifier: 0.1.12
+        version: 0.1.12(@vmz/plugin-markdown-it@0.1.12)(typescript@5.9.3)
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
 
 packages:
 
-  '@shikijs/core@4.4.3':
-    resolution: {integrity: sha512-QCR4q2ZO/ILJEuwiBMel4wdcTDb1JGwfjKTxPDF6x8ixOaluPrVqIn06C99AcRPhmYlBR56d/Fb+GN58GzExpg==}
-    engines: {node: '>=20'}
+  '@shikijs/core@3.23.0':
+    resolution: {integrity: sha512-NSWQz0riNb67xthdm5br6lAkvpDJRTgB36fxlo37ZzM2yq0PQFFzbd8psqC2XMPgCzo1fW6cVi18+ArJ44wqgA==}
 
-  '@shikijs/engine-javascript@4.4.3':
-    resolution: {integrity: sha512-FbOjFJp9VLdo1Wevs10BBtVxiTWwNLqZh5Gkhjgda/ioL15YOgeSl9n+6XMa3qRlPQzfhFNe641SrynFHYG0nQ==}
-    engines: {node: '>=20'}
+  '@shikijs/engine-javascript@3.23.0':
+    resolution: {integrity: sha512-aHt9eiGFobmWR5uqJUViySI1bHMqrAgamWE1TYSUoftkAeCCAiGawPMwM+VCadylQtF4V3VNOZ5LmfItH5f3yA==}
 
-  '@shikijs/engine-oniguruma@4.4.3':
-    resolution: {integrity: sha512-EcOQkxdxGQrc1Row/cC2c96/v1dbZqGnEVu1qTuT/MJmp6+cXCvQussowVmCv5Tqr3KuY3c7IbM6HTW3LJ1k9w==}
-    engines: {node: '>=20'}
+  '@shikijs/engine-oniguruma@3.23.0':
+    resolution: {integrity: sha512-1nWINwKXxKKLqPibT5f4pAFLej9oZzQTsby8942OTlsJzOBZ0MWKiwzMsd+jhzu8YPCHAswGnnN1YtQfirL35g==}
 
-  '@shikijs/langs@4.4.3':
-    resolution: {integrity: sha512-ePic0yfAJGOF83D5wBHK/00EjK65oahBYxFk5epgq33WRv7X9UuxLEV8PtR0szC0z8dl7INIpIodB99JRFlR+A==}
-    engines: {node: '>=20'}
+  '@shikijs/langs@3.23.0':
+    resolution: {integrity: sha512-2Ep4W3Re5aB1/62RSYQInK9mM3HsLeB91cHqznAJMuylqjzNVAVCMnNWRHFtcNHXsoNRayP9z1qj4Sq3nMqYXg==}
 
-  '@shikijs/primitive@4.4.3':
-    resolution: {integrity: sha512-m0wBeLDQDeIxRdUmrCPdQqfuUamDwRL5isCfYbguKD6NiaKpVbsv+3J81DyIKgNW5h4WAIIr8T4EkgQrBBxvaQ==}
-    engines: {node: '>=20'}
+  '@shikijs/themes@3.23.0':
+    resolution: {integrity: sha512-5qySYa1ZgAT18HR/ypENL9cUSGOeI2x+4IvYJu4JgVJdizn6kG4ia5Q1jDEOi7gTbN4RbuYtmHh0W3eccOrjMA==}
 
-  '@shikijs/themes@4.4.3':
-    resolution: {integrity: sha512-w8UHjeUnIR965KMWJHUPXOc2mNJUnK3vpVLYLvw5IYU2mnTTJ89E24OrJDBNiJDQ0qzb0tc4l7mrIXx5cFeIyw==}
-    engines: {node: '>=20'}
-
-  '@shikijs/types@4.4.3':
-    resolution: {integrity: sha512-UEJxmRR++MAGR6hugn0vgVS2W/6lWAts84FFSrnlH9sP0LNol7E5+NQ792pH8liWUhyMyjhTgSUH3k7iD7tc5g==}
-    engines: {node: '>=20'}
+  '@shikijs/types@3.23.0':
+    resolution: {integrity: sha512-3JZ5HXOZfYjsYSk0yPwBrkupyYSLpAE26Qc0HLghhZNGTZg/SKxXIIgoxOpmmeQP0RRSDJTk1/vPfw9tbw+jSQ==}
 
   '@shikijs/vscode-textmate@10.0.2':
     resolution: {integrity: sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg==}
@@ -73,52 +69,52 @@ packages:
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
 
-  '@vmz/core@0.1.10':
-    resolution: {integrity: sha512-YzSzv1yh3i/VYyA0JgqxY3DpzMyMAHMEI3CBz2Mt2NcIiUTcTvOwogzQvAMEwmA1NmIVvcbb5vwgj6L9TSuIrQ==}
+  '@vmz/core@0.1.12':
+    resolution: {integrity: sha512-xbGPkZIXQPpPeypMyaX0ebqeVn9/X6vAG3wikBKD/WLpsKFbz17ub90RfPM+xDmoRHJPHuQPHQcp59slXlyC9g==}
 
-  '@vmz/plugin-markdown-it@0.1.10':
-    resolution: {integrity: sha512-CS61EwNTp6IEl7BBItSEF/tkwrarHqXr0ExbDTjEYikNh2hLlV821Asm3ZaByltrhWgtwRnsaU6lQRrZaso/Og==}
+  '@vmz/plugin-markdown-it@0.1.12':
+    resolution: {integrity: sha512-6NN3mBcGUkee35bVxt+ohu65vA493Bpgo0GuPhf6hhNg/oQuZKrrEVyGYSK26gDiMy+D+KYr4ib4yqREFiixAw==}
 
-  '@vmz/plugin-shiki@0.1.10':
-    resolution: {integrity: sha512-6Jm3vm92SuA+YXs52eXodzIdzj5trWnTdyvEvmeKqsqkS0XEykscF2r0wZZLv+JDq9WLZDibxscteBG8HCuLDA==}
+  '@vmz/plugin-shiki@0.1.12':
+    resolution: {integrity: sha512-qqPfFOOv6R0pozetiqVaGQLclduWYIMMMCOE67AdplPG6tgjZrSPUhPfpo/Ytk/ZupmK2rAM/gaLGrA92ycNSQ==}
     peerDependencies:
       shiki: '>=3'
-      vmz-textmate: 0.1.10
+      vmz-textmate: 0.1.12
     peerDependenciesMeta:
       vmz-textmate:
         optional: true
 
-  '@vmz/plugin@0.1.10':
-    resolution: {integrity: sha512-SUHBLDta9gLjQBANtdZSYfCEhZwvR95MAe5+uxz5gLwm4+pBP8xIXtTPYCjDCw+IaMLE0ZgPhO777vTTaVJCrw==}
+  '@vmz/plugin@0.1.12':
+    resolution: {integrity: sha512-o4Zv0zTVW4hJePfcIUTI4DQ8kpPHMnoBbgIOa3eqVQQVlVcTOukVAEGZZVvd320LpA92arxdXq/Lh6EL6md3LA==}
 
-  '@vmz/protocol@0.1.10':
-    resolution: {integrity: sha512-CHsmlKg7ndFpj+i5tZXTKJ9w8qqVDKvlPJAjlJWsw04haUTFlT+C5Sgzrj7T7+CUHWx1zZhgW5bKiFEP/bGOLQ==}
+  '@vmz/protocol@0.1.12':
+    resolution: {integrity: sha512-tnTFzBo56oY3rmRXo+Ce8KUNQw7hnsgQH36LP450XEP0NLdPef9nsqWwLISQYBLb8pklBWMEwFEgcDB6GDs69Q==}
     engines: {node: '>=20'}
 
-  '@vmz/ui@0.1.10':
-    resolution: {integrity: sha512-CprGGvq29NbBy7biV4d7+78GqNox2WlxAZp/s85ALAlUCvbHgghRb4qxG+1JVWLXnh7v6CRGpbVAfVNrQqTHyw==}
+  '@vmz/ui@0.1.12':
+    resolution: {integrity: sha512-9JvUjEiW/0ZKJ5hb8ofpxckkw9yc7eGhHH+Zwv6QsvZKBt9dYULbHm0BeQFqocwQYlPLvVuK8BIIEzMf4JPsLA==}
 
-  '@vmz/vmz-darwin-arm64@0.1.10':
-    resolution: {integrity: sha512-qndF7Iq0ykr/jrPn1lyoV0etXlwJh0+as3j3LpbEY6hMqUKWFdehq98aGmjkRwX1tjqnjfAVuk7zQFeIKT2dxA==}
+  '@vmz/vmz-darwin-arm64@0.1.12':
+    resolution: {integrity: sha512-tYdKUJHKK5PRuIynBoWaK2/WnsA/I3zDC/gnwXrMfssNB+DuPWrukF8X58djl9BACZZZeovhmjd7ZxGYxUfn5g==}
     cpu: [arm64]
     os: [darwin]
 
-  '@vmz/vmz-linux-x64@0.1.10':
-    resolution: {integrity: sha512-VKNZDHu+pmOfAe6QBxRl5RjqTlKX4gDO25k6l2thAP57xX038Vpeh8/akYeM9dG6NHkNa7rXmQ1UkjhVutPFjA==}
+  '@vmz/vmz-linux-x64@0.1.12':
+    resolution: {integrity: sha512-nEvJA6zujZdLafIatEDL+VdSUwPs10QoDSTAfJncbjvjgxuPWlknIHAWbSkQqwRAIVh1JryZudgPY4PmuetzXQ==}
     cpu: [x64]
     os: [linux]
 
-  '@vmz/vmz-win32-x64@0.1.10':
-    resolution: {integrity: sha512-sXgutFZUvVULxRIhooSBIATZHmcyt3IxHIx2SjYo3YjRuWyEjtIXlA989eC/ta8qkJhDn9xSEUXEIpWG5glgXw==}
+  '@vmz/vmz-win32-x64@0.1.12':
+    resolution: {integrity: sha512-iNabpWfhRzFo9W3CIeQMVBNmnBYBSJLh6TfPE35y3Q9g1n38uJy/z58h93gn/5OBkcPzTMZvW3mNyRXS9eDGlA==}
     cpu: [x64]
     os: [win32]
 
-  '@vmz/vmz@0.1.10':
-    resolution: {integrity: sha512-AyCHfI1eqSAUX6ojjHYNMm4GPt018Ykqwtip9cDhdVQp9UB7sY/FrpsP8ZtYtGQP5Qjoa8Ez/zA0TlHVpvFD6A==}
+  '@vmz/vmz@0.1.12':
+    resolution: {integrity: sha512-ZjNambPim+F5+yDNCzlJe7nFMnLsbnwO88OXZKNDaw4ThS7rfK7WKCbnnvBMxyOqzEtOAb4JP/k4eNK7yd2MfQ==}
     hasBin: true
     peerDependencies:
-      '@vmz/plugin-markdown-it': 0.1.10
-      '@vmz/test': 0.1.10
+      '@vmz/plugin-markdown-it': 0.1.12
+      '@vmz/test': 0.1.12
       typescript: ^5.8.3
     peerDependenciesMeta:
       '@vmz/plugin-markdown-it':
@@ -293,9 +289,8 @@ packages:
   regex@6.1.0:
     resolution: {integrity: sha512-6VwtthbV4o/7+OaAF9I5L5V3llLEsoPyq9P1JVXkedTP33c7MfCG0/5NOPcSJn0TzXcG9YUrR0gQSWioew3LDg==}
 
-  shiki@4.4.3:
-    resolution: {integrity: sha512-Mb/GvXPHBAXdgGIcnfU5L3ldpn1XcxrGkPHwqgRx17/I2XRfqlFKk2vGkHWINn1kdXvzJZeuO3is6I9KLPFm0g==}
-    engines: {node: '>=20'}
+  shiki@3.23.0:
+    resolution: {integrity: sha512-55Dj73uq9ZXL5zyeRPzHQsK7Nbyt6Y10k5s7OjuFZGMhpp4r/rsLBH0o/0fstIzX1Lep9VxefWljK/SKCzygIA==}
 
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
@@ -343,40 +338,33 @@ packages:
 
 snapshots:
 
-  '@shikijs/core@4.4.3':
+  '@shikijs/core@3.23.0':
     dependencies:
-      '@shikijs/primitive': 4.4.3
-      '@shikijs/types': 4.4.3
+      '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
       '@types/hast': 3.0.5
       hast-util-to-html: 9.0.5
 
-  '@shikijs/engine-javascript@4.4.3':
+  '@shikijs/engine-javascript@3.23.0':
     dependencies:
-      '@shikijs/types': 4.4.3
+      '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
       oniguruma-to-es: 4.3.6
 
-  '@shikijs/engine-oniguruma@4.4.3':
+  '@shikijs/engine-oniguruma@3.23.0':
     dependencies:
-      '@shikijs/types': 4.4.3
+      '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
 
-  '@shikijs/langs@4.4.3':
+  '@shikijs/langs@3.23.0':
     dependencies:
-      '@shikijs/types': 4.4.3
+      '@shikijs/types': 3.23.0
 
-  '@shikijs/primitive@4.4.3':
+  '@shikijs/themes@3.23.0':
     dependencies:
-      '@shikijs/types': 4.4.3
-      '@shikijs/vscode-textmate': 10.0.2
-      '@types/hast': 3.0.5
+      '@shikijs/types': 3.23.0
 
-  '@shikijs/themes@4.4.3':
-    dependencies:
-      '@shikijs/types': 4.4.3
-
-  '@shikijs/types@4.4.3':
+  '@shikijs/types@3.23.0':
     dependencies:
       '@shikijs/vscode-textmate': 10.0.2
       '@types/hast': 3.0.5
@@ -395,51 +383,51 @@ snapshots:
 
   '@ungap/structured-clone@1.4.0': {}
 
-  '@vmz/core@0.1.10':
+  '@vmz/core@0.1.12':
     dependencies:
       linkedom: 0.18.13
     transitivePeerDependencies:
       - canvas
 
-  '@vmz/plugin-markdown-it@0.1.10':
+  '@vmz/plugin-markdown-it@0.1.12':
     dependencies:
-      '@vmz/plugin': 0.1.10
+      '@vmz/plugin': 0.1.12
       markdown-it: 14.3.0
 
-  '@vmz/plugin-shiki@0.1.10(shiki@4.4.3)':
+  '@vmz/plugin-shiki@0.1.12(shiki@3.23.0)':
     dependencies:
-      '@vmz/plugin': 0.1.10
-      shiki: 4.4.3
+      '@vmz/plugin': 0.1.12
+      shiki: 3.23.0
 
-  '@vmz/plugin@0.1.10':
+  '@vmz/plugin@0.1.12':
     dependencies:
-      '@vmz/protocol': 0.1.10
+      '@vmz/protocol': 0.1.12
 
-  '@vmz/protocol@0.1.10': {}
+  '@vmz/protocol@0.1.12': {}
 
-  '@vmz/ui@0.1.10': {}
+  '@vmz/ui@0.1.12': {}
 
-  '@vmz/vmz-darwin-arm64@0.1.10':
+  '@vmz/vmz-darwin-arm64@0.1.12':
     optional: true
 
-  '@vmz/vmz-linux-x64@0.1.10':
+  '@vmz/vmz-linux-x64@0.1.12':
     optional: true
 
-  '@vmz/vmz-win32-x64@0.1.10':
+  '@vmz/vmz-win32-x64@0.1.12':
     optional: true
 
-  '@vmz/vmz@0.1.10(@vmz/plugin-markdown-it@0.1.10)(typescript@5.9.3)':
+  '@vmz/vmz@0.1.12(@vmz/plugin-markdown-it@0.1.12)(typescript@5.9.3)':
     dependencies:
-      '@vmz/core': 0.1.10
-      '@vmz/plugin': 0.1.10
-      '@vmz/protocol': 0.1.10
+      '@vmz/core': 0.1.12
+      '@vmz/plugin': 0.1.12
+      '@vmz/protocol': 0.1.12
       jiti: 2.7.0
       json5: 2.2.3
     optionalDependencies:
-      '@vmz/plugin-markdown-it': 0.1.10
-      '@vmz/vmz-darwin-arm64': 0.1.10
-      '@vmz/vmz-linux-x64': 0.1.10
-      '@vmz/vmz-win32-x64': 0.1.10
+      '@vmz/plugin-markdown-it': 0.1.12
+      '@vmz/vmz-darwin-arm64': 0.1.12
+      '@vmz/vmz-linux-x64': 0.1.12
+      '@vmz/vmz-win32-x64': 0.1.12
       typescript: 5.9.3
     transitivePeerDependencies:
       - canvas
@@ -627,14 +615,14 @@ snapshots:
     dependencies:
       regex-utilities: 2.3.0
 
-  shiki@4.4.3:
+  shiki@3.23.0:
     dependencies:
-      '@shikijs/core': 4.4.3
-      '@shikijs/engine-javascript': 4.4.3
-      '@shikijs/engine-oniguruma': 4.4.3
-      '@shikijs/langs': 4.4.3
-      '@shikijs/themes': 4.4.3
-      '@shikijs/types': 4.4.3
+      '@shikijs/core': 3.23.0
+      '@shikijs/engine-javascript': 3.23.0
+      '@shikijs/engine-oniguruma': 3.23.0
+      '@shikijs/langs': 3.23.0
+      '@shikijs/themes': 3.23.0
+      '@shikijs/types': 3.23.0
       '@shikijs/vscode-textmate': 10.0.2
       '@types/hast': 3.0.5
 

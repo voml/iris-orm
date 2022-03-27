@@ -13,13 +13,13 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
     let ctx = model.to_json();
     let entity_names: HashSet<&str> = model.tables.iter().map(|t| t.name.as_str()).collect();
 
-    let macros = emit_macros(&model.macros).replace(
-        "./synthesize.js",
-        "./_internal/synthesize.js",
-    );
+    let macros = emit_macros(&model.macros).replace("./synthesize.js", "./_internal/synthesize.js");
     // Single operations.ts: keep IrisDbBinding import from macros; drop duplicate from db.
     let db = emit_db(model)
-        .replace("import type { IrisDbBinding } from \"@yydb/iris/types\";\n", "")
+        .replace(
+            "import type { IrisDbBinding } from \"@yydb/iris/types\";\n",
+            "",
+        )
         .replace("import { GeneratedMacros } from \"./macros.js\";\n", "")
         .replace("./synthesize.js", "./_internal/synthesize.js");
     let operations = format!("{macros}\n{db}");
@@ -29,10 +29,7 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
         ("index.ts".into(), render("index", &ctx)?),
         ("node.ts".into(), render("node", &ctx)?),
         ("browser.ts".into(), render("browser", &ctx)?),
-        (
-            "_internal/synthesize.ts".into(),
-            SYNTHESIZE_TS.to_string(),
-        ),
+        ("_internal/synthesize.ts".into(), SYNTHESIZE_TS.to_string()),
         ("references.ts".into(), emit_references(model)),
         ("models.ts".into(), emit_models(model)),
         ("inputs.ts".into(), emit_inputs(model, &entity_names)),

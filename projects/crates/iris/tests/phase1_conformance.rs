@@ -148,9 +148,6 @@ fn write_method_rejected_at_lower_with_span() {
 #[test]
 fn version_and_envelope_are_phase1() {
     let iris = Runtime::new().open_reference(sample_users());
-    let plan = iris
-        .session()
-        .plan("User.take(1).collect()")
-        .expect("plan");
+    let plan = iris.session().plan("User.take(1).collect()").expect("plan");
     assert_eq!(plan.envelope.ir_version, iris::IrVersion::PHASE1);
 }

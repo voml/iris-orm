@@ -22,8 +22,8 @@ mod schema;
 mod session;
 mod topology;
 mod topology_activate;
-mod value;
 mod uuid_v7;
+mod value;
 
 pub use adapter::{
     DriftReport, FieldMapping, LogicalChange, LogicalMigrationPlan, MappingManifest,
@@ -81,8 +81,8 @@ pub use topology_activate::{
     TOPOLOGY_ACTIVATION_FORMAT, TopologyActivateReport, TopologyActivation, TopologyHandshake,
     activate_topology, load_activation, reader_version_accepted, writer_version_ok,
 };
-pub use value::{Row, Value};
 pub use uuid_v7::{is_v7, uuid};
+pub use value::{Row, Value};
 
 use iris_ir::{IrVersion, PhysicalPlan, RealizationClass};
 
