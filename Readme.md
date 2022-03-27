@@ -120,18 +120,19 @@ Public VOS text entry points (not a second query dialect):
 | DML escape hatch | `db.$query(vosText, parameters?)` | `Db::query` / `Session::query` |
 | DDL / unit | `db.$execute(vosText, parameters?)` | `Db::execute` / `Session::execute` |
 | Plan only | (via binding / explain) | `session.plan(vosText)` |
-| Shared-DB tests | (host txn helpers) | `Db::with_rollback` / `MysqlSource::with_rollback` + `*_on` / `DbTxn` |
+| Held connection (txn / test) | (txn on client) | `Db::transaction` / `Db::with_rollback` → `Txn` (same CRUD names) |
 
-Rust `iris generate --target rust` emits domain structs **and** a thin MySQL `Db`/`DbTxn`
+Rust `iris generate --target rust` emits domain structs **and** a thin MySQL `Db`/`Txn`
 CRUD shim (synthesizes `.filter` VOS). That is **not** knife-B `GeneratedCall` / identity IR.
+Pooling stays inside `MysqlSource`; apps do not build a second pool.
 
 Pipeline predicates: prefer **`.filter(x => …)`**. `.where(…)` is accepted only as a
 compatibility alias of `.filter` (same physical `Filter` op); **do not document or
 generate SQL-style `.where` in new examples**.
 
-Inside MySQL `transaction` / `with_rollback`, use same-connection APIs (`DbTxn` or
-`insert_on` / `execute_plan_on`). Pool-level `insert` / `execute_plan` check out a
-**different** connection and do not participate in the transaction.
+Inside `transaction` / `with_rollback`, use **`Txn`** (same method names as `Db`).
+Do not call `MysqlSource::insert` / `execute_plan` from the closure — those check out
+another connection and leave the transaction.
 
 Legacy Rust names `execute_vos` / `plan_vos` / `interpret_vos` are deprecated
 aliases of `query` / `plan` / `interpret`.
