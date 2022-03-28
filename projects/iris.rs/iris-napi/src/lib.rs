@@ -108,14 +108,16 @@ pub struct GenerateResult {
 pub fn generate(source: String, target: String, out_dir: String) -> Result<GenerateResult> {
     match iris_generator::generate_from_source(&source, &target, Path::new(&out_dir)) {
         Ok((model, paths)) => {
-            let output_path = if target == "rust" || target == "typescript" || target == "ts" {
-                if target == "rust" {
-                    out_dir
-                } else {
-                    Path::new(&out_dir).join("generated").display().to_string()
-                }
-            } else {
-                out_dir.clone()
+            let output_path = match target.as_str() {
+                "rust" => Path::new(&out_dir)
+                    .join("generated/iris/rust")
+                    .display()
+                    .to_string(),
+                "typescript" | "ts" => Path::new(&out_dir)
+                    .join("generated/iris/typescript")
+                    .display()
+                    .to_string(),
+                _ => out_dir.clone(),
             };
             Ok(GenerateResult {
                 ok: true,
