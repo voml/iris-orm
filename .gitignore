@@ -28,6 +28,7 @@ pnpm-lock.yaml
 # npm placeholder / trust (local only)
 .placeholder-npm-cache.json
 scripts/.placeholder-npm-cache.json
+.cache/npm-placeholder.json
 .env.placeholder.local
 
 # Accidental local `iris generate` outputs in this repo
