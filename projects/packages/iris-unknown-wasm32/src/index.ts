@@ -1,4 +1,4 @@
-import initGlue, * as glue from "../iris.unknown-wasm32.js";
+import initGlue, * as glue from "../lib/iris_wasm.js";
 
 /** Result of validating a VOS / `.iris` schema source via the Rust core. */
 export interface CheckSourceResult {
@@ -13,7 +13,7 @@ export interface CheckSourceResult {
 export type WasmInitInput = URL | Request | Response | ArrayBuffer | Uint8Array | WebAssembly.Module;
 
 export type InitWasmOptions = {
-    /** When omitted, loads the bundled `lib/iris.unknown-wasm32.wasm` asset. */
+    /** When omitted, loads the bundled `lib/iris_wasm_bg.wasm` asset. */
     module?: WasmInitInput;
 };
 
@@ -60,7 +60,7 @@ function toCheckResult(raw: GlueCheckSourceResult): CheckSourceResult {
 }
 
 async function resolveDefaultWasmBytes(): Promise<ArrayBuffer | Uint8Array | URL> {
-    const wasmUrl = new URL("../lib/iris.unknown-wasm32.wasm", import.meta.url);
+    const wasmUrl = new URL("../lib/iris_wasm_bg.wasm", import.meta.url);
     if (typeof process !== "undefined" && process.versions?.node) {
         const { readFileSync } = await import("node:fs");
         const { fileURLToPath } = await import("node:url");

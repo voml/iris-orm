@@ -1,0 +1,14 @@
+{
+    "name": "@yydb/iris-darwin-arm64",
+    "version": "0.0.1",
+    "description": "Iris ORM Node-API binary for macOS arm64",
+    "type": "module",
+    "license": "MPL-2.0",
+    "main": "./index.js",
+    "files": ["index.js", "lib", "readme.md"],
+    "os": ["darwin"],
+    "cpu": ["arm64"],
+    "publishConfig": {
+        "access": "public"
+    }
+}

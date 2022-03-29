@@ -35,10 +35,14 @@ jobs:
         include:
           - os: windows-latest
             short: win32-x64
-            artifact: iris.win32-x64-msvc.node
           - os: ubuntu-latest
             short: linux-x64
-            artifact: iris.linux-x64-gnu.node
+          - os: ubuntu-24.04-arm
+            short: linux-arm64
+          - os: macos-15-intel
+            short: darwin-x64
+          - os: macos-latest
+            short: darwin-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,28 +62,29 @@ jobs:
         run: pnpm install
 
       - name: Build N-API (release)
-        run: pnpm napi:build
+        run: node scripts/build-napi.mjs
 
       - name: Stage native artifact
         shell: bash
         run: |
           set -euo pipefail
-          out="dist/native/${{ matrix.short }}"
+          out="dist/${{ matrix.short }}"
           mkdir -p "$out"
-          src="projects/packages/iris-${{ matrix.short }}/${{ matrix.artifact }}"
-          if [[ ! -f "$src" ]]; then
-            echo "missing native binary: $src" >&2
-            ls -la "projects/packages/iris-${{ matrix.short }}/" || true
+          src="projects/crates/iris-napi"
+          node="$(find "$src" -maxdepth 1 -name '*.node' | head -n 1)"
+          if [[ -z "$node" ]]; then
+            echo "missing native binary under $src" >&2
+            ls -la "$src" || true
             exit 1
           fi
-          cp "$src" "$out/${{ matrix.artifact }}"
+          cp "$node" "$out/$(basename "$node")"
           ls -la "$out"
 
       - name: Upload native artifact
         uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.short }}
-          path: dist/native/${{ matrix.short }}
+          path: dist/${{ matrix.short }}
           if-no-files-found: error
 
   build-wasm:
@@ -109,13 +114,13 @@ jobs:
         run: pnpm install
 
       - name: Build WASM (release)
-        run: pnpm wasm:build
+        run: node scripts/build-wasm.mjs
 
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wasm-unknown-wasm32
-          path: projects/packages/iris-unknown-wasm32
+          name: wasm-lib
+          path: projects/packages/iris-unknown-wasm32/lib
           if-no-files-found: error
 
   publish:
@@ -170,39 +175,24 @@ jobs:
           pattern: native-*
           path: dist/native-artifacts
 
-      - name: Download WASM artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-unknown-wasm32
-          path: projects/packages/iris-unknown-wasm32
-
-      - name: Install native binaries into platform packages
+      - name: Normalize native artifact layout
         shell: bash
         run: |
           set -euo pipefail
-          install_native() {
-            local short="$1"
-            local artifact="$2"
-            local dest="projects/packages/iris-${short}/${artifact}"
-            local found=""
-            for candidate in \
-              "dist/native-artifacts/native-${short}/${artifact}" \
-              "dist/native-artifacts/${short}/${artifact}"; do
-              if [[ -f "$candidate" ]]; then
-                found="$candidate"
-                break
-              fi
-            done
-            if [[ -z "$found" ]]; then
-              echo "missing downloaded native artifact for ${short}" >&2
-              find dist/native-artifacts -type f -print || true
-              exit 1
-            fi
-            cp "$found" "$dest"
-            ls -la "$dest"
-          }
-          install_native win32-x64 iris.win32-x64-msvc.node
-          install_native linux-x64 iris.linux-x64-gnu.node
+          mkdir -p dist/native-flat
+          for d in dist/native-artifacts/native-*; do
+            [[ -d "$d" ]] || continue
+            short="$(basename "$d" | sed 's/^native-//')"
+            mkdir -p "dist/native-flat/$short"
+            cp -r "$d"/. "dist/native-flat/$short/"
+          done
+          find dist/native-flat -type f -print
+
+      - name: Download WASM artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-lib
+          path: projects/packages/iris-unknown-wasm32/lib
 
       - name: Strip token-style npmrc (OIDC only)
         shell: bash
@@ -220,5 +210,5 @@ jobs:
       - name: Publish real packages
         env:
           GITHUB_REF: refs/tags/v${{ steps.ver.outputs.version }}
-          IRIS_SKIP_PREBUILD: '1'
+          IRIS_NATIVE_ARTIFACTS: ${{ github.workspace }}/dist/native-flat
         run: node scripts/ci/publish-npm.mjs --version=${{ steps.ver.outputs.version }}

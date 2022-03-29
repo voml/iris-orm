@@ -4,20 +4,19 @@
     "description": "Browser WebAssembly binary for @yydb/iris",
     "license": "MPL-2.0",
     "type": "module",
-    "sideEffects": false,
+    "sideEffects": ["./lib/iris_wasm.js"],
     "exports": {
         ".": {
             "types": "./src/index.ts",
             "import": "./src/index.ts",
             "default": "./src/index.ts"
         },
-        "./wasm": "./lib/iris.unknown-wasm32.wasm"
+        "./wasm": "./lib/iris_wasm_bg.wasm"
     },
     "files": [
         "src",
         "lib",
-        "iris.unknown-wasm32.js",
-        "iris.unknown-wasm32.d.ts"
+        "readme.md"
     ],
     "scripts": {
         "typecheck": "tsc --noEmit -p tsconfig.json",

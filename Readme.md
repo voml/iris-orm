@@ -18,7 +18,8 @@
   <img src="https://img.shields.io/badge/schema-.iris-0d7a62" alt=".iris schema">
 </p>
 
-**Site:** [iris-orm.pages.dev](https://iris-orm.pages.dev/) · **Repo:** [github.com/voml/iris-orm](https://github.com/voml/iris-orm)
+**Site:** [iris-orm.pages.dev](https://iris-orm.pages.dev/) ·
+**Repo:** [github.com/voml/iris-orm](https://github.com/voml/iris-orm)
 
 Iris is the **VOS data-access layer** for backend applications. It is not a
 database and not a new schema language.
@@ -34,15 +35,17 @@ keeping ecosystem-specific driver and storage integration outside the core.
 Node.js uses N-API; browsers use browser-safe WebAssembly. WASI is not currently a supported host contract.
 
 Public binding packages use coarse host/CPU names: `@yydb/iris-win32-x64`,
-`@yydb/iris-linux-x64`, and `@yydb/iris-unknown-wasm32`. Toolchain details such
-as MSVC, GNU, and musl remain internal build targets rather than public import
+`@yydb/iris-linux-x64`, `@yydb/iris-linux-arm64`, `@yydb/iris-darwin-x64`,
+`@yydb/iris-darwin-arm64`, and `@yydb/iris-unknown-wasm32`. Each native package
+is a thin `index.js` loader over `lib/*.node` (panduck-style). Toolchain details
+such as MSVC, GNU, and musl remain internal build targets rather than public import
 names. The WASM package is browser-safe WebAssembly, not WASI.
 
-| Tree | User facade | Role |
-| --- | --- | --- |
-| `projects/crates` | `iris::*` | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
-| `projects/packages` | `@yydb/iris` | Node/browser facades, `iris` CLI, N-API/WASM loaders, platform packages |
-| `projects/packages/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`) |
+| Tree                            | User facade         | Role                                                                                  |
+|---------------------------------|---------------------|---------------------------------------------------------------------------------------|
+| `projects/crates`               | `iris::*`           | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
+| `projects/packages`             | `@yydb/iris`        | Node/browser facades, `iris` CLI, N-API/WASM loaders, platform packages               |
+| `projects/packages/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`)                                                   |
 
 Codegen shares `.dejavu` templates; each host facade runs generate locally so
 TS users do not need the Rust `iris` executable. TypeScript must not implement
@@ -90,13 +93,13 @@ projects/crates/
 
 projects/packages/
   iris/                 @yydb/iris — browser default + /node + /types + iris CLI
-  iris-win32-x64/       optional N-API platform package
-  iris-linux-x64/       optional N-API platform package
-  iris-unknown-wasm32/  optional browser WASM platform package
-  iris-napi/            private napi-rs build workspace
-  iris-wasm/            private wasm-pack build workspace
+  iris-{platform}/      optional N-API platform packages (`index.js` + `lib/*.node`)
+  iris-unknown-wasm32/  browser WASM artifact package (`lib/` from `iris-wasm` crate)
   iris-skills/          @yydb/iris-skills
   homepage/             official site → https://iris-orm.pages.dev/
+
+Native builds: `projects/crates/iris-napi` + `scripts/build-napi.mjs` (not npm workspace members).
+WASM builds: `projects/crates/iris-wasm` + `scripts/build-wasm.mjs`.
 ```
 
 VOS language sources are **not** vendored. The Rust workspace depends on the
@@ -114,13 +117,13 @@ activate, projection verify). Phase 5 YYDS remains readiness-gated.
 
 Public VOS text entry points (not a second query dialect):
 
-| Intent | TypeScript generated client | Rust |
-| --- | --- | --- |
-| Typed CRUD (primary) | `db.user.findMany` / `create` | `Db::user().find_many` / `insert` (generate `--target rust`) |
-| DML escape hatch | `db.$query(vosText, parameters?)` | `Db::query` / `Session::query` |
-| DDL / unit | `db.$execute(vosText, parameters?)` | `Db::execute` / `Session::execute` |
-| Plan only | (via binding / explain) | `session.plan(vosText)` |
-| Held connection (txn / test) | (txn on client) | `Db::transaction` / `Db::with_rollback` → `Txn` (same CRUD names) |
+| Intent                       | TypeScript generated client         | Rust                                                              |
+|------------------------------|-------------------------------------|-------------------------------------------------------------------|
+| Typed CRUD (primary)         | `db.user.findMany` / `create`       | `Db::user().find_many` / `insert` (generate `--target rust`)      |
+| DML escape hatch             | `db.$query(vosText, parameters?)`   | `Db::query` / `Session::query`                                    |
+| DDL / unit                   | `db.$execute(vosText, parameters?)` | `Db::execute` / `Session::execute`                                |
+| Plan only                    | (via binding / explain)             | `session.plan(vosText)`                                           |
+| Held connection (txn / test) | (txn on client)                     | `Db::transaction` / `Db::with_rollback` → `Txn` (same CRUD names) |
 
 Rust `iris generate --target rust` emits domain structs **and** a thin MySQL `Db`/`Txn`
 CRUD shim (synthesizes `.filter` VOS). That is **not** knife-B `GeneratedCall` / identity IR.
