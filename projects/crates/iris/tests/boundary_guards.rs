@@ -182,9 +182,8 @@ fn facade_does_not_reexport_adapters() {
 #[test]
 fn types_and_ir_have_no_sql_driver_dependencies() {
     for crate_name in ["iris-types", "iris-ir"] {
-        let manifest =
-            fs::read_to_string(crates_root().join(format!("{crate_name}/Cargo.toml")))
-                .unwrap_or_else(|_| panic!("{crate_name} Cargo.toml"));
+        let manifest = fs::read_to_string(crates_root().join(format!("{crate_name}/Cargo.toml")))
+            .unwrap_or_else(|_| panic!("{crate_name} Cargo.toml"));
         for banned in [
             "rusqlite",
             "sqlx",
