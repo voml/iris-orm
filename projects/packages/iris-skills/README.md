@@ -42,5 +42,5 @@ Structured Agent tool DTOs (`migration.apply`, …) are **not live**. Teach the 
 ```bash
 npx skills add @yydb/iris-skills
 # or local checkout:
-npx skills add ./projects/iris.ts/iris-skills --skill '*' -y --copy
+npx skills add ./projects/packages/iris-skills --skill '*' -y --copy
 ```

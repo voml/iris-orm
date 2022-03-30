@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const crateDir = join(pkgRoot, "../../iris.rs/iris-wasm");
+const crateDir = join(pkgRoot, "../../crates/iris-wasm");
 const stagingDir = join(pkgRoot, "../iris-unknown-wasm32/pkg-staging");
 const release = process.argv.includes("--release");
 

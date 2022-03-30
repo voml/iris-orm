@@ -20,7 +20,7 @@ const args = [
     "--platform",
     ...(release ? ["--release"] : []),
     "--manifest-path",
-    join(pkgRoot, "../../iris.rs/Cargo.toml"),
+    join(pkgRoot, "../../../Cargo.toml"),
     "--package",
     "iris-napi",
     "--output-dir",
