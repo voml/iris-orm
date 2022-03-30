@@ -2,7 +2,8 @@ import type { CreateIrisDbBindingOptions, IrisDbBinding } from "../types/executo
 import { mapWireToQueryValue } from "../types/executor.ts";
 import type { ExecutionWireResult } from "../types/execution-result.ts";
 import { parseExecuteJson, parseRowsJson } from "../runtime/parse.ts";
-import { loadSemanticCore } from "./native.ts";
+import type { IrisNodeBindings } from "../bindings.ts";
+import { loadIrisNative } from "./load.ts";
 
 type NativeSession = {
     executeVos(source: string, parametersJson?: string | null): { ok: boolean; rowsJson: string; error?: string | null };
@@ -10,7 +11,7 @@ type NativeSession = {
     managedPush?: (schema: string) => void;
 };
 
-function openNativeSession(core: Awaited<ReturnType<typeof loadSemanticCore>>, options?: CreateIrisDbBindingOptions): NativeSession {
+function openNativeSession(core: IrisNodeBindings, options?: CreateIrisDbBindingOptions): NativeSession {
     const profile = options?.profile ?? (options?.sqlitePath ? "sqlite" : options?.project ? "project" : "memory");
     let session: NativeSession;
     if (profile === "sqlite" && core.openSqliteSession) {
@@ -46,7 +47,7 @@ function runVos(session: NativeSession, source: string, parameters?: Readonly<Re
 
 /** Create internal binding support for generated `db` (not an application entry). */
 export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
-    const core = await loadSemanticCore();
+    const core = loadIrisNative();
     const session = openNativeSession(core, options);
 
     return {
@@ -69,6 +70,6 @@ export const createIrisExecutor = createIrisDbBinding;
 /** @deprecated Binding bring-up host; use generated `db`. */
 export async function createIrisBindingHost(options: CreateIrisDbBindingOptions = {}) {
     const { buildRuntime } = await import("../runtime/build-runtime.ts");
-    const core = await loadSemanticCore();
+    const core = loadIrisNative();
     return buildRuntime("node", core);
 }

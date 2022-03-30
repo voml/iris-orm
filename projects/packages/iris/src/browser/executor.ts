@@ -1,7 +1,7 @@
 import type { CreateIrisDbBindingOptions, IrisDbBinding } from "../types/executor.ts";
 import { mapWireToQueryValue } from "../types/executor.ts";
 import { parseExecuteJson } from "../runtime/parse.ts";
-import { getWasmSemanticCore } from "./wasm.ts";
+import { getWasmSemanticCore } from "../wasm/index.ts";
 
 /**
  * Create internal binding support for generated browser `db` (not an application entry).
@@ -16,7 +16,11 @@ export async function createBrowserIrisDbBinding(_options: CreateIrisDbBindingOp
             if (parameters !== undefined && Object.keys(parameters).length > 0) {
                 throw new Error("@yydb/iris: browser WASM binding does not support VOS parameters yet");
             }
-            const parsed = parseExecuteJson(session.executeVos(source));
+            const raw = session.executeVos(source);
+            const parsed = parseExecuteJson(typeof raw === "string" ? raw : raw.rowsJson);
+            if (typeof raw !== "string" && !raw.ok) {
+                throw new Error(raw.error ?? "iris execution failed");
+            }
             if (!parsed.ok) {
                 throw new Error(parsed.error ?? "iris execution failed");
             }

@@ -25,6 +25,11 @@
             "node": "./src/node/index.ts",
             "default": "./src/node/unsupported.ts"
         },
+        "./wasm": {
+            "types": "./src/wasm/index.ts",
+            "browser": "./src/wasm/index.ts",
+            "default": "./src/wasm/index.ts"
+        },
         "./types": {
             "types": "./src/types/index.ts",
             "default": "./src/types/index.ts"
@@ -48,11 +53,14 @@
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "dependencies": {
+        "@yydb/iris-unknown-wasm32": "workspace:*",
         "cac": "^6.7.14"
     },
     "optionalDependencies": {
+        "@yydb/iris-darwin-arm64": "workspace:*",
+        "@yydb/iris-darwin-x64": "workspace:*",
+        "@yydb/iris-linux-arm64": "workspace:*",
         "@yydb/iris-linux-x64": "workspace:*",
-        "@yydb/iris-unknown-wasm32": "workspace:*",
         "@yydb/iris-win32-x64": "workspace:*"
     },
     "devDependencies": {

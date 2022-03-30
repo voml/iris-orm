@@ -9,7 +9,7 @@ import cac from "cac";
 
 import { checkSchemaFile } from "../src/node/check.ts";
 import { printDoctorReport } from "../src/node/doctor.ts";
-import { loadSemanticCore } from "../src/node/native.ts";
+import { loadIrisNative } from "../src/node/load.ts";
 import { loadProject, readProjectSchema } from "../src/node/project.ts";
 import { packageVersion } from "../src/node/versions.ts";
 
@@ -40,7 +40,7 @@ cli.command("generate [schema]", "Generate Iris client from .iris schema")
     .option("--target <name>", "Emitter target (defaults to iris.von generate.target or typescript)")
     .action(async (schema?: string, options?: { out?: string; target?: string; config?: string }) => {
         try {
-            const core = await loadSemanticCore();
+            const core = loadIrisNative();
             const project = schema ? null : await loadProject(options?.config ?? process.cwd());
             const source = schema ? await readFile(resolve(schema), "utf8") : await readProjectSchema(project!);
             const target = options?.target ?? project?.generateTarget ?? "typescript";
@@ -70,7 +70,7 @@ cli.command("push", "Push local schema to datasource (schema -> database)")
     .action(async (options?: { config?: string; source?: string; out?: string; plan?: boolean }) => {
         const config = resolve(options?.config ?? "iris.von");
         try {
-            const core = await loadSemanticCore();
+            const core = loadIrisNative();
             if (options?.plan) {
                 const result = core.migratePlanCmd(config, options?.source ?? "default", options?.out ?? null);
                 if (!result.ok) {

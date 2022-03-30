@@ -2,8 +2,11 @@
  * `@yydb/iris/node` — Node N-API facade, project helpers, and CLI builder.
  *
  * Import this entry from servers, SSR, tests, and Node tooling only.
- * Browser code must use the default `@yydb/iris` entry.
+ * Browser code must use the default `@yydb/iris` entry or `@yydb/iris/wasm`.
  */
+
+export type { IrisBindings, IrisNodeBindings } from "../bindings.ts";
+export { loadIrisNode, loadIrisNative, isNodeSemanticCoreInstalled } from "./load.ts";
 
 export { checkSchemaFile } from "./check.ts";
 export { createIris, type CreateIrisNodeOptions } from "./create.ts";

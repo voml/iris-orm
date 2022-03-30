@@ -10,8 +10,8 @@ function ensureNativeOverride(): void {
     if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
         return;
     }
-    const resolveScript = fileURLToPath(new URL("../../iris-napi/scripts/resolve-platform-dir.mjs", import.meta.url));
-    const artifactOut = spawnSync(process.execPath, [resolveScript, "--artifact"], {
+    const resolveScript = fileURLToPath(new URL("../../../../scripts/resolve-native-artifact.mjs", import.meta.url));
+    const artifactOut = spawnSync(process.execPath, [resolveScript], {
         encoding: "utf8",
     });
     if (artifactOut.status === 0 && artifactOut.stdout.trim()) {
@@ -21,7 +21,7 @@ function ensureNativeOverride(): void {
 
 test("createIris throws wasm-not-initialized before initIris", async () => {
     const browser = await import(srcImport("src/browser/index.ts"));
-    const wasm = await import(srcImport("src/browser/wasm.ts"));
+    const wasm = await import(srcImport("src/wasm/index.ts"));
     wasm.resetInitStateForTests();
 
     await assert.rejects(
@@ -32,7 +32,7 @@ test("createIris throws wasm-not-initialized before initIris", async () => {
 
 test("browser createIris exposes symmetric runtime methods", async (t) => {
     const browser = await import(srcImport("src/browser/index.ts"));
-    const wasm = await import(srcImport("src/browser/wasm.ts"));
+    const wasm = await import(srcImport("src/wasm/index.ts"));
     wasm.resetInitStateForTests();
 
     try {
@@ -162,7 +162,7 @@ test("@yydb/iris/node exposes host facade only", async () => {
     assert.equal("checkSchemaFile" in node, true);
     assert.equal("printDoctorReport" in node, true);
     assert.equal("openDatasourceSession" in node, true);
+    assert.equal("loadIrisNative" in node, true);
+    assert.equal("loadIrisNode" in node, true);
     assert.equal("loadSemanticCore" in node, false);
-    assert.equal("loadNativeBinding" in node, false);
-    assert.equal("resolvePlatformPackageName" in node, false);
 });
