@@ -40,9 +40,9 @@ names. The WASM package is browser-safe WebAssembly, not WASI.
 
 | Tree | User facade | Role |
 | --- | --- | --- |
-| `projects/iris.rs` | `iris::*` | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
-| `projects/iris.ts` | `@yydb/iris` | Node/browser facades, `iris` CLI, N-API/WASM loaders, platform packages |
-| `projects/iris.ts/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`) |
+| `projects/crates` | `iris::*` | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
+| `projects/packages` | `@yydb/iris` | Node/browser facades, `iris` CLI, N-API/WASM loaders, platform packages |
+| `projects/packages/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`) |
 
 Codegen shares `.dejavu` templates; each host facade runs generate locally so
 TS users do not need the Rust `iris` executable. TypeScript must not implement
@@ -79,7 +79,7 @@ lowered to an approximate backend command.
 ## Workspace
 
 ```text
-projects/iris.rs/
+projects/crates/
   iris/                 public Rust facade
   iris-types/           session / planner / capability / runtime
   iris-ir/              physical plan + envelopes
@@ -88,7 +88,7 @@ projects/iris.rs/
   iris-connector-*      native VOS connectors
   iris-adapter-*        foreign-store adapters
 
-projects/iris.ts/
+projects/packages/
   iris/                 @yydb/iris — browser default + /node + /types + iris CLI
   iris-win32-x64/       optional N-API platform package
   iris-linux-x64/       optional N-API platform package
@@ -101,7 +101,7 @@ projects/iris.ts/
 
 VOS language sources are **not** vendored. The Rust workspace depends on the
 public `vos` facade from a sibling checkout of [`vos-language`](https://github.com/voml/vos-language)
-on branch `dev` (`../../../vos-language/projects/vos.rs/vos` from `projects/iris.rs`).
+on branch `dev` (`../../../vos-language/projects/vos.rs/vos` from `projects/crates`).
 YYDB native tests also need a sibling [`yydb.rs`](https://github.com/yy-database/yydb.rs)
 checkout. VON config uses sibling [`von-language`](https://github.com/voml/von-language).
 
@@ -149,10 +149,10 @@ pnpm run typecheck:ts
 pnpm run iris -- doctor   # TS host CLI stub
 ```
 
-Or from `projects/iris.rs` directly:
+Or from `projects/crates` directly:
 
 ```bash
-cd projects/iris.rs
+cd .
 cargo fmt --all -- --check
 cargo check --workspace --all-targets
 cargo test --workspace
@@ -160,8 +160,8 @@ cargo run -p iris-tools -- doctor
 ```
 
 ```bash
-cargo run -p iris-tools --manifest-path projects/iris.rs/Cargo.toml -- check path/to/schema.iris
-cargo run -p iris-tools --manifest-path projects/iris.rs/Cargo.toml -- generate path/to/schema.iris
+cargo run -p iris-tools --manifest-path Cargo.toml -- check path/to/schema.iris
+cargo run -p iris-tools --manifest-path Cargo.toml -- generate path/to/schema.iris
 ```
 
 Optional live backends (CI enables these when services are up):

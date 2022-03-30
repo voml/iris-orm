@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Format the iris-orm mono:
- *   - Rust: `cargo fmt` in projects/iris.rs
+ *   - Rust: `cargo fmt` at workspace root
  *   - JSON / JS / TS / MJS: Biome
  *
  *   node scripts/format.mjs           # write
@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const checkOnly = process.argv.includes("--check");
-const rustDir = join(rootDir, "projects", "iris.rs");
+const rustDir = rootDir;
 
 /**
  * @param {string} file
@@ -32,7 +32,7 @@ function runFile(file, args, cwd = rootDir) {
 
 console.log(checkOnly ? "=== Format check ===\n" : "=== Format (write) ===\n");
 
-console.log("--- Rust (projects/iris.rs) ---");
+console.log("--- Rust (workspace) ---");
 runFile("cargo", ["fmt", "--all", ...(checkOnly ? ["--", "--check"] : [])], rustDir);
 
 console.log("\n--- Biome (json/js/ts/mjs) ---");

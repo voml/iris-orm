@@ -29,7 +29,7 @@
             "biome.json",
             "pnpm-workspace.yaml",
             "scripts/**",
-            "projects/iris.ts/**",
+            "projects/packages/**",
             "!**/node_modules/**",
             "!**/dist/**",
             "!**/target/**",
