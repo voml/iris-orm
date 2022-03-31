@@ -25,9 +25,9 @@ use vos::ast::Document;
 
 pub use catalog::{adopt_plan, classify_type};
 pub use migrate::{PushReport, apply_push, plan_push};
-pub use schema_map::collect_uuid_fields;
 /// Connection handle for generated `Txn` (adapter-internal checkout; not an app pool).
 pub use mysql::PooledConn;
+pub use schema_map::collect_uuid_fields;
 
 /// Adapter identifier.
 pub const BACKEND_ID: &str = "mysql";
