@@ -19,12 +19,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 /** @type {{ dir: string, publishName?: string, prebuild?: string }[]} */
 const PACKAGES = [
-    { dir: 'projects/iris.ts/iris', prebuild: 'pnpm napi:build && pnpm wasm:build' },
-    { dir: 'projects/iris.ts/iris-skills' },
-    { dir: 'projects/iris.ts/iris-win32-x64', publishName: '@yydb/iris-win32-x64' },
-    { dir: 'projects/iris.ts/iris-linux-x64', publishName: '@yydb/iris-linux-x64' },
+    { dir: 'projects/packages/iris', prebuild: 'pnpm napi:build && pnpm wasm:build' },
+    { dir: 'projects/packages/iris-skills' },
+    { dir: 'projects/packages/iris-win32-x64', publishName: '@yydb/iris-win32-x64' },
+    { dir: 'projects/packages/iris-linux-x64', publishName: '@yydb/iris-linux-x64' },
     {
-        dir: 'projects/iris.ts/iris-unknown-wasm32',
+        dir: 'projects/packages/iris-unknown-wasm32',
         publishName: '@yydb/iris-unknown-wasm32',
         prebuild: 'pnpm wasm:build',
     },
