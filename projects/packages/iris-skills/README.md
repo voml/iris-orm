@@ -24,16 +24,16 @@ Prefer **`.filter(x => …)`** in any VOS text; do not teach SQL-style `.where`.
 
 ## Skills
 
-| Skill | Role | Delivery |
-|-------|------|----------|
-| `iris-schema` | Author/check `.iris` | CLI-backed (`iris check`) |
-| `iris-migrate` | `iris push` plan/apply — **local/ops only** | CLI-backed |
-| `iris-generate` | Local `iris generate`; **commit** outputs | CLI-backed |
-| `iris-operation` | Runtime VOS / generated client | docs + host API |
-| `iris-explain` | Planner / capability explain | docs / CLI when present |
-| `iris-topology` | Composite topology | docs / CLI when present |
-| `iris-diagnose` | Failures & drift; upstream fixes | CLI-backed habits |
-| `iris-conformance` | Host conformance evidence | docs / host tests |
+| Skill              | Role                                        | Delivery                  |
+|--------------------|---------------------------------------------|---------------------------|
+| `iris-schema`      | Author/check `.iris`                        | CLI-backed (`iris check`) |
+| `iris-migrate`     | `iris push` plan/apply — **local/ops only** | CLI-backed                |
+| `iris-generate`    | Local `iris generate`; **commit** outputs   | CLI-backed                |
+| `iris-operation`   | Runtime VOS / generated client              | docs + host API           |
+| `iris-explain`     | Planner / capability explain                | docs / CLI when present   |
+| `iris-topology`    | Composite topology                          | docs / CLI when present   |
+| `iris-diagnose`    | Failures & drift; upstream fixes            | CLI-backed habits         |
+| `iris-conformance` | Host conformance evidence                   | docs / host tests         |
 
 Structured Agent tool DTOs (`migration.apply`, …) are **not live**. Teach the real CLI.
 

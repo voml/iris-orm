@@ -22,21 +22,21 @@ Read [../references/workflow.md](../references/workflow.md) and
 
 1. **Evidence first**: full CLI stderr, plan artifact path, schema fingerprint, Iris version (`@yydb/iris` / git rev).
 2. Classify:
-   - unsupported capability / not-yet-implemented adapter step → **upstream iris-orm**
-   - bad `.iris` / wrong config → `iris-schema` / fix `iris.von`
-   - deploy missing generated/schemas → app packaging (`iris-generate`, Docker ignore, embed)
-   - credentials / network → env, not schema hacks
+    - unsupported capability / not-yet-implemented adapter step → **upstream iris-orm**
+    - bad `.iris` / wrong config → `iris-schema` / fix `iris.von`
+    - deploy missing generated/schemas → app packaging (`iris-generate`, Docker ignore, embed)
+    - credentials / network → env, not schema hacks
 3. Prefer `iris doctor` / host doctor when implemented; otherwise use check + push --plan + logs.
 4. Redact secrets (`MYSQL_URL`, tokens) in reports.
 
 ## Antiforwards
 
-| Wrong | Right |
-|-------|--------|
-| Bypass with SQL / mysql2 | Upstream fix + publish + bump |
-| “Use SQL Studio ORM instead” | Stay on Iris; open Iris bug |
-| Path-patch siblings to hide CI failure | Fix publish / lockfile / Dockerfile |
-| Silence errors with empty catch + fake data | Surface diagnostics |
+| Wrong                                       | Right                               |
+|---------------------------------------------|-------------------------------------|
+| Bypass with SQL / mysql2                    | Upstream fix + publish + bump       |
+| “Use SQL Studio ORM instead”                | Stay on Iris; open Iris bug         |
+| Path-patch siblings to hide CI failure      | Fix publish / lockfile / Dockerfile |
+| Silence errors with empty catch + fake data | Surface diagnostics                 |
 
 ## Planned tools (not live)
 

@@ -30,21 +30,22 @@ edit .iris → iris check → iris generate (commit) → push --plan → push
 
 ## Hard boundary
 
-| Allowed | Forbidden |
-|---------|-----------|
+| Allowed                                      | Forbidden                                                         |
+|----------------------------------------------|-------------------------------------------------------------------|
 | Developer / ops shell, intentional target DB | GitHub Actions, TCB build, Dockerfile `RUN`, container entrypoint |
-| After human review of plan | Auto-migrate on every deploy |
-| | HTTP server boot calling `managed_push` |
+| After human review of plan                   | Auto-migrate on every deploy                                      |
+|                                              | HTTP server boot calling `managed_push`                           |
 
-App demo **seed** (DML) is the same safety class: **local/ops only**, never CI/runtime — not DDL, still never automate in deploy.
+App demo **seed** (DML) is the same safety class: **local/ops only**, never CI/runtime — not DDL, still never automate
+in deploy.
 
 ## Antiforwards
 
-| Wrong | Right |
-|-------|--------|
-| CI/TCB runs migrate | Human `iris push` when needed |
-| Hand `ALTER TABLE` / mysql2 | Edit `.iris` + `iris push`; upstream if adapter gap |
-| Path-patch iris so CI migrate “works” | Publish / pin; no sibling paths on deploy |
+| Wrong                                 | Right                                               |
+|---------------------------------------|-----------------------------------------------------|
+| CI/TCB runs migrate                   | Human `iris push` when needed                       |
+| Hand `ALTER TABLE` / mysql2           | Edit `.iris` + `iris push`; upstream if adapter gap |
+| Path-patch iris so CI migrate “works” | Publish / pin; no sibling paths on deploy           |
 
 ## Planned tools (not live)
 

@@ -6,12 +6,12 @@ See [workflow.md](./workflow.md) — CLI (local) vs runtime (deploy).
 
 ## Live today (CLI — use these)
 
-| Command | Skill | Where |
-|---------|--------|--------|
-| `iris check --config iris.von` | `iris-schema` | local |
-| `iris push … [--plan]` | `iris-migrate` | local / ops — **never CI** |
-| `iris generate …` | `iris-generate` | local → **commit `generated/`** |
-| Host VOS execute / generated client | `iris-operation` | **runtime** |
+| Command                             | Skill            | Where                           |
+|-------------------------------------|------------------|---------------------------------|
+| `iris check --config iris.von`      | `iris-schema`    | local                           |
+| `iris push … [--plan]`              | `iris-migrate`   | local / ops — **never CI**      |
+| `iris generate …`                   | `iris-generate`  | local → **commit `generated/`** |
+| Host VOS execute / generated client | `iris-operation` | **runtime**                     |
 
 See [consumer-hard-rules.md](./consumer-hard-rules.md).
 

@@ -17,10 +17,12 @@ Read [../references/consumer-hard-rules.md](../references/consumer-hard-rules.md
 
 ## Do today
 
-1. Run the **host** conformance commands documented in the iris-orm package (e.g. Rust workspace tests / published scripts) — do not invent private pass criteria.
+1. Run the **host** conformance commands documented in the iris-orm package (e.g. Rust workspace tests / published
+   scripts) — do not invent private pass criteria.
 2. Evidence packs: reproducible, **secret-free**.
 3. Foreign adapters stay private SQL/commands; conformance asserts **VOS-facing** behavior.
-4. App feature work (CRUD pages, JWT, etc.) is **not** conformance — do not run this skill as a substitute for product tests.
+4. App feature work (CRUD pages, JWT, etc.) is **not** conformance — do not run this skill as a substitute for product
+   tests.
 
 ## Rules
 
