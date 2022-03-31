@@ -40,8 +40,9 @@ pnpm exec iris --help
 
 ## Schema
 
-在仓库中维护 `schemas/**/*.iris`，用 `iris.von` 声明 datasource 与 generate 输出。示例见 [circle-farm](https://github.com/voml/iris-orm) 的 `farm-database` crate。
+在仓库中维护 `schemas/**/*.iris`，用 `iris.von` 声明 datasource 与 generate
+输出。示例见 [circle-farm](https://github.com/voml/iris-orm) 的 `farm-database` crate。
 
 ## 与 sql-studio-orm 的关系
 
-`@yydb/sql-studio-orm` 与 Iris 是**平行产品**，不是上下层叠。Iris 只走 VOS / `.iris`，不路由进 SQL query AST。
+`@yydb/sql-studio-orm` 与 Iris 是 **平行产品**，不是上下层叠。Iris 只走 VOS / `.iris`，不路由进 SQL query AST。
