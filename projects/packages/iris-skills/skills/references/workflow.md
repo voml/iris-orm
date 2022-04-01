@@ -39,7 +39,7 @@ pnpm migrate       # DDL apply — NEVER in CI/Docker/server boot
 ```text
 YES:  generated/*  (structs, SCHEMA_FINGERPRINT, UUID_FIELDS, …)
 YES:  Iris runtime crates (iris, iris-adapter-*, iris-types, …)
-NO:   Iris CLI / iris-tools / iris-generator as a deploy dependency
+NO:   Iris CLI / iris-generator as a deploy dependency
 NO:   re-parsing or embedding raw .iris at runtime
 NO:   .cache/iris/*
 ```

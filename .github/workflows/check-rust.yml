@@ -89,7 +89,7 @@ jobs:
       - name: Clippy (Iris crates only; path deps keep capped lints)
         run: >
           cargo clippy
-          -p iris -p iris-types -p iris-ir -p iris-generator -p iris-tools
+          -p iris -p iris-types -p iris-ir -p iris-generator
           -p iris-connector-yydb -p iris-connector-yyds
           -p iris-adapter-mysql -p iris-adapter-postgres
           -p iris-adapter-sqlite -p iris-adapter-redis

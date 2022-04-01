@@ -87,7 +87,6 @@ projects/crates/
   iris-types/           session / planner / capability / runtime
   iris-ir/              physical plan + envelopes
   iris-generator/       Dejavu AOT for Rust host (shared templates)
-  iris-tools/           Rust-host `iris` CLI (check / generate / migrate / …)
   iris-connector-*      native VOS connectors
   iris-adapter-*        foreign-store adapters
 
@@ -149,22 +148,14 @@ pnpm run fmt:check
 pnpm run check:rs
 pnpm run test:rs
 pnpm run typecheck:ts
-pnpm run iris -- doctor   # TS host CLI stub
+pnpm run iris -- doctor   # @yydb/iris CLI
 ```
 
-Or from `projects/crates` directly:
+The `iris` CLI ships from `@yydb/iris` (`projects/packages/iris`). Use `pnpm run iris -- …` or `pnpm exec iris …` after install.
 
 ```bash
-cd .
-cargo fmt --all -- --check
-cargo check --workspace --all-targets
-cargo test --workspace
-cargo run -p iris-tools -- doctor
-```
-
-```bash
-cargo run -p iris-tools --manifest-path Cargo.toml -- check path/to/schema.iris
-cargo run -p iris-tools --manifest-path Cargo.toml -- generate path/to/schema.iris
+pnpm run iris -- check path/to/schema.iris
+pnpm run iris -- generate path/to/schema.iris
 ```
 
 Optional live backends (CI enables these when services are up):

@@ -3,7 +3,6 @@ resolver = "2"
 members = ["projects/crates/*"]
 default-members = [
     "projects/crates/iris",
-    "projects/crates/iris-tools",
 ]
 
 [workspace.package]
@@ -39,7 +38,6 @@ iris = { path = "projects/crates/iris" }
 iris-types = { path = "projects/crates/iris-types" }
 iris-ir = { path = "projects/crates/iris-ir" }
 iris-generator = { path = "projects/crates/iris-generator" }
-iris-tools = { path = "projects/crates/iris-tools" }
 iris-wasm = { path = "projects/crates/iris-wasm" }
 iris-connector-yydb = { path = "projects/crates/iris-connector-yydb" }
 iris-connector-yyds = { path = "projects/crates/iris-connector-yyds" }

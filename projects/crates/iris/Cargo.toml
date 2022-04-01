@@ -11,5 +11,9 @@ publish = false
 [dependencies]
 iris-types = { workspace = true }
 iris-ir = { workspace = true }
+iris-adapter-mysql = { workspace = true }
+iris-adapter-postgres = { workspace = true }
+iris-adapter-sqlite = { workspace = true }
+von = { workspace = true }
 
 [dev-dependencies]

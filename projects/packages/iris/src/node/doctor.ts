@@ -26,7 +26,7 @@ export async function printDoctorReport(): Promise<void> {
         lines.push("", "Node semantic core:", `  not ready: ${note}`);
     }
 
-    lines.push("", "Note: full generate/migrate runs on Rust iris-tools until N-API commands land.");
+    lines.push("", "CLI: run `iris check`, `generate`, and `push` via this package when the Node semantic core is installed.");
 
     console.log(lines.join("\n"));
 }

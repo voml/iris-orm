@@ -8,7 +8,7 @@ use iris::{CapabilitySet, DatasourceKind, Iris, Planner, ReferenceStore, Row, re
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
 use iris_adapter_sqlite::SqliteSource;
-use iris_tools::project::{expand_endpoint, load_project};
+use iris::project::{expand_endpoint, load_project};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value as JsonValue, json};

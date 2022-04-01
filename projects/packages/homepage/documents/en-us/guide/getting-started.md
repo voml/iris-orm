@@ -30,13 +30,13 @@ Do **not** branch on `typeof window` in a shared entry — bundlers may pull bot
 
 ## CLI
 
-The Node host ships the `iris` CLI (same brand as Rust `iris-tools`):
+The Node host ships the sole `iris` CLI:
 
 ```bash
 pnpm exec iris --help
 ```
 
-The TypeScript host CLI is still a skeleton; full semantic commands come from the Rust core via N-API.
+The CLI runs through `@yydb/iris/node` and the optional platform N-API packages.
 
 ## Schema
 

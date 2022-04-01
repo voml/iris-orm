@@ -6,6 +6,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod migrate;
+pub mod project;
+
 pub use iris_ir::{
     AccessKind, AppliedWatermark, COMPOSITE_PLAN_FORMAT, CmpOp, CommitToken, CompositePlan,
     CompositeStep, ConsistencyIntent, DEFAULT_COMMIT_SHARD, EffectKind, HydrateCompleteness,
@@ -58,3 +61,8 @@ pub fn uuid_is_v7(text: &str) -> bool {
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
+
+pub use migrate::{ApplyReport, migrate_apply, migrate_plan, migrate_run, migrate_verify};
+pub use project::{
+    expand_endpoint, load_project, load_project_optional, load_project_required, write_file,
+};
