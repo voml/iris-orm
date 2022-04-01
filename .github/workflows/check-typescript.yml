@@ -8,14 +8,14 @@ on:
       - "projects/packages/homepage/**"
       - "pnpm-workspace.yaml"
       - "package.json"
-      - ".github/workflows/iris-homepage.yml"
+      - ".github/workflows/check-typescript.yml"
   pull_request:
     branches: [master, dev]
     paths:
       - "projects/packages/homepage/**"
       - "pnpm-workspace.yaml"
       - "package.json"
-      - ".github/workflows/iris-homepage.yml"
+      - ".github/workflows/check-typescript.yml"
 
 defaults:
   run:
