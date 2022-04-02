@@ -56,9 +56,11 @@ fn generate_dispatch_typescript_target() {
     let (_, paths) =
         iris_generator::generate_from_source(USER_SCHEMA, "typescript", &dir).expect("generate");
     assert_eq!(paths.len(), 10);
-    assert!(paths.iter().all(|path| {
-        path.starts_with(dir.join("generated/iris/typescript"))
-    }));
+    assert!(
+        paths
+            .iter()
+            .all(|path| { path.starts_with(dir.join("generated/iris/typescript")) })
+    );
     assert!(
         paths
             .iter()

@@ -3,20 +3,25 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Cargo workspace root (`projects/iris.rs`).
-fn workspace_root() -> PathBuf {
+/// Rust crates root (`projects/crates/`).
+fn crates_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .canonicalize()
-        .expect("workspace root")
+        .expect("crates root")
+}
+
+/// Cargo workspace / repo root (`iris-orm/`).
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .canonicalize()
+        .expect("repo root")
 }
 
 /// Product repo root (`iris-orm/`).
 fn product_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../..")
-        .canonicalize()
-        .expect("product root")
+    repo_root()
 }
 
 fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -59,7 +64,7 @@ fn does_not_vendor_vos_language_sources() {
 #[test]
 fn public_iris_crate_has_no_sql_dependencies() {
     let manifest =
-        fs::read_to_string(workspace_root().join("iris/Cargo.toml")).expect("iris Cargo.toml");
+        fs::read_to_string(crates_root().join("iris/Cargo.toml")).expect("iris Cargo.toml");
     for banned in [
         "sqlx",
         "diesel",
@@ -82,8 +87,7 @@ fn public_iris_crate_has_no_sql_dependencies() {
 
 #[test]
 fn workspace_depends_on_external_vos_facade_only() {
-    let workspace =
-        fs::read_to_string(workspace_root().join("Cargo.toml")).expect("workspace toml");
+    let workspace = fs::read_to_string(repo_root().join("Cargo.toml")).expect("workspace toml");
     let deps_section = workspace
         .split("[workspace.dependencies]")
         .nth(1)
@@ -114,14 +118,14 @@ fn workspace_depends_on_external_vos_facade_only() {
         "vos must resolve via voml/vos-language git facade"
     );
     assert!(
-        !workspace_root().join("vos").exists(),
-        "vos must not be vendored under projects/iris.rs"
+        !crates_root().join("vos").exists(),
+        "vos must not be vendored under projects/crates"
     );
 }
 
 #[test]
 fn public_sources_forbid_sql_product_surface() {
-    let ws = workspace_root();
+    let ws = crates_root();
     let mut files = Vec::new();
     collect_files(&ws.join("iris/src"), &mut files);
     collect_files(&ws.join("iris-types/src"), &mut files);
@@ -157,7 +161,7 @@ fn public_sources_forbid_sql_product_surface() {
 
 #[test]
 fn facade_does_not_reexport_adapters() {
-    let lib = fs::read_to_string(workspace_root().join("iris/src/lib.rs")).expect("iris lib");
+    let lib = fs::read_to_string(crates_root().join("iris/src/lib.rs")).expect("iris lib");
     for banned in [
         "iris_adapter_",
         "iris_connector_",
@@ -179,7 +183,7 @@ fn facade_does_not_reexport_adapters() {
 fn types_and_ir_have_no_sql_driver_dependencies() {
     for crate_name in ["iris-types", "iris-ir"] {
         let manifest =
-            fs::read_to_string(workspace_root().join(format!("{crate_name}/Cargo.toml")))
+            fs::read_to_string(crates_root().join(format!("{crate_name}/Cargo.toml")))
                 .unwrap_or_else(|_| panic!("{crate_name} Cargo.toml"));
         for banned in [
             "rusqlite",
@@ -200,7 +204,7 @@ fn types_and_ir_have_no_sql_driver_dependencies() {
 
 #[test]
 fn yydb_connector_does_not_depend_on_foreign_sql_adapters() {
-    let manifest = fs::read_to_string(workspace_root().join("iris-connector-yydb/Cargo.toml"))
+    let manifest = fs::read_to_string(crates_root().join("iris-connector-yydb/Cargo.toml"))
         .expect("yydb connector Cargo.toml");
     for banned in [
         "iris-adapter-sqlite",
@@ -219,9 +223,9 @@ fn yydb_connector_does_not_depend_on_foreign_sql_adapters() {
 
 #[test]
 fn postgres_and_mysql_adapters_are_separate_crates() {
-    let pg = fs::read_to_string(workspace_root().join("iris-adapter-postgres/Cargo.toml"))
+    let pg = fs::read_to_string(crates_root().join("iris-adapter-postgres/Cargo.toml"))
         .expect("postgres Cargo.toml");
-    let my = fs::read_to_string(workspace_root().join("iris-adapter-mysql/Cargo.toml"))
+    let my = fs::read_to_string(crates_root().join("iris-adapter-mysql/Cargo.toml"))
         .expect("mysql Cargo.toml");
     assert!(pg.contains("postgres") && pg.contains("r2d2"));
     assert!(!pg.contains("mysql"));
@@ -233,7 +237,7 @@ fn postgres_and_mysql_adapters_are_separate_crates() {
 
 #[test]
 fn redis_adapter_is_keyspace_only() {
-    let manifest = fs::read_to_string(workspace_root().join("iris-adapter-redis/Cargo.toml"))
+    let manifest = fs::read_to_string(crates_root().join("iris-adapter-redis/Cargo.toml"))
         .expect("redis Cargo.toml");
     assert!(manifest.contains("redis"));
     for banned in ["rusqlite", "postgres", "mysql", "sqlx"] {
@@ -246,14 +250,14 @@ fn redis_adapter_is_keyspace_only() {
 
 #[test]
 fn typescript_tree_has_no_iris_adapter_packages() {
-    let ts_root = product_root().join("projects/iris.ts");
+    let ts_root = product_root().join("projects/packages");
     assert!(
         ts_root.is_dir(),
         "expected TypeScript tree at {}",
         ts_root.display()
     );
-    for entry in fs::read_dir(&ts_root).expect("read projects/iris.ts") {
-        let entry = entry.expect("iris.ts dir entry");
+    for entry in fs::read_dir(&ts_root).expect("read projects/packages") {
+        let entry = entry.expect("packages dir entry");
         let name = entry.file_name().to_string_lossy().into_owned();
         assert!(
             !name.starts_with("iris-adapter-"),
@@ -265,7 +269,7 @@ fn typescript_tree_has_no_iris_adapter_packages() {
 
 #[test]
 fn yyds_connector_stays_gated_without_sql() {
-    let manifest = fs::read_to_string(workspace_root().join("iris-connector-yyds/Cargo.toml"))
+    let manifest = fs::read_to_string(crates_root().join("iris-connector-yyds/Cargo.toml"))
         .expect("yyds connector Cargo.toml");
     for banned in [
         "yydb",

@@ -80,7 +80,12 @@ table Item {
 }
 "#;
     let model = GenerationModel::from_vos_schema(schema).unwrap();
-    assert!(model.tables[0].fields.iter().any(|f| f.name == "id" && f.is_uuid));
+    assert!(
+        model.tables[0]
+            .fields
+            .iter()
+            .any(|f| f.name == "id" && f.is_uuid)
+    );
     assert!(
         model.tables[0]
             .fields

@@ -189,15 +189,13 @@ pub fn migrate_run_cmd(
     plan_only: bool,
 ) -> Result<MigrateRunResult> {
     let config = Path::new(&config_path);
-    let plan_path = plan_out
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            config
-                .parent()
-                .unwrap_or_else(|| Path::new("."))
-                .join("migrations")
-                .join(format!("{source}-plan.von"))
-        });
+    let plan_path = plan_out.map(std::path::PathBuf::from).unwrap_or_else(|| {
+        config
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join("migrations")
+            .join(format!("{source}-plan.von"))
+    });
     match migrate_run(config, &source, &plan_path, plan_only) {
         Ok(None) => Ok(MigrateRunResult {
             ok: true,

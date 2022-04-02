@@ -69,10 +69,7 @@ impl SessionStore {
 
     fn execute(&self, planner: &Planner, source: &str) -> std::result::Result<Vec<Row>, String> {
         match self {
-            Self::Memory(iris) => iris
-                .session()
-                .query(source)
-                .map_err(|err| err.to_string()),
+            Self::Memory(iris) => iris.session().query(source).map_err(|err| err.to_string()),
             Self::Sqlite(db) => {
                 let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
                 db.execute_plan(&plan).map_err(|err| err.to_string())
@@ -189,11 +186,7 @@ impl MemorySession {
 
     /// Plan + execute VOS DML (returns rows). Aligns with generated `db.$query`.
     #[napi]
-    pub fn query(
-        &self,
-        source: String,
-        parameters_json: Option<String>,
-    ) -> Result<ExecuteResult> {
+    pub fn query(&self, source: String, parameters_json: Option<String>) -> Result<ExecuteResult> {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }

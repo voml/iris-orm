@@ -228,15 +228,9 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
     let structs = unescape_rust_template(&render("domain_mod", &model.to_json())?);
     let models_body = rust_client::emit_models_body(model)?;
     let models = format!("{header}\n{structs}\n{models_body}");
-    let metadata = format!(
-        "{header}\n{}\n",
-        rust_client::emit_metadata(model)
-    );
+    let metadata = format!("{header}\n{}\n", rust_client::emit_metadata(model));
     let errors = format!("{header}\n{}\n", rust_client::emit_errors());
-    let operations = format!(
-        "{header}\n{}\n",
-        rust_client::emit_operations(model)?
-    );
+    let operations = format!("{header}\n{}\n", rust_client::emit_operations(model)?);
     let index = format!(
         r#"{header}
 //! Public entry for generated Iris Rust bindings.

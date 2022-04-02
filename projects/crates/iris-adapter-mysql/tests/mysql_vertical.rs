@@ -130,7 +130,12 @@ fn plan_push_emits_add_field_for_missing_columns() {
         .collect();
     assert!(adds.contains(&("Goods", "cover_url")), "{adds:?}");
     assert!(adds.contains(&("Goods", "status")), "{adds:?}");
-    assert!(!plan.changes.iter().any(|c| matches!(c, LogicalChange::CreateTable { .. })));
+    assert!(
+        !plan
+            .changes
+            .iter()
+            .any(|c| matches!(c, LogicalChange::CreateTable { .. }))
+    );
 }
 
 #[test]
