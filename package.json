@@ -19,9 +19,11 @@
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
         "iris": "pnpm --filter @yydb/iris exec node ./bin/iris.ts",
-        "napi:build": "pnpm --filter @yydb/iris-napi build",
-        "wasm:build": "pnpm --filter @yydb/iris-wasm build",
-        "test:ts": "pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 --filter @yydb/iris-napi run test",
+        "build:napi": "node scripts/build-napi.mjs",
+        "build:wasm": "node scripts/build-wasm.mjs",
+        "napi:build": "node scripts/build-napi.mjs",
+        "wasm:build": "node scripts/build-wasm.mjs",
+        "test:ts": "pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 run test",
         "homepage": "pnpm --filter @yydb/iris-homepage build",
         "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
         "homepage:build": "pnpm homepage",
@@ -34,6 +36,7 @@
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",
         "@doki-land/nifty": "^0.0.12",
+        "@napi-rs/cli": "^2.18.4",
         "typescript": "^5.9.2"
     }
 }

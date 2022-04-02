@@ -1,20 +1,13 @@
 {
     "name": "@yydb/iris-linux-x64",
     "version": "0.1.0",
-    "description": "Linux x64 N-API binary for @yydb/iris",
+    "description": "Iris ORM Node-API binary for Linux x64",
+    "type": "module",
     "license": "MPL-2.0",
-    "os": [
-        "linux"
-    ],
-    "cpu": [
-        "x64"
-    ],
-    "main": "iris.linux-x64-gnu.node",
-    "files": [
-        "iris.linux-x64-gnu.node",
-        "index.d.ts"
-    ],
-    "types": "index.d.ts",
+    "main": "./index.js",
+    "files": ["index.js", "lib", "readme.md"],
+    "os": ["linux"],
+    "cpu": ["x64"],
     "publishConfig": {
         "access": "public"
     }

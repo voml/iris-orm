@@ -1,12 +1,12 @@
 {
-    "name": "@yydb/iris-win32-x64",
+    "name": "@yydb/iris-darwin-x64",
     "version": "0.1.0",
-    "description": "Iris ORM Node-API binary for Windows x64",
+    "description": "Iris ORM Node-API binary for macOS x64",
     "type": "module",
     "license": "MPL-2.0",
     "main": "./index.js",
     "files": ["index.js", "lib", "readme.md"],
-    "os": ["win32"],
+    "os": ["darwin"],
     "cpu": ["x64"],
     "publishConfig": {
         "access": "public"
