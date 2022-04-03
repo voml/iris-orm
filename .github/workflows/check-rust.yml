@@ -6,12 +6,12 @@ on:
     branches: [master, dev]
     paths:
       - "projects/crates/**"
-      - ".github/workflows/iris-rs.yml"
+      - ".github/workflows/check-rust.yml"
   pull_request:
     branches: [master, dev]
     paths:
       - "projects/crates/**"
-      - ".github/workflows/iris-rs.yml"
+      - ".github/workflows/check-rust.yml"
 
 defaults:
   run:
