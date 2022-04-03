@@ -1,2 +1,5 @@
 packages:
   - "projects/packages/*"
+  - "projects/examples/hono"
+  - "projects/examples/express"
+  - "projects/examples/fastify"

@@ -1,0 +1,19 @@
+{
+    "name": "@yydb-examples/hono",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "start": "node --experimental-strip-types src/index.ts",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "dependencies": {
+        "@hono/node-server": "^1.14.3",
+        "@yydb/iris": "workspace:*",
+        "hono": "^4.7.11"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2"
+    }
+}
