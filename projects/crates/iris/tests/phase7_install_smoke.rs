@@ -25,12 +25,16 @@ fn workspace_crate_dirs_exist_for_clean_checkout() {
         "iris-adapter-redis",
         "iris-tools",
         "iris-generator",
-        "Cargo.toml",
     ] {
         let path = workspace.join(rel);
         assert!(path.exists(), "missing workspace path {}", path.display());
     }
-    for rel in ["Readme.md", "projects/iris.ts", "projects/iris.cs"] {
+    for rel in [
+        "Cargo.toml",
+        "Readme.md",
+        "projects/packages",
+        "projects/iris.cs",
+    ] {
         let path = product.join(rel);
         assert!(path.exists(), "missing product path {}", path.display());
     }
