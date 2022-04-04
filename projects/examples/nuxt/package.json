@@ -1,0 +1,21 @@
+{
+    "name": "@yydb-examples/nuxt",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "nuxt dev --port 3003",
+        "build": "nuxt build",
+        "start": "node .output/server/index.mjs",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*",
+        "nuxt": "^3.19.2"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2",
+        "vue-tsc": "^3.0.8"
+    }
+}

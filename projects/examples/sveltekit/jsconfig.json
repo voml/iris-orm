@@ -1,0 +1,8 @@
+{
+    "compilerOptions": {
+        "moduleResolution": "bundler",
+        "module": "esnext",
+        "target": "esnext"
+    },
+    "include": ["./.svelte-kit/ambient.d.ts", "./src/**/*.ts", "./src/**/*.svelte"]
+}

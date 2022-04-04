@@ -3,3 +3,7 @@ packages:
   - "projects/examples/hono"
   - "projects/examples/express"
   - "projects/examples/fastify"
+  - "projects/examples/next"
+  - "projects/examples/nuxt"
+  - "projects/examples/sveltekit"
+  - "projects/examples/astro"
