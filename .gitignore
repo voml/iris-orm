@@ -7,6 +7,8 @@ Thumbs.db
 .vscode/
 .cursor/
 *.iml
+*.log
+*.txt
 
 # Rust
 /target/
@@ -16,8 +18,8 @@ Thumbs.db
 node_modules/
 dist/
 pnpm-lock.yaml
-!projects/packages/homepage/pnpm-lock.yaml
-*.log
+*.node
+*.wasm
 
 # Secrets / local env
 .env
@@ -34,6 +36,3 @@ scripts/.placeholder-npm-cache.json
 # Accidental local `iris generate` outputs in this repo
 iris.lock
 **/.cache/iris/
-
-# wasm-pack mis-targeted output (use projects/packages/iris-unknown-wasm32)
-projects/crates/iris-unknown-wasm32/
