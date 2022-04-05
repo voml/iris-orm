@@ -40,8 +40,10 @@ The TypeScript host CLI is still a skeleton; full semantic commands come from th
 
 ## Schema
 
-Keep `schemas/**/*.iris` in your repo and an `iris.von` project file for datasources and generate output. See the `farm-database` crate in [vmz-circle-farm](https://github.com/voml/iris-orm) for a worked example.
+Keep `schemas/**/*.iris` in your repo and an `iris.von` project file for datasources and generate output. See the
+`farm-database` crate in [vmz-circle-farm](https://github.com/voml/iris-orm) for a worked example.
 
 ## vs sql-studio-orm
 
-`@yydb/sql-studio-orm` and Iris are **parallel products**, not stacked. Iris only speaks VOS / `.iris` and never routes through a SQL query AST.
+`@yydb/sql-studio-orm` and Iris are **parallel products**, not stacked. Iris only speaks VOS / `.iris` and never routes
+through a SQL query AST.

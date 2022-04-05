@@ -19,7 +19,8 @@ pnpm --filter @yydb/iris-homepage document:check
 pnpm run verify:homepage-hosts
 ```
 
-Build uses delivery profile **`static`** (`static-cdn` assembly, `vmz.config.ts`). Output folder is **`dist/cdn`** — upload to any CDN / static host (Cloudflare Pages, Netlify, …).
+Build uses delivery profile **`static`** (`static-cdn` assembly, `vmz.config.ts`). Output folder is **`dist/cdn`** —
+upload to any CDN / static host (Cloudflare Pages, Netlify, …).
 
 ```text
 dist/cdn/    # upload this tree to CDN / static hosting
@@ -31,29 +32,32 @@ Override output target: `VMZ_OUT_TARGET=cdn` (default) or `--target cdn` on `scr
 - Playground: `/playground`（`.iris` DDL + VOS DML，浏览器 WASM 内存执行）
 - Documents: `/d/`（语言为 Host 状态，不在 URL 中）
 
-npm 包使用 **`@yydb`** 作用域；**Iris ORM 与 YY Database 无隶属关系**（见 `#locales` `footerScopeNote`）。
+npm 包使用 **`@yydb`** 作用域； **Iris ORM 与 YY Database 无隶属关系**（见 `#locales` `footerScopeNote`）。
 
-UI components are used as **bare tags** (`<Button>`, `<Card>`, `<Icon>`, …) discovered from npm dependencies — no `import { Button } from '@vmz/ui'`.
+UI components are used as **bare tags** (`<Button>`, `<Card>`, `<Icon>`, …) discovered from npm dependencies — no
+`import { Button } from '@vmz/ui'`.
 
 ## Static host (Cloudflare Pages / Netlify / …)
 
-| Field | Value |
-|-------|--------|
-| Root directory | `projects/packages/homepage` |
-| Build command | `pnpm build` |
-| Build output directory | `dist/cdn` |
-| Node version | 20 or 22 |
+| Field                  | Value                        |
+|------------------------|------------------------------|
+| Root directory         | `projects/packages/homepage` |
+| Build command          | `pnpm build`                 |
+| Build output directory | `dist/cdn`                   |
+| Node version           | 20 or 22                     |
 
 Do **not** enable SPA fallback — routes are pre-rendered HTML.
 
 ## Dependency discipline
 
-| Scenario | Rule |
-|----------|------|
-| CI / commits | **npm registry only** — pin `@vmz/*@0.1.12`, lock resolves registry tarballs |
+| Scenario         | Rule                                                                                                  |
+|------------------|-------------------------------------------------------------------------------------------------------|
+| CI / commits     | **npm registry only** — pin `@vmz/*@0.1.12`, lock resolves registry tarballs                          |
 | Local VMZ bugfix | Temporary `pnpm link` or `file:` **on your machine only** — never commit linked `package.json` / lock |
-| After local test | Restore npm deps and re-run `check` + `build` before push |
+| After local test | Restore npm deps and re-run `check` + `build` before push                                             |
 
-See [VMZ_ISSUES.md](./VMZ_ISSUES.md) for framework/UI gaps found while building this site.
+VMZ dogfood gaps from `@vmz/*@0.1.12` are tracked
+in [vmz-framework discussion #2](https://github.com/doki-land/vmz-framework/discussions/2).
 
-Product messaging follows the Rust-core + N-API binding model. TypeScript `@yydb/iris-adapter-*` packages have been removed from the repo.
+Product messaging follows the Rust-core + N-API binding model. TypeScript `@yydb/iris-adapter-*` packages have been
+removed from the repo.
