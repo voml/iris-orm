@@ -1,38 +1,11 @@
-import type { CheckSourceResult } from "../types/check-source.ts";
+import type { IrisBindings, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
 import type { IrisBindingHost, IrisHost } from "../types/binding.ts";
 import type { IrisOperation } from "../types/operation.ts";
 import type { SchemaIntrospection } from "../types/schema-introspection.ts";
 import type { IrisSession, OpenSessionOptions } from "../types/session.ts";
 import { parseExecuteJson, parseIntrospectionJson, parseRowsJson } from "./parse.ts";
 
-export type MemorySessionBinding = {
-    executeVos(source: string, parametersJson?: string | null): string | { ok: boolean; rowsJson: string; error?: string | null };
-    executeOperation?(operationJson: string): string | { ok: boolean; rowsJson: string; error?: string | null };
-    close(): void;
-    managedPush?: (schema: string) => void;
-};
-
-export type SemanticCoreBinding = {
-    irisVersion(): string;
-    checkSource(source: string): CheckSourceResult;
-    introspectSchema(source: string): string;
-    openMemorySession(): MemorySessionBinding;
-    openSession?(options?: OpenSessionNapiOptions): MemorySessionBinding;
-    openSqliteSession?(path: string): MemorySessionBinding;
-    openPostgresSession?(url: string): MemorySessionBinding;
-    openMysqlSession?(url: string): MemorySessionBinding;
-    openProjectSession?(configPath: string, source: string): MemorySessionBinding;
-};
-
-/** N-API `openSession` wire shape (camelCase from napi-rs). */
-export type OpenSessionNapiOptions = {
-    profile?: string;
-    sqlitePath?: string;
-    postgresUrl?: string;
-    mysqlUrl?: string;
-    projectConfig?: string;
-    datasource?: string;
-};
+export type { IrisBindings as SemanticCoreBinding, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
 
 function wrapSession(binding: MemorySessionBinding): IrisSession {
     const session: IrisSession = {
@@ -69,7 +42,7 @@ function wrapSession(binding: MemorySessionBinding): IrisSession {
     return session;
 }
 
-function resolveSessionBinding(host: IrisHost, core: SemanticCoreBinding, options?: OpenSessionOptions): MemorySessionBinding {
+function resolveSessionBinding(host: IrisHost, core: IrisBindings, options?: OpenSessionOptions): MemorySessionBinding {
     if (host === "node" && core.openSession) {
         const profile =
             options?.profile ??
@@ -111,7 +84,7 @@ function resolveSessionBinding(host: IrisHost, core: SemanticCoreBinding, option
 }
 
 /** Build the symmetric Iris runtime facade from a loaded semantic core. */
-export function buildRuntime(host: IrisHost, core: SemanticCoreBinding): IrisBindingHost {
+export function buildRuntime(host: IrisHost, core: IrisBindings): IrisBindingHost {
     return {
         host,
         capabilities: {

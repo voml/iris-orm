@@ -1,7 +1,7 @@
 import type { IrisSession } from "../types/session.ts";
 import { buildRuntime } from "../runtime/build-runtime.ts";
 import { IrisFacadeError } from "../types/errors.ts";
-import { getWasmSemanticCore } from "./wasm.ts";
+import { getWasmSemanticCore } from "../wasm/index.ts";
 
 /**
  * Local Web Backend storage profile.

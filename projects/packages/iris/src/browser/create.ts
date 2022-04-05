@@ -1,5 +1,5 @@
 import type { IrisBindingHost } from "../types/binding.ts";
-import { getWasmSemanticCore } from "./wasm.ts";
+import { getWasmSemanticCore } from "../wasm/index.ts";
 import { buildRuntime } from "../runtime/build-runtime.ts";
 
 export type CreateIrisBrowserOptions = {

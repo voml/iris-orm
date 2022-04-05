@@ -26,8 +26,8 @@ function ensureNativeOverride(): void {
     if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
         return;
     }
-    const resolveScript = fileURLToPath(new URL("../../iris-napi/scripts/resolve-platform-dir.mjs", import.meta.url));
-    const artifactOut = spawnSync(process.execPath, [resolveScript, "--artifact"], {
+    const resolveScript = fileURLToPath(new URL("../../../../scripts/resolve-native-artifact.mjs", import.meta.url));
+    const artifactOut = spawnSync(process.execPath, [resolveScript], {
         encoding: "utf8",
     });
     if (artifactOut.status === 0 && artifactOut.stdout.trim()) {
@@ -37,9 +37,9 @@ function ensureNativeOverride(): void {
 
 async function loadCore(t: { skip: (msg?: string) => void }) {
     ensureNativeOverride();
-    const node = await import(srcImport("src/node/native.ts"));
+    const node = await import(srcImport("src/node/index.ts"));
     try {
-        return await node.loadSemanticCore();
+        return node.loadIrisNative();
     } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
             t.skip("Node semantic core not installed");
