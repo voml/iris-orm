@@ -231,6 +231,13 @@ impl IrisProject {
         Ok(project)
     }
 
+    /// Parse a JSON project document (same wire shape as `iris.von`, used by `iris.config.ts`).
+    pub fn from_json(text: &str) -> Result<Self, ProjectError> {
+        let project: Self = serde_json::from_str(text).map_err(ProjectError::Json)?;
+        project.validate()?;
+        Ok(project)
+    }
+
     /// Canonical VON text.
     pub fn to_von(&self) -> Result<String, ProjectError> {
         self.validate()?;
@@ -439,6 +446,8 @@ pub enum ProjectError {
     Io(std::io::Error),
     /// VON parse/serialize.
     Von(von::VonError),
+    /// JSON parse.
+    Json(serde_json::Error),
     /// Unknown format discriminator.
     UnsupportedFormat(String),
     /// Unsupported version.
@@ -458,6 +467,7 @@ impl std::fmt::Display for ProjectError {
         match self {
             Self::Io(e) => write!(f, "{e}"),
             Self::Von(e) => write!(f, "{e}"),
+            Self::Json(e) => write!(f, "{e}"),
             Self::UnsupportedFormat(s) => write!(f, "unsupported iris.von format `{s}`"),
             Self::UnsupportedVersion(v) => write!(f, "unsupported iris.von version {v}"),
             Self::Invalid(s) | Self::SecretInConfig(s) => write!(f, "{s}"),

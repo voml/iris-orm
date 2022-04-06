@@ -69,7 +69,7 @@ pub struct LoadProjectResult {
     pub generate_target: String,
 }
 
-/// Load `iris.von` from a config path.
+/// Load project config (`iris.von` or materialized `.iris/project.von`) from a config path.
 #[napi]
 pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
     let (root, project) =
@@ -81,6 +81,14 @@ pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
         generate_out: project.generate.out,
         generate_target: project.generate.target,
     })
+}
+
+/// Materialize a JSON project document from `iris.config.ts` to `.iris/project.von`.
+#[napi]
+pub fn materialize_runtime_project(project_dir: String, document_json: String) -> Result<String> {
+    let path = project::materialize_runtime_project(Path::new(&project_dir), &document_json)
+        .map_err(|e| Error::from_reason(e))?;
+    Ok(path.display().to_string())
 }
 
 /// Read merged schema text for a loaded project.

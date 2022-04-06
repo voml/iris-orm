@@ -1341,6 +1341,7 @@ dependencies = [
  "glob",
  "iris-ir",
  "serde",
+ "serde_json",
  "von",
  "vos",
 ]
