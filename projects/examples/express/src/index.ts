@@ -1,6 +1,6 @@
 import express from "express";
 
-import { closeIrisDb, createUser, listUsers, openIrisDb } from "./iris.ts";
+import { closeIrisDb, createPost, createUser, listPosts, listPostsByAuthorName, listUsers, openIrisDb } from "./iris.ts";
 
 const app = express();
 app.use(express.json());
@@ -20,6 +20,27 @@ app.post("/users", async (req, res) => {
     const active = typeof req.body?.active === "boolean" ? req.body.active : true;
     const user = await createUser(db, userName, active);
     res.status(201).json(user);
+});
+
+app.get("/posts", async (req, res) => {
+    const author = typeof req.query.author === "string" ? req.query.author.trim() : "";
+    if (author) {
+        res.json(await listPostsByAuthorName(db, author));
+        return;
+    }
+    res.json(await listPosts(db));
+});
+
+app.post("/posts", async (req, res) => {
+    const authorUserId = typeof req.body?.author_user_id === "string" ? req.body.author_user_id.trim() : "";
+    const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+    if (!authorUserId || !title) {
+        res.status(400).json({ error: "author_user_id and title are required" });
+        return;
+    }
+    const published = typeof req.body?.published === "boolean" ? req.body.published : true;
+    const post = await createPost(db, { author_user_id: authorUserId, title, published });
+    res.status(201).json(post);
 });
 
 const port = Number(process.env.PORT ?? 3000);

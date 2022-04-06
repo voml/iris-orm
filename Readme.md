@@ -162,7 +162,7 @@ pnpm run iris -- check path/to/schema.iris
 pnpm run iris -- generate path/to/schema.iris
 ```
 
-HTTP backend examples (Hono, Express, Fastify) live under `projects/examples/`. See that README for `pnpm run build:napi` and run commands.
+HTTP and full-stack backend examples live under `projects/examples/`. See that README for `pnpm run build:napi` and run commands.
 
 Optional live backends (CI enables these when services are up):
 

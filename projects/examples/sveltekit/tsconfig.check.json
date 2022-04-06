@@ -13,5 +13,5 @@
         },
         "types": ["node"]
     },
-    "include": ["src/lib/**/*.ts", "src/routes/api/**/*.ts"]
+    "include": ["src/lib/**/*.ts", "src/routes/api/users/**/*.ts", "src/routes/api/posts/**/*.ts"]
 }

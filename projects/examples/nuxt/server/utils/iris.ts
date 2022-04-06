@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,25 +11,36 @@ export type User = {
     active: boolean;
 };
 
-const schemaPath = join(dirname(fileURLToPath(import.meta.url)), "../../schemas/user.iris");
+/** Post row projected through `author: &User` ???note `author_name` from `x.author.user_name`. */
+export type PostSummary = {
+    post_id: string;
+    title: string;
+    author_name: string;
+    published: boolean;
+};
+
+const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 let binding: IrisDbBinding | null = null;
-
-async function loadSchema(): Promise<string> {
-    return readFile(schemaPath, "utf8");
-}
 
 export async function openIrisDb(): Promise<IrisDbBinding> {
     if (binding) {
         return binding;
     }
     binding = await createIrisDbBinding({
-        profile: "sqlite",
-        sqlitePath: ":memory:",
-        schema: await loadSchema(),
+        config: projectRoot,
+        source: "default",
     });
-    await seedUsers(binding);
+    await seedBlog(binding);
     return binding;
+}
+
+export async function closeIrisDb(): Promise<void> {
+    if (!binding) {
+        return;
+    }
+    await binding.close();
+    binding = null;
 }
 
 export async function listUsers(db: IrisDbBinding): Promise<User[]> {
@@ -52,10 +62,56 @@ export async function createUser(db: IrisDbBinding, userName: string, active = t
     return user;
 }
 
-async function seedUsers(db: IrisDbBinding): Promise<void> {
+export async function listPosts(db: IrisDbBinding): Promise<PostSummary[]> {
+    const rows = await db.query(
+        "Post.filter(x => x.published).map(x => { post_id: x.post_id, title: x.title, author_name: x.author.user_name, published: x.published }).collect()",
+    );
+    return rows as PostSummary[];
+}
+
+/** Filter posts by traversing the `&User` reference in VOS (`x.author.user_name`). */
+export async function listPostsByAuthorName(db: IrisDbBinding, authorName: string): Promise<PostSummary[]> {
+    const rows = await db.query(
+        "Post.filter(x => x.author.user_name == $name).map(x => { post_id: x.post_id, title: x.title, author_name: x.author.user_name, published: x.published }).collect()",
+        { name: authorName },
+    );
+    return rows as PostSummary[];
+}
+
+/** Insert a post; `author_user_id` is the FK stored for `author: &User`. */
+export async function createPost(
+    db: IrisDbBinding,
+    input: { author_user_id: string; title: string; published?: boolean },
+): Promise<{ post_id: string; author_user_id: string; title: string; published: boolean }> {
+    const post = {
+        post_id: randomUUID(),
+        author_user_id: input.author_user_id,
+        title: input.title,
+        published: input.published ?? true,
+    };
+    await db.execute("Post::insert({ post_id: $post_id, author: $author, title: $title, published: $published })", {
+        post_id: post.post_id,
+        author: post.author_user_id,
+        title: post.title,
+        published: post.published,
+    });
+    return post;
+}
+
+async function seedBlog(db: IrisDbBinding): Promise<void> {
     if ((await listUsers(db)).length > 0) {
         return;
     }
-    await createUser(db, "ada", true);
-    await createUser(db, "linus", true);
+    const ada = await createUser(db, "ada", true);
+    const linus = await createUser(db, "linus", true);
+    await createPost(db, {
+        author_user_id: ada.user_id,
+        title: "Hello &User refs",
+        published: true,
+    });
+    await createPost(db, {
+        author_user_id: linus.user_id,
+        title: "Filter via x.author.user_name",
+        published: true,
+    });
 }
