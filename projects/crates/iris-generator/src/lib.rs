@@ -49,7 +49,8 @@ pub enum Error {
 /// Result alias.
 pub type Result<T> = std::result::Result<T, Error>;
 
-mod rust_client;
+mod rust_view;
+mod ts_view;
 mod typescript;
 
 include!(concat!(env!("OUT_DIR"), "/aot_registry.rs"));
@@ -77,6 +78,17 @@ pub struct FieldModel {
     pub reference_target: Option<String>,
 }
 
+/// One VOS macro parameter in the generation model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MacroParamModel {
+    /// Parameter name.
+    pub name: String,
+    /// VOS type label.
+    pub vos_type: String,
+    /// TypeScript parameter type.
+    pub ts_type: String,
+}
+
 /// One VOS macro in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MacroModel {
@@ -84,6 +96,9 @@ pub struct MacroModel {
     pub name: String,
     /// Return type label (VOS surface).
     pub return_type: String,
+    /// Positional parameters from the macro signature.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<MacroParamModel>,
 }
 
 /// One VOS table in the generation model.
@@ -152,6 +167,18 @@ impl GenerationModel {
                     });
                 }
                 Item::Macro(macro_def) => {
+                    let params = macro_def
+                        .params
+                        .iter()
+                        .map(|param| {
+                            let vos_type = type_label(&param.ty);
+                            MacroParamModel {
+                                name: param.name.clone(),
+                                vos_type: vos_type.clone(),
+                                ts_type: vos_type_to_ts(&vos_type),
+                            }
+                        })
+                        .collect();
                     macros.push(MacroModel {
                         name: macro_def.name.clone(),
                         return_type: macro_def
@@ -159,6 +186,7 @@ impl GenerationModel {
                             .as_ref()
                             .map(type_label)
                             .unwrap_or_else(|| "unit".into()),
+                        params,
                     });
                 }
                 _ => {}
@@ -203,7 +231,7 @@ pub fn typescript_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
 
 fn rust_file_header(model: &GenerationModel) -> Result<String> {
     render(
-        "file_header",
+        "rust/file_header",
         &json!({
             "generator_version": model.generator_version,
             "schema_fingerprint": model.schema_fingerprint,
@@ -224,29 +252,19 @@ pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
 
 /// Emit Rust target files: `mod` / `models` / `operations` / `metadata` / `errors`.
 pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>> {
+    let ctx = model.rust_template_context()?;
     let header = rust_file_header(model)?;
-    let structs = unescape_rust_template(&render("domain_mod", &model.to_json())?);
-    let models_body = rust_client::emit_models_body(model)?;
-    let models = format!("{header}\n{structs}\n{models_body}");
-    let metadata = format!("{header}\n{}\n", rust_client::emit_metadata(model));
-    let errors = format!("{header}\n{}\n", rust_client::emit_errors());
-    let operations = format!("{header}\n{}\n", rust_client::emit_operations(model)?);
-    let index = format!(
-        r#"{header}
-//! Public entry for generated Iris Rust bindings.
-//! Layout: `generated/iris/rust/` — models / operations / metadata / errors.
-
-pub mod errors;
-pub mod metadata;
-pub mod models;
-pub mod operations;
-
-pub use errors::{{Error, Result}};
-pub use metadata::{{GENERATOR_VERSION, SCHEMA_FINGERPRINT, UUID_FIELDS}};
-pub use models::*;
-pub use operations::{{Db, Txn}};
-"#
+    let structs = unescape_rust_template(&render("rust/domain_mod", &model.to_json())?);
+    let helpers = render("rust/models_helpers", &ctx)?;
+    let impls = unescape_rust_template(&render("rust/models_impl", &ctx)?);
+    let models = format!("{header}\n{structs}\n{helpers}\n{impls}");
+    let metadata = format!("{header}\n{}\n", render("rust/metadata", &ctx)?);
+    let errors = format!("{header}\n{}\n", render("rust/errors", &ctx)?);
+    let operations = format!(
+        "{header}\n{}\n",
+        unescape_rust_template(&render("rust/operations", &ctx)?),
     );
+    let index = format!("{header}\n{}\n", render("rust/rust_index", &ctx)?);
 
     Ok(vec![
         ("mod.rs".into(), index),
@@ -322,6 +340,25 @@ struct MappedFieldType {
     optional: bool,
     is_uuid: bool,
     reference_target: Option<String>,
+}
+
+fn vos_type_to_ts(vos_type: &str) -> String {
+    let base = vos_type.trim_end_matches('?').trim_start_matches('&');
+    match base {
+        "bool" => "boolean".into(),
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => {
+            "number".into()
+        }
+        "unit" => "void".into(),
+        "utf8" | "utf16" | "uuid" | "decimal" | "datetime" | "bytes" => "string".into(),
+        other
+            if other.contains("::")
+                || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) =>
+        {
+            other.into()
+        }
+        _ => "unknown".into(),
+    }
 }
 
 fn type_label(ty: &TypeExpr) -> String {

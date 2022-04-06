@@ -1,0 +1,21 @@
+<%- loop table in tables_view %>
+impl <% table.name %> {
+    /// Decode one Iris [`Row`] into `<% table.name %>` (flat scalar fields).
+    pub fn from_row(row: &Row) -> Option<Self> {
+        Some(Self {
+<%- loop field in table.scalar_fields %>
+            <% field.name %>: <% field.from_row_expr %>,
+<%- end loop %>
+        })
+    }
+}
+
+/// Flat equality / bool filter for `<% table.name %>` (omit fields with `None`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct <% table.name %>Where {
+<%- loop field in table.scalar_fields %>
+    pub <% field.name %>: <% field.where_ty %>,
+<%- end loop %>
+}
+
+<%- end loop %>

@@ -1,0 +1,102 @@
+import type { IrisDbBinding } from "@yydb/iris/types";
+import { synthesizeCreate, synthesizeFindMany, synthesizeFindUnique, synthesizeMacroCall } from "./_internal/synthesize.js";
+import type {
+    <% input_import_names %>
+} from "./inputs.js";
+
+<% if has_macros %>
+/** Generated macro bindings from schema truth (not backend capability intersection). */
+export class GeneratedMacros {
+    constructor(private readonly binding: IrisDbBinding) {}
+
+<%- loop macro in macros_view %>
+    async <% macro.name %>(<% macro.param_signature %>): Promise<<% macro.ts_return %>> {
+        const { source, parameters } = synthesizeMacroCall("<% macro.name %>", [<% macro.param_names %>]);
+<% if macro.uses_execute %>
+        await this.binding.execute(source, parameters);
+<% else %>
+        return (await this.binding.query(source, parameters)) as <% macro.ts_return %>;
+<% end if %>
+    }
+<%- end loop %>
+}
+<% else %>
+/** Schema macros (empty for this project). */
+export class GeneratedMacros {
+    constructor(private readonly binding: IrisDbBinding) {}
+}
+<% end if %>
+
+<%- loop table in tables_view %>
+export class <% table.name %>Delegate {
+    constructor(private readonly binding: IrisDbBinding) {}
+
+    async findMany<const A extends <% table.name %>FindManyArgs>(
+        args?: A,
+    ): Promise<ReadonlyArray<<% table.name %>GetPayload<A>>> {
+        const { source, parameters } = synthesizeFindMany("<% table.name %>", args);
+        const rows = await this.binding.query(source, parameters);
+        return rows as ReadonlyArray<<% table.name %>GetPayload<A>>;
+    }
+
+    async findUnique<const A extends <% table.name %>FindUniqueArgs>(
+        args: A,
+    ): Promise<<% table.name %>GetPayload<A> | null> {
+        const { source, parameters } = synthesizeFindUnique("<% table.name %>", args);
+        const rows = (await this.binding.query(source, parameters)) as unknown[];
+        return (rows[0] ?? null) as <% table.name %>GetPayload<A> | null;
+    }
+
+    async create<const A extends <% table.name %>CreateArgs>(
+        args: A,
+    ): Promise<<% table.name %>GetPayload<A>> {
+        const { source, parameters } = synthesizeCreate("<% table.name %>", args);
+        const row = await this.binding.query(source, parameters);
+        return row as <% table.name %>GetPayload<A>;
+    }
+}
+<%- end loop %>
+
+export class DbClient {
+<%- loop table in tables_view %>
+    readonly <% table.camel_name %>: <% table.name %>Delegate;
+<%- end loop %>
+    readonly $macros: GeneratedMacros;
+    private readonly binding: IrisDbBinding;
+
+    constructor(binding: IrisDbBinding) {
+        this.binding = binding;
+        this.$macros = new GeneratedMacros(binding);
+<%- loop table in tables_view %>
+        this.<% table.camel_name %> = new <% table.name %>Delegate(binding);
+<%- end loop %>
+    }
+
+    /**
+     * Escape hatch for ad-hoc VOS. Prefer generated delegates for typed args and results.
+     * @internal
+     */
+    async $query<T = unknown>(
+        source: string,
+        parameters?: Readonly<Record<string, unknown>>,
+    ): Promise<T> {
+        return (await this.binding.query(source, parameters)) as T;
+    }
+
+    /** Direct VOS DDL. Success maps VOS unit to void. */
+    async $execute(
+        source: string,
+        parameters?: Readonly<Record<string, unknown>>,
+    ): Promise<void> {
+        await this.binding.execute(source, parameters);
+    }
+
+    async $close(): Promise<void> {
+        await this.binding.close();
+    }
+}
+
+/** Construct a client from an injected binding (Node/Web host wiring stays outside generated types). */
+export function createClient(binding: IrisDbBinding): DbClient {
+    return new DbClient(binding);
+}

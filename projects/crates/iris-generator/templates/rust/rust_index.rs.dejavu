@@ -1,0 +1,12 @@
+//! Public entry for generated Iris Rust bindings.
+//! Layout: `generated/iris/rust/` — models / operations / metadata / errors.
+
+pub mod errors;
+pub mod metadata;
+pub mod models;
+pub mod operations;
+
+pub use errors::{Error, Result};
+pub use metadata::{GENERATOR_VERSION, SCHEMA_FINGERPRINT, UUID_FIELDS};
+pub use models::*;
+pub use operations::{Db, Txn};

@@ -1,0 +1,204 @@
+use std::collections::BTreeMap;
+
+use iris::{Planner, Row, RowWrite, Value};
+use iris_adapter_mysql::MysqlSource;
+use super::errors::Result as MysqlResult;
+use super::models::{escape_vos_str, *};
+
+// --- Thin generated client (TS-parity shim; not knife-B GeneratedCall) ---------
+// Prefer these delegates over hand-written VOS strings / RowWrite. Escape hatch:
+// `Db::query` / `Db::execute` (aligns with Session::query / db.$query).
+// `transaction` / `with_rollback` give a `Txn` with the same CRUD surface;
+// the connection is held by Iris — do not call MysqlSource checkout APIs from `f`.
+
+/// Generated Iris client bound to a MySQL adapter.
+pub struct Db<'a> {
+    source: &'a MysqlSource,
+    planner: Planner,
+}
+
+impl<'a> Db<'a> {
+    /// Bind to an open [`MysqlSource`].
+    pub fn new(source: &'a MysqlSource) -> Self {
+        Self {
+            source,
+            planner: Planner::new(MysqlSource::capabilities()),
+        }
+    }
+
+    /// Escape hatch: plan + execute VOS DML (returns rows). Prefer typed delegates.
+    pub fn query(&self, source: &str) -> MysqlResult<Vec<Row>> {
+        let plan = self
+            .planner
+            .plan_source(source)
+            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+        self.source.execute_plan(&plan)
+    }
+
+    /// Escape hatch: unit-valued / DDL-shaped VOS.
+    pub fn execute(&self, source: &str) -> MysqlResult<()> {
+        let _ = self.query(source)?;
+        Ok(())
+    }
+
+    /// Commit-on-success transaction. Use [`Txn`] inside `f` (same CRUD names as [`Db`]).
+    pub fn transaction<R>(
+        &self,
+        f: impl FnOnce(&mut Txn<'_>) -> MysqlResult<R>,
+    ) -> MysqlResult<R> {
+        self.source.transaction(|conn| {
+            let mut txn = Txn {
+                source: self.source,
+                planner: &self.planner,
+                conn,
+            };
+            f(&mut txn)
+        })
+    }
+
+    /// Always `ROLLBACK` — shared-DB integration tests (fixtures leave no residue).
+    pub fn with_rollback<R>(
+        &self,
+        f: impl FnOnce(&mut Txn<'_>) -> MysqlResult<R>,
+    ) -> MysqlResult<R> {
+        self.source.with_rollback(|conn| {
+            let mut txn = Txn {
+                source: self.source,
+                planner: &self.planner,
+                conn,
+            };
+            f(&mut txn)
+        })
+    }
+
+<%- loop table in tables_view %>
+    /// Table delegate for `<% table.name %>`.
+    pub fn <% table.snake_name %>(&self) -> <% table.name %>Delegate<'_> {
+        <% table.name %>Delegate { db: self }
+    }
+<%- end loop %>
+}
+
+/// Transaction handle: same CRUD names as [`Db`]; Iris holds one connection for the closure.
+pub struct Txn<'a> {
+    source: &'a MysqlSource,
+    planner: &'a Planner,
+    conn: &'a mut iris_adapter_mysql::PooledConn,
+}
+
+impl Txn<'_> {
+    /// Escape hatch while the transaction connection is held.
+    pub fn query(&mut self, source: &str) -> MysqlResult<Vec<Row>> {
+        let plan = self
+            .planner
+            .plan_source(source)
+            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+        self.source.execute_plan_on(self.conn, &plan)
+    }
+
+    /// Unit-valued escape hatch while the transaction connection is held.
+    pub fn execute(&mut self, source: &str) -> MysqlResult<()> {
+        let _ = self.query(source)?;
+        Ok(())
+    }
+
+<%- loop table in tables_view %>
+    /// Table delegate for `<% table.name %>` on this transaction.
+    pub fn <% table.snake_name %>(&mut self) -> <% table.name %>TxnDelegate<'_> {
+        <% table.name %>TxnDelegate {
+            source: self.source,
+            planner: self.planner,
+            conn: self.conn,
+        }
+    }
+<%- end loop %>
+}
+
+<%- loop table in tables_view %>
+/// Table delegate for `<% table.name %>`.
+pub struct <% table.name %>Delegate<'a> {
+    db: &'a Db<'a>,
+}
+
+impl <% table.name %>Delegate<'_> {
+<% table.synthesize_fns %>
+<% table.row_write_fn %>
+    /// Find many rows matching a flat where.
+    pub fn find_many(&self, where_: &<% table.name %>Where) -> MysqlResult<Vec<<% table.name %>>> {
+        let source = Self::synthesize_find_many(where_);
+        let rows = self.db.query(&source)?;
+        Ok(rows.iter().filter_map(<% table.name %>::from_row).collect())
+    }
+
+    /// Find at most one row (adds `.take(1)`).
+    pub fn find_unique(&self, where_: &<% table.name %>Where) -> MysqlResult<Option<<% table.name %>>> {
+        let source = Self::synthesize_find_unique(where_);
+        let rows = self.db.query(&source)?;
+        Ok(rows.first().and_then(<% table.name %>::from_row))
+    }
+
+    /// Insert a row.
+    pub fn insert(&self, row: &<% table.name %>) -> MysqlResult<()> {
+        self.db.source.insert(&Self::to_row_write(row))
+    }
+
+    /// Update by primary key.
+    pub fn update(&self, row: &<% table.name %>) -> MysqlResult<u64> {
+        self.db.source.update(&Self::to_row_write(row))
+    }
+
+    /// Delete by primary key.
+    pub fn delete(&self, key: &Value) -> MysqlResult<u64> {
+        self.db.source.delete("<% table.name %>", "<% table.primary_key %>", key)
+    }
+}
+
+/// Table delegate for `<% table.name %>` while a [`Txn`] holds the connection.
+pub struct <% table.name %>TxnDelegate<'a> {
+    source: &'a MysqlSource,
+    planner: &'a Planner,
+    conn: &'a mut iris_adapter_mysql::PooledConn,
+}
+
+impl <% table.name %>TxnDelegate<'_> {
+    /// Find many rows matching a flat where.
+    pub fn find_many(&mut self, where_: &<% table.name %>Where) -> MysqlResult<Vec<<% table.name %>>> {
+        let source = <% table.name %>Delegate::synthesize_find_many(where_);
+        let plan = self
+            .planner
+            .plan_source(&source)
+            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+        let rows = self.source.execute_plan_on(self.conn, &plan)?;
+        Ok(rows.iter().filter_map(<% table.name %>::from_row).collect())
+    }
+
+    /// Find at most one row (adds `.take(1)`).
+    pub fn find_unique(&mut self, where_: &<% table.name %>Where) -> MysqlResult<Option<<% table.name %>>> {
+        let source = <% table.name %>Delegate::synthesize_find_unique(where_);
+        let plan = self
+            .planner
+            .plan_source(&source)
+            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+        let rows = self.source.execute_plan_on(self.conn, &plan)?;
+        Ok(rows.first().and_then(<% table.name %>::from_row))
+    }
+
+    /// Insert a row.
+    pub fn insert(&mut self, row: &<% table.name %>) -> MysqlResult<()> {
+        self.source
+            .insert_on(self.conn, &<% table.name %>Delegate::to_row_write(row))
+    }
+
+    /// Update by primary key.
+    pub fn update(&mut self, row: &<% table.name %>) -> MysqlResult<u64> {
+        self.source
+            .update_on(self.conn, &<% table.name %>Delegate::to_row_write(row))
+    }
+
+    /// Delete by primary key.
+    pub fn delete(&mut self, key: &Value) -> MysqlResult<u64> {
+        self.source.delete_on(self.conn, "<% table.name %>", "<% table.primary_key %>", key)
+    }
+}
+
+<%- end loop %>

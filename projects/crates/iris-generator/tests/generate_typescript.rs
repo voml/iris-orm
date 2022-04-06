@@ -70,6 +70,33 @@ fn generate_dispatch_typescript_target() {
 }
 
 #[test]
+fn typescript_emit_has_typed_filters_patch_and_payload() {
+    let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let inputs = files
+        .iter()
+        .find(|(name, _)| name == "inputs.ts")
+        .map(|(_, content)| content.as_str())
+        .expect("inputs.ts");
+    assert!(inputs.contains("export type StringFilter"));
+    assert!(inputs.contains("export type BooleanFilter"));
+    assert!(inputs.contains("export type PatchValue<"));
+    assert!(inputs.contains("UserPatchInput"));
+    assert!(!inputs.contains("UpdateInput"));
+    assert!(inputs.contains("UserGetPayload<"));
+
+    let ops = files
+        .iter()
+        .find(|(name, _)| name == "operations.ts")
+        .map(|(_, content)| content.as_str())
+        .expect("operations.ts");
+    assert!(ops.contains("findMany<const A extends UserFindManyArgs>"));
+    assert!(ops.contains("ReadonlyArray<UserGetPayload<A>>"));
+    assert!(inputs.contains("active?: boolean | BooleanFilter"));
+    assert!(inputs.contains("user_name?: string | StringFilter"));
+}
+
+#[test]
 fn generate_rejects_unknown_target() {
     let err =
         iris_generator::generate_from_source(USER_SCHEMA, "kotlin", Path::new(".")).unwrap_err();

@@ -1,0 +1,10 @@
+import type { <% ref_type_imports %> } from "./references.js";
+
+<%- loop table in tables_view %>
+export interface <% table.name %> {
+<%- loop field in table.fields %>
+    <% field.name %>: <% field.ts_model_type %>;
+<%- end loop %>
+}
+
+<%- end loop %>

@@ -1,0 +1,177 @@
+import type {
+<% models_import_lines %>
+} from "./models.js";
+import type {
+<% refs_import_lines %>
+} from "./references.js";
+
+/** Shared input/result type helpers for generated delegates (use-site reference paths). */
+
+type EntityByName = {
+<% entity_map_lines %>
+};
+
+type EntityName = <% entity_union %>;
+
+/** Scalar filter operators for utf8 fields. */
+export type StringFilter = {
+    readonly eq?: string;
+    readonly not?: string;
+    readonly contains?: string;
+    readonly startsWith?: string;
+    readonly endsWith?: string;
+};
+
+/** Scalar filter operators for numeric fields. */
+export type NumberFilter = {
+    readonly eq?: number;
+    readonly not?: number;
+    readonly gt?: number;
+    readonly gte?: number;
+    readonly lt?: number;
+    readonly lte?: number;
+};
+
+/** Scalar filter operators for bool fields. */
+export type BooleanFilter = {
+    readonly eq?: boolean;
+    readonly not?: boolean;
+};
+
+/** Scalar filter operators for uuid / branded id fields. */
+export type UuidFilter = {
+    readonly eq?: string;
+    readonly not?: string;
+};
+
+/** Scalar filter operators for decimal fields. */
+export type DecimalFilter = {
+    readonly eq?: string;
+    readonly not?: string;
+    readonly gt?: string;
+    readonly gte?: string;
+    readonly lt?: string;
+    readonly lte?: string;
+};
+
+/** Scalar filter operators for datetime fields. */
+export type DateTimeFilter = {
+    readonly eq?: string;
+    readonly not?: string;
+    readonly gt?: string;
+    readonly gte?: string;
+    readonly lt?: string;
+    readonly lte?: string;
+};
+
+/** Scalar filter operators for bytes fields. */
+export type BytesFilter = {
+    readonly eq?: string;
+    readonly not?: string;
+};
+
+/** Patch field: write a value. Omitted field means unchanged. */
+export type PatchValue<T> = { readonly set: T };
+
+/** Patch field on nullable columns: write a value or explicit null. */
+export type NullablePatchValue<T> = PatchValue<T> | { readonly setNull: true };
+
+/** Nested select shape for a reference target (use-site dereference projection). */
+export type SelectPathFor<E extends EntityName> = {
+    [K in keyof EntityByName[E]]?:
+        | boolean
+        | (EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
+              ? SelectPathFor<T>
+              : never);
+};
+
+/** Nested where path for a reference target (use-site filter navigation). */
+export type WherePathFor<E extends EntityName> = {
+    [K in keyof EntityByName[E]]?:
+        | WhereValueForField<EntityByName[E][K]>
+        | (EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
+              ? WherePathFor<T>
+              : never);
+};
+
+type WhereValueForField<V> = V extends { readonly __irisRef: EntityName }
+    ? never
+    : V extends boolean
+      ? boolean | BooleanFilter | { readonly isNull: true } | { readonly isNotNull: true }
+      : V extends number
+        ? number | NumberFilter | { readonly isNull: true } | { readonly isNotNull: true }
+        : V extends string
+          ? string | StringFilter | UuidFilter | DecimalFilter | DateTimeFilter | BytesFilter | { readonly isNull: true } | { readonly isNotNull: true }
+          : never;
+
+/**
+ * Resolve a select shape against an entity — nested object on &T becomes
+ * SelectResultFor of the target; `true` on &T means full target entity.
+ */
+export type SelectResultFor<E extends EntityName, S> = [S] extends [undefined]
+    ? EntityByName[E]
+    : {
+          [K in keyof S & keyof EntityByName[E] as S[K] extends true | object ? K : never]: S[K] extends true
+              ? EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
+                  ? EntityByName[T]
+                  : EntityByName[E][K]
+              : S[K] extends object
+                ? EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
+                    ? SelectResultFor<T, S[K]>
+                    : never
+                : never;
+      };
+
+<%- loop table in tables_view %>
+
+export type <% table.name %>Select = {
+<%- loop field in table.fields %>
+<% if field.select_line %><% field.select_line %>
+<% end if %>
+<%- end loop %>
+};
+
+export type <% table.name %>WhereInput = {
+<%- loop field in table.fields %>
+<% if field.where_line %><% field.where_line %>
+<% end if %>
+<%- end loop %>
+};
+
+export type <% table.name %>WhereUniqueInput = {
+<% table.unique_where_lines %>
+};
+
+export type <% table.name %>CreateInput = {
+<%- loop field in table.fields %>
+<% if field.create_line %><% field.create_line %>
+<% end if %>
+<%- end loop %>
+};
+
+export type <% table.name %>PatchInput = {
+<%- loop field in table.fields %>
+<% if field.patch_line %><% field.patch_line %>
+<% end if %>
+<%- end loop %>
+};
+
+export type <% table.name %>FindManyArgs = {
+    where?: <% table.name %>WhereInput;
+    select?: <% table.name %>Select;
+    take?: number;
+};
+
+export type <% table.name %>FindUniqueArgs = {
+    where: <% table.name %>WhereUniqueInput;
+    select?: <% table.name %>Select;
+};
+
+export type <% table.name %>CreateArgs = {
+    data: <% table.name %>CreateInput;
+    select?: <% table.name %>Select;
+};
+
+export type <% table.name %>GetPayload<A extends <% table.name %>FindManyArgs | <% table.name %>FindUniqueArgs | <% table.name %>CreateArgs> =
+    SelectResultFor<"<% table.name %>", A["select"]>;
+<%- end loop %>

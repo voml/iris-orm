@@ -1,0 +1,21 @@
+<%- loop table in tables_view %>
+declare const __iris<% table.name %>IdBrand: unique symbol;
+
+/** Branded primary key for <% table.name %>. */
+export type <% table.name %>Id = <% table.pk_ts_scalar %> & {
+    readonly [__iris<% table.name %>IdBrand]: true;
+};
+
+/** Stored reference identity for &<% table.name %> (not an ORM relation object). */
+export type <% table.name %>Reference = {
+    readonly __irisRef: "<% table.name %>";
+    <% table.pk_name %>: <% table.name %>Id;
+};
+
+/** Values accepted when writing &<% table.name %>. */
+export type <% table.name %>RefInput =
+    | <% table.name %>Id
+    | { <% table.pk_name %>: <% table.name %>Id }
+    | <% table.name %>Reference;
+
+<%- end loop %>

@@ -72,6 +72,13 @@ pub fn introspect_schema_json(source: &str) -> String {
                     serde_json::json!({
                         "name": macro_def.name,
                         "returnType": macro_def.return_type,
+                        "params": macro_def.params.iter().map(|param| {
+                            serde_json::json!({
+                                "name": param.name,
+                                "vosType": param.vos_type,
+                                "tsType": param.ts_type,
+                            })
+                        }).collect::<Vec<Value>>(),
                     })
                 }).collect::<Vec<Value>>(),
                 "error": Value::Null,
