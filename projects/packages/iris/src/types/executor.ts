@@ -21,9 +21,16 @@ export interface IrisDbBinding {
 export interface CreateIrisDbBindingOptions {
     profile?: "memory" | "sqlite" | "project";
     sqlitePath?: string;
+    /** Project root or `iris.config.ts` path. Preferred over legacy `project`. */
+    config?: string;
+    /** @deprecated Use `config` (project root or `iris.config.ts`). */
     project?: string;
+    /** Datasource name from `iris.config.ts` (`default` when omitted). */
     source?: string;
-    /** Apply managed-push schema after opening a SQLite session. */
+    /**
+     * Managed-push schema **data** text. Omit when using `config` — schema is read from
+     * the on-disk paths declared by `iris.config.ts#schema`.
+     */
     schema?: string;
 }
 

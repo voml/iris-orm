@@ -54,7 +54,8 @@
     },
     "dependencies": {
         "@yydb/iris-unknown-wasm32": "workspace:*",
-        "cac": "^6.7.14"
+        "cac": "^6.7.14",
+        "jiti": "^2.4.2"
     },
     "optionalDependencies": {
         "@yydb/iris-darwin-arm64": "workspace:*",

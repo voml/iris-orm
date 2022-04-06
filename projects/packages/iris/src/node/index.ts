@@ -12,7 +12,15 @@ export { checkSchemaFile } from "./check.ts";
 export { createIris, type CreateIrisNodeOptions } from "./create.ts";
 export { createIrisExecutor, createIrisDbBinding, createIrisBindingHost } from "./executor.ts";
 export { printDoctorReport } from "./doctor.ts";
-export { loadProject, readProjectSchema } from "./project.ts";
+export {
+    CONFIG_FILE_NAMES,
+    LEGACY_CONFIG_FILE,
+    RUNTIME_PROJECT_FILE,
+    findAuthoringConfig,
+    loadAuthoringConfig,
+    resolveProjectRoot,
+} from "./config.ts";
+export { loadIrisConfig, loadProject, readProjectSchema, resolveProjectConfigPath } from "./project.ts";
 export { openDatasourceSession } from "./datasource-session.ts";
 export { createIrisTooling } from "./tooling.ts";
 export { irisCoreVersion, packageVersion } from "./versions.ts";

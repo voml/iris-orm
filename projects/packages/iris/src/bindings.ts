@@ -59,6 +59,7 @@ export type MigratePlanResult = {
 /** Node-only semantic core (tooling / project / migrate). */
 export type IrisNodeBindings = IrisBindings & {
     loadProject(configPath: string): LoadProjectResult;
+    materializeRuntimeProject(projectDir: string, documentJson: string): string;
     readSchema(projectRoot: string, schemaGlob: string): string;
     generate(source: string, target: string, outDir: string): GenerateResult;
     migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;

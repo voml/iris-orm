@@ -66,6 +66,10 @@ function loadModule(specifier: string): IrisNodeBindings {
                 return wrapNativeSession(session);
             },
             loadProject: (configPath) => (module.loadProject as (p: string) => LoadProjectResult)(configPath),
+            materializeRuntimeProject: (projectDir, documentJson) =>
+                String(
+                    (module.materializeRuntimeProject as (d: string, j: string) => string)(projectDir, documentJson),
+                ),
             readSchema: (projectRoot, schemaGlob) => String((module.readSchema as (r: string, g: string) => string)(projectRoot, schemaGlob)),
             generate: (source, target, outDir) =>
                 (module.generate as (s: string, t: string, o: string) => GenerateResult)(source, target, outDir),

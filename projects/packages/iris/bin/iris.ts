@@ -10,7 +10,7 @@ import cac from "cac";
 import { checkSchemaFile } from "../src/node/check.ts";
 import { printDoctorReport } from "../src/node/doctor.ts";
 import { loadIrisNative } from "../src/node/load.ts";
-import { loadProject, readProjectSchema } from "../src/node/project.ts";
+import { loadProject, readProjectSchema, resolveProjectConfigPath } from "../src/node/project.ts";
 import { packageVersion } from "../src/node/versions.ts";
 
 function notImplemented(name: string): void {
@@ -24,20 +24,36 @@ cli.version(packageVersion);
 cli.help();
 
 cli.command("check [schema]", "Validate schema + generated client drift")
-    .option("--config <path>", "Path to iris.von")
-    .action(async (schema?: string) => {
-        if (!schema) {
-            console.error("iris check: schema path required");
-            process.exitCode = 1;
+    .option("--config <path>", "Project root or iris.config.ts")
+    .action(async (schema?: string, options?: { config?: string }) => {
+        if (schema) {
+            process.exitCode = await checkSchemaFile(schema);
             return;
         }
-        process.exitCode = await checkSchemaFile(schema);
+        try {
+            const project = await loadProject(options?.config ?? process.cwd());
+            const source = await readProjectSchema(project);
+            const core = loadIrisNative();
+            const result = core.checkSource(source);
+            if (result.ok) {
+                console.log(
+                    `iris check: ok (${project.schemaGlob}) — ${result.tableCount} table(s), fingerprint=${result.schemaFingerprint}`,
+                );
+                process.exitCode = 0;
+                return;
+            }
+            console.error(`error: ${result.error ?? "schema validation failed"}`);
+            process.exitCode = 1;
+        } catch (error) {
+            console.error(`error: ${error instanceof Error ? error.message : String(error)}`);
+            process.exitCode = 1;
+        }
     });
 
 cli.command("generate [schema]", "Generate Iris client from .iris schema")
-    .option("--config <path>", "Path to iris.von")
+    .option("--config <path>", "Project root or iris.config.ts")
     .option("--out <dir>", "Output project root (writes generated/iris/<target>/ under this path)")
-    .option("--target <name>", "Emitter target (defaults to iris.von generate.target or typescript)")
+    .option("--target <name>", "Emitter target (defaults to iris.config.ts generate.target or typescript)")
     .action(async (schema?: string, options?: { out?: string; target?: string; config?: string }) => {
         try {
             const core = loadIrisNative();
@@ -63,13 +79,13 @@ cli.command("generate [schema]", "Generate Iris client from .iris schema")
     });
 
 cli.command("push", "Push local schema to datasource (schema -> database)")
-    .option("--config <path>", "Path to iris.von")
+    .option("--config <path>", "Project root or iris.config.ts")
     .option("--source <name>", "Datasource name", { default: "default" })
     .option("--out <dir>", "Output directory for push plan artifacts")
     .option("--plan", "Plan only (no apply)")
     .action(async (options?: { config?: string; source?: string; out?: string; plan?: boolean }) => {
-        const config = resolve(options?.config ?? "iris.von");
         try {
+            const config = await resolveProjectConfigPath(options?.config ?? process.cwd());
             const core = loadIrisNative();
             if (options?.plan) {
                 const result = core.migratePlanCmd(config, options?.source ?? "default", options?.out ?? null);
@@ -104,13 +120,13 @@ cli.command("push", "Push local schema to datasource (schema -> database)")
     });
 
 cli.command("doctor", "Local diagnostics (config / environment)")
-    .option("--config <path>", "Path to iris.von")
+    .option("--config <path>", "Project root or iris.config.ts")
     .action(async () => {
         await printDoctorReport();
     });
 
 cli.command("capabilities", "Print datasource capability summaries")
-    .option("--config <path>", "Path to iris.von")
+    .option("--config <path>", "Project root or iris.config.ts")
     .action(() => {
         notImplemented("capabilities");
     });
