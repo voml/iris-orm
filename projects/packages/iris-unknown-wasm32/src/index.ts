@@ -105,7 +105,7 @@ export function irisVersion(): string {
     return glueApi.irisVersion();
 }
 
-/** Parse and validate schema source (same semantics as `iris-tools check`). */
+/** Parse and validate schema source (same semantics as `iris check`). */
 export function checkSource(source: string): CheckSourceResult {
     assertReady();
     if (!glueApi.checkSource) {

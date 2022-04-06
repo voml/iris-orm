@@ -23,7 +23,6 @@ fn workspace_crate_dirs_exist_for_clean_checkout() {
         "iris-adapter-postgres",
         "iris-adapter-mysql",
         "iris-adapter-redis",
-        "iris-tools",
         "iris-generator",
     ] {
         let path = workspace.join(rel);
@@ -33,7 +32,7 @@ fn workspace_crate_dirs_exist_for_clean_checkout() {
         "Cargo.toml",
         "Readme.md",
         "projects/packages",
-        "projects/iris.cs",
+        "projects/packages/iris/package.json",
     ] {
         let path = product.join(rel);
         assert!(path.exists(), "missing product path {}", path.display());
@@ -41,15 +40,10 @@ fn workspace_crate_dirs_exist_for_clean_checkout() {
 }
 
 #[test]
-fn cli_binary_crate_declares_iris_dependency() {
-    let manifest = include_str!("../../iris-tools/Cargo.toml");
+fn node_cli_package_declares_iris_bin() {
+    let manifest = include_str!("../../../packages/iris/package.json");
     assert!(
-        manifest.contains("name = \"iris-tools\"")
-            || manifest.contains("name = \"iris\"")
-            || manifest.contains("iris")
-    );
-    assert!(
-        manifest.contains("iris"),
-        "iris-tools should depend on the public iris facade"
+        manifest.contains("\"bin\"") && manifest.contains("\"iris\""),
+        "@yydb/iris should ship the sole iris CLI entry"
     );
 }

@@ -4,9 +4,9 @@
 
 ```text
 Rust Iris core
-  ├─ iris-tools / iris-generator（Rust CLI）
+  ├─ iris-generator（Rust codegen）
   ├─ iris-connector-* / iris-adapter-*（Rust 工作区 lowering）
-  ├─ Node N-API → @yydb/iris/node
+  ├─ Node N-API → @yydb/iris/node + `iris` CLI
   └─ browser WASM → @yydb/iris（默认入口）
 ```
 
@@ -58,4 +58,4 @@ pnpm run verify:iris-exports     # 仅 @yydb/iris 包
 
 ## Rust 原生
 
-Rust 应用直接使用 `iris::*` crate 与 `iris-tools` CLI，不经过 npm。
+Rust 应用直接使用 `iris::*` crate。Node 上的 `iris` CLI 由 `@yydb/iris` 提供。

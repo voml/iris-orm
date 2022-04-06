@@ -30,13 +30,13 @@ import { createIris } from "@yydb/iris/node";
 
 ## CLI
 
-Node 宿主提供 `iris` CLI（与 Rust `iris-tools` 同品牌）：
+Node 宿主提供唯一的 `iris` CLI：
 
 ```bash
 pnpm exec iris --help
 ```
 
-当前 TypeScript 宿主 CLI 仍为 skeleton；完整语义命令由 Rust core + N-API 绑定提供。
+CLI 通过 `@yydb/iris/node` 与 optional 平台 N-API 包运行。
 
 ## Schema
 

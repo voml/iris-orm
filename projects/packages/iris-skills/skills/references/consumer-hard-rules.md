@@ -23,7 +23,7 @@ local tool:  iris check | iris push | iris generate | (app seed/admin)
 commit:      generated/*   (enters language compile)
 ignore:      .cache/iris/*
 deploy bin:  generated + Iris *runtime* only
-             — no CLI, no iris-tools, no .iris embed, no migrate/seed on boot
+             — no CLI, no `.iris` embed, no migrate/seed on boot
 ```
 
 ## Hard antiforwards

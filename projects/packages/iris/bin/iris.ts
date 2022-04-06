@@ -14,7 +14,7 @@ import { loadProject, readProjectSchema } from "../src/node/project.ts";
 import { packageVersion } from "../src/node/versions.ts";
 
 function notImplemented(name: string): void {
-    console.error(`iris ${name}: not implemented in @yydb/iris/node yet — use Rust iris-tools for full semantics`);
+    console.error(`iris ${name}: not implemented in @yydb/iris yet`);
     process.exitCode = 1;
 }
 

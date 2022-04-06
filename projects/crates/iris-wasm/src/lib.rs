@@ -69,7 +69,7 @@ impl CheckSourceResult {
     }
 }
 
-/// Parse and validate schema source (same semantics as `iris-tools check`).
+/// Parse and validate schema source (same semantics as `iris check`).
 #[wasm_bindgen(js_name = checkSource)]
 pub fn check_source(source: &str) -> CheckSourceResult {
     check_schema_source(source).into()

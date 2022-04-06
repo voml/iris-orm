@@ -1,8 +1,8 @@
-//! iris.von project loading and schema I/O (shared by CLI + embedders).
+//! `iris.von` project loading and schema I/O (shared by CLI + embedders).
 
 use std::path::{Path, PathBuf};
 
-use iris::{DatasourceConfig, IrisProject, PROJECT_FILE, expand_env};
+use crate::{DatasourceConfig, IrisProject, PROJECT_FILE, expand_env};
 
 /// Load `iris.von` and return `(project_dir, project)`.
 pub fn load_project(config: &Path) -> Result<(PathBuf, IrisProject), String> {
@@ -52,7 +52,7 @@ pub fn load_project_required(config: Option<&Path>) -> Result<(PathBuf, IrisProj
 
 /// Read merged VOS schema text from `iris.von` (`schema` field; glob ok).
 pub fn read_schema(project_dir: &Path, project: &IrisProject) -> Result<String, String> {
-    iris::read_schema(project_dir, &project.schema)
+    crate::read_schema(project_dir, &project.schema)
 }
 
 /// Expand `$MYSQL_URL` / env placeholders in a datasource endpoint.
