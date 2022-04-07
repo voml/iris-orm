@@ -1,0 +1,19 @@
+{
+    "name": "@yydb-examples/express",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "start": "node --experimental-strip-types src/index.ts",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*",
+        "express": "^5.1.0"
+    },
+    "devDependencies": {
+        "@types/express": "^5.0.3",
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2"
+    }
+}

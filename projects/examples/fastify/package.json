@@ -1,0 +1,18 @@
+{
+    "name": "@yydb-examples/fastify",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "start": "node --experimental-strip-types src/index.ts",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*",
+        "fastify": "^5.4.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2"
+    }
+}

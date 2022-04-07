@@ -97,6 +97,9 @@ projects/packages/
   iris-skills/          @yydb/iris-skills
   homepage/             official site → https://iris-orm.pages.dev/
 
+projects/examples/
+  hono/ express/ fastify/   @yydb-examples/* HTTP servers
+
 Native builds: `projects/crates/iris-napi` + `scripts/build-napi.mjs` (not npm workspace members).
 WASM builds: `projects/crates/iris-wasm` + `scripts/build-wasm.mjs`.
 ```
@@ -157,6 +160,8 @@ The `iris` CLI ships from `@yydb/iris` (`projects/packages/iris`). Use `pnpm run
 pnpm run iris -- check path/to/schema.iris
 pnpm run iris -- generate path/to/schema.iris
 ```
+
+HTTP backend examples (Hono, Express, Fastify) live under `projects/examples/`. See that README for `pnpm run build:napi` and run commands.
 
 Optional live backends (CI enables these when services are up):
 
