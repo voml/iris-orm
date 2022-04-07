@@ -1,0 +1,8 @@
+{
+    "extends": "astro/tsconfigs/strict",
+    "compilerOptions": {
+        "allowImportingTsExtensions": true,
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*.ts", "src/**/*.astro", "astro.config.mjs"]
+}
