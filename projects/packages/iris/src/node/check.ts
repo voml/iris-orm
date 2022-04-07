@@ -1,13 +1,13 @@
 import { readFile } from "node:fs/promises";
 
-import { loadSemanticCore } from "./native.ts";
+import { loadIrisNative } from "./load.ts";
 import { IrisFacadeError } from "../types/errors.ts";
 
 /** Validate a `.iris` / VOS schema file on disk via Rust N-API. */
 export async function checkSchemaFile(schemaPath: string): Promise<number> {
     const source = await readFile(schemaPath, "utf8");
     try {
-        const core = await loadSemanticCore();
+        const core = loadIrisNative();
         const result = core.checkSource(source);
         if (result.ok) {
             console.log(`iris check: ok (${schemaPath}) — ${result.tableCount} table(s), fingerprint=${result.schemaFingerprint}`);

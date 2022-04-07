@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 
 import { IrisFacadeError } from "../types/errors.ts";
-import { loadSemanticCore } from "./native.ts";
+import { loadIrisNative } from "./load.ts";
 
 const PROJECT_FILE = "iris.von";
 
@@ -13,7 +13,7 @@ export async function loadProject(projectPath: string): Promise<{
     readonly generateOut: string;
     readonly generateTarget: string;
 }> {
-    const core = await loadSemanticCore();
+    const core = loadIrisNative();
     const root = resolve(projectPath);
     const config = root.endsWith(PROJECT_FILE) ? root : resolve(root, PROJECT_FILE);
     try {
@@ -36,6 +36,6 @@ export async function loadProject(projectPath: string): Promise<{
 
 /** Read merged schema text for a loaded project (Node-only). */
 export async function readProjectSchema(project: { root: string; schemaGlob: string }): Promise<string> {
-    const core = await loadSemanticCore();
+    const core = loadIrisNative();
     return core.readSchema(project.root, project.schemaGlob);
 }

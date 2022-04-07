@@ -2,46 +2,21 @@ import { createRequire } from "node:module";
 
 import type { CheckSourceResult } from "../types/check-source.ts";
 import { IrisFacadeError } from "../types/errors.ts";
-import type { SemanticCoreBinding, MemorySessionBinding } from "../runtime/build-runtime.ts";
+import type { IrisNodeBindings, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
+import type {
+    GenerateResult,
+    LoadProjectResult,
+    MigratePlanResult,
+} from "../bindings.ts";
+import { resolvePlatformPackage } from "./platform-packages.ts";
 
 const require = createRequire(import.meta.url);
-
-type LoadProjectResult = {
-    root: string;
-    config: string;
-    schemaGlob: string;
-    generateOut: string;
-    generateTarget: string;
-};
-
-type GenerateResult = {
-    ok: boolean;
-    outputPath: string;
-    schemaFingerprint: string;
-    files: string[];
-    error?: string | null;
-};
-
-type MigratePlanResult = {
-    ok: boolean;
-    planPath: string;
-    error?: string | null;
-};
 
 type NativeMemorySession = {
     executeVos(source: string, parametersJson?: string | null): { ok: boolean; rowsJson: string; error?: string | null };
     executeOperation?(operationJson: string): { ok: boolean; rowsJson: string; error?: string | null };
     close(): void;
     managedPush?: (schema: string) => void;
-};
-
-type OpenSessionNapiOptions = {
-    profile?: string;
-    sqlitePath?: string;
-    postgresUrl?: string;
-    mysqlUrl?: string;
-    projectConfig?: string;
-    datasource?: string;
 };
 
 function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
@@ -58,49 +33,10 @@ function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
     return binding;
 }
 
-export type SemanticCore = SemanticCoreBinding & {
-    loadProject(configPath: string): LoadProjectResult;
-    readSchema(projectRoot: string, schemaGlob: string): string;
-    generate(source: string, target: string, outDir: string): GenerateResult;
-    migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;
-    migrateRunCmd?(
-        configPath: string,
-        source: string,
-        planOut?: string | null,
-        planOnly?: boolean,
-    ): {
-        ok: boolean;
-        planPath: string;
-        planOnly: boolean;
-        createdTables: string[];
-        error?: string | null;
-    };
-};
-
-let cached: SemanticCore | null = null;
-
-function resolvePlatformPackage(platform: NodeJS.Platform, arch: string): string | null {
-    if (platform === "win32" && arch === "x64") {
-        return "@yydb/iris-win32-x64";
-    }
-    if (platform === "linux" && arch === "x64") {
-        return "@yydb/iris-linux-x64";
-    }
-    return null;
-}
-
-function isPackageInstalled(packageName: string): boolean {
+function loadModule(specifier: string): IrisNodeBindings {
     try {
-        require.resolve(packageName);
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-function loadModule(specifier: string): SemanticCore {
-    try {
-        const module = require(specifier) as Record<string, unknown>;
+        const loaded = require(specifier) as Record<string, unknown> & { default?: Record<string, unknown> };
+        const module = (loaded.default ?? loaded) as Record<string, unknown>;
         return {
             irisVersion: () => String((module.irisVersion as () => string)()),
             checkSource: (source) => (module.checkSource as (s: string) => CheckSourceResult)(source),
@@ -164,32 +100,30 @@ function loadModule(specifier: string): SemanticCore {
     }
 }
 
+function isPackageInstalled(packageName: string): boolean {
+    try {
+        require.resolve(packageName);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** Whether the optional Node semantic core resolves for this host. */
 export function isNodeSemanticCoreInstalled(platform: NodeJS.Platform = process.platform, arch: string = process.arch): boolean {
     const packageName = resolvePlatformPackage(platform, arch);
     return packageName != null && isPackageInstalled(packageName);
 }
 
-/** Whether the optional browser semantic core resolves. */
-export function isBrowserSemanticCoreInstalled(): boolean {
-    return isPackageInstalled("@yydb/iris-unknown-wasm32");
-}
-
-/** Load the Rust semantic core for the current Node host. */
-export async function loadSemanticCore(): Promise<SemanticCore> {
-    if (cached) {
-        return cached;
+/** Load the Rust semantic core from the optional `@yydb/iris-<platform>` package. */
+export function loadIrisNode(): IrisNodeBindings {
+    const overridePath = process.env.NAPI_RS_NATIVE_LIBRARY_PATH;
+    if (overridePath) {
+        return loadModule(overridePath);
     }
 
     const platform = process.platform;
     const arch = process.arch;
-    const overridePath = process.env.NAPI_RS_NATIVE_LIBRARY_PATH;
-
-    if (overridePath) {
-        cached = loadModule(overridePath);
-        return cached;
-    }
-
     const packageName = resolvePlatformPackage(platform, arch);
     if (!packageName) {
         throw new IrisFacadeError("native-unsupported-platform", `@yydb/iris/node: no semantic core published for ${platform}-${arch}`);
@@ -201,6 +135,15 @@ export async function loadSemanticCore(): Promise<SemanticCore> {
         );
     }
 
-    cached = loadModule(packageName);
+    return loadModule(packageName);
+}
+
+let cached: IrisNodeBindings | undefined;
+
+/** Cached Node-API binding loader (panduck `loadPanduckNative` shape). */
+export function loadIrisNative(): IrisNodeBindings {
+    if (!cached) {
+        cached = loadIrisNode();
+    }
     return cached;
 }

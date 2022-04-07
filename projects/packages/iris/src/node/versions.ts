@@ -8,6 +8,6 @@ export const packageVersion: string = require("../../package.json").version as s
 
 /** Iris semantic core version from Rust (`iris::version()` via N-API). */
 export async function irisCoreVersion(): Promise<string> {
-    const { loadSemanticCore } = await import("./native.ts");
-    return (await loadSemanticCore()).irisVersion();
+    const { loadIrisNative } = await import("./load.ts");
+    return loadIrisNative().irisVersion();
 }

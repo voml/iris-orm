@@ -13,15 +13,19 @@ const require = createRequire(import.meta.url);
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf8"));
 
+const PLATFORM_PACKAGES = {
+    "win32-x64": "@yydb/iris-win32-x64",
+    "linux-x64": "@yydb/iris-linux-x64",
+    "linux-arm64": "@yydb/iris-linux-arm64",
+    "darwin-x64": "@yydb/iris-darwin-x64",
+    "darwin-arm64": "@yydb/iris-darwin-arm64",
+};
+
 function resolvePlatformPackage() {
     const override = process.env.NAPI_RS_NATIVE_LIBRARY_PATH;
     if (override) return override;
     const key = `${process.platform}-${process.arch}`;
-    const map = {
-        "win32-x64": "@yydb/iris-win32-x64",
-        "linux-x64": "@yydb/iris-linux-x64",
-    };
-    const name = map[key];
+    const name = PLATFORM_PACKAGES[key];
     if (!name) {
         throw new Error(`@yydb/iris: no semantic core for ${key}`);
     }
@@ -34,7 +38,8 @@ function resolvePlatformPackage() {
 }
 
 function loadCore() {
-    return require(resolvePlatformPackage());
+    const loaded = require(resolvePlatformPackage());
+    return loaded?.default ?? loaded;
 }
 
 function notImplemented(name) {
