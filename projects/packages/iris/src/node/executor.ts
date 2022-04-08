@@ -4,6 +4,7 @@ import type { ExecutionWireResult } from "../types/execution-result.ts";
 import { parseExecuteJson, parseRowsJson } from "../runtime/parse.ts";
 import type { IrisNodeBindings } from "../bindings.ts";
 import { loadIrisNative } from "./load.ts";
+import { loadProject, readProjectSchema } from "./project.ts";
 
 type NativeSession = {
     executeVos(source: string, parametersJson?: string | null): { ok: boolean; rowsJson: string; error?: string | null };
@@ -11,18 +12,26 @@ type NativeSession = {
     managedPush?: (schema: string) => void;
 };
 
-function openNativeSession(core: IrisNodeBindings, options?: CreateIrisDbBindingOptions): NativeSession {
-    const profile = options?.profile ?? (options?.sqlitePath ? "sqlite" : options?.project ? "project" : "memory");
+async function openNativeSession(core: IrisNodeBindings, options?: CreateIrisDbBindingOptions): Promise<NativeSession> {
+    const configPath = options?.config ?? options?.project;
+    const profile =
+        options?.profile ??
+        (options?.sqlitePath ? "sqlite" : configPath ? "project" : "memory");
     let session: NativeSession;
+    let schemaData = options?.schema;
     if (profile === "sqlite" && core.openSqliteSession) {
         session = core.openSqliteSession(options?.sqlitePath ?? ":memory:") as NativeSession;
-    } else if (profile === "project" && core.openProjectSession) {
-        session = core.openProjectSession(options!.project!, options?.source ?? "default") as NativeSession;
+    } else if (profile === "project" && core.openProjectSession && configPath) {
+        const project = await loadProject(configPath);
+        session = core.openProjectSession(project.runtimeConfig, options?.source ?? "default") as NativeSession;
+        if (!schemaData) {
+            schemaData = await readProjectSchema(project);
+        }
     } else {
         session = core.openMemorySession() as NativeSession;
     }
-    if (options?.schema && session.managedPush) {
-        session.managedPush(options.schema);
+    if (schemaData && session.managedPush) {
+        session.managedPush(schemaData);
     }
     return session;
 }
@@ -48,7 +57,7 @@ function runVos(session: NativeSession, source: string, parameters?: Readonly<Re
 /** Create internal binding support for generated `db` (not an application entry). */
 export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
     const core = loadIrisNative();
-    const session = openNativeSession(core, options);
+    const session = await openNativeSession(core, options);
 
     return {
         async query(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<unknown> {

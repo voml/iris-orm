@@ -12,4 +12,13 @@ export type {
     IrisExecutor,
     VosParameters,
 } from "./executor.ts";
+export type {
+    IrisDatasourceConfig,
+    IrisDatasourceKind,
+    IrisGenerateConfig,
+    IrisProjectDocument,
+    IrisTruthMode,
+    IrisUserConfig,
+} from "./config.ts";
+export { defineIrisConfig, toProjectDocument } from "./config.ts";
 export type { IrisTooling } from "./tooling.ts";

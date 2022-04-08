@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 
 import cac from "cac";
 
+import { resolveNativeProjectConfig } from "../src/node/config.mjs";
+
 const require = createRequire(import.meta.url);
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf8"));
@@ -47,20 +49,26 @@ function notImplemented(name) {
     process.exitCode = 1;
 }
 
+async function resolveRuntimeConfig(input) {
+    const core = loadCore();
+    const resolved = await resolveNativeProjectConfig(input ?? process.cwd(), core);
+    return resolved;
+}
+
 const cli = cac("iris");
 cli.version(pkg.version || "0.0.0");
 cli.help();
 
 cli.command("check [schema]", "Validate schema")
-    .option("--config <path>", "Path to iris.von")
-    .action((schema) => {
+    .option("--config <path>", "Project root or iris.config.ts")
+    .action(async (schema, options) => {
         try {
             const core = loadCore();
             let source = schema;
             if (!source) {
-                const config = resolve(cli.options?.config || "iris.von");
-                const project = core.loadProject(config);
-                source = core.readSchema(project.root, project.schemaGlob);
+                const project = await resolveRuntimeConfig(options?.config);
+                const loaded = core.loadProject(project.runtimeConfig);
+                source = core.readSchema(loaded.root, loaded.schemaGlob);
             } else {
                 source = readFileSync(resolve(schema), "utf8");
             }
@@ -78,10 +86,10 @@ cli.command("check [schema]", "Validate schema")
     });
 
 cli.command("generate [schema]", "Generate client from .iris schema")
-    .option("--config <path>", "Path to iris.von")
+    .option("--config <path>", "Project root or iris.config.ts")
     .option("--out <dir>", "Output project root")
     .option("--target <name>", "Emitter target")
-    .action((schema, options) => {
+    .action(async (schema, options) => {
         try {
             const core = loadCore();
             let source;
@@ -92,11 +100,11 @@ cli.command("generate [schema]", "Generate client from .iris schema")
                 target = target || "typescript";
                 outRoot = outRoot || resolve(".");
             } else {
-                const config = resolve(options?.config || join(process.cwd(), "iris.von"));
-                const project = core.loadProject(config);
-                source = core.readSchema(project.root, project.schemaGlob);
-                target = target || project.generateTarget || "typescript";
-                outRoot = outRoot || resolve(project.root, project.generateOut);
+                const project = await resolveRuntimeConfig(options?.config);
+                const loaded = core.loadProject(project.runtimeConfig);
+                source = core.readSchema(loaded.root, loaded.schemaGlob);
+                target = target || loaded.generateTarget || "typescript";
+                outRoot = outRoot || resolve(loaded.root, loaded.generateOut);
             }
             const result = core.generate(source, target, outRoot);
             if (!result.ok) {
@@ -114,14 +122,15 @@ cli.command("generate [schema]", "Generate client from .iris schema")
     });
 
 cli.command("push", "Push local schema to datasource")
-    .option("--config <path>", "Path to iris.von")
-    .option("--source <name>", "Datasource name", { default: "main" })
+    .option("--config <path>", "Project root or iris.config.ts")
+    .option("--source <name>", "Datasource name", { default: "default" })
     .option("--out <dir>", "Plan output path or directory")
     .option("--plan", "Plan only (no apply)")
-    .action((options) => {
-        const config = resolve(options?.config || "iris.von");
-        const source = options?.source || "main";
+    .action(async (options) => {
+        const source = options?.source || "default";
         try {
+            const resolved = await resolveRuntimeConfig(options?.config);
+            const config = resolved.runtimeConfig;
             const core = loadCore();
             if (options?.plan) {
                 const result = core.migratePlanCmd(config, source, options?.out ?? null);
@@ -166,8 +175,10 @@ cli.command("doctor", "Local diagnostics").action(() => {
         console.log(`@yydb/iris ${pkg.version}`);
         console.log(`semantic core: ${core.irisVersion()}`);
         console.log(`platform: ${process.platform}-${process.arch}`);
-        const cfg = resolve("iris.von");
-        console.log(`iris.von: ${existsSync(cfg) ? cfg : "(not in cwd)"}`);
+        const cfgTs = resolve("iris.config.ts");
+        const cfgVon = resolve("iris.von");
+        console.log(`iris.config.ts: ${existsSync(cfgTs) ? cfgTs : "(not in cwd)"}`);
+        console.log(`iris.von (legacy): ${existsSync(cfgVon) ? cfgVon : "(not in cwd)"}`);
     } catch (e) {
         console.error(e instanceof Error ? e.message : String(e));
         process.exitCode = 1;
