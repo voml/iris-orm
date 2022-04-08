@@ -55,7 +55,8 @@ Post.map(x => { title: x.title, author_name: x.author.user_name }).collect()
 hono/
   iris.config.ts        # datasources + schema data pointer
   schemas/blog.iris     # schema data (User + Post with author: &User)
-  src/iris.ts           # openIrisDb(), listPosts(), createPost(), …
+  generated/iris/typescript/  # `iris generate --config .` output (committed)
+  src/iris.ts           # host wrapper over generated `createDb`
   src/index.ts          # HTTP routes only
 ```
 
@@ -69,8 +70,24 @@ export default defineIrisConfig({
     datasources: {
         default: { kind: "sqlite", mode: "managed_push", path: ":memory:" },
     },
+    generate: { out: ".", target: "typescript" },
 });
 ```
+
+## Generate TypeScript client
+
+The query API lives in **`generated/iris/typescript/`** — not hand-written. Regenerate from config + schema data:
+
+```bash
+pnpm run build:napi
+pnpm run examples:generate
+# or per project:
+pnpm iris generate --config projects/examples/hono
+```
+
+`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generated/iris/typescript/` (`createDb`, `db.user`, `db.post`, …).
+
+`src/iris.ts` is only a thin host wrapper (`openIrisDb`, seed, HTTP helpers) importing the generated client.
 
 Full-stack apps expose the same API under `/api/*` (for example `/api/posts`).
 
@@ -96,7 +113,7 @@ pnpm --filter @yydb-examples/next dev
 |-------|---------|
 | `GET /users` | List active users |
 | `POST /users` | `{ "user_name": "grace" }` |
-| `GET /posts` | Published posts with `author_name` projected through `&User` |
+| `GET /posts` | Published posts with nested `author.user_name` through generated `&User` select |
 | `GET /posts?author=ada` | Filter posts where `x.author.user_name == "ada"` |
 | `POST /posts` | `{ "author_user_id": "<uuid>", "title": "…" }` — FK into `author: &User` |
 

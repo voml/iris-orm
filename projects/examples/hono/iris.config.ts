@@ -10,7 +10,7 @@ export default defineIrisConfig({
         },
     },
     generate: {
-        out: "generated/iris",
+        out: ".",
         target: "typescript",
     },
 });

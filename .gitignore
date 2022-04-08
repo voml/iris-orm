@@ -36,3 +36,4 @@ scripts/.placeholder-npm-cache.json
 # Accidental local `iris generate` outputs in this repo
 iris.lock
 **/.cache/iris/
+**/.iris/
