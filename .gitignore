@@ -37,3 +37,5 @@ scripts/.placeholder-npm-cache.json
 iris.lock
 **/.cache/iris/
 **/.iris/
+projects/examples/**/src/generated/
+projects/examples/**/generated/

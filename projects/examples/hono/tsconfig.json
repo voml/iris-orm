@@ -10,5 +10,5 @@
         "allowImportingTsExtensions": true,
         "types": ["node"]
     },
-    "include": ["src/**/*.ts", "generated/iris/typescript/**/*.ts"]
+    "include": ["src/**/*.ts"]
 }

@@ -13,5 +13,5 @@ Rules:
 
 | Path | Target |
 |------|--------|
-| `rust/*.dejavu` | `generated/iris/rust/` |
-| `typescript/*.dejavu` | `generated/iris/typescript/` |
+| `rust/*.dejavu` | `src/generated/iris/rust/` |
+| `typescript/*.dejavu` | `src/generated/iris/` |

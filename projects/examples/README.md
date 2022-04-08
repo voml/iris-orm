@@ -55,9 +55,9 @@ Post.map(x => { title: x.title, author_name: x.author.user_name }).collect()
 hono/
   iris.config.ts        # datasources + schema data pointer
   schemas/blog.iris     # schema data (User + Post with author: &User)
-  generated/iris/typescript/  # `iris generate --config .` output (committed)
-  src/iris.ts           # host wrapper over generated `createDb`
-  src/index.ts          # HTTP routes only
+  src/generated/iris/       # `iris generate --config .` output (local, gitignored)
+  src/iris.ts               # host wrapper over generated `createDb`
+  src/index.ts              # HTTP routes only
 ```
 
 ### `iris.config.ts`
@@ -76,7 +76,7 @@ export default defineIrisConfig({
 
 ## Generate TypeScript client
 
-The query API lives in **`generated/iris/typescript/`** — not hand-written. Regenerate from config + schema data:
+The query API lives in **`src/generated/iris/`** — not hand-written. Regenerate from config + schema data:
 
 ```bash
 pnpm run build:napi
@@ -85,7 +85,7 @@ pnpm run examples:generate
 pnpm iris generate --config projects/examples/hono
 ```
 
-`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generated/iris/typescript/` (`createDb`, `db.user`, `db.post`, …).
+`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `src/generated/iris/` (`createDb`, `db.user`, `db.post`, …).
 
 `src/iris.ts` is only a thin host wrapper (`openIrisDb`, seed, HTTP helpers) importing the generated client.
 

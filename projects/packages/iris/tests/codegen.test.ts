@@ -60,8 +60,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.equal(result.ok, true);
     assert.equal(result.files.length, 10);
 
-    const root = join(outDir, "generated", "iris", "typescript");
-    assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris\/typescript$/);
+    const root = join(outDir, "src", "generated", "iris");
+    assert.match(result.outputPath.replace(/\\/g, "/"), /src\/generated\/iris$/);
 
     const index = await readFile(join(root, "index.ts"), "utf8");
     assert.match(index, /export \{ DbClient, createClient \}/);
@@ -117,7 +117,7 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-tsc-"));
     const result = core.generate(POST_USER_SCHEMA, "typescript", outDir);
     assert.equal(result.ok, true);
-    const generatedRoot = join(outDir, "generated", "iris", "typescript");
+    const generatedRoot = join(outDir, "src", "generated", "iris");
 
     const typesRoot = fileURLToPath(new URL("../src/types", import.meta.url));
     const stubDir = join(outDir, "stubs");
@@ -176,8 +176,8 @@ export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingO
                     },
                     baseUrl: ".",
                 },
-                include: ["./generated/iris/typescript/**/*.ts"],
-                exclude: ["./generated/iris/typescript/consumer-negative.ts"],
+                include: ["./src/generated/iris/**/*.ts"],
+                exclude: ["./src/generated/iris/consumer-negative.ts"],
             },
             null,
             2,
@@ -259,7 +259,7 @@ void run;
                     },
                     baseUrl: ".",
                 },
-                include: ["./generated/iris/typescript/consumer-negative.ts"],
+                include: ["./src/generated/iris/consumer-negative.ts"],
             },
             null,
             2,

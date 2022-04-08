@@ -216,17 +216,17 @@ pub const fn prefers_aot() -> bool {
     cfg!(feature = "aot")
 }
 
-/// Relative root for all targets: `{out}/generated/iris/<target>/`.
-pub const GENERATED_IRIS_DIR: &str = "generated/iris";
+/// Relative root for generated bindings under the project source tree.
+pub const GENERATED_IRIS_SRC_ROOT: &str = "src/generated/iris";
 
-/// Output directory for the Rust target.
+/// Output directory for the Rust target (`src/generated/iris/rust/`).
 pub fn rust_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
-    out_dir.join(GENERATED_IRIS_DIR).join("rust")
+    out_dir.join(GENERATED_IRIS_SRC_ROOT).join("rust")
 }
 
-/// Output directory for the TypeScript target.
+/// Output directory for the TypeScript target (`src/generated/iris/`).
 pub fn typescript_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
-    out_dir.join(GENERATED_IRIS_DIR).join("typescript")
+    out_dir.join(GENERATED_IRIS_SRC_ROOT)
 }
 
 fn rust_file_header(model: &GenerationModel) -> Result<String> {
@@ -301,7 +301,7 @@ fn write_files_atomic(
     Ok(written)
 }
 
-/// Write Rust bindings into `{out_dir}/generated/iris/rust/`.
+/// Write Rust bindings into `{out_dir}/src/generated/iris/rust/`.
 pub fn write_rust_domain(
     model: &GenerationModel,
     out_dir: &std::path::Path,

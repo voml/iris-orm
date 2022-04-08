@@ -3,7 +3,7 @@
  * Generate TypeScript clients for all `projects/examples/*` via `@yydb/iris` CLI.
  *
  * Reads each project's `iris.config.ts`, loads schema **data** from the declared pointer,
- * and writes `generated/iris/typescript/` (same as `iris generate --config .` in each example).
+ * and writes `src/generated/iris/` (same as `iris generate --config .` in each example).
  */
 import { execSync } from "node:child_process";
 import { existsSync } from "node:fs";

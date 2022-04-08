@@ -118,11 +118,11 @@ pub fn generate(source: String, target: String, out_dir: String) -> Result<Gener
         Ok((model, paths)) => {
             let output_path = match target.as_str() {
                 "rust" => Path::new(&out_dir)
-                    .join("generated/iris/rust")
+                    .join("src/generated/iris/rust")
                     .display()
                     .to_string(),
                 "typescript" | "ts" => Path::new(&out_dir)
-                    .join("generated/iris/typescript")
+                    .join("src/generated/iris")
                     .display()
                     .to_string(),
                 _ => out_dir.clone(),
