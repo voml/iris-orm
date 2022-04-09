@@ -1,8 +1,36 @@
 # Iris + TypeScript backends
 
-Self-contained examples: each project keeps its own `schemas/user.iris`, Iris wiring beside server routes, and the same list/create users API.
+Self-contained examples: each project keeps **`iris.config.ts`** (project config) and **`schemas/blog.iris`** (schema **data**) beside the app, and wires Iris through `@yydb/iris/node` on the server only.
+
+**Config vs data:** `iris.config.ts` declares datasource bindings and a `schema` pointer to on-disk `.iris` files. It does **not** embed VOS schema text.
+
+The schema highlights **VOS references** — `author: &User` on `Post` — and route handlers query through that edge (`x.author.user_name`).
 
 Example packages use the `@yydb-examples/*` scope so an accidental publish is rejected without `@yydb` registry access.
+
+## Schema (`schemas/blog.iris`)
+
+```vos
+table User {
+    @@user_id: uuid,
+    user_name: utf8,
+    active: bool,
+}
+
+table Post {
+    @@post_id: uuid,
+    author: &User,
+    title: utf8,
+    published: bool,
+}
+```
+
+`&User` declares a reference field. Inserts pass the referenced primary key (`author_user_id` → `author`). Queries traverse the edge in VOS:
+
+```vos
+Post.filter(x => x.author.user_name == $name).collect()
+Post.map(x => { title: x.title, author_name: x.author.user_name }).collect()
+```
 
 ## HTTP servers
 
@@ -14,71 +42,77 @@ Example packages use the `@yydb-examples/*` scope so an accidental publish is re
 
 ## Full-stack frameworks
 
-| Example       | Package                      | Default port | Iris entry                         |
-|---------------|------------------------------|--------------|------------------------------------|
-| [Next.js](./next/)       | `@yydb-examples/next`       | `3002`       | `app/api/users/route.ts`           |
-| [Nuxt](./nuxt/)          | `@yydb-examples/nuxt`        | `3003`       | `server/api/users.{get,post}.ts`   |
-| [SvelteKit](./sveltekit/) | `@yydb-examples/sveltekit` | `3004`       | `src/routes/api/users/+server.ts`  |
-| [Astro](./astro/)        | `@yydb-examples/astro`      | `3005`       | `src/pages/api/users.ts`           |
+| Example       | Package                      | Default port |
+|---------------|------------------------------|--------------|
+| [Next.js](./next/)       | `@yydb-examples/next`       | `3002`       |
+| [Nuxt](./nuxt/)          | `@yydb-examples/nuxt`        | `3003`       |
+| [SvelteKit](./sveltekit/) | `@yydb-examples/sveltekit` | `3004`       |
+| [Astro](./astro/)        | `@yydb-examples/astro`      | `3005`       |
 
 ## Layout (per example)
 
 ```text
-next/   # shape varies by framework, same pieces everywhere
-  schemas/user.iris          # VOS schema beside the app
-  lib/iris.ts                # or server/utils/iris.ts — openIrisDb(), listUsers(), createUser()
-  app/api/users/route.ts     # framework route handler only
+hono/
+  iris.config.ts        # datasources + schema data pointer
+  schemas/blog.iris     # schema data (User + Post with author: &User)
+  src/iris.ts           # openIrisDb(), listPosts(), createPost(), …
+  src/index.ts          # HTTP routes only
 ```
 
-Full-stack samples set `serverExternalPackages` / Vite `ssr.external` so N-API `.node` binaries are not bundled.
+### `iris.config.ts`
+
+```ts
+import { defineIrisConfig } from "@yydb/iris/types";
+
+export default defineIrisConfig({
+    schema: "schemas/blog.iris",
+    datasources: {
+        default: { kind: "sqlite", mode: "managed_push", path: ":memory:" },
+    },
+});
+```
+
+Full-stack apps expose the same API under `/api/*` (for example `/api/posts`).
 
 ## Prerequisites
-
-From the iris-orm repo root:
 
 ```bash
 pnpm install
 pnpm run build:napi
 ```
 
-Examples require the Node semantic core (`@yydb/iris/node` + a platform package such as `@yydb/iris-win32-x64` on Windows).
+Requires `@yydb/iris/node` and a platform package such as `@yydb/iris-win32-x64` on Windows.
 
 ## Run
 
-HTTP servers:
-
 ```bash
 pnpm --filter @yydb-examples/hono start
-pnpm --filter @yydb-examples/express start
-pnpm --filter @yydb-examples/fastify start
-```
-
-Full-stack (dev servers):
-
-```bash
 pnpm --filter @yydb-examples/next dev
-pnpm --filter @yydb-examples/nuxt dev
-pnpm --filter @yydb-examples/sveltekit dev
-pnpm --filter @yydb-examples/astro dev
 ```
 
-Each app exposes list + create users:
+### API
 
-- HTTP servers: `GET /users`, `POST /users`
-- Full-stack: `GET /api/users`, `POST /api/users`
+| Route | Purpose |
+|-------|---------|
+| `GET /users` | List active users |
+| `POST /users` | `{ "user_name": "grace" }` |
+| `GET /posts` | Published posts with `author_name` projected through `&User` |
+| `GET /posts?author=ada` | Filter posts where `x.author.user_name == "ada"` |
+| `POST /posts` | `{ "author_user_id": "<uuid>", "title": "…" }` — FK into `author: &User` |
+
+HTTP servers use `/users` and `/posts`. Full-stack samples use `/api/users` and `/api/posts`.
 
 ```bash
-curl http://127.0.0.1:3002/api/users
-curl -X POST http://127.0.0.1:3002/api/users -H "content-type: application/json" -d "{\"user_name\":\"ada\"}"
+curl http://127.0.0.1:8787/posts
+curl "http://127.0.0.1:8787/posts?author=ada"
+curl -X POST http://127.0.0.1:8787/posts \
+  -H "content-type: application/json" \
+  -d "{\"author_user_id\":\"<user_id from GET /users>\",\"title\":\"New post\"}"
 ```
 
-## Integration pattern
+Seed data creates users `ada` / `linus` and one post each so `?author=ada` returns a row immediately.
 
-1. **Open once per process** — `openIrisDb()` loads `schemas/user.iris` and calls `createIrisDbBinding()` with in-memory SQLite.
-2. **Call from server routes only** — handlers invoke `listUsers` / `createUser` through `@yydb/iris/node`. Do not import `@yydb/iris/node` from client components or browser bundles.
-3. **Production** — replace hand-written VOS helpers with a generated `createDb()` client after `iris generate`, and point `iris.von` at a real datasource.
-
-## Typecheck all examples
+## Typecheck
 
 ```bash
 pnpm run examples:typecheck
