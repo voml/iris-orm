@@ -4,18 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { defineIrisConfig, toProjectDocument } from "../src/types/config.ts";
+import { defineConfig, toProjectDocument } from "../src/types/config.ts";
 import { findAuthoringConfig, loadAuthoringConfig, resolveProjectRoot } from "../src/node/config.ts";
 
-test("defineIrisConfig requires schema data pointer", () => {
-    assert.throws(() => defineIrisConfig({ schema: "  " }), /schema/);
-    const config = defineIrisConfig({ schema: "schemas/blog.iris" });
+test("defineConfig requires schema data pointer", () => {
+    assert.throws(() => defineConfig({ schema: "  " }), /schema/);
+    const config = defineConfig({ schema: "schemas/blog.iris" });
     assert.equal(config.schema, "schemas/blog.iris");
 });
 
 test("toProjectDocument keeps schema as data pointer", () => {
     const document = toProjectDocument(
-        defineIrisConfig({
+        defineConfig({
             schema: "schemas/**/*.iris",
             datasources: {
                 main: { kind: "mysql", mode: "managed_push", url: "$MYSQL_URL" },

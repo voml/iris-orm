@@ -20,5 +20,5 @@ export type {
     IrisTruthMode,
     IrisUserConfig,
 } from "./config.ts";
-export { defineIrisConfig, toProjectDocument } from "./config.ts";
+export { defineConfig, toProjectDocument } from "./config.ts";
 export type { IrisTooling } from "./tooling.ts";
