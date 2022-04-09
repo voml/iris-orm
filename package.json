@@ -38,7 +38,7 @@
     "devDependencies": {
         "@biomejs/biome": "^2.4.8",
         "@doki-land/nifty": "^0.0.12",
-        "@napi-rs/cli": "^2.18.4",
+        "@napi-rs/cli": "^3.10.6",
         "typescript": "^5.9.2"
     }
 }
