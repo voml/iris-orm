@@ -1,7 +1,6 @@
 //! Bind `$name` parameters into VOS source before parse/plan (Rust authority).
 //!
-//! TypeScript must not interpolate values into VOS text. Values arrive as JSON
-//! and are encoded here as VOS literals.
+//! Shared by N-API and WASM hosts. TypeScript must not interpolate values into VOS text.
 
 use serde_json::Value as JsonValue;
 
@@ -50,9 +49,10 @@ fn encode_literal(value: &JsonValue) -> Result<String, String> {
         JsonValue::Bool(b) => Ok(if *b { "true".into() } else { "false".into() }),
         JsonValue::Number(n) => Ok(n.to_string()),
         JsonValue::String(s) => Ok(format!("\"{}\"", escape_vos_string(s))),
-        JsonValue::Array(_) | JsonValue::Object(_) => {
-            Err("parameter values must be scalar (null|bool|number|string); nested objects are not VOS literals".into())
-        }
+        JsonValue::Array(_) | JsonValue::Object(_) => Err(
+            "parameter values must be scalar (null|bool|number|string); nested objects are not VOS literals"
+                .into(),
+        ),
     }
 }
 

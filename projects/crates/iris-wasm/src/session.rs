@@ -1,5 +1,6 @@
 //! Stateful in-memory reference session for browser WASM hosts.
 
+use crate::bind;
 use iris::{CapabilitySet, Iris, ReferenceStore, Row};
 use serde_json::{Map, Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
@@ -22,6 +23,13 @@ fn value_to_json(value: &iris::Value) -> JsonValue {
         iris::Value::Bool(b) => json!(b),
         iris::Value::Int(i) => json!(i),
         iris::Value::Str(s) => json!(s),
+    }
+}
+
+fn bind_source(source: &str, parameters_json: Option<String>) -> Result<String, JsValue> {
+    match parameters_json {
+        Some(json) => bind::bind_parameters(source, &json).map_err(|err| JsValue::from_str(&err)),
+        None => Ok(source.to_string()),
     }
 }
 
@@ -65,20 +73,22 @@ impl MemorySession {
 
     /// VOS DML (returns row JSON). Aligns with `db.$query`.
     #[wasm_bindgen(js_name = query)]
-    pub fn query(&self, source: &str) -> Result<String, JsValue> {
+    pub fn query(&self, source: &str, parameters_json: Option<String>) -> Result<String, JsValue> {
         if self.closed {
             return Err(JsValue::from_str("session closed"));
         }
-        Ok(execute_result_json(source, &self.iris))
+        let source = bind_source(source, parameters_json)?;
+        Ok(execute_result_json(&source, &self.iris))
     }
 
     /// Unit-valued / DDL-shaped VOS. Aligns with `db.$execute`.
     #[wasm_bindgen(js_name = execute)]
-    pub fn execute(&self, source: &str) -> Result<String, JsValue> {
+    pub fn execute(&self, source: &str, parameters_json: Option<String>) -> Result<String, JsValue> {
         if self.closed {
             return Err(JsValue::from_str("session closed"));
         }
-        match self.iris.session().execute(source) {
+        let source = bind_source(source, parameters_json)?;
+        match self.iris.session().execute(&source) {
             Ok(()) => Ok(json!({ "ok": true, "rows": [], "error": JsonValue::Null }).to_string()),
             Err(err) => {
                 Ok(json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string())
@@ -88,8 +98,12 @@ impl MemorySession {
 
     /// Legacy alias of [`MemorySession::query`].
     #[wasm_bindgen(js_name = executeVos)]
-    pub fn execute_vos(&self, source: &str) -> Result<String, JsValue> {
-        self.query(source)
+    pub fn execute_vos(
+        &self,
+        source: &str,
+        parameters_json: Option<String>,
+    ) -> Result<String, JsValue> {
+        self.query(source, parameters_json)
     }
 
     #[wasm_bindgen]

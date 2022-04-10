@@ -4,8 +4,11 @@
 
 #![deny(clippy::all)]
 
+pub mod bind;
 mod core;
 mod session;
+
+pub use bind::bind_parameters;
 
 pub use core::{SchemaCheck, check_schema_source, introspect_schema_json, iris_version};
 #[allow(deprecated)]

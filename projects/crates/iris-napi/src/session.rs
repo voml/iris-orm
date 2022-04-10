@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::bind;
+use iris_wasm::bind;
 use crate::operation;
 use iris::{CapabilitySet, DatasourceKind, Iris, Planner, ReferenceStore, Row, resolve_path};
 use iris_adapter_mysql::MysqlSource;
