@@ -13,8 +13,11 @@ table User {
 #[test]
 fn prefers_aot_by_default() {
     assert!(prefers_aot());
-    assert!(TEMPLATE_NAMES.contains(&"domain_mod"));
-    assert!(TEMPLATE_NAMES.contains(&"file_header"));
+    assert!(TEMPLATE_NAMES.contains(&"rust/domain_mod"));
+    assert!(TEMPLATE_NAMES.contains(&"rust/file_header"));
+    assert!(TEMPLATE_NAMES.contains(&"rust/models_helpers"));
+    assert!(TEMPLATE_NAMES.contains(&"rust/operations"));
+    assert!(TEMPLATE_NAMES.contains(&"rust/metadata"));
 }
 
 #[test]
