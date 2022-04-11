@@ -12,16 +12,28 @@ import { resolvePlatformPackage } from "./platform-packages.ts";
 
 const require = createRequire(import.meta.url);
 
+type NativeExecuteResult = { ok: boolean; rowsJson: string; error?: string | null };
+
 type NativeMemorySession = {
-    executeVos(source: string, parametersJson?: string | null): { ok: boolean; rowsJson: string; error?: string | null };
-    executeOperation?(operationJson: string): { ok: boolean; rowsJson: string; error?: string | null };
+    query?(source: string, parametersJson?: string | null): NativeExecuteResult;
+    execute?(source: string, parametersJson?: string | null): NativeExecuteResult;
+    executeVos(source: string, parametersJson?: string | null): NativeExecuteResult;
+    executeOperation?(operationJson: string): NativeExecuteResult;
     close(): void;
     managedPush?: (schema: string) => void;
 };
 
 function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
+    const executeVos = (source: string, parametersJson?: string | null) =>
+        session.executeVos(source, parametersJson ?? null);
     const binding: MemorySessionBinding = {
-        executeVos: (source: string, parametersJson?: string | null) => session.executeVos(source, parametersJson ?? null),
+        query: session.query
+            ? (source: string, parametersJson?: string | null) => session.query!(source, parametersJson ?? null)
+            : executeVos,
+        execute: session.execute
+            ? (source: string, parametersJson?: string | null) => session.execute!(source, parametersJson ?? null)
+            : executeVos,
+        executeVos,
         close: () => session.close(),
     };
     if (session.executeOperation) {

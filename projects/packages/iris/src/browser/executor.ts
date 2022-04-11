@@ -1,36 +1,18 @@
 import type { CreateIrisDbBindingOptions, IrisDbBinding } from "../types/executor.ts";
-import { mapWireToQueryValue } from "../types/executor.ts";
-import { parseExecuteJson } from "../runtime/parse.ts";
-import { getWasmSemanticCore } from "../wasm/index.ts";
+import { createIrisDbBindingFromSession } from "../runtime/db-binding.ts";
+import { openBindingSession } from "../runtime/open-binding-session.ts";
+import { getWasmSemanticCore } from "../wasm/state.ts";
 
 /**
  * Create internal binding support for generated browser `db` (not an application entry).
  *
- * Requires prior `initIris()`. Browser host currently uses WASM in-memory ReferenceStore only.
+ * Requires prior `initIris()` / `loadIrisWeb()`. Browser host currently uses WASM in-memory ReferenceStore only.
+ * Generated `browser.ts` imports the same factory from `@yydb/iris/wasm`.
  */
-export async function createBrowserIrisDbBinding(_options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
-    const session = getWasmSemanticCore().openMemorySession();
-
-    return {
-        async query(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<unknown> {
-            if (parameters !== undefined && Object.keys(parameters).length > 0) {
-                throw new Error("@yydb/iris: browser WASM binding does not support VOS parameters yet");
-            }
-            const raw = session.executeVos(source);
-            const parsed = parseExecuteJson(typeof raw === "string" ? raw : raw.rowsJson);
-            if (typeof raw !== "string" && !raw.ok) {
-                throw new Error(raw.error ?? "iris execution failed");
-            }
-            if (!parsed.ok) {
-                throw new Error(parsed.error ?? "iris execution failed");
-            }
-            return mapWireToQueryValue({ kind: "rows", rows: parsed.rows });
-        },
-        async execute(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<void> {
-            await this.query(source, parameters);
-        },
-        async close() {
-            session.close();
-        },
-    };
+export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
+    const session = await openBindingSession("web", getWasmSemanticCore(), options);
+    return createIrisDbBindingFromSession(session);
 }
+
+/** @deprecated Use `createIrisDbBinding` or import from `@yydb/iris/wasm`. */
+export const createBrowserIrisDbBinding = createIrisDbBinding;

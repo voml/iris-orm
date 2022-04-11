@@ -6,6 +6,6 @@
  */
 
 export { createIris, type CreateIrisBrowserOptions } from "./create.ts";
-export { createBrowserIrisDbBinding } from "./executor.ts";
+export { createIrisDbBinding, createBrowserIrisDbBinding } from "./executor.ts";
 export { initIris, loadIrisWeb, type InitIrisOptions, type WasmSource } from "../wasm/index.ts";
 export { openLocalStore, type LocalStore, type LocalStoreBackend, type OpenLocalStoreOptions } from "./local-store.ts";

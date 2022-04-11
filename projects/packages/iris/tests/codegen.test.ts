@@ -75,8 +75,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(nodeEntry, /export async function createDb/);
 
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
-    assert.match(browserEntry, /createBrowserIrisDbBinding/);
+    assert.match(browserEntry, /@yydb\/iris\/wasm/);
+    assert.match(browserEntry, /createIrisDbBinding/);
     assert.match(browserEntry, /export async function createDb/);
+    assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
     assert.match(inputs, /export type StringFilter/);
@@ -149,11 +151,22 @@ export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions)
         "utf8",
     );
     await writeFile(
-        join(stubDir, "iris-browser.ts"),
+        join(stubDir, "iris-wasm.ts"),
         `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
-export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
+export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
   throw new Error("stub");
 }
+`,
+        "utf8",
+    );
+    await writeFile(
+        join(stubDir, "iris-browser.ts"),
+        `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
+export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
+  throw new Error("stub");
+}
+/** @deprecated */
+export const createBrowserIrisDbBinding = createIrisDbBinding;
 `,
         "utf8",
     );
@@ -172,6 +185,7 @@ export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingO
                     paths: {
                         "@yydb/iris/types": [join(stubDir, "iris-types.ts").replace(/\\/g, "/")],
                         "@yydb/iris/node": [join(stubDir, "iris-node.ts").replace(/\\/g, "/")],
+                        "@yydb/iris/wasm": [join(stubDir, "iris-wasm.ts").replace(/\\/g, "/")],
                         "@yydb/iris": [join(stubDir, "iris-browser.ts").replace(/\\/g, "/")],
                     },
                     baseUrl: ".",
@@ -359,5 +373,75 @@ test("createIrisDbBinding splits DML query and DDL execute", async (t) => {
     const unit = await binding.execute("User.filter(x => x.active).collect()");
     assert.equal(unit, undefined);
 
+    await binding.close();
+});
+
+test("createBrowserIrisDbBinding binds parameters through Rust", async (t) => {
+    const browser = await import(srcImport("src/browser/index.ts"));
+    const wasm = await import(srcImport("src/wasm/index.ts"));
+    wasm.resetInitStateForTests();
+
+    try {
+        await wasm.initIris();
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "wasm-package-missing") {
+            t.skip("browser semantic core not built");
+            return;
+        }
+        throw error;
+    }
+
+    let binding;
+    try {
+        binding = await browser.createIrisDbBinding({ schema: USER_SCHEMA });
+    } catch (error) {
+        if (error instanceof Error && error.message.includes("iris_wasm")) {
+            t.skip("browser semantic core not built");
+            return;
+        }
+        throw error;
+    }
+
+    const rows = await binding.query("User.filter(x => x.active == $active).collect()", {
+        active: true,
+    });
+    assert.equal(Array.isArray(rows), true);
+
+    await assert.rejects(
+        () => binding.query("User.filter(x => x.active == $active).collect()", {}),
+        /unbound/i,
+    );
+
+    await binding.close();
+});
+
+test("@yydb/iris/wasm createIrisDbBinding matches node binding surface", async (t) => {
+    const wasm = await import(srcImport("src/wasm/index.ts"));
+    wasm.resetInitStateForTests();
+
+    try {
+        await wasm.initIris();
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "wasm-package-missing") {
+            t.skip("browser semantic core not built");
+            return;
+        }
+        throw error;
+    }
+
+    let binding;
+    try {
+        binding = await wasm.createIrisDbBinding({ schema: USER_SCHEMA });
+    } catch (error) {
+        if (error instanceof Error && error.message.includes("iris_wasm")) {
+            t.skip("browser semantic core not built");
+            return;
+        }
+        throw error;
+    }
+
+    assert.equal(typeof binding.query, "function");
+    assert.equal(typeof binding.execute, "function");
+    assert.equal(typeof binding.close, "function");
     await binding.close();
 });

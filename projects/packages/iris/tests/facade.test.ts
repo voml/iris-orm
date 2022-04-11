@@ -166,3 +166,10 @@ test("@yydb/iris/node exposes host facade only", async () => {
     assert.equal("loadIrisNode" in node, true);
     assert.equal("loadSemanticCore" in node, false);
 });
+
+test("@yydb/iris/wasm load.ts stays browser-safe (no node:module import)", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+        fs.readFile(new URL("../src/wasm/load.ts", import.meta.url), "utf8"),
+    );
+    assert.doesNotMatch(source, /node:module/);
+});
