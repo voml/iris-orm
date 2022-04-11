@@ -78,10 +78,21 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(browserEntry, /createBrowserIrisDbBinding/);
     assert.match(browserEntry, /export async function createDb/);
 
+    const inputs = await readFile(join(root, "inputs.ts"), "utf8");
+    assert.match(inputs, /export type StringFilter/);
+    assert.match(inputs, /export type BooleanFilter/);
+    assert.match(inputs, /export type PatchValue</);
+    assert.match(inputs, /UserPatchInput/);
+    assert.doesNotMatch(inputs, /UpdateInput/);
+    assert.match(inputs, /UserGetPayload</);
+
     const operations = await readFile(join(root, "operations.ts"), "utf8");
     assert.match(operations, /\$query<T = unknown>/);
+    assert.match(operations, /findMany<const A extends UserFindManyArgs>/);
+    assert.match(operations, /ReadonlyArray<UserGetPayload<A>>/);
     assert.match(operations, /synthesizeCreate/);
     assert.match(operations, /\.\/_internal\/synthesize\.js/);
+    assert.doesNotMatch(operations, /\.\.\.args: unknown\[\]/);
     assert.doesNotMatch(operations, /@yydb\/iris\/node/);
     assert.doesNotMatch(operations, /include/);
     assert.doesNotMatch(operations, /::insert\(\{ \.\.\. \}\)/);
@@ -166,6 +177,7 @@ export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingO
                     baseUrl: ".",
                 },
                 include: ["./generated/iris/typescript/**/*.ts"],
+                exclude: ["./generated/iris/typescript/consumer-negative.ts"],
             },
             null,
             2,
@@ -177,16 +189,18 @@ export async function createBrowserIrisDbBinding(_options?: CreateIrisDbBindingO
         join(generatedRoot, "consumer.ts"),
         `import { createClient } from "./index.js";
 import type { IrisDbBinding } from "@yydb/iris/types";
+import type { PostFindManyArgs } from "./inputs.js";
 
 declare const binding: IrisDbBinding;
 const db = createClient(binding);
 
 async function run() {
-  const posts = await db.post.findMany({
+  const args = {
     where: {
       author: {
         user_name: { not: "" },
       },
+      title: { contains: "Iris" },
     },
     select: {
       post_id: true,
@@ -196,7 +210,9 @@ async function run() {
         user_name: true,
       },
     },
-  });
+  } satisfies PostFindManyArgs;
+
+  const posts = await db.post.findMany(args);
   const _title: string = posts[0]!.title;
   const _name: string = posts[0]!.author.user_name;
   void _title;
@@ -204,6 +220,50 @@ async function run() {
 }
 void run;
 `,
+        "utf8",
+    );
+
+    await writeFile(
+        join(generatedRoot, "consumer-negative.ts"),
+        `import { createClient } from "./index.js";
+import type { IrisDbBinding } from "@yydb/iris/types";
+
+declare const binding: IrisDbBinding;
+const db = createClient(binding);
+
+async function run() {
+  await db.post.findMany({
+    where: {
+      title: { contains: 123 },
+    },
+  });
+}
+void run;
+`,
+        "utf8",
+    );
+
+    await writeFile(
+        join(outDir, "tsconfig.negative.json"),
+        JSON.stringify(
+            {
+                compilerOptions: {
+                    target: "ES2022",
+                    module: "ESNext",
+                    moduleResolution: "bundler",
+                    strict: true,
+                    noEmit: true,
+                    skipLibCheck: true,
+                    paths: {
+                        "@yydb/iris/types": [join(stubDir, "iris-types.ts").replace(/\\/g, "/")],
+                    },
+                    baseUrl: ".",
+                },
+                include: ["./generated/iris/typescript/consumer-negative.ts"],
+            },
+            null,
+            2,
+        ),
         "utf8",
     );
 
@@ -224,9 +284,28 @@ void run;
             shell: true,
         });
         assert.equal(tsc2.status, 0, tsc2.stdout + tsc2.stderr + (typesRoot ?? "") + result.schemaFingerprint);
-        return;
+    } else {
+        assert.equal(tsc.status, 0, tsc.stdout + tsc.stderr);
     }
-    assert.equal(tsc.status, 0, tsc.stdout + tsc.stderr);
+
+    const tscNegative = spawnSync(
+        process.execPath,
+        [
+            fileURLToPath(new URL("../../../../node_modules/typescript/bin/tsc", import.meta.url)),
+            "--noEmit",
+            "-p",
+            join(outDir, "tsconfig.negative.json"),
+        ],
+        { encoding: "utf8" },
+    );
+    const negativeStatus =
+        tscNegative.status ??
+        spawnSync("pnpm", ["exec", "tsc", "--noEmit", "-p", join(outDir, "tsconfig.negative.json")], {
+            encoding: "utf8",
+            cwd: fileURLToPath(new URL("../../../..", import.meta.url)),
+            shell: true,
+        }).status;
+    assert.notEqual(negativeStatus, 0, "invalid filter value types must fail tsc");
 });
 
 test("createIrisDbBinding binds parameters through Rust", async (t) => {

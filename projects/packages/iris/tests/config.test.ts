@@ -26,6 +26,8 @@ test("toProjectDocument keeps schema as data pointer", () => {
     assert.equal(document.version, 1);
     assert.equal(document.schema, "schemas/**/*.iris");
     assert.equal(document.datasources.main.kind, "mysql");
+    assert.equal(document.generate.out, ".");
+    assert.equal(document.generate.target, "typescript");
 });
 
 test("loadAuthoringConfig reads iris.config.ts", async () => {
