@@ -1,5 +1,3 @@
-import initGlue, * as glue from "../lib/iris_wasm.js";
-
 /** Result of validating a VOS / `.iris` schema source via the Rust core. */
 export interface CheckSourceResult {
     ok: boolean;
@@ -27,11 +25,14 @@ type GlueCheckSourceResult = {
 };
 
 type GlueMemorySession = {
-    executeVos(source: string): string;
+    query(source: string, parametersJson?: string | null): string;
+    execute(source: string, parametersJson?: string | null): string;
+    executeVos(source: string, parametersJson?: string | null): string;
     close(): void;
 };
 
-const glueApi = glue as {
+type GlueModule = {
+    default: (input: { module_or_path: WasmInitInput | ArrayBuffer | Uint8Array }) => Promise<void>;
     checkSource?: (source: string) => GlueCheckSourceResult;
     irisVersion?: () => string;
     introspectSchema?: (source: string) => string;
@@ -39,12 +40,18 @@ const glueApi = glue as {
     MemorySession?: new () => GlueMemorySession;
 };
 
+let glue: GlueModule | null = null;
 let ready = false;
 
 function assertReady(): void {
-    if (!ready) {
+    if (!ready || glue == null) {
         throw new Error("@yydb/iris-unknown-wasm32: call initWasm() before semantic core methods");
     }
+}
+
+function glueApi(): GlueModule {
+    assertReady();
+    return glue!;
 }
 
 function toCheckResult(raw: GlueCheckSourceResult): CheckSourceResult {
@@ -57,6 +64,15 @@ function toCheckResult(raw: GlueCheckSourceResult): CheckSourceResult {
     };
     raw.free();
     return result;
+}
+
+async function loadGlueModule(): Promise<GlueModule> {
+    if (glue) {
+        return glue;
+    }
+    const mod = (await import("../lib/iris_wasm.js")) as GlueModule;
+    glue = mod;
+    return mod;
 }
 
 async function resolveDefaultWasmBytes(): Promise<ArrayBuffer | Uint8Array | URL> {
@@ -91,57 +107,59 @@ export async function initWasm(options: InitWasmOptions = {}): Promise<void> {
     if (ready) {
         return;
     }
+    const module = await loadGlueModule();
     const moduleOrPath = await normalizeInitInput(options.module);
-    await initGlue({ module_or_path: moduleOrPath });
+    await module.default({ module_or_path: moduleOrPath });
     ready = true;
 }
 
 /** Library version (matches `iris::version()` / Cargo package version). */
 export function irisVersion(): string {
-    assertReady();
-    if (!glueApi.irisVersion) {
+    const api = glueApi();
+    if (!api.irisVersion) {
         throw new Error("@yydb/iris-unknown-wasm32: irisVersion export missing; rebuild wasm artifacts");
     }
-    return glueApi.irisVersion();
+    return api.irisVersion();
 }
 
 /** Parse and validate schema source (same semantics as `iris check`). */
 export function checkSource(source: string): CheckSourceResult {
-    assertReady();
-    if (!glueApi.checkSource) {
+    const api = glueApi();
+    if (!api.checkSource) {
         throw new Error("@yydb/iris-unknown-wasm32: checkSource export missing; rebuild wasm artifacts");
     }
-    return toCheckResult(glueApi.checkSource(source));
+    return toCheckResult(api.checkSource(source));
 }
 
 /** Read-only schema introspection JSON. */
 export function introspectSchema(source: string): string {
-    assertReady();
-    if (!glueApi.introspectSchema) {
+    const api = glueApi();
+    if (!api.introspectSchema) {
         throw new Error("@yydb/iris-unknown-wasm32: introspectSchema export missing; rebuild wasm artifacts");
     }
-    return glueApi.introspectSchema(source);
+    return api.introspectSchema(source);
 }
 
 /** Stateless in-memory execute helper. */
 export function executeVosMemory(source: string): string {
-    assertReady();
-    if (!glueApi.executeVosMemory) {
+    const api = glueApi();
+    if (!api.executeVosMemory) {
         throw new Error("@yydb/iris-unknown-wasm32: executeVosMemory export missing; rebuild wasm artifacts");
     }
-    return glueApi.executeVosMemory(source);
+    return api.executeVosMemory(source);
 }
 
 /** Stateful in-memory reference session. */
 export function openMemorySession(): GlueMemorySession {
-    assertReady();
-    if (!glueApi.MemorySession) {
+    const api = glueApi();
+    if (!api.MemorySession) {
         throw new Error("@yydb/iris-unknown-wasm32: MemorySession export missing; rebuild wasm artifacts");
     }
-    return new glueApi.MemorySession();
+    return new api.MemorySession();
 }
 
 /** @internal Reset init gate (binding tests only). */
 export function resetWasmBindingForTests(): void {
     ready = false;
+    glue = null;
 }
