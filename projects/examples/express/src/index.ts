@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 
 import { closeDb, getDb } from "./db.ts";
-import type { PostId, UserId } from "./generated/iris/references.ts";
+import type { PostId, UserId } from "@iris/index.ts";
 
 const app = express();
 app.use(express.json());

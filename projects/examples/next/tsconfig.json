@@ -13,6 +13,10 @@
         "isolatedModules": true,
         "jsx": "preserve",
         "allowImportingTsExtensions": true,
+        "baseUrl": ".",
+        "paths": {
+            "@iris/*": ["src/generated/iris/*"]
+        },
         "plugins": [{ "name": "next" }]
     },
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],

@@ -9,7 +9,8 @@
         "allowImportingTsExtensions": true,
         "baseUrl": ".",
         "paths": {
-            "$lib/*": ["src/lib/*"]
+            "$lib/*": ["src/lib/*"],
+            "@iris/*": ["src/generated/iris/*"]
         },
         "types": ["node"]
     },

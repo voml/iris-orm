@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { APIRoute } from "astro";
 
 import { getDb } from "../../lib/server/db.ts";
-import type { UserId } from "../../generated/iris/references.ts";
+import type { UserId } from "@iris/index.ts";
 
 export const GET: APIRoute = async () => {
     const db = await getDb();

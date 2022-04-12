@@ -1,6 +1,6 @@
 import { defineConfig } from "@yydb/iris/types";
 
-/** Next.js App Router — file sqlite survives dev HMR (`lib/db.ts` + `react.cache`). */
+/** Next.js App Router — file sqlite survives dev HMR (`file:.iris/dev.sqlite`). */
 export default defineConfig({
     schema: "schemas/blog.iris",
     datasources: {

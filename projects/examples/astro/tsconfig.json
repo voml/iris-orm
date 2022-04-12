@@ -2,7 +2,11 @@
     "extends": "astro/tsconfigs/strict",
     "compilerOptions": {
         "allowImportingTsExtensions": true,
-        "skipLibCheck": true
+        "skipLibCheck": true,
+        "baseUrl": ".",
+        "paths": {
+            "@iris/*": ["src/generated/iris/*"]
+        }
     },
     "include": ["src/**/*.ts", "src/**/*.astro", "astro.config.mjs"]
 }

@@ -10,6 +10,10 @@
         "sourceMap": true,
         "strict": true,
         "moduleResolution": "bundler",
-        "allowImportingTsExtensions": true
+        "allowImportingTsExtensions": true,
+        "baseUrl": ".",
+        "paths": {
+            "@iris/*": ["src/generated/iris/*"]
+        }
     }
 }

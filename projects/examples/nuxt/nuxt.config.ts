@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 const irisNativePackages = [
     "@yydb/iris",
     "@yydb/iris-win32-x64",
@@ -8,6 +10,9 @@ const irisNativePackages = [
 ];
 
 export default defineNuxtConfig({
+    alias: {
+        "@iris": fileURLToPath(new URL("./src/generated/iris", import.meta.url)),
+    },
     devtools: { enabled: false },
     compatibilityDate: "2025-07-15",
     nitro: {

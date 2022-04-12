@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 
 import { closeDb, getDb } from "./db.ts";
-import type { PostId, UserId } from "./generated/iris/references.ts";
+import { postId, userId } from "@iris/index.ts";
 
 const app = Fastify({ logger: false });
 const db = await getDb();
@@ -11,7 +11,7 @@ const postListSelect = {
     post_id: true,
     title: true,
     published: true,
-    author: { user_name: true },
+    author: { select: { user_name: true } },
 } as const;
 
 app.get("/users", async () => {
@@ -25,7 +25,7 @@ app.post<{ Body: { user_name?: string; active?: boolean } }>("/users", async (re
     }
     const user = await db.user.create({
         data: {
-            user_id: randomUUID() as UserId,
+            user_id: userId(randomUUID()),
             user_name: userName,
             active: request.body.active ?? true,
         },
@@ -49,8 +49,8 @@ app.post<{ Body: { author_user_id?: string; title?: string; published?: boolean 
     }
     const post = await db.post.create({
         data: {
-            post_id: randomUUID() as PostId,
-            author: authorUserId as UserId,
+            post_id: postId(randomUUID()),
+            author: userId(authorUserId),
             title,
             published: request.body.published ?? true,
         },
