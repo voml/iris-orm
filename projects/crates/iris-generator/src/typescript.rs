@@ -7,7 +7,18 @@ use serde_json::Value;
 use crate::{GenerationModel, Result, render, unescape_dejavu_template};
 
 fn render_ts(name: &str, ctx: &Value) -> Result<String> {
-    Ok(unescape_dejavu_template(&render(name, ctx)?))
+    let rendered = unescape_dejavu_template(&render(name, ctx)?);
+    Ok(normalize_ts_blank_lines(&rendered))
+}
+
+/// Dejavu templates interleave blank lines for readability; compact before write.
+fn normalize_ts_blank_lines(text: &str) -> String {
+    let mut normalized = text.replace("\r\n", "\n").trim().to_string();
+    while normalized.contains("\n\n") {
+        normalized = normalized.replace("\n\n", "\n");
+    }
+    normalized.push('\n');
+    normalized
 }
 
 /// Emit all TypeScript client files for a generation model.
