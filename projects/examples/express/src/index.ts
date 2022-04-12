@@ -1,14 +1,23 @@
+import { randomUUID } from "node:crypto";
 import express from "express";
 
-import { closeIrisDb, createPost, createUser, listPosts, listPostsByAuthorName, listUsers, openIrisDb } from "./iris.ts";
+import { closeDb, getDb } from "./db.ts";
+import type { PostId, UserId } from "./generated/iris/references.ts";
 
 const app = express();
 app.use(express.json());
 
-const db = await openIrisDb();
+const db = await getDb();
+
+const postListSelect = {
+    post_id: true,
+    title: true,
+    published: true,
+    author: { user_name: true },
+} as const;
 
 app.get("/users", async (_req, res) => {
-    res.json(await listUsers(db));
+    res.json(await db.user.findMany({ where: { active: true } }));
 });
 
 app.post("/users", async (req, res) => {
@@ -18,17 +27,18 @@ app.post("/users", async (req, res) => {
         return;
     }
     const active = typeof req.body?.active === "boolean" ? req.body.active : true;
-    const user = await createUser(db, userName, active);
+    const user = await db.user.create({
+        data: { user_id: randomUUID() as UserId, user_name: userName, active },
+    });
     res.status(201).json(user);
 });
 
 app.get("/posts", async (req, res) => {
     const author = typeof req.query.author === "string" ? req.query.author.trim() : "";
-    if (author) {
-        res.json(await listPostsByAuthorName(db, author));
-        return;
-    }
-    res.json(await listPosts(db));
+    const where = author
+        ? { published: true, author: { user_name: author } }
+        : { published: true };
+    res.json(await db.post.findMany({ where, select: postListSelect }));
 });
 
 app.post("/posts", async (req, res) => {
@@ -39,7 +49,14 @@ app.post("/posts", async (req, res) => {
         return;
     }
     const published = typeof req.body?.published === "boolean" ? req.body.published : true;
-    const post = await createPost(db, { author_user_id: authorUserId, title, published });
+    const post = await db.post.create({
+        data: {
+            post_id: randomUUID() as PostId,
+            author: authorUserId as UserId,
+            title,
+            published,
+        },
+    });
     res.status(201).json(post);
 });
 
@@ -52,7 +69,7 @@ const server = app.listen(port, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
         server.close();
-        await closeIrisDb();
+        await closeDb();
         process.exit(0);
     });
 }

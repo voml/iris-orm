@@ -1,20 +1,27 @@
-import { json } from "@sveltejs/kit";
+import { randomUUID } from "node:crypto";
+import { json, type RequestEvent } from "@sveltejs/kit";
 
-import { createUser, listUsers, openIrisDb } from "$lib/iris.ts";
-import type { RequestHandler } from "./$types";
+import { getDb } from "$lib/server/db.ts";
+import type { UserId } from "../../../generated/iris/references.ts";
 
-export const GET: RequestHandler = async () => {
-    const db = await openIrisDb();
-    return json(await listUsers(db));
-};
+export async function GET() {
+    const db = await getDb();
+    return json(await db.user.findMany({ where: { active: true } }));
+}
 
-export const POST: RequestHandler = async ({ request }) => {
+export async function POST({ request }: RequestEvent) {
     const body = (await request.json()) as { user_name?: string; active?: boolean };
     const userName = body.user_name?.trim() ?? "";
     if (!userName) {
         return json({ error: "user_name is required" }, { status: 400 });
     }
-    const db = await openIrisDb();
-    const user = await createUser(db, userName, body.active ?? true);
+    const db = await getDb();
+    const user = await db.user.create({
+        data: {
+            user_id: randomUUID() as UserId,
+            user_name: userName,
+            active: body.active ?? true,
+        },
+    });
     return json(user, { status: 201 });
-};
+}
