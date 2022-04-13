@@ -8,7 +8,8 @@ use iris::{CapabilitySet, DatasourceKind, Iris, Planner, ReferenceStore, Row, re
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
 use iris_adapter_sqlite::SqliteSource;
-use iris::project::{expand_endpoint, load_project};
+use iris_connector_yydb::YydbSource;
+use iris::project::{expand_endpoint, load_project, read_schema};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value as JsonValue, json};
@@ -52,6 +53,7 @@ fn err_result(message: String) -> ExecuteResult {
 
 enum SessionStore {
     Memory(Iris),
+    Yydb(YydbSource),
     Sqlite(SqliteSource),
     Postgres(PostgresSource),
     Mysql(MysqlSource),
@@ -61,6 +63,7 @@ impl SessionStore {
     fn capabilities(&self) -> CapabilitySet {
         match self {
             Self::Memory(_) => CapabilitySet::reference_full(),
+            Self::Yydb(_) => YydbSource::capabilities(),
             Self::Sqlite(_) => SqliteSource::capabilities(),
             Self::Postgres(_) => PostgresSource::capabilities(),
             Self::Mysql(_) => MysqlSource::capabilities(),
@@ -70,6 +73,7 @@ impl SessionStore {
     fn execute(&self, planner: &Planner, source: &str) -> std::result::Result<Vec<Row>, String> {
         match self {
             Self::Memory(iris) => iris.session().query(source).map_err(|err| err.to_string()),
+            Self::Yydb(db) => db.query(source).map_err(|err| err.to_string()),
             Self::Sqlite(db) => {
                 let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
                 db.execute_plan(&plan).map_err(|err| err.to_string())
@@ -101,6 +105,18 @@ pub struct MemorySession {
     store: SessionStore,
     planner: Planner,
     closed: bool,
+}
+
+fn open_yydb_endpoint(project_dir: &Path, endpoint: &str) -> std::result::Result<YydbSource, String> {
+    if endpoint == ":memory:" {
+        return YydbSource::open_in_memory().map_err(|err| err.to_string());
+    }
+    let path = endpoint.strip_prefix("file:").unwrap_or(endpoint);
+    let path = resolve_path(project_dir, path);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    YydbSource::open(path).map_err(|err| err.to_string())
 }
 
 impl MemorySession {
@@ -143,6 +159,17 @@ impl MemorySession {
             .datasource(&source)
             .map_err(|err| Error::from_reason(err.to_string()))?;
         let store = match ds.kind {
+            DatasourceKind::Yydb => {
+                let endpoint =
+                    expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
+                let db = open_yydb_endpoint(&project_dir, &endpoint)
+                    .map_err(|err| Error::from_reason(err))?;
+                let schema = read_schema(&project_dir, &project)
+                    .map_err(|err| Error::from_reason(err))?;
+                db.ensure_schema(1, &schema)
+                    .map_err(|err| Error::from_reason(err.to_string()))?;
+                SessionStore::Yydb(db)
+            }
             DatasourceKind::Sqlite => {
                 let path = resolve_path(
                     &project_dir,
@@ -168,7 +195,7 @@ impl MemorySession {
             }
             other => {
                 return Err(Error::from_reason(format!(
-                    "open_project_session does not support {:?} yet (use sqlite/postgres/mysql)",
+                    "open_project_session does not support {:?} yet (use yydb/sqlite/postgres/mysql)",
                     other
                 )));
             }
@@ -250,13 +277,18 @@ impl MemorySession {
             return Err(Error::from_reason("session closed"));
         }
         match &self.store {
+            SessionStore::Yydb(db) => {
+                db.ensure_schema(1, &schema)
+                    .map_err(|err| Error::from_reason(err.to_string()))?;
+                Ok(())
+            }
             SessionStore::Sqlite(db) => {
                 db.managed_push(&schema)
                     .map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
             _ => Err(Error::from_reason(
-                "managed_push is only supported on sqlite sessions",
+                "managed_push is only supported on yydb and sqlite sessions",
             )),
         }
     }

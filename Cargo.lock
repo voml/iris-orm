@@ -1324,6 +1324,7 @@ dependencies = [
  "iris-adapter-mysql",
  "iris-adapter-postgres",
  "iris-adapter-sqlite",
+ "iris-connector-yydb",
  "iris-generator",
  "iris-wasm",
  "napi",

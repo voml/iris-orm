@@ -17,6 +17,7 @@ iris-wasm = { workspace = true }
 iris-adapter-sqlite = { workspace = true }
 iris-adapter-postgres = { workspace = true }
 iris-adapter-mysql = { workspace = true }
+iris-connector-yydb = { workspace = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
 serde = { workspace = true }
