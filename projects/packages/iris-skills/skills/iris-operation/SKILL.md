@@ -46,8 +46,10 @@ db.with_rollback(|txn| {
 Rules for Rust:
 
 1. **Primary path** = generated `Db` delegates (`find_many` / `find_unique` / `insert` / `update` / `delete`).
-2. A unit of work that needs one connection is **`Txn`** (from `transaction` / `with_rollback`) — **same method names** as `Db`. Pooling stays inside `MysqlSource`; do not teach a second “pool API” story.
-3. Escape hatch only: `db.query("…")` / `db.execute("…")` (or `Session::query` on the reference store). **Do not** teach hand-written VOS strings as the normal CRUD API.
+2. A unit of work that needs one connection is **`Txn`** (from `transaction` / `with_rollback`) — **same method names**
+   as `Db`. Pooling stays inside `MysqlSource`; do not teach a second “pool API” story.
+3. Escape hatch only: `db.query("…")` / `db.execute("…")` (or `Session::query` on the reference store). **Do not** teach
+   hand-written VOS strings as the normal CRUD API.
 4. Prefer **`.filter(x => …)`** inside any escape-hatch VOS. Do **not** teach SQL-style `.where(…)`.
 5. New primary keys: **`iris::uuid()`** (v7), never `Uuid::new_v4()`.
 
@@ -67,13 +69,13 @@ This thin CRUD is a **TS-parity shim** (synthesizes VOS). It is **not** knife-B 
 
 ## Antiforwards
 
-| Wrong | Right |
-|-------|--------|
-| `sqlx::query!("SELECT …")` on Iris tables | VOS / generated Iris API |
-| Hand-written `query("Goods.filter…")` as the app CRUD layer | Generated `db.goods().find_many` |
-| Call `MysqlSource::insert` / `execute_plan` inside `transaction` | `txn.goods().insert` / `txn.query` |
-| App-level connection pool wrapping Iris | One pool inside the Iris adapter |
-| New examples using `.where(…)` like SQL | `.filter(x => …)` (or generated where struct) |
+| Wrong                                                            | Right                                         |
+|------------------------------------------------------------------|-----------------------------------------------|
+| `sqlx::query!("SELECT …")` on Iris tables                        | VOS / generated Iris API                      |
+| Hand-written `query("Goods.filter…")` as the app CRUD layer      | Generated `db.goods().find_many`              |
+| Call `MysqlSource::insert` / `execute_plan` inside `transaction` | `txn.goods().insert` / `txn.query`            |
+| App-level connection pool wrapping Iris                          | One pool inside the Iris adapter              |
+| New examples using `.where(…)` like SQL                          | `.filter(x => …)` (or generated where struct) |
 
 ## Planned tools (not live)
 
@@ -81,8 +83,8 @@ This thin CRUD is a **TS-parity shim** (synthesizes VOS). It is **not** knife-B 
 
 ## Not this skill
 
-| Need | Skill |
-|------|--------|
-| Schema / check | `iris-schema` |
-| Explain plans | `iris-explain` |
-| Migrate | `iris-migrate` |
+| Need           | Skill          |
+|----------------|----------------|
+| Schema / check | `iris-schema`  |
+| Explain plans  | `iris-explain` |
+| Migrate        | `iris-migrate` |

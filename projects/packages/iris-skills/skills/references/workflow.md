@@ -4,10 +4,10 @@ Agents **must** follow this. Wrong habits (SQL bypass, CI migrate, embed `.iris`
 
 ## Two surfaces — do not confuse
 
-| Surface | What | When |
-|---------|------|------|
-| **Iris CLI / tools** (`@yydb/iris`: `check` / `push` / `generate`) | Developer laptop / explicit ops window | Schema change, DDL, regenerate bindings |
-| **Iris runtime** (`iris` / adapters + **committed** `generated/`) | App binary after compile | Production / Docker / TCB — **only this** |
+| Surface                                                            | What                                   | When                                      |
+|--------------------------------------------------------------------|----------------------------------------|-------------------------------------------|
+| **Iris CLI / tools** (`@yydb/iris`: `check` / `push` / `generate`) | Developer laptop / explicit ops window | Schema change, DDL, regenerate bindings   |
+| **Iris runtime** (`iris` / adapters + **committed** `generated/`)  | App binary after compile               | Production / Docker / TCB — **only this** |
 
 Deployed servers **never** invoke the Iris CLI. They only link Iris **runtime** libraries and call VOS / generated APIs.
 
@@ -44,15 +44,16 @@ NO:   re-parsing or embedding raw .iris at runtime
 NO:   .cache/iris/*
 ```
 
-If the runtime needs schema-derived metadata (e.g. MySQL uuid column map), **`iris generate` must emit it**. Do not invent `build.rs` embeds of `.iris` source.
+If the runtime needs schema-derived metadata (e.g. MySQL uuid column map), **`iris generate` must emit it**. Do not
+invent `build.rs` embeds of `.iris` source.
 
 ## DDL and seed — development / ops only
 
-| Action | Allowed | Forbidden |
-|--------|---------|-----------|
-| `iris push` / migrate | Explicit local or ops shell against an intentional target DB | CI, Docker build, container entrypoint, `farm-server` boot |
-| Demo / fixture seed (app bin) | Explicit local run | CI, Docker, server boot, “auto seed on deploy” |
-| `iris generate` | Local before commit | CI “to fix missing generated”, Docker `RUN pnpm generate` |
+| Action                        | Allowed                                                      | Forbidden                                                  |
+|-------------------------------|--------------------------------------------------------------|------------------------------------------------------------|
+| `iris push` / migrate         | Explicit local or ops shell against an intentional target DB | CI, Docker build, container entrypoint, `farm-server` boot |
+| Demo / fixture seed (app bin) | Explicit local run                                           | CI, Docker, server boot, “auto seed on deploy”             |
+| `iris generate`               | Local before commit                                          | CI “to fix missing generated”, Docker `RUN pnpm generate`  |
 
 **Database safety:** CI must not mutate production (or shared) schemas. DDL and seed are **human-gated**.
 
@@ -83,12 +84,12 @@ App → generated Db / db.user.findMany  (primary)
 
 ## Skill map
 
-| Need | Skill |
-|------|--------|
-| Edit / check `.iris` | `iris-schema` |
-| DDL plan/apply | `iris-migrate` |
-| Bindings | `iris-generate` |
+| Need                   | Skill            |
+|------------------------|------------------|
+| Edit / check `.iris`   | `iris-schema`    |
+| DDL plan/apply         | `iris-migrate`   |
+| Bindings               | `iris-generate`  |
 | Queries / DML via Iris | `iris-operation` |
-| Failures | `iris-diagnose` |
+| Failures               | `iris-diagnose`  |
 
 See also [consumer-hard-rules.md](./consumer-hard-rules.md) and [tool-protocol.md](./tool-protocol.md).
