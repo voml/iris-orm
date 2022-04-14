@@ -11,7 +11,7 @@ const irisNativePackages = [
 
 export default defineNuxtConfig({
     alias: {
-        "@iris": fileURLToPath(new URL("./src/generated/iris", import.meta.url)),
+        "@iris": fileURLToPath(new URL("./server/generated/iris", import.meta.url)),
     },
     devtools: { enabled: false },
     compatibilityDate: "2025-07-15",

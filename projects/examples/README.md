@@ -62,21 +62,32 @@ hono/
   src/index.ts              # routes: `getDb()` then `db.user` / `db.post`
 ```
 
+### `generate.out` (framework layout)
+
+`iris.config.ts` `generate.out` is the **generated client root**. Follow each framework's source layout — never a bare `<root>/generated/` dump:
+
+| Example | `generate.out` | Why |
+|---------|----------------|-----|
+| Hono / Express / Fastify | `src/generated/iris` | App code under `src/` |
+| Next.js | `lib/generated/iris` | App Router at `app/`, server helpers in `lib/` |
+| Nuxt | `server/generated/iris` | Nitro server under `server/` |
+| SvelteKit / Astro | `src/generated/iris` | `src/` is the app root |
+
+Legacy `generate.out: "."` still maps to `src/generated/iris`.
+
 ### `@iris/*` import alias
 
-Generated client lives at `src/generated/iris/`, but app code imports through **`@iris/*`**:
+App code imports through **`@iris/*`**, mapped to each project's `generate.out`:
 
 ```ts
 import type { UserId } from "@iris/index.ts";
 import { createDb } from "@iris/node.ts";
 ```
 
-Map `@iris/*` → `src/generated/iris/*` in each example:
-
 | Surface | Mapping |
 |---------|---------|
-| `tsconfig.json` | `"paths": { "@iris/*": ["src/generated/iris/*"] }` |
-| Node (`hono` / `express` / `fastify`) | `tsx` start (reads `tsconfig` paths; Node `imports` cannot remap `@iris/*`) |
+| `tsconfig.json` | `"paths": { "@iris/*": ["<generate.out>/*"] }` |
+| Node (`hono` / `express` / `fastify`) | `tsx` start (reads `tsconfig` paths) |
 | Nuxt / Astro / SvelteKit / Next | framework `alias` / Vite / `tsconfig` paths on `@iris` |
 
 Do not import `references.ts`, `inputs.ts`, or other internal stems. Domain types from `@iris/index.ts`, host entry from `@iris/node.ts` or `@iris/browser.ts`.
@@ -104,11 +115,11 @@ export default defineConfig({
     datasources: {
         default: { kind: "yydb", mode: "native_pull", path: ":memory:" },
     },
-    generate: { out: ".", target: "typescript" },
+    generate: { out: "src/generated/iris", target: "typescript" },
 });
 ```
 
-Full-stack dev (file-backed YYDB):
+Full-stack dev (file-backed YYDB, Next layout):
 
 ```ts
 export default defineConfig({
@@ -116,7 +127,7 @@ export default defineConfig({
     datasources: {
         default: { kind: "yydb", mode: "native_pull", path: ".iris/dev.yydb" },
     },
-    generate: { out: ".", target: "typescript" },
+    generate: { out: "lib/generated/iris", target: "typescript" },
 });
 ```
 
@@ -124,7 +135,7 @@ Examples default to **YYDB** (`native_pull`). SQLite `managed_push` remains avai
 
 ## Generate TypeScript client
 
-The query API lives in **`src/generated/iris/`** — not hand-written. Regenerate from config + schema data:
+The query API lives under each project's **`generate.out`** — not hand-written. Regenerate from config + schema data:
 
 ```bash
 pnpm run build:napi
@@ -133,7 +144,7 @@ pnpm run examples:generate
 pnpm iris generate --config projects/examples/hono
 ```
 
-`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `src/generated/iris/` (`createDb`, `db.user`, `db.post`, …).
+`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generate.out` (`createDb`, `db.user`, `db.post`, …).
 
 Each example may keep a thin `db.ts` for process singleton only. It imports **`@iris/node.ts`** (`createDb`) and never reaches into other generated stems. Route handlers use `getDb()` / `useDb()` then the generated delegates. Domain types come from **`@iris/index.ts`**. No parallel `iris.ts` wrapper layer and no seed logic outside routes.
 

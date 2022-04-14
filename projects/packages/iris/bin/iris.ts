@@ -10,6 +10,7 @@ import cac from "cac";
 import { checkSchemaFile } from "../src/node/check.ts";
 import { printDoctorReport } from "../src/node/doctor.ts";
 import { loadIrisNative } from "../src/node/load.ts";
+import { DEFAULT_TYPESCRIPT_GENERATE_OUT, resolveGenerateRoot } from "../src/node/generate-path.ts";
 import { loadProject, readProjectSchema, resolveProjectConfigPath } from "../src/node/project.ts";
 import { packageVersion } from "../src/node/versions.ts";
 
@@ -52,7 +53,7 @@ cli.command("check [schema]", "Validate schema + generated client drift")
 
 cli.command("generate [schema]", "Generate Iris client from .iris schema")
     .option("--config <path>", "Project root or iris.config.ts")
-    .option("--out <dir>", "Output project root (writes src/generated/iris/ under this path)")
+    .option("--out <dir>", "Generated client root (defaults to iris.config.ts generate.out)")
     .option("--target <name>", "Emitter target (defaults to iris.config.ts generate.target or typescript)")
     .action(async (schema?: string, options?: { out?: string; target?: string; config?: string }) => {
         try {
@@ -60,7 +61,11 @@ cli.command("generate [schema]", "Generate Iris client from .iris schema")
             const project = schema ? null : await loadProject(options?.config ?? process.cwd());
             const source = schema ? await readFile(resolve(schema), "utf8") : await readProjectSchema(project!);
             const target = options?.target ?? project?.generateTarget ?? "typescript";
-            const outRoot = options?.out ? resolve(options.out) : project ? resolve(project.root, project.generateOut) : resolve(".");
+            const outRoot = options?.out
+                ? resolve(options.out)
+                : project
+                  ? resolveGenerateRoot(project.root, project.generateOut)
+                  : resolve(DEFAULT_TYPESCRIPT_GENERATE_OUT);
             const result = core.generate(source, target, outRoot);
             if (!result.ok) {
                 console.error(`error: ${result.error ?? "generate failed"}`);

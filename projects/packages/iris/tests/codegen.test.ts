@@ -56,12 +56,12 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     }
 
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-"));
-    const result = core.generate(USER_SCHEMA, "typescript", outDir);
+    const root = join(outDir, "generated", "iris");
+    const result = core.generate(USER_SCHEMA, "typescript", root);
     assert.equal(result.ok, true);
     assert.equal(result.files.length, 10);
 
-    const root = join(outDir, "src", "generated", "iris");
-    assert.match(result.outputPath.replace(/\\/g, "/"), /src\/generated\/iris$/);
+    assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris$/);
 
     const index = await readFile(join(root, "index.ts"), "utf8");
     assert.match(index, /export \{ DbClient, createClient \}/);
@@ -117,9 +117,9 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
     }
 
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-tsc-"));
-    const result = core.generate(POST_USER_SCHEMA, "typescript", outDir);
-    assert.equal(result.ok, true);
     const generatedRoot = join(outDir, "src", "generated", "iris");
+    const result = core.generate(POST_USER_SCHEMA, "typescript", generatedRoot);
+    assert.equal(result.ok, true);
 
     const typesRoot = fileURLToPath(new URL("../src/types", import.meta.url));
     const stubDir = join(outDir, "stubs");
