@@ -11,7 +11,7 @@ mod session;
 use std::path::Path;
 
 use iris_generator::GenerationModel;
-use iris_tools::{migrate_plan, migrate_run, project};
+use iris::{migrate_plan, migrate_run, project};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use session::MemorySession;
@@ -32,7 +32,7 @@ pub struct CheckSourceResult {
     pub error: Option<String>,
 }
 
-/// Parse and validate schema source (same semantics as `iris-tools check`).
+/// Parse and validate schema source (same semantics as `iris check`).
 #[napi]
 pub fn check_source(source: String) -> Result<CheckSourceResult> {
     match GenerationModel::from_vos_schema(&source) {
@@ -148,7 +148,7 @@ pub struct MigratePlanResult {
     pub error: Option<String>,
 }
 
-/// Plan a managed-push migration (same as `iris-tools migrate plan`).
+/// Plan a managed-push migration (same as `iris push --plan`).
 #[napi]
 pub fn migrate_plan_cmd(
     config_path: String,
@@ -180,7 +180,7 @@ pub struct MigrateRunResult {
     pub error: Option<String>,
 }
 
-/// Plan → apply → verify (same as `iris-tools migrate run` / library `migrate_run`).
+/// Plan → apply → verify (same as `iris push` / library `migrate_run`).
 #[napi]
 pub fn migrate_run_cmd(
     config_path: String,

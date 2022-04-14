@@ -4,9 +4,9 @@
 
 ```text
 Rust Iris core
-  ├─ iris-tools / iris-generator (Rust CLI)
+  ├─ iris-generator (Rust codegen)
   ├─ iris-connector-* / iris-adapter-* (Rust workspace lowering)
-  ├─ Node N-API → @yydb/iris/node
+  ├─ Node N-API → @yydb/iris/node + `iris` CLI
   └─ browser WASM → @yydb/iris (default entry)
 ```
 
@@ -60,4 +60,4 @@ On Node, `import "@yydb/iris/node"` correctly resolves to the N-API facade. Bund
 
 ## Rust native
 
-Rust apps use the `iris::*` crate and `iris-tools` CLI directly — no npm layer required.
+Rust apps use the `iris::*` crate directly. The `iris` CLI ships from `@yydb/iris` on Node hosts.

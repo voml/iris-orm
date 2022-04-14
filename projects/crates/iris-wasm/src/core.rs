@@ -18,7 +18,7 @@ pub fn iris_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-/// Parse and validate schema source (same semantics as `iris-tools check`).
+/// Parse and validate schema source (same semantics as `iris check`).
 pub fn check_schema_source(source: &str) -> SchemaCheck {
     match GenerationModel::from_vos_schema(source) {
         Ok(model) => SchemaCheck {
