@@ -216,17 +216,30 @@ pub const fn prefers_aot() -> bool {
     cfg!(feature = "aot")
 }
 
-/// Relative root for generated bindings under the project source tree.
-pub const GENERATED_IRIS_SRC_ROOT: &str = "src/generated/iris";
+/// Default TypeScript generate root when `iris.config.ts` `generate.out` is `.` (legacy).
+pub const DEFAULT_TYPESCRIPT_GENERATE_OUT: &str = "src/generated/iris";
 
-/// Output directory for the Rust target (`src/generated/iris/rust/`).
-pub fn rust_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
-    out_dir.join(GENERATED_IRIS_SRC_ROOT).join("rust")
+/// Resolve `generate.out` (project-relative) to the TypeScript client root.
+pub fn resolve_typescript_generate_root(
+    project_root: &std::path::Path,
+    generate_out: &str,
+) -> std::path::PathBuf {
+    let relative = if generate_out == "." {
+        DEFAULT_TYPESCRIPT_GENERATE_OUT
+    } else {
+        generate_out
+    };
+    project_root.join(relative)
 }
 
-/// Output directory for the TypeScript target (`src/generated/iris/`).
-pub fn typescript_target_dir(out_dir: &std::path::Path) -> std::path::PathBuf {
-    out_dir.join(GENERATED_IRIS_SRC_ROOT)
+/// Output directory for the Rust target (`{generate_root}/rust/`).
+pub fn rust_target_dir(generate_root: &std::path::Path) -> std::path::PathBuf {
+    generate_root.join("rust")
+}
+
+/// Output directory for the TypeScript target (`generate.out` from `iris.config.ts`).
+pub fn typescript_target_dir(generate_root: &std::path::Path) -> std::path::PathBuf {
+    generate_root.to_path_buf()
 }
 
 fn rust_file_header(model: &GenerationModel) -> Result<String> {
@@ -308,24 +321,24 @@ fn write_files_atomic(
     Ok(written)
 }
 
-/// Write Rust bindings into `{out_dir}/src/generated/iris/rust/`.
+/// Write Rust bindings into `{generate_root}/rust/`.
 pub fn write_rust_domain(
     model: &GenerationModel,
-    out_dir: &std::path::Path,
+    generate_root: &std::path::Path,
 ) -> Result<Vec<std::path::PathBuf>> {
-    let root = rust_target_dir(out_dir);
+    let root = rust_target_dir(generate_root);
     write_files_atomic(&root, emit_rust_files(model)?)
 }
 
-/// Generate bindings for `target` (`rust` | `typescript`) under `out_dir`.
+/// Generate bindings for `target` (`rust` | `typescript`) under `generate_root`.
 pub fn generate(
     model: &GenerationModel,
     target: &str,
-    out_dir: &std::path::Path,
+    generate_root: &std::path::Path,
 ) -> Result<Vec<std::path::PathBuf>> {
     match target {
-        "rust" => write_rust_domain(model, out_dir),
-        "typescript" | "ts" => write_typescript_client(model, out_dir),
+        "rust" => write_rust_domain(model, generate_root),
+        "typescript" | "ts" => write_typescript_client(model, generate_root),
         other => Err(typescript::unsupported_target(other)),
     }
 }
@@ -334,10 +347,10 @@ pub fn generate(
 pub fn generate_from_source(
     source: &str,
     target: &str,
-    out_dir: &std::path::Path,
+    generate_root: &std::path::Path,
 ) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
     let model = GenerationModel::from_vos_schema(source)?;
-    let paths = generate(&model, target, out_dir)?;
+    let paths = generate(&model, target, generate_root)?;
     Ok((model, paths))
 }
 

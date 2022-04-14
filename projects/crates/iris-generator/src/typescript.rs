@@ -42,7 +42,7 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
     Ok(files)
 }
 
-/// Write TypeScript client files into `{out_dir}/src/generated/iris/`.
+/// Write TypeScript client files into `generate_root` (`iris.config.ts` `generate.out`).
 pub fn write_typescript_client(model: &GenerationModel, out_dir: &Path) -> Result<Vec<PathBuf>> {
     let root = crate::typescript_target_dir(out_dir);
     std::fs::create_dir_all(root.join("_internal"))?;
