@@ -3,8 +3,28 @@ import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
 import { createClient, type DbClient } from "./operations.js";
 
 /** Node host: construct a generated client with N-API binding. */
-export async function createDb(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
+export async function createDatabase(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
     return createClient(await createIrisDbBinding(options));
+}
+
+let openDatabaseClient: DbClient | null = null;
+
+/** Reuse one client per process. Options apply only on the first call. */
+export async function openDatabase(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
+    if (!openDatabaseClient) {
+        openDatabaseClient = await createDatabase(
+            options ?? { config: process.cwd(), source: "default" },
+        );
+    }
+    return openDatabaseClient;
+}
+
+export async function closeDatabase(): Promise<void> {
+    if (!openDatabaseClient) {
+        return;
+    }
+    await openDatabaseClient.$close();
+    openDatabaseClient = null;
 }
 
 export { createClient, DbClient } from "./operations.js";

@@ -72,12 +72,14 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
     assert.match(nodeEntry, /createIrisDbBinding/);
-    assert.match(nodeEntry, /export async function createDb/);
+    assert.match(nodeEntry, /export async function createDatabase/);
+    assert.match(nodeEntry, /export async function openDatabase/);
+    assert.match(nodeEntry, /export async function closeDatabase/);
 
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris\/wasm/);
     assert.match(browserEntry, /createIrisDbBinding/);
-    assert.match(browserEntry, /export async function createDb/);
+    assert.match(browserEntry, /export async function createDatabase/);
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
@@ -134,6 +136,7 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
 export type CreateIrisDbBindingOptions = {
   profile?: "memory" | "sqlite" | "project";
   sqlitePath?: string;
+  config?: string;
   project?: string;
   source?: string;
   schema?: string;
@@ -191,7 +194,11 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
                     baseUrl: ".",
                 },
                 include: ["./src/generated/iris/**/*.ts"],
-                exclude: ["./src/generated/iris/consumer-negative.ts"],
+                exclude: [
+                    "./src/generated/iris/consumer-negative.ts",
+                    "./src/generated/iris/node.ts",
+                    "./src/generated/iris/browser.ts",
+                ],
             },
             null,
             2,
@@ -220,8 +227,10 @@ async function run() {
       post_id: true,
       title: true,
       author: {
-        user_id: true,
-        user_name: true,
+        select: {
+          user_id: true,
+          user_name: true,
+        },
       },
     },
   } satisfies PostFindManyArgs;

@@ -2,8 +2,8 @@ import { createIrisDbBinding } from "@yydb/iris/wasm";
 import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
 import { createClient, type DbClient } from "./operations.js";
 
-/** Browser / Worker host: WASM binding (call `initIris()` or `loadIrisWeb()` before `createDb`). */
-export async function createDb(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
+/** Browser / Worker host: WASM binding (call `initIris()` or `loadIrisWeb()` before `createDatabase`). */
+export async function createDatabase(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
     return createClient(await createIrisDbBinding(options));
 }
 
