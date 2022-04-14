@@ -4,6 +4,7 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
+        "generate": "node --experimental-strip-types ../../packages/iris/bin/iris.ts generate --config .",
         "dev": "nuxt dev --port 3003",
         "build": "nuxt build",
         "start": "node .output/server/index.mjs",

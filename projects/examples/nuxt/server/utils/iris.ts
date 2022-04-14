@@ -2,103 +2,82 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createIrisDbBinding } from "@yydb/iris/node";
-import type { IrisDbBinding } from "@yydb/iris/types";
+import { createDb, type DbClient } from "../../../generated/iris/typescript/node.ts";
 
-export type User = {
-    user_id: string;
-    user_name: string;
-    active: boolean;
-};
-
-/** Post row projected through `author: &User` ???note `author_name` from `x.author.user_name`. */
-export type PostSummary = {
-    post_id: string;
-    title: string;
-    author_name: string;
-    published: boolean;
-};
+export type { Post, User } from "../../../generated/iris/typescript/models.ts";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-let binding: IrisDbBinding | null = null;
+let db: DbClient | null = null;
 
-export async function openIrisDb(): Promise<IrisDbBinding> {
-    if (binding) {
-        return binding;
+/** Open the generated Iris client (`iris generate --config .`). */
+export async function openIrisDb(): Promise<DbClient> {
+    if (db) {
+        return db;
     }
-    binding = await createIrisDbBinding({
-        config: projectRoot,
-        source: "default",
-    });
-    await seedBlog(binding);
-    return binding;
+    db = await createDb({ config: projectRoot, source: "default" });
+    await seedBlog(db);
+    return db;
 }
 
 export async function closeIrisDb(): Promise<void> {
-    if (!binding) {
+    if (!db) {
         return;
     }
-    await binding.close();
-    binding = null;
+    await db.$close();
+    db = null;
 }
 
-export async function listUsers(db: IrisDbBinding): Promise<User[]> {
-    const rows = await db.query("User.filter(x => x.active).collect()");
-    return rows as User[];
+export async function listUsers(db: DbClient) {
+    return db.user.findMany({ where: { active: true } });
 }
 
-export async function createUser(db: IrisDbBinding, userName: string, active = true): Promise<User> {
-    const user: User = {
-        user_id: randomUUID(),
-        user_name: userName,
-        active,
-    };
-    await db.execute("User::insert({ user_id: $user_id, user_name: $user_name, active: $active })", {
-        user_id: user.user_id,
-        user_name: user.user_name,
-        active: user.active,
+export async function createUser(db: DbClient, userName: string, active = true) {
+    return db.user.create({
+        data: { user_id: randomUUID(), user_name: userName, active },
     });
-    return user;
 }
 
-export async function listPosts(db: IrisDbBinding): Promise<PostSummary[]> {
-    const rows = await db.query(
-        "Post.filter(x => x.published).map(x => { post_id: x.post_id, title: x.title, author_name: x.author.user_name, published: x.published }).collect()",
-    );
-    return rows as PostSummary[];
+export async function listPosts(db: DbClient) {
+    return db.post.findMany({
+        where: { published: true },
+        select: {
+            post_id: true,
+            title: true,
+            published: true,
+            author: { user_name: true },
+        },
+    });
 }
 
-/** Filter posts by traversing the `&User` reference in VOS (`x.author.user_name`). */
-export async function listPostsByAuthorName(db: IrisDbBinding, authorName: string): Promise<PostSummary[]> {
-    const rows = await db.query(
-        "Post.filter(x => x.author.user_name == $name).map(x => { post_id: x.post_id, title: x.title, author_name: x.author.user_name, published: x.published }).collect()",
-        { name: authorName },
-    );
-    return rows as PostSummary[];
+/** Filter posts through generated `&User` where input (`author.user_name`). */
+export async function listPostsByAuthorName(db: DbClient, authorName: string) {
+    return db.post.findMany({
+        where: { author: { user_name: authorName } },
+        select: {
+            post_id: true,
+            title: true,
+            published: true,
+            author: { user_name: true },
+        },
+    });
 }
 
-/** Insert a post; `author_user_id` is the FK stored for `author: &User`. */
 export async function createPost(
-    db: IrisDbBinding,
+    db: DbClient,
     input: { author_user_id: string; title: string; published?: boolean },
-): Promise<{ post_id: string; author_user_id: string; title: string; published: boolean }> {
-    const post = {
-        post_id: randomUUID(),
-        author_user_id: input.author_user_id,
-        title: input.title,
-        published: input.published ?? true,
-    };
-    await db.execute("Post::insert({ post_id: $post_id, author: $author, title: $title, published: $published })", {
-        post_id: post.post_id,
-        author: post.author_user_id,
-        title: post.title,
-        published: post.published,
+) {
+    return db.post.create({
+        data: {
+            post_id: randomUUID(),
+            author: input.author_user_id,
+            title: input.title,
+            published: input.published ?? true,
+        },
     });
-    return post;
 }
 
-async function seedBlog(db: IrisDbBinding): Promise<void> {
+async function seedBlog(db: DbClient): Promise<void> {
     if ((await listUsers(db)).length > 0) {
         return;
     }

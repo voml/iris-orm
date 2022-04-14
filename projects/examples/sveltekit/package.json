@@ -4,6 +4,7 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
+        "generate": "node --experimental-strip-types ../../packages/iris/bin/iris.ts generate --config .",
         "dev": "vite dev --port 3004",
         "build": "vite build",
         "preview": "vite preview --port 3004",
