@@ -29,7 +29,7 @@
         "homepage:build": "pnpm homepage",
         "homepage:check": "pnpm --filter @yydb/iris-homepage check",
         "verify:homepage-hosts": "pnpm --filter @yydb/iris-homepage run verify:hosts",
-        "examples:typecheck": "pnpm -r --filter @yydb-examples/hono --filter @yydb-examples/express --filter @yydb-examples/fastify run typecheck",
+        "examples:typecheck": "pnpm -r --filter \"@yydb-examples/*\" run typecheck",
         "placeholder": "nifty publish --placeholder --dry-run",
         "placeholder:publish": "nifty publish --placeholder",
         "placeholder:trust": "nifty trust"

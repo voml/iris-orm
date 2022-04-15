@@ -1,0 +1,25 @@
+{
+    "name": "@yydb-examples/sveltekit",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite dev --port 3004",
+        "build": "vite build",
+        "preview": "vite preview --port 3004",
+        "typecheck": "tsc --noEmit -p tsconfig.check.json"
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*"
+    },
+    "devDependencies": {
+        "@sveltejs/adapter-node": "^5.2.14",
+        "@sveltejs/kit": "^2.39.0",
+        "@sveltejs/vite-plugin-svelte": "^6.2.0",
+        "@types/node": "^22.15.0",
+        "svelte": "^5.38.10",
+        "svelte-check": "^4.3.1",
+        "typescript": "^5.9.2",
+        "vite": "^7.1.5"
+    }
+}

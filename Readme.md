@@ -98,7 +98,8 @@ projects/packages/
   homepage/             official site → https://iris-orm.pages.dev/
 
 projects/examples/
-  hono/ express/ fastify/   @yydb-examples/* HTTP servers
+  hono/ express/ fastify/              @yydb-examples/* HTTP servers
+  next/ nuxt/ sveltekit/ astro/        @yydb-examples/* full-stack server routes
 
 Native builds: `projects/crates/iris-napi` + `scripts/build-napi.mjs` (not npm workspace members).
 WASM builds: `projects/crates/iris-wasm` + `scripts/build-wasm.mjs`.
