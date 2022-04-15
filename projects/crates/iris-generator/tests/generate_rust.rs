@@ -112,7 +112,7 @@ fn write_rust_domain_atomic() {
     ));
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
     let paths = iris_generator::write_rust_domain(&model, &dir).unwrap();
-    let root = dir.join("generated/iris/rust");
+    let root = dir.join("src/generated/iris/rust");
     assert_eq!(paths.len(), 5);
     assert!(paths.iter().all(|p| p.starts_with(&root)));
     assert!(root.join("mod.rs").is_file());
