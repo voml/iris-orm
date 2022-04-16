@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { PostId, UserId } from "@iris/index.ts";
-import { createDb } from "@iris/node.ts";
+import { createDatabase } from "@iris/node.ts";
 
 export const runtime = "nodejs";
 
@@ -14,7 +14,7 @@ const postListSelect = {
 
 export async function GET(request: Request) {
     const author = new URL(request.url).searchParams.get("author")?.trim();
-    const db = await createDb({ config: process.cwd(), source: "default" });
+    const db = await createDatabase({ config: process.cwd(), source: "default" });
     const where = author
         ? { published: true, author: { user_name: author } }
         : { published: true };
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     if (!authorUserId || !title) {
         return Response.json({ error: "author_user_id and title are required" }, { status: 400 });
     }
-    const db = await createDb({ config: process.cwd(), source: "default" });
+    const db = await createDatabase({ config: process.cwd(), source: "default" });
     const post = await db.post.create({
         data: {
             post_id: randomUUID() as PostId,

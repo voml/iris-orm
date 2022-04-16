@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { APIRoute } from "astro";
 
-import { getDb } from "../../lib/server/db.ts";
+import { openDatabase } from "@iris/node.ts";
 import type { UserId } from "@iris/index.ts";
 
 export const GET: APIRoute = async () => {
-    const db = await getDb();
+    const db = await openDatabase({ config: process.cwd(), source: "default" });
     return new Response(JSON.stringify(await db.user.findMany({ where: { active: true } })), {
         headers: { "content-type": "application/json" },
     });
@@ -20,7 +20,7 @@ export const POST: APIRoute = async ({ request }) => {
             headers: { "content-type": "application/json" },
         });
     }
-    const db = await getDb();
+    const db = await openDatabase({ config: process.cwd(), source: "default" });
     const user = await db.user.create({
         data: {
             user_id: randomUUID() as UserId,

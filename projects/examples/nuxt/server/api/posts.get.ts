@@ -1,4 +1,4 @@
-import { useDb } from "../utils/db.ts";
+import { openDatabase } from "@iris/node.ts";
 
 const postListSelect = {
     post_id: true,
@@ -9,7 +9,7 @@ const postListSelect = {
 
 export default defineEventHandler(async (event) => {
     const author = getQuery(event).author;
-    const db = await useDb();
+    const db = await openDatabase({ config: process.cwd(), source: "default" });
     const authorName = typeof author === "string" ? author.trim() : "";
     const where = authorName
         ? { published: true, author: { user_name: authorName } }

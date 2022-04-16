@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import express from "express";
 
-import { closeDb, getDb } from "./db.ts";
 import type { PostId, UserId } from "@iris/index.ts";
+import { closeDatabase, openDatabase } from "@iris/node.ts";
 
+const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = express();
 app.use(express.json());
 
-const db = await getDb();
+const db = await openDatabase({ config: projectRoot, source: "default" });
 
 const postListSelect = {
     post_id: true,
@@ -69,7 +72,7 @@ const server = app.listen(port, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
         server.close();
-        await closeDb();
+        await closeDatabase();
         process.exit(0);
     });
 }

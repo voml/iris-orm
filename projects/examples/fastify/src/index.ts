@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 
-import { closeDb, getDb } from "./db.ts";
 import type { PostId, UserId } from "@iris/index.ts";
+import { closeDatabase, openDatabase } from "@iris/node.ts";
 
+const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = Fastify({ logger: false });
-const db = await getDb();
+const db = await openDatabase({ config: projectRoot, source: "default" });
 
 const postListSelect = {
     post_id: true,
@@ -66,7 +69,7 @@ console.log(`@yydb/iris + Fastify → http://127.0.0.1:${port}`);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
         await app.close();
-        await closeDb();
+        await closeDatabase();
         process.exit(0);
     });
 }

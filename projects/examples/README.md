@@ -58,8 +58,7 @@ hono/
   iris.config.ts            # datasources + schema pointer (YYDB `:memory:`)
   schemas/blog.iris         # schema data (User + Post with author: &User)
   src/generated/iris/       # `iris generate --config .` output (local, gitignored)
-  src/db.ts                 # process singleton over generated `createDb` (host wiring only)
-  src/index.ts              # routes: `getDb()` then `db.user` / `db.post`
+  src/index.ts              # `openDatabase` from `@iris/node.ts`, then `db.user` / `db.post`
 ```
 
 ### `generate.out` (framework layout)
@@ -81,7 +80,7 @@ App code imports through **`@iris/*`**, mapped to each project's `generate.out`:
 
 ```ts
 import type { UserId } from "@iris/index.ts";
-import { createDb } from "@iris/node.ts";
+import { createDatabase, openDatabase, closeDatabase } from "@iris/node.ts";
 ```
 
 | Surface | Mapping |
@@ -92,16 +91,16 @@ import { createDb } from "@iris/node.ts";
 
 Do not import `references.ts`, `inputs.ts`, or other internal stems. Domain types from `@iris/index.ts`, host entry from `@iris/node.ts` or `@iris/browser.ts`.
 
-Full-stack (Next / Nuxt / SvelteKit / Astro) use framework-native server modules:
+Full-stack (Next / Nuxt / SvelteKit / Astro) import directly from `@iris/node.ts`:
 
-| Framework | DB module | Accessor |
-|-----------|-----------|----------|
-| Next | — | route handlers call `createDb` from `@iris/node.ts` |
-| Nuxt | `server/utils/db.ts` | `useDb()` |
-| SvelteKit | `src/lib/server/db.ts` | `getDb()` |
-| Astro | `src/lib/server/db.ts` | `getDb()` |
+| Framework | Pattern |
+|-----------|---------|
+| Next | `createDatabase` per handler (no process singleton) |
+| Nuxt / SvelteKit / Astro | `openDatabase({ config: process.cwd(), source: "default" })` |
 
-Full-stack configs use file-backed `.iris/dev.yydb` so data survives dev HMR. Populate via `POST /users` and `POST /posts`, not hand-written seed in `db.ts`.
+HTTP servers call `openDatabase` once at startup and `closeDatabase` on shutdown. No hand-written `db.ts` wrapper.
+
+Full-stack configs use file-backed `.iris/dev.yydb` so data survives dev HMR. Populate via `POST /users` and `POST /posts`.
 
 ### `iris.config.ts`
 
@@ -144,9 +143,9 @@ pnpm run examples:generate
 pnpm iris generate --config projects/examples/hono
 ```
 
-`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generate.out` (`createDb`, `db.user`, `db.post`, …).
+`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generate.out` (`createDatabase`, `openDatabase`, `closeDatabase`, `db.user`, `db.post`, …).
 
-Each example may keep a thin `db.ts` for process singleton only. It imports **`@iris/node.ts`** (`createDb`) and never reaches into other generated stems. Route handlers use `getDb()` / `useDb()` then the generated delegates. Domain types come from **`@iris/index.ts`**. No parallel `iris.ts` wrapper layer and no seed logic outside routes.
+Route handlers import **`@iris/node.ts`** (`createDatabase` / `openDatabase` / `closeDatabase`) and **`@iris/index.ts`** (domain types). No hand-written `db.ts`, no parallel `iris.ts` wrapper, no seed logic outside routes.
 
 Full-stack apps expose the same API under `/api/*` (for example `/api/posts`).
 
