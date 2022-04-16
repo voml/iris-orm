@@ -64,5 +64,7 @@ pub fn version() -> &'static str {
 
 pub use migrate::{ApplyReport, migrate_apply, migrate_plan, migrate_run, migrate_verify};
 pub use project::{
-    expand_endpoint, load_project, load_project_optional, load_project_required, write_file,
+    discover_project_config, expand_endpoint, load_project, load_project_optional,
+    load_project_required, materialize_runtime_project, resolve_project_root, write_file,
+    RUNTIME_PROJECT_FILE,
 };
