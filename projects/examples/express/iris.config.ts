@@ -1,6 +1,6 @@
-import { defineIrisConfig } from "@yydb/iris/types";
+import { defineConfig } from "@yydb/iris/types";
 
-export default defineIrisConfig({
+export default defineConfig({
     schema: "schemas/blog.iris",
     datasources: {
         default: {

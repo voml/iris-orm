@@ -54,7 +54,7 @@ export interface IrisProjectDocument {
 }
 
 /** Identity helper for `iris.config.ts` inference. */
-export function defineIrisConfig(config: IrisUserConfig): IrisUserConfig {
+export function defineConfig(config: IrisUserConfig): IrisUserConfig {
     if (!config.schema?.trim()) {
         throw new Error("iris.config.ts: `schema` must point at on-disk .iris data");
     }
