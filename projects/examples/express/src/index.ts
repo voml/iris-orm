@@ -11,6 +11,7 @@ const app = express();
 app.use(express.json());
 
 const db = await openDatabase({ config: projectRoot, source: "default" });
+await db.$macros.seed_blog();
 
 const postListSelect = {
     post_id: true,

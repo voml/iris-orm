@@ -2,7 +2,7 @@ import { defineConfig } from "@yydb/iris/types";
 
 /** Standalone Node server — ephemeral in-memory YYDB per process (`openDatabase` from `@iris/node.ts`). */
 export default defineConfig({
-    schema: "schemas/blog.iris",
+    schema: "schemas/**/*.iris",
     datasources: {
         default: {
             kind: "yydb",

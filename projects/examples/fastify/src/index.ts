@@ -9,6 +9,7 @@ import { closeDatabase, openDatabase } from "@iris/node.ts";
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = Fastify({ logger: false });
 const db = await openDatabase({ config: projectRoot, source: "default" });
+await db.$macros.seed_blog();
 
 const postListSelect = {
     post_id: true,
