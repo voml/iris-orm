@@ -1,0 +1,37 @@
+use iris::{Row, Value};
+
+pub(crate) fn escape_vos_str(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn __iris_value_str(row: &Row, key: &str) -> Option<String> {
+    match row.get(key)? {
+        Value::Str(s) => Some(s.clone()),
+        Value::Null => None,
+        other => Some(format!("{other:?}")),
+    }
+}
+
+fn __iris_value_bool(row: &Row, key: &str) -> Option<bool> {
+    match row.get(key)? {
+        Value::Bool(b) => Some(*b),
+        // MySQL BOOLEAN is TINYINT(1); adapter surfaces Int.
+        Value::Int(i) => Some(*i != 0),
+        _ => None,
+    }
+}
+
+fn __iris_value_i64(row: &Row, key: &str) -> Option<i64> {
+    match row.get(key)? {
+        Value::Int(i) => Some(*i),
+        _ => None,
+    }
+}

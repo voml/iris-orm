@@ -34,7 +34,8 @@ fn main() {
     let mut name_list = Vec::new();
 
     for path in &entries {
-        let stem = template_stem(path);
+        let stem = template_stem(path, &templates_dir);
+        let ir_file = stem.replace('/', "__");
         name_list.push(stem.clone());
         println!("cargo:rerun-if-changed={}", path.display());
         let source = fs::read_to_string(path).unwrap_or_else(|e| {
@@ -43,11 +44,11 @@ fn main() {
         let doc = dejavu::Dejavu::parse(&source).unwrap_or_else(|e| {
             panic!("AOT parse {}: {e:?}", path.display());
         });
-        let ir_path = aot_dir.join(format!("{stem}.ir.json"));
+        let ir_path = aot_dir.join(format!("{ir_file}.ir.json"));
         let json = serde_json::to_string_pretty(&doc).expect("serialize IR");
         fs::write(&ir_path, json).expect("write IR JSON");
         match_arms.push_str(&format!(
-            "        {stem:?} => render_aot_ir(include_str!(concat!(env!(\"OUT_DIR\"), \"/aot/{stem}.ir.json\")), ctx),\n"
+            "        {stem:?} => render_aot_ir(include_str!(concat!(env!(\"OUT_DIR\"), \"/aot/{ir_file}.ir.json\")), ctx),\n"
         ));
     }
 
@@ -85,14 +86,12 @@ fn collect_dejavu(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-fn template_stem(path: &Path) -> String {
-    let file = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .expect("utf-8 template name");
-    file.strip_suffix(".dejavu")
-        .unwrap_or(file)
-        .trim_end_matches(".rs")
-        .trim_end_matches(".ts")
-        .to_owned()
+fn template_stem(path: &Path, templates_dir: &Path) -> String {
+    let relative = path
+        .strip_prefix(templates_dir)
+        .expect("template path must live under templates/");
+    let file = relative.to_string_lossy();
+    let without = file.strip_suffix(".dejavu").unwrap_or(&file);
+    let without = without.trim_end_matches(".rs").trim_end_matches(".ts");
+    without.replace('\\', "/")
 }

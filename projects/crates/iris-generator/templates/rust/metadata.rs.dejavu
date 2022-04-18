@@ -1,0 +1,12 @@
+/// Deterministic fingerprint of the VOS schema used to generate these bindings.
+pub const SCHEMA_FINGERPRINT: &str = "<% schema_fingerprint %>";
+
+/// `iris-generator` crate version that produced these bindings.
+pub const GENERATOR_VERSION: &str = "<% generator_version %>";
+
+/// `(table, field)` pairs whose VOS type is `uuid` / `uuid?` (MySQL `BINARY(16)`).
+pub const UUID_FIELDS: &[(&str, &str)] = &[
+<%- loop entry in uuid_fields %>
+    ("<% entry.table %>", "<% entry.field %>"),
+<%- end loop %>
+];

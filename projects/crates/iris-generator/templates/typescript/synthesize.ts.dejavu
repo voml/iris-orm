@@ -18,7 +18,19 @@ export type FindUniqueArgs = {
     select?: Record<string, unknown>;
 };
 
-const FILTER_OPS = new Set(["eq", "not", "gt", "gte", "lt", "lte", "contains", "startsWith", "endsWith"]);
+const FILTER_OPS = new Set([
+    "eq",
+    "not",
+    "gt",
+    "gte",
+    "lt",
+    "lte",
+    "contains",
+    "startsWith",
+    "endsWith",
+    "isNull",
+    "isNotNull",
+]);
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -99,6 +111,12 @@ function compileLeafPredicate(
         if ("endsWith" in value) {
             const param = nextParam(parameters, `${hint}_ends`, value.endsWith);
             clauses.push(`${target}.ends_with($${param})`);
+        }
+        if ("isNull" in value && value.isNull === true) {
+            clauses.push(`${target} == null`);
+        }
+        if ("isNotNull" in value && value.isNotNull === true) {
+            clauses.push(`${target} != null`);
         }
         return clauses.length === 1 ? clauses[0]! : `(${clauses.join(" && ")})`;
     }
