@@ -11,11 +11,12 @@ Thumbs.db
 *.txt
 
 # Rust
-/target/
-**/target/
+target/
+.cargo/config.toml
 
 # Node
 node_modules/
+.astro/
 dist/
 pnpm-lock.yaml
 *.node

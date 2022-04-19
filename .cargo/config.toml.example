@@ -1,0 +1,5 @@
+# Copy to `config.toml` (gitignored) for a local `vos-language` checkout.
+# CI / publish: no `config.toml` — root `Cargo.toml` git `dev` only.
+
+[patch."https://github.com/voml/vos-language.git"]
+vos = { path = "../vos-language/projects/crates/vos" }
