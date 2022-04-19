@@ -14,7 +14,7 @@ function toProjectDocument(config) {
         schema: config.schema,
         datasources: { ...(config.datasources ?? {}) },
         generate: {
-            out: config.generate?.out ?? "generated/iris",
+            out: config.generate?.out ?? ".",
             target: config.generate?.target ?? "typescript",
         },
     };
