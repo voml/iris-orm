@@ -275,11 +275,18 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
     ])
 }
 
-/// Dejavu template mode HTML-escapes `<`/`>`; Rust types need raw angle brackets.
-fn unescape_rust_template(text: &str) -> String {
+/// Dejavu template mode HTML-escapes output; generated source must be unescaped.
+pub(crate) fn unescape_dejavu_template(text: &str) -> String {
     text.replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+}
+
+/// Rust-only alias (angle brackets in generics and lifetimes).
+fn unescape_rust_template(text: &str) -> String {
+    unescape_dejavu_template(text)
 }
 
 fn write_files_atomic(
