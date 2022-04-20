@@ -1,0 +1,16 @@
+name = "iris-blog-cf"
+main = "src/worker.ts"
+compatibility_date = "2024-11-12"
+
+# WASM semantic core (`@yydb/iris-unknown-wasm32`) is pulled in by the Worker bundle.
+[[rules]]
+type = "CompiledWasm"
+globs = ["**/*.wasm"]
+fallthrough = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "iris-blog"
+# Replace after `wrangler d1 create iris-blog` (see README).
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

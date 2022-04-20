@@ -1,0 +1,26 @@
+{
+    "name": "@yydb-examples/cloudflare",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "generate": "node --experimental-strip-types ../../packages/iris/bin/iris.ts generate --config .",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "dev": "wrangler dev",
+        "deploy": "wrangler deploy",
+        "db:migrate:local": "wrangler d1 migrations apply iris-blog --local",
+        "db:migrate:remote": "wrangler d1 migrations apply iris-blog --remote",
+        "cf:types": "wrangler types"
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*",
+        "@yydb/iris-unknown-wasm32": "workspace:*",
+        "hono": "^4.7.11"
+    },
+    "devDependencies": {
+        "@cloudflare/workers-types": "^5.20261001.1",
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2",
+        "wrangler": "^4.24.0"
+    }
+}
