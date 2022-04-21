@@ -21,7 +21,7 @@ pub use error::{Error, Result};
 /// Connector identifier.
 pub const BACKEND_ID: &str = "yydb";
 
-/// Stable readiness code for tooling and diagnostics.
+/// Stable readiness code when the native query executor is unavailable.
 pub const READINESS_CODE: &str = "IRIS-YYDB-VOS-EXECUTOR-NOT-READY";
 
 /// What Iris requires from YYDB before enabling native VOS execution.
@@ -43,15 +43,32 @@ impl ReadinessReport {
     /// Probe current readiness against the pinned `yydb` git dependency.
     pub fn probe() -> Self {
         let schema_handshake_ready = Connection::open_in_memory().is_ok();
-        let vos_executor_ready = false;
+        let vos_executor_ready = Connection::open_in_memory()
+            .and_then(|conn| {
+                conn.ensure_schema(1, "table T { @@id: uuid }")?;
+                conn.query("T.filter(x => true).collect()")?;
+                Ok(())
+            })
+            .is_ok();
+        let (code, message) = if vos_executor_ready {
+            (
+                "IRIS-YYDB-VOS-EXECUTOR-READY".to_string(),
+                "YYDB Phase 1 VOS read query is available on Connection::query".to_string(),
+            )
+        } else {
+            (
+                READINESS_CODE.into(),
+                "YYDB formal VOS executor (query / sessions / prepared plans) is not yet \
+                 exported on the public Connection facade; Iris refuses DML/query until then"
+                    .into(),
+            )
+        };
         Self {
             backend_id: BACKEND_ID.into(),
             schema_handshake_ready,
             vos_executor_ready,
-            code: READINESS_CODE.into(),
-            message: "YYDB formal VOS executor (query / sessions / prepared plans) is not yet \
-                      exported on the public Connection facade; Iris refuses DML/query until then"
-                .into(),
+            code,
+            message,
         }
     }
 
@@ -162,11 +179,12 @@ impl YydbSource {
     /// Execute a VOS DML program on the native YYDB executor.
     ///
     /// Counterpart of `Session::query` / generated `db.$query`.
-    pub fn query(&self, _program: &str) -> Result<Vec<iris_types::Row>> {
+    pub fn query(&self, program: &str) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
-        Err(Error::Policy(
-            "readiness cleared but VOS client binding is not implemented yet".into(),
-        ))
+        self.conn
+            .query(program)
+            .map_err(Error::from)
+            .map(|rows| rows.into_iter().map(row_to_iris).collect())
     }
 
     /// Execute unit-valued / DDL-shaped VOS on the native YYDB executor.
@@ -229,6 +247,22 @@ impl YydbSource {
 #[derive(Debug, Clone)]
 pub struct PreparedVos {
     ddl_revision: u64,
+}
+
+fn row_to_iris(row: yydb::query::QueryRow) -> iris_types::Row {
+    row.into_iter()
+        .map(|(key, value)| (key, value_to_iris(&value)))
+        .collect()
+}
+
+fn value_to_iris(value: &yydb::Value) -> iris_types::Value {
+    match value {
+        yydb::Value::Null => iris_types::Value::Null,
+        yydb::Value::Bool(b) => iris_types::Value::Bool(*b),
+        yydb::Value::I64(i) => iris_types::Value::Int(*i),
+        yydb::Value::Text(s) => iris_types::Value::Str(s.clone()),
+        _ => iris_types::Value::Null,
+    }
 }
 
 impl PreparedVos {

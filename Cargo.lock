@@ -1608,7 +1608,7 @@ dependencies = [
  "serde",
  "serde_json",
  "socket2 0.5.10",
- "twox-hash",
+ "twox-hash 1.6.3",
  "url",
 ]
 
@@ -1801,6 +1801,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "oak-core"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=424dd544c57f2d9e40b248056ab12a1725ae932f#424dd544c57f2d9e40b248056ab12a1725ae932f"
+dependencies = [
+ "smallvec",
+ "triomphe",
+ "twox-hash 2.1.4",
+]
+
+[[package]]
+name = "oak-vos"
+version = "0.0.12"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=424dd544c57f2d9e40b248056ab12a1725ae932f#424dd544c57f2d9e40b248056ab12a1725ae932f"
+dependencies = [
+ "oak-core",
 ]
 
 [[package]]
@@ -2895,6 +2913,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "triomphe"
+version = "0.1.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b40688ea6389c8171614b25491f71d4a27946e0c7ce2da1c6de27e25abf1a0ae"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "twox-hash"
 version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2903,6 +2930,15 @@ dependencies = [
  "cfg-if",
  "rand 0.8.7",
  "static_assertions",
+]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5283634e518fe9e82c7b20520bb4bc209009fd16c82077c802f8111ecbb0117a"
+dependencies = [
+ "rand 0.10.2",
 ]
 
 [[package]]
@@ -3072,7 +3108,6 @@ dependencies = [
 [[package]]
 name = "vos"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "uuid",
  "vos-ast",
@@ -3084,7 +3119,6 @@ dependencies = [
 [[package]]
 name = "vos-ast"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "serde",
 ]
@@ -3092,7 +3126,6 @@ dependencies = [
 [[package]]
 name = "vos-generator"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "dejavu",
  "once_cell",
@@ -3104,7 +3137,6 @@ dependencies = [
 [[package]]
 name = "vos-inspect"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "serde",
  "vos-ast",
@@ -3113,9 +3145,9 @@ dependencies = [
 [[package]]
 name = "vos-parser"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "miette",
+ "oak-vos",
  "thiserror 2.0.20",
  "vos-ast",
 ]
@@ -3397,19 +3429,36 @@ dependencies = [
 [[package]]
 name = "yydb"
 version = "0.1.0"
-source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#5b6e0b96593583a06ad9c2d851bd1797b95ef3e5"
 dependencies = [
+ "base64 0.22.1",
  "blake3",
+ "serde_json",
+ "sha1",
  "vos",
+ "windows-sys 0.61.2",
+ "yydb-execution",
  "yydb-types",
+ "yydb-udf",
 ]
+
+[[package]]
+name = "yydb-execution"
+version = "0.1.0"
 
 [[package]]
 name = "yydb-types"
 version = "0.1.0"
-source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#5b6e0b96593583a06ad9c2d851bd1797b95ef3e5"
 dependencies = [
  "uuid",
+]
+
+[[package]]
+name = "yydb-udf"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "vos",
+ "yydb-execution",
 ]
 
 [[package]]
