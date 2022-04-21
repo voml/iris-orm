@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createDb, type DbClient } from "../generated/iris/typescript/node.ts";
+import { createDb, type DbClient } from "../src/generated/iris/node.ts";
 
-export type { Post, User } from "../generated/iris/typescript/models.ts";
+export type { Post, User } from "../src/generated/iris/models.ts";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 

@@ -24,7 +24,7 @@ fn typescript_emit_writes_ux_layout() {
     ));
     let paths = write_typescript_client(&model, &dir).expect("write");
     assert_eq!(paths.len(), 10);
-    let root = dir.join("generated/iris/typescript");
+    let root = dir.join("src/generated/iris");
     assert!(root.join("index.ts").is_file());
     assert!(root.join("models.ts").is_file());
     assert!(root.join("operations.ts").is_file());
@@ -59,7 +59,7 @@ fn generate_dispatch_typescript_target() {
     assert!(
         paths
             .iter()
-            .all(|path| { path.starts_with(dir.join("generated/iris/typescript")) })
+            .all(|path| { path.starts_with(dir.join("src/generated/iris")) })
     );
     assert!(
         paths

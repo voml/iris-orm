@@ -1,5 +1,5 @@
 //! Public entry for generated Iris Rust bindings.
-//! Layout: `generated/iris/rust/` — models / operations / metadata / errors.
+//! Layout: `src/generated/iris/rust/` — models / operations / metadata / errors.
 
 pub mod errors;
 pub mod metadata;
