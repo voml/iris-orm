@@ -349,8 +349,8 @@ fn emit_where_field(
     if let Some(ref target) = field.reference_target {
         if entity_names.contains(target.as_str()) {
             return Some(format!(
-                "    {}?: WherePathFor<\"{}\">;",
-                field.name, target
+                "    {}?: WherePathFor<\"{}\"> | {{ readonly is: WherePathFor<\"{}\"> }};",
+                field.name, target, target
             ));
         }
         return None;
