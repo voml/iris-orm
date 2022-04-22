@@ -3,7 +3,7 @@
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use iris_connector_yydb::{BACKEND_ID, YydbSource};
+use iris_connector_yydb::{BACKEND_ID, PREPARED_STALE_CODE, YydbSource};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -132,6 +132,69 @@ fn execute_runs_seed_blog_insert_program() {
         .expect("posts");
     assert_eq!(users.len(), 2);
     assert_eq!(posts.len(), 1);
+}
+
+#[test]
+fn transaction_commit_makes_execute_visible() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(1, BLOG_SCHEMA).unwrap();
+    db.begin().unwrap();
+    assert!(db.in_transaction());
+    db.execute(
+        r#"User {
+            user_id: "550e8400-e29b-41d4-a716-446655440000",
+            user_name: "ada",
+            active: true,
+        }.insert()"#,
+    )
+    .unwrap();
+    db.commit().unwrap();
+    assert!(!db.in_transaction());
+
+    let rows = db
+        .query(r#"User.filter(x => true).collect()"#)
+        .expect("users");
+    assert_eq!(rows.len(), 1);
+}
+
+#[test]
+fn prepared_query_executes_when_ddl_revision_matches() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.connection()
+        .upsert_row(
+            "User",
+            "ada",
+            [
+                ("user_name".into(), yydb::Value::Text("ada".into())),
+                ("active".into(), yydb::Value::Bool(true)),
+            ]
+            .into_iter()
+            .collect(),
+        )
+        .unwrap();
+
+    let prepared = db
+        .prepare(r#"User.filter(x => x.active).collect()"#)
+        .expect("prepare");
+    assert_eq!(prepared.ddl_revision(), 1);
+    let rows = prepared.execute(&db).expect("execute prepared");
+    assert_eq!(rows.len(), 1);
+}
+
+#[test]
+fn prepared_execute_rejects_stale_ddl_revision() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    let prepared = db
+        .prepare(r#"User.filter(x => true).collect()"#)
+        .expect("prepare");
+    db.connection()
+        .migrate_schema(1, 2, USER_SCHEMA, &Default::default())
+        .expect("migrate");
+
+    let err = prepared.execute(&db).expect_err("stale prepared");
+    assert!(err.to_string().contains(PREPARED_STALE_CODE));
 }
 
 #[test]

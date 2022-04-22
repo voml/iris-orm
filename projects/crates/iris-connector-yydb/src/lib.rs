@@ -24,6 +24,9 @@ pub const BACKEND_ID: &str = "yydb";
 /// Stable readiness code when the native query executor is unavailable.
 pub const READINESS_CODE: &str = "IRIS-YYDB-VOS-EXECUTOR-NOT-READY";
 
+/// Stable code when a prepared plan was built against an older DDL revision.
+pub const PREPARED_STALE_CODE: &str = "VOS-PREPARED-STALE";
+
 /// What Iris requires from YYDB before enabling native VOS execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReadinessReport {
@@ -202,31 +205,36 @@ impl YydbSource {
     }
 
     /// Prepare a VOS program against the current DDL revision.
-    pub fn prepare(&self, _program: &str) -> Result<PreparedVos> {
+    pub fn prepare(&self, program: &str) -> Result<PreparedVos> {
         self.require_vos_executor()?;
-        Err(Error::Policy(
-            "readiness cleared but prepared VOS binding is not implemented yet".into(),
-        ))
+        let handshake = self.schema_handshake()?;
+        Ok(PreparedVos {
+            program: program.to_owned(),
+            ddl_revision: handshake.ddl_revision,
+        })
     }
 
     /// Begin a data transaction.
     pub fn begin(&self) -> Result<()> {
-        self.require_vos_executor()
+        self.require_vos_executor()?;
+        self.conn.begin().map_err(Error::from)
     }
 
     /// Commit the open data transaction.
     pub fn commit(&self) -> Result<()> {
-        self.require_vos_executor()
+        self.require_vos_executor()?;
+        self.conn.commit().map_err(Error::from)
     }
 
     /// Roll back the open data transaction.
     pub fn rollback(&self) -> Result<()> {
-        self.require_vos_executor()
+        self.require_vos_executor()?;
+        self.conn.rollback().map_err(Error::from)
     }
 
     /// Whether a data transaction is open.
     pub fn in_transaction(&self) -> bool {
-        false
+        self.conn.in_transaction()
     }
 
     /// Re-open the same file path (drop + open). In-memory sources error.
@@ -241,9 +249,10 @@ impl YydbSource {
     }
 }
 
-/// Prepared VOS plan pinned to a DDL revision (not yet wired).
+/// Prepared VOS plan pinned to a DDL revision.
 #[derive(Debug, Clone)]
 pub struct PreparedVos {
+    program: String,
     ddl_revision: u64,
 }
 
@@ -272,8 +281,13 @@ impl PreparedVos {
     /// Execute if the database DDL revision still matches.
     pub fn execute(&self, source: &YydbSource) -> Result<Vec<iris_types::Row>> {
         source.require_vos_executor()?;
-        Err(Error::Policy(
-            "readiness cleared but prepared execute binding is not implemented yet".into(),
-        ))
+        let handshake = source.schema_handshake()?;
+        if handshake.ddl_revision != self.ddl_revision {
+            return Err(Error::Policy(format!(
+                "{PREPARED_STALE_CODE}: prepared at ddl revision {} but database is at {}",
+                self.ddl_revision, handshake.ddl_revision
+            )));
+        }
+        source.query(&self.program)
     }
 }
