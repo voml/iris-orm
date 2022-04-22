@@ -4,7 +4,6 @@
 
 #![deny(clippy::all)]
 
-mod bind;
 mod operation;
 mod session;
 
