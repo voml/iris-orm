@@ -3,7 +3,7 @@
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use iris_connector_yydb::{BACKEND_ID, PREPARED_STALE_CODE, YydbSource};
+use iris_connector_yydb::{BACKEND_ID, PREPARED_STALE_CODE, SESSION_STALE_CODE, YydbSource};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -195,6 +195,41 @@ fn prepared_execute_rejects_stale_ddl_revision() {
 
     let err = prepared.execute(&db).expect_err("stale prepared");
     assert!(err.to_string().contains(PREPARED_STALE_CODE));
+}
+
+#[test]
+fn session_ddl_revision_rejects_stale_sessions() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    let revision = db.schema_handshake().unwrap().ddl_revision;
+    db.check_session_ddl_revision(revision)
+        .expect("fresh session");
+    db.connection()
+        .migrate_schema(1, 2, USER_SCHEMA, &Default::default())
+        .expect("migrate");
+    let err = db
+        .check_session_ddl_revision(revision)
+        .expect_err("stale session");
+    assert!(err.to_string().contains(SESSION_STALE_CODE));
+}
+
+#[test]
+fn execute_inserts_via_static_insert_program() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.execute(
+        r#"User::insert({
+            user_id: "550e8400-e29b-41d4-a716-446655440000",
+            user_name: "ada",
+            active: true,
+        })"#,
+    )
+    .expect("execute");
+
+    let rows = db
+        .query(r#"User.filter(x => true).collect()"#)
+        .expect("query");
+    assert_eq!(rows.len(), 1);
 }
 
 #[test]
