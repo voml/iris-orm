@@ -1,5 +1,5 @@
 import { isNodeSemanticCoreInstalled } from "./load.ts";
-import { isBrowserSemanticCoreInstalled } from "../wasm/load.ts";
+import { isBrowserSemanticCoreInstalled } from "../wasm/install-check.ts";
 import { IrisFacadeError } from "../types/errors.ts";
 import { irisCoreVersion, packageVersion } from "./versions.ts";
 

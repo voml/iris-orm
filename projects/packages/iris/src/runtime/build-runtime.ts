@@ -7,30 +7,27 @@ import { parseExecuteJson, parseIntrospectionJson, parseRowsJson } from "./parse
 
 export type { IrisBindings as SemanticCoreBinding, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
 
+function parseWire(raw: string | { ok: boolean; rowsJson: string; error?: string | null }) {
+    if (typeof raw === "string") {
+        return parseExecuteJson(raw);
+    }
+    return {
+        ok: raw.ok,
+        rows: parseRowsJson(raw.rowsJson),
+        error: raw.error ?? null,
+    };
+}
+
 function wrapSession(binding: MemorySessionBinding): IrisSession {
+    const runQuery = binding.query ?? binding.executeVos.bind(binding);
     const session: IrisSession = {
         execute(source: string) {
-            const raw = binding.executeVos(source);
-            if (typeof raw === "string") {
-                return parseExecuteJson(raw);
-            }
-            return {
-                ok: raw.ok,
-                rows: parseRowsJson(raw.rowsJson),
-                error: raw.error ?? null,
-            };
+            return parseWire(runQuery(source));
         },
         executeOperation(operation: IrisOperation) {
             const json = JSON.stringify(operation);
-            const raw = binding.executeOperation ? binding.executeOperation(json) : binding.executeVos(json);
-            if (typeof raw === "string") {
-                return parseExecuteJson(raw);
-            }
-            return {
-                ok: raw.ok,
-                rows: parseRowsJson(raw.rowsJson),
-                error: raw.error ?? null,
-            };
+            const raw = binding.executeOperation ? binding.executeOperation(json) : runQuery(json);
+            return parseWire(raw);
         },
         close() {
             binding.close();

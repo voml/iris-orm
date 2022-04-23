@@ -9,7 +9,8 @@
         "skipLibCheck": true,
         "declaration": true,
         "isolatedModules": true,
-        "allowImportingTsExtensions": true
+        "allowImportingTsExtensions": true,
+        "allowJs": true
     },
-    "include": ["src/**/*.ts", "tests/**/*.ts"]
+    "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.mts", "src/**/*.mjs", "tests/**/*.ts"]
 }
