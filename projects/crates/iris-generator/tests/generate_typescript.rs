@@ -94,6 +94,21 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
     assert!(ops.contains("ReadonlyArray<UserGetPayload<A>>"));
     assert!(inputs.contains("active?: boolean | BooleanFilter"));
     assert!(inputs.contains("user_name?: string | StringFilter"));
+    assert!(!inputs.contains("&quot;"));
+    assert!(!inputs.contains("&lt;"));
+}
+
+#[test]
+fn typescript_emit_unescapes_conditional_types() {
+    let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let inputs = files
+        .iter()
+        .find(|(name, _)| name == "inputs.ts")
+        .map(|(_, content)| content.as_str())
+        .expect("inputs.ts");
+    assert!(inputs.contains("type EntityName = \"User\""));
+    assert!(inputs.contains("[S] extends [undefined]"));
 }
 
 #[test]

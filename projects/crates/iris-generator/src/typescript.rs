@@ -2,23 +2,29 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::{GenerationModel, Result, render};
+use serde_json::Value;
+
+use crate::{GenerationModel, Result, render, unescape_dejavu_template};
+
+fn render_ts(name: &str, ctx: &Value) -> Result<String> {
+    Ok(unescape_dejavu_template(&render(name, ctx)?))
+}
 
 /// Emit all TypeScript client files for a generation model.
 pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, String)>> {
     let ctx = model.typescript_template_context();
 
     let mut files: Vec<(String, String)> = vec![
-        ("metadata.ts".into(), render("typescript/metadata", &ctx)?),
-        ("index.ts".into(), render("typescript/index", &ctx)?),
-        ("node.ts".into(), render("typescript/node", &ctx)?),
-        ("browser.ts".into(), render("typescript/browser", &ctx)?),
-        ("_internal/synthesize.ts".into(), render("typescript/synthesize", &ctx)?),
-        ("references.ts".into(), render("typescript/references", &ctx)?),
-        ("models.ts".into(), render("typescript/models", &ctx)?),
-        ("inputs.ts".into(), render("typescript/inputs", &ctx)?),
-        ("operations.ts".into(), render("typescript/operations", &ctx)?),
-        ("errors.ts".into(), render("typescript/errors", &ctx)?),
+        ("metadata.ts".into(), render_ts("typescript/metadata", &ctx)?),
+        ("index.ts".into(), render_ts("typescript/index", &ctx)?),
+        ("node.ts".into(), render_ts("typescript/node", &ctx)?),
+        ("browser.ts".into(), render_ts("typescript/browser", &ctx)?),
+        ("_internal/synthesize.ts".into(), render_ts("typescript/synthesize", &ctx)?),
+        ("references.ts".into(), render_ts("typescript/references", &ctx)?),
+        ("models.ts".into(), render_ts("typescript/models", &ctx)?),
+        ("inputs.ts".into(), render_ts("typescript/inputs", &ctx)?),
+        ("operations.ts".into(), render_ts("typescript/operations", &ctx)?),
+        ("errors.ts".into(), render_ts("typescript/errors", &ctx)?),
     ];
 
     files.sort_by(|a, b| a.0.cmp(&b.0));
