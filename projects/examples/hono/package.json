@@ -4,7 +4,6 @@
     "version": "0.0.0",
     "type": "module",
     "scripts": {
-        "generate": "node ../../packages/iris/bin/iris.ts generate --config .",
         "generate": "node --experimental-strip-types ../../packages/iris/bin/iris.ts generate --config .",
         "start": "node --experimental-strip-types src/index.ts",
         "typecheck": "tsc --noEmit -p tsconfig.json"

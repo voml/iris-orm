@@ -1,12 +1,23 @@
+import { randomUUID } from "node:crypto";
 import type { APIRoute } from "astro";
 
-import { createPost, listPosts, listPostsByAuthorName, openIrisDb } from "../../lib/iris.ts";
+import { getDb } from "../../lib/server/db.ts";
+import type { PostId, UserId } from "../../generated/iris/references.ts";
 
-export const GET: APIRoute = async ({ url }) => {
-    const author = url.searchParams.get("author")?.trim();
-    const db = await openIrisDb();
-    const rows = author ? await listPostsByAuthorName(db, author) : await listPosts(db);
-    return new Response(JSON.stringify(rows), {
+const postListSelect = {
+    post_id: true,
+    title: true,
+    published: true,
+    author: { user_name: true },
+} as const;
+
+export const GET: APIRoute = async ({ request }) => {
+    const author = new URL(request.url).searchParams.get("author")?.trim();
+    const db = await getDb();
+    const where = author
+        ? { published: true, author: { user_name: author } }
+        : { published: true };
+    return new Response(JSON.stringify(await db.post.findMany({ where, select: postListSelect })), {
         headers: { "content-type": "application/json" },
     });
 };
@@ -21,11 +32,14 @@ export const POST: APIRoute = async ({ request }) => {
             headers: { "content-type": "application/json" },
         });
     }
-    const db = await openIrisDb();
-    const post = await createPost(db, {
-        author_user_id: authorUserId,
-        title,
-        published: body.published,
+    const db = await getDb();
+    const post = await db.post.create({
+        data: {
+            post_id: randomUUID() as PostId,
+            author: authorUserId as UserId,
+            title,
+            published: body.published ?? true,
+        },
     });
     return new Response(JSON.stringify(post), {
         status: 201,

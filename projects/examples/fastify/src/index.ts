@@ -1,12 +1,21 @@
+import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 
-import { closeIrisDb, createPost, createUser, listPosts, listPostsByAuthorName, listUsers, openIrisDb } from "./iris.ts";
+import { closeDb, getDb } from "./db.ts";
+import type { PostId, UserId } from "./generated/iris/references.ts";
 
 const app = Fastify({ logger: false });
-const db = await openIrisDb();
+const db = await getDb();
+
+const postListSelect = {
+    post_id: true,
+    title: true,
+    published: true,
+    author: { user_name: true },
+} as const;
 
 app.get("/users", async () => {
-    return await listUsers(db);
+    return await db.user.findMany({ where: { active: true } });
 });
 
 app.post<{ Body: { user_name?: string; active?: boolean } }>("/users", async (request, reply) => {
@@ -14,16 +23,22 @@ app.post<{ Body: { user_name?: string; active?: boolean } }>("/users", async (re
     if (!userName) {
         return reply.code(400).send({ error: "user_name is required" });
     }
-    const user = await createUser(db, userName, request.body.active ?? true);
+    const user = await db.user.create({
+        data: {
+            user_id: randomUUID() as UserId,
+            user_name: userName,
+            active: request.body.active ?? true,
+        },
+    });
     return reply.code(201).send(user);
 });
 
 app.get<{ Querystring: { author?: string } }>("/posts", async (request) => {
     const author = request.query.author?.trim();
-    if (author) {
-        return await listPostsByAuthorName(db, author);
-    }
-    return await listPosts(db);
+    const where = author
+        ? { published: true, author: { user_name: author } }
+        : { published: true };
+    return await db.post.findMany({ where, select: postListSelect });
 });
 
 app.post<{ Body: { author_user_id?: string; title?: string; published?: boolean } }>("/posts", async (request, reply) => {
@@ -32,10 +47,13 @@ app.post<{ Body: { author_user_id?: string; title?: string; published?: boolean 
     if (!authorUserId || !title) {
         return reply.code(400).send({ error: "author_user_id and title are required" });
     }
-    const post = await createPost(db, {
-        author_user_id: authorUserId,
-        title,
-        published: request.body.published,
+    const post = await db.post.create({
+        data: {
+            post_id: randomUUID() as PostId,
+            author: authorUserId as UserId,
+            title,
+            published: request.body.published ?? true,
+        },
     });
     return reply.code(201).send(post);
 });
@@ -48,7 +66,7 @@ console.log(`@yydb/iris + Fastify → http://127.0.0.1:${port}`);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
         await app.close();
-        await closeIrisDb();
+        await closeDb();
         process.exit(0);
     });
 }

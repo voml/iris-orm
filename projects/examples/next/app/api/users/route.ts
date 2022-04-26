@@ -1,10 +1,13 @@
-import { createUser, listUsers, openIrisDb } from "../../../lib/iris.ts";
+import { randomUUID } from "node:crypto";
+
+import { getDb } from "../../../lib/db.ts";
+import type { UserId } from "../../../src/generated/iris/references.ts";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-    const db = await openIrisDb();
-    return Response.json(await listUsers(db));
+    const db = await getDb();
+    return Response.json(await db.user.findMany({ where: { active: true } }));
 }
 
 export async function POST(request: Request) {
@@ -13,7 +16,13 @@ export async function POST(request: Request) {
     if (!userName) {
         return Response.json({ error: "user_name is required" }, { status: 400 });
     }
-    const db = await openIrisDb();
-    const user = await createUser(db, userName, body.active ?? true);
+    const db = await getDb();
+    const user = await db.user.create({
+        data: {
+            user_id: randomUUID() as UserId,
+            user_name: userName,
+            active: body.active ?? true,
+        },
+    });
     return Response.json(user, { status: 201 });
 }
