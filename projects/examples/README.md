@@ -51,16 +51,31 @@ Post.map(x => { title: x.title, author_name: x.author.user_name }).collect()
 
 ## Layout (per example)
 
+HTTP servers (Hono / Express / Fastify):
+
 ```text
 hono/
-  iris.config.ts        # datasources + schema data pointer
-  schemas/blog.iris     # schema data (User + Post with author: &User)
+  iris.config.ts            # datasources + schema pointer (`:memory:`)
+  schemas/blog.iris         # schema data (User + Post with author: &User)
   src/generated/iris/       # `iris generate --config .` output (local, gitignored)
-  src/iris.ts               # host wrapper over generated `createDb`
-  src/index.ts              # HTTP routes only
+  src/db.ts                 # process singleton + seed over generated `createDb`
+  src/index.ts              # HTTP routes call `db.user` / `db.post` directly
 ```
 
+Full-stack (Next / Nuxt / SvelteKit / Astro) use framework-native server modules:
+
+| Framework | DB module | Accessor |
+|-----------|-----------|----------|
+| Next | `lib/db.ts` | `getDb()` via `react.cache()` |
+| Nuxt | `server/utils/db.ts` | `useDb()` |
+| SvelteKit | `src/lib/server/db.ts` | `getDb()` |
+| Astro | `src/lib/server/db.ts` | `getDb()` |
+
+Full-stack configs use `file:.iris/dev.sqlite` so seed data survives dev HMR.
+
 ### `iris.config.ts`
+
+Standalone server (`:memory:`):
 
 ```ts
 import { defineConfig } from "@yydb/iris/types";
@@ -69,6 +84,18 @@ export default defineConfig({
     schema: "schemas/blog.iris",
     datasources: {
         default: { kind: "sqlite", mode: "managed_push", path: ":memory:" },
+    },
+    generate: { out: ".", target: "typescript" },
+});
+```
+
+Full-stack dev (`file:.iris/dev.sqlite`):
+
+```ts
+export default defineConfig({
+    schema: "schemas/blog.iris",
+    datasources: {
+        default: { kind: "sqlite", mode: "managed_push", path: "file:.iris/dev.sqlite" },
     },
     generate: { out: ".", target: "typescript" },
 });
@@ -87,7 +114,7 @@ pnpm iris generate --config projects/examples/hono
 
 `iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `src/generated/iris/` (`createDb`, `db.user`, `db.post`, …).
 
-`src/iris.ts` is only a thin host wrapper (`openIrisDb`, seed, HTTP helpers) importing the generated client.
+Each example keeps a small `db.ts` module (framework-native path) that opens the generated client and seeds demo data. Route handlers import the generated API directly — no parallel `iris.ts` wrapper layer.
 
 Full-stack apps expose the same API under `/api/*` (for example `/api/posts`).
 

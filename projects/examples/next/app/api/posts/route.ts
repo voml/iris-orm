@@ -1,14 +1,24 @@
-import { createPost, listPosts, listPostsByAuthorName, openIrisDb } from "../../../lib/iris.ts";
+import { randomUUID } from "node:crypto";
+
+import { getDb } from "../../../lib/db.ts";
+import type { PostId, UserId } from "../../../src/generated/iris/references.ts";
 
 export const runtime = "nodejs";
 
+const postListSelect = {
+    post_id: true,
+    title: true,
+    published: true,
+    author: { user_name: true },
+} as const;
+
 export async function GET(request: Request) {
     const author = new URL(request.url).searchParams.get("author")?.trim();
-    const db = await openIrisDb();
-    if (author) {
-        return Response.json(await listPostsByAuthorName(db, author));
-    }
-    return Response.json(await listPosts(db));
+    const db = await getDb();
+    const where = author
+        ? { published: true, author: { user_name: author } }
+        : { published: true };
+    return Response.json(await db.post.findMany({ where, select: postListSelect }));
 }
 
 export async function POST(request: Request) {
@@ -18,11 +28,14 @@ export async function POST(request: Request) {
     if (!authorUserId || !title) {
         return Response.json({ error: "author_user_id and title are required" }, { status: 400 });
     }
-    const db = await openIrisDb();
-    const post = await createPost(db, {
-        author_user_id: authorUserId,
-        title,
-        published: body.published,
+    const db = await getDb();
+    const post = await db.post.create({
+        data: {
+            post_id: randomUUID() as PostId,
+            author: authorUserId as UserId,
+            title,
+            published: body.published ?? true,
+        },
     });
     return Response.json(post, { status: 201 });
 }
