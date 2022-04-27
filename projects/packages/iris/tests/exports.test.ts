@@ -44,6 +44,19 @@ test("/types export resolves to protocol-only surface", () => {
     assert.match(path.replace(/\\/g, "/"), /\/src\/types\//);
 });
 
+test("/wasm export resolves to wasm facade", () => {
+    const path = resolveExportMap("./wasm", ["browser", "import"]);
+    assert.match(path.replace(/\\/g, "/"), /\/src\/wasm\/index\.ts$/);
+});
+
+test("@yydb/iris/wasm exposes symmetric binding loader", async () => {
+    const wasm = await import(srcImport("src/wasm/index.ts"));
+    assert.equal("loadIrisWasm" in wasm, true);
+    assert.equal("loadIrisWeb" in wasm, true);
+    assert.equal("createIrisDbBinding" in wasm, true);
+    assert.equal("getWasmSemanticCore" in wasm, true);
+});
+
 test("unsupported /node stub throws node-host-required", async () => {
     const unsupported = await import(srcImport("src/node/unsupported.ts"));
     assert.throws(

@@ -1,12 +1,22 @@
 import type { CheckSourceResult } from "./types/check-source.ts";
 
+/** Wire execute payload from Node N-API or browser WASM session methods. */
+export type SessionExecuteWire =
+    | string
+    | { ok: boolean; rowsJson: string; error?: string | null };
+
 /** Wire session surface shared by Node N-API and browser WASM hosts. */
 export type MemorySessionBinding = {
+    /** DML entry (preferred). Aligns with generated `db.$query`. */
+    query?(source: string, parametersJson?: string | null): SessionExecuteWire;
+    /** DDL / unit entry (preferred). Aligns with generated `db.$execute`. */
+    execute?(source: string, parametersJson?: string | null): SessionExecuteWire;
+    /** Legacy DML alias kept for older native builds. */
     executeVos(
         source: string,
         parametersJson?: string | null,
-    ): string | { ok: boolean; rowsJson: string; error?: string | null };
-    executeOperation?(operationJson: string): string | { ok: boolean; rowsJson: string; error?: string | null };
+    ): SessionExecuteWire;
+    executeOperation?(operationJson: string): SessionExecuteWire;
     close(): void;
     managedPush?: (schema: string) => void;
 };

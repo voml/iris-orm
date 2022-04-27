@@ -1,21 +1,8 @@
-import { createRequire } from "node:module";
-
 import type { CheckSourceResult } from "../types/check-source.ts";
 import { IrisFacadeError } from "../types/errors.ts";
 import type { IrisBindings, IrisWasmOptions, MemorySessionBinding, WasmSource } from "../bindings.ts";
 
 const WEB_CORE_PACKAGE = "@yydb/iris-unknown-wasm32";
-const require = createRequire(import.meta.url);
-
-/** Whether the optional browser semantic core package resolves. */
-export function isBrowserSemanticCoreInstalled(): boolean {
-    try {
-        require.resolve(WEB_CORE_PACKAGE);
-        return true;
-    } catch {
-        return false;
-    }
-}
 
 type WasmPackage = {
     initWasm(options?: { module?: WasmSource }): Promise<void>;
@@ -27,7 +14,9 @@ type WasmPackage = {
 };
 
 type WasmMemorySession = {
-    executeVos(source: string): string;
+    query?(source: string, parametersJson?: string | null): string;
+    execute?(source: string, parametersJson?: string | null): string;
+    executeVos(source: string, parametersJson?: string | null): string;
     close(): void;
 };
 
@@ -41,8 +30,16 @@ async function importWasmPackage(): Promise<WasmPackage> {
 }
 
 function wrapWasmSession(session: WasmMemorySession): MemorySessionBinding {
+    const executeVos = (source: string, parametersJson?: string | null) =>
+        session.executeVos(source, parametersJson ?? null);
     return {
-        executeVos: (source: string) => session.executeVos(source),
+        query: session.query
+            ? (source: string, parametersJson?: string | null) => session.query!(source, parametersJson ?? null)
+            : executeVos,
+        execute: session.execute
+            ? (source: string, parametersJson?: string | null) => session.execute!(source, parametersJson ?? null)
+            : executeVos,
+        executeVos,
         close: () => session.close(),
     };
 }
@@ -56,7 +53,7 @@ function toBindings(pkg: WasmPackage): IrisBindings {
     };
 }
 
-/** Load and initialize the browser WASM semantic core. */
+/** Load and initialize the browser WASM semantic core (browser-safe dynamic import). */
 export async function loadIrisWasm(options: IrisWasmOptions = {}): Promise<IrisBindings> {
     let pkg: WasmPackage;
     try {
@@ -69,6 +66,14 @@ export async function loadIrisWasm(options: IrisWasmOptions = {}): Promise<IrisB
         );
     }
 
-    await pkg.initWasm({ module: options.module });
+    try {
+        await pkg.initWasm({ module: options.module });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new IrisFacadeError(
+            "wasm-package-missing",
+            `@yydb/iris: browser semantic core not built (run wasm build): ${message}`,
+        );
+    }
     return toBindings(pkg);
 }
