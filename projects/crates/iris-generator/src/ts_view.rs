@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{FieldModel, GenerationModel, MacroModel, TableModel};
+use crate::{Error, FieldModel, GenerationModel, MacroModel, Result, TableModel};
 
 #[derive(Debug, Clone, Serialize)]
 struct TsFieldView {
@@ -56,6 +56,8 @@ struct TsTemplateContext {
     refs_import_lines: String,
     input_import_names: String,
     ref_type_imports: String,
+    wire_map_lines: String,
+    reference_target_lines: String,
     tables_view: Vec<TsTableView>,
     macros_view: Vec<TsMacroView>,
     has_macros: bool,
@@ -63,8 +65,9 @@ struct TsTemplateContext {
 
 impl GenerationModel {
     /// JSON context for TypeScript `.dejavu` templates.
-    pub fn typescript_template_context(&self) -> Value {
-        serde_json::to_value(build_ts_context(self)).expect("TsTemplateContext serializes")
+    pub fn typescript_template_context(&self) -> Result<Value> {
+        validate_ts_naming(self)?;
+        Ok(serde_json::to_value(build_ts_context(self)).expect("TsTemplateContext serializes"))
     }
 }
 
@@ -125,6 +128,54 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .map(|table| build_table_view(table, &entity_names))
         .collect();
 
+    let wire_map_lines = model
+        .tables
+        .iter()
+        .map(|table| {
+            let fields = table
+                .fields
+                .iter()
+                .map(|field| {
+                    format!(
+                        "{}: \"{}\"",
+                        field_ts_name(field),
+                        field.name.replace('\\', "\\\\").replace('"', "\\\"")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("    {}: {{ {} }},", table.name, fields)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let reference_target_lines = model
+        .tables
+        .iter()
+        .map(|table| {
+            let refs = table
+                .fields
+                .iter()
+                .filter_map(|field| {
+                    field
+                        .reference_target
+                        .as_ref()
+                        .filter(|target| entity_names.contains(target.as_str()))
+                        .map(|target| {
+                            format!(
+                                "{}: \"{}\"",
+                                field_ts_name(field),
+                                target.replace('\\', "\\\\").replace('"', "\\\"")
+                            )
+                        })
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("    {}: {{ {} }},", table.name, refs)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
     let macros_view = model
         .macros
         .iter()
@@ -174,6 +225,8 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         refs_import_lines,
         input_import_names,
         ref_type_imports,
+        wire_map_lines,
+        reference_target_lines,
         tables_view,
         macros_view,
         has_macros: !model.macros.is_empty(),
@@ -444,4 +497,29 @@ fn macro_return_ts(return_type: &str) -> String {
         }
         _ => "unknown".into(),
     }
+}
+
+fn field_ts_name(field: &FieldModel) -> String {
+    field.name.clone()
+}
+
+fn validate_ts_naming(model: &GenerationModel) -> Result<()> {
+    use std::collections::HashMap;
+
+    for table in &model.tables {
+        let mut seen: HashMap<String, String> = HashMap::new();
+        for field in &table.fields {
+            let ts_name = field_ts_name(field);
+            if let Some(wire_a) = seen.get(&ts_name) {
+                return Err(Error::NamingCollision {
+                    entity: table.name.clone(),
+                    wire_a: wire_a.clone(),
+                    wire_b: field.name.clone(),
+                    ts_name,
+                });
+            }
+            seen.insert(ts_name, field.name.clone());
+        }
+    }
+    Ok(())
 }

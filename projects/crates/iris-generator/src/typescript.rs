@@ -23,7 +23,7 @@ fn normalize_ts_blank_lines(text: &str) -> String {
 
 /// Emit all TypeScript client files for a generation model.
 pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, String)>> {
-    let ctx = model.typescript_template_context();
+    let ctx = model.typescript_template_context()?;
 
     let mut files: Vec<(String, String)> = vec![
         ("metadata.ts".into(), render_ts("typescript/metadata", &ctx)?),
