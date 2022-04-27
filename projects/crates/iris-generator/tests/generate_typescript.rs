@@ -12,6 +12,40 @@ table User {
 }
 "#;
 
+const BLOG_SCHEMA: &str = r#"
+table User {
+    @@user_id: uuid,
+    user_name: utf8,
+    active: bool,
+}
+
+table Post {
+    @@post_id: uuid,
+    author: &User,
+    title: utf8,
+    published: bool,
+}
+"#;
+
+fn assert_compact_ts_layout(name: &str, content: &str) {
+    assert!(!content.starts_with('\n'), "{name} must not start with a blank line");
+    assert!(
+        !content.contains("\n\n"),
+        "{name} must not contain consecutive blank lines"
+    );
+    assert!(content.ends_with('\n'), "{name} must end with a single newline");
+    assert!(
+        !content.contains("import type {\n\n"),
+        "{name} must not have blank lines inside import type braces"
+    );
+    for entity in ["&quot;", "&lt;", "&gt;", "&amp;", "&#39;"] {
+        assert!(
+            !content.contains(entity),
+            "{name} must not contain HTML entity {entity}"
+        );
+    }
+}
+
 #[test]
 fn typescript_emit_writes_ux_layout() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
@@ -92,10 +126,24 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
         .expect("operations.ts");
     assert!(ops.contains("findMany<const A extends UserFindManyArgs>"));
     assert!(ops.contains("ReadonlyArray<UserGetPayload<A>>"));
+    assert!(
+        ops.contains("} from \"./inputs.js\";\n/** Schema macros"),
+        "single newline between imports and GeneratedMacros when macros are empty"
+    );
     assert!(inputs.contains("active?: boolean | BooleanFilter"));
     assert!(inputs.contains("user_name?: string | StringFilter"));
     assert!(!inputs.contains("&quot;"));
     assert!(!inputs.contains("&lt;"));
+}
+
+#[test]
+fn typescript_emit_compact_layout_for_all_files() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    assert_eq!(files.len(), 10);
+    for (name, content) in &files {
+        assert_compact_ts_layout(name, content);
+    }
 }
 
 #[test]

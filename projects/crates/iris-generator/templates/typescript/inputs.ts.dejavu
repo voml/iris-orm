@@ -11,7 +11,7 @@ type EntityByName = {
 <% entity_map_lines %>
 };
 
-type EntityName = <% entity_union %>;
+type EntityName = <% entity_union %>;type SelectShape<S> = S extends { readonly select: infer Nested } ? Nested : S;
 
 /** Scalar filter operators for utf8 fields. */
 export type StringFilter = {
@@ -81,7 +81,7 @@ export type SelectPathFor<E extends EntityName> = {
     [K in keyof EntityByName[E]]?:
         | boolean
         | (EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
-              ? SelectPathFor<T>
+              ? { readonly select: SelectPathFor<T> }
               : never);
 };
 
@@ -90,7 +90,7 @@ export type WherePathFor<E extends EntityName> = {
     [K in keyof EntityByName[E]]?:
         | WhereValueForField<EntityByName[E][K]>
         | (EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
-              ? WherePathFor<T>
+              ? WherePathFor<T> | { readonly is: WherePathFor<T> }
               : never);
 };
 
@@ -111,13 +111,13 @@ type WhereValueForField<V> = V extends { readonly __irisRef: EntityName }
 export type SelectResultFor<E extends EntityName, S> = [S] extends [undefined]
     ? EntityByName[E]
     : {
-          [K in keyof S & keyof EntityByName[E] as S[K] extends true | object ? K : never]: S[K] extends true
+          [K in keyof SelectShape<S> & keyof EntityByName[E] as SelectShape<S>[K] extends true | object ? K : never]: SelectShape<S>[K] extends true
               ? EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
                   ? EntityByName[T]
                   : EntityByName[E][K]
-              : S[K] extends object
+              : SelectShape<S>[K] extends object
                 ? EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
-                    ? SelectResultFor<T, S[K]>
+                    ? SelectResultFor<T, SelectShape<S>[K]>
                     : never
                 : never;
       };
@@ -165,7 +165,7 @@ export type <% table.name %>FindManyArgs = {
 export type <% table.name %>FindUniqueArgs = {
     where: <% table.name %>WhereUniqueInput;
     select?: <% table.name %>Select;
-};
+};export type <% table.name %>FindFirstArgs = <% table.name %>FindManyArgs;
 
 export type <% table.name %>CreateArgs = {
     data: <% table.name %>CreateInput;
