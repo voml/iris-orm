@@ -104,6 +104,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .flat_map(|table| {
             [
                 format!("{}FindManyArgs", table.name),
+                format!("{}FindFirstArgs", table.name),
                 format!("{}FindUniqueArgs", table.name),
                 format!("{}CreateArgs", table.name),
                 format!("{}GetPayload", table.name),
@@ -191,7 +192,7 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
     } else {
         primary_fields
             .iter()
-            .map(|field| format!("    {}?: {}Id;", field.name, table.name))
+            .map(|field| format!("    {}: {}Id;", field.name, table.name))
             .collect::<Vec<_>>()
             .join("\n")
     };
@@ -370,7 +371,7 @@ fn emit_select_field(field: &FieldModel, entity_names: &HashSet<&str>) -> Option
     if let Some(ref target) = field.reference_target {
         if entity_names.contains(target.as_str()) {
             return Some(format!(
-                "    {}?: boolean | SelectPathFor<\"{}\">;",
+                "    {}?: boolean | {{ readonly select: SelectPathFor<\"{}\"> }};",
                 field.name, target
             ));
         }

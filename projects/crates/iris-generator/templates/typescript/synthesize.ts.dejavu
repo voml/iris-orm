@@ -142,6 +142,10 @@ export function compileWherePredicates(
             continue;
         }
         const nextPath = [...path, key];
+        if (key === "is" && isPlainObject(value)) {
+            predicates.push(...compileWherePredicates(value, parameters, root, path));
+            continue;
+        }
         if (isPlainObject(value) && !isFilterOperatorObject(value)) {
             predicates.push(...compileWherePredicates(value, parameters, root, nextPath));
             continue;
@@ -164,7 +168,8 @@ export function compileSelectProjection(select: Record<string, unknown>, root = 
             continue;
         }
         if (isPlainObject(value)) {
-            const nested = compileSelectProjection(value, `${root}.${key}`);
+            const nestedSelect = isPlainObject(value.select) ? value.select : value;
+            const nested = compileSelectProjection(nestedSelect, `${root}.${key}`);
             parts.push(`${key}: ${nested}`);
         }
     }
@@ -201,6 +206,10 @@ export function synthesizeFindMany(entity: string, args?: FindManyArgs): VosSynt
     }
     pipeline += ".collect()";
     return { source: pipeline, parameters };
+}
+
+export function synthesizeFindFirst(entity: string, args?: FindManyArgs): VosSynthesis {
+    return synthesizeFindMany(entity, { ...args, take: 1 });
 }
 
 /** Synthesize VOS for findUnique — same use-site rules as findMany. */

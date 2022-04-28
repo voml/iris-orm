@@ -6,6 +6,11 @@ export type <% table.name %>Id = <% table.pk_ts_scalar %> & {
     readonly [__iris<% table.name %>IdBrand]: true;
 };
 
+/** Convert an external scalar into this schema's branded identity. */
+export function <% table.camel_name %>Id(value: <% table.pk_ts_scalar %>): <% table.name %>Id {
+    return value as <% table.name %>Id;
+}
+
 /** Stored reference identity for &<% table.name %> (not an ORM relation object). */
 export type <% table.name %>Reference = {
     readonly __irisRef: "<% table.name %>";
