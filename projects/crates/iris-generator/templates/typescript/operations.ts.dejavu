@@ -60,8 +60,8 @@ export class <% table.name %>Delegate {
         args: A,
     ): Promise<<% table.name %>GetPayload<A>> {
         const { source, parameters } = synthesizeCreate("<% table.name %>", args);
-        const row = await this.binding.query(source, parameters);
-        return row as <% table.name %>GetPayload<A>;
+        const rows = (await this.binding.query(source, parameters)) as unknown[];
+        return rows[0] as <% table.name %>GetPayload<A>;
     }
 }
 <%- end loop %>
