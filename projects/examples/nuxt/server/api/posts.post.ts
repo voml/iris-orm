@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { PostId, UserId } from "../../src/generated/iris/references.ts";
+import type { PostId, UserId } from "@iris/index.ts";
 import { useDb } from "../utils/db.ts";
 
 export default defineEventHandler(async (event) => {

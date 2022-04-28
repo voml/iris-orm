@@ -3,7 +3,7 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 import { closeDb, getDb } from "./db.ts";
-import type { PostId, UserId } from "./generated/iris/references.ts";
+import type { PostId, UserId } from "@iris/index.ts";
 
 const app = new Hono();
 const db = await getDb();

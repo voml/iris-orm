@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { json, type RequestEvent } from "@sveltejs/kit";
 
 import { getDb } from "$lib/server/db.ts";
-import type { UserId } from "../../../generated/iris/references.ts";
+import type { UserId } from "@iris/index.ts";
 
 export async function GET() {
     const db = await getDb();
