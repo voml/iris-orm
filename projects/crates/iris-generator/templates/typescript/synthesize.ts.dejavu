@@ -1,5 +1,7 @@
 /** Runtime VOS synthesis for generated delegates (use-site reference paths, not include/relation). */
 
+import { IRIS_FIELD_WIRE_NAMES, IRIS_REFERENCE_TARGETS } from "../metadata.js";
+
 export type VosParameters = Record<string, unknown>;
 
 export type VosSynthesis = {
@@ -39,6 +41,14 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function isFilterOperatorObject(value: Record<string, unknown>): boolean {
     const keys = Object.keys(value);
     return keys.length > 0 && keys.every((key) => FILTER_OPS.has(key));
+}
+
+function wireName(entity: string, tsField: string): string {
+    return IRIS_FIELD_WIRE_NAMES[entity]?.[tsField] ?? tsField;
+}
+
+function referenceTargetEntity(entity: string, tsField: string): string | undefined {
+    return IRIS_REFERENCE_TARGETS[entity]?.[tsField];
 }
 
 function nextParam(parameters: VosParameters, hint: string, value: unknown): string {
@@ -127,10 +137,10 @@ function compileLeafPredicate(
 
 /**
  * Walk a nested where object into VOS predicates.
- * Nested plain objects that are not filter ops are treated as reference path navigation
- * (e.g. `{ author: { user_name: { not: "" } } }` → `x.author.user_name != $p`).
+ * TypeScript author keys are lowered to VOS wire field names per entity.
  */
 export function compileWherePredicates(
+    entity: string,
     where: Record<string, unknown>,
     parameters: VosParameters,
     root = "x",
@@ -141,36 +151,44 @@ export function compileWherePredicates(
         if (value === undefined) {
             continue;
         }
-        const nextPath = [...path, key];
+        const wireKey = wireName(entity, key);
         if (key === "is" && isPlainObject(value)) {
-            predicates.push(...compileWherePredicates(value, parameters, root, path));
+            predicates.push(...compileWherePredicates(entity, value, parameters, root, path));
             continue;
         }
         if (isPlainObject(value) && !isFilterOperatorObject(value)) {
-            predicates.push(...compileWherePredicates(value, parameters, root, nextPath));
+            const target = referenceTargetEntity(entity, key);
+            const nextEntity = target ?? entity;
+            predicates.push(...compileWherePredicates(nextEntity, value, parameters, root, [...path, wireKey]));
             continue;
         }
-        predicates.push(compileLeafPredicate(root, nextPath, value, parameters));
+        predicates.push(compileLeafPredicate(root, [...path, wireKey], value, parameters));
     }
     return predicates;
 }
 
 /**
  * Compile nested select into a VOS projection expression rooted at `root`.
- * Reference fields with nested objects become dereference projections:
- * `{ author: { userId: true } }` → `x.{ author: x.author.{ userId } }`
+ * TypeScript author keys are lowered to VOS wire field names per entity.
  */
-export function compileSelectProjection(select: Record<string, unknown>, root = "x"): string {
+export function compileSelectProjection(
+    entity: string,
+    select: Record<string, unknown>,
+    root = "x",
+): string {
     const parts: string[] = [];
     for (const [key, value] of Object.entries(select)) {
+        const wireKey = wireName(entity, key);
         if (value === true) {
-            parts.push(key);
+            parts.push(wireKey);
             continue;
         }
         if (isPlainObject(value)) {
             const nestedSelect = isPlainObject(value.select) ? value.select : value;
-            const nested = compileSelectProjection(nestedSelect, `${root}.${key}`);
-            parts.push(`${key}: ${nested}`);
+            const target = referenceTargetEntity(entity, key);
+            const nestedEntity = target ?? entity;
+            const nested = compileSelectProjection(nestedEntity, nestedSelect, `${root}.${wireKey}`);
+            parts.push(`${wireKey}: ${nested}`);
         }
     }
     return `${root}.{ ${parts.join(", ")} }`;
@@ -180,7 +198,7 @@ function appendFilter(entity: string, where: Record<string, unknown> | undefined
     if (!where || Object.keys(where).length === 0) {
         return entity;
     }
-    const predicates = compileWherePredicates(where, parameters);
+    const predicates = compileWherePredicates(entity, where, parameters);
     if (predicates.length === 0) {
         return entity;
     }
@@ -188,18 +206,18 @@ function appendFilter(entity: string, where: Record<string, unknown> | undefined
     return `${entity}.filter(x => ${body})`;
 }
 
-function appendMap(pipeline: string, select: Record<string, unknown> | undefined): string {
+function appendMap(entity: string, pipeline: string, select: Record<string, unknown> | undefined): string {
     if (!select || Object.keys(select).length === 0) {
         return pipeline;
     }
-    return `${pipeline}.map(x => ${compileSelectProjection(select, "x")})`;
+    return `${pipeline}.map(x => ${compileSelectProjection(entity, select, "x")})`;
 }
 
 /** Synthesize VOS for findMany — where paths + select projections are use-site IR for the planner. */
 export function synthesizeFindMany(entity: string, args?: FindManyArgs): VosSynthesis {
     const parameters: VosParameters = {};
     let pipeline = appendFilter(entity, args?.where, parameters);
-    pipeline = appendMap(pipeline, args?.select);
+    pipeline = appendMap(entity, pipeline, args?.select);
     if (args?.take != null) {
         parameters.take = args.take;
         pipeline += ".take($take)";
@@ -216,7 +234,7 @@ export function synthesizeFindFirst(entity: string, args?: FindManyArgs): VosSyn
 export function synthesizeFindUnique(entity: string, args: FindUniqueArgs): VosSynthesis {
     const parameters: VosParameters = {};
     let pipeline = appendFilter(entity, args.where, parameters);
-    pipeline = appendMap(pipeline, args.select);
+    pipeline = appendMap(entity, pipeline, args.select);
     pipeline += ".collect()";
     return { source: pipeline, parameters };
 }
@@ -247,12 +265,13 @@ export function synthesizeCreate(entity: string, args: CreateArgs): VosSynthesis
         if (value === undefined) {
             continue;
         }
-        const param = nextParam(parameters, `data_${key}`, flattenRefInput(value));
-        fields.push(`${key}: $${param}`);
+        const wireKey = wireName(entity, key);
+        const param = nextParam(parameters, `data_${wireKey}`, flattenRefInput(value));
+        fields.push(`${wireKey}: $${param}`);
     }
     let source = `${entity}::insert({ ${fields.join(", ")} })`;
     if (args.select && Object.keys(args.select).length > 0) {
-        source = `(${source}).map(x => ${compileSelectProjection(args.select, "x")})`;
+        source = `(${source}).map(x => ${compileSelectProjection(entity, args.select, "x")})`;
     }
     return { source, parameters };
 }

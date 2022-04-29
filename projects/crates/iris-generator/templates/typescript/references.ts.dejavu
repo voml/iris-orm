@@ -14,13 +14,13 @@ export function <% table.camel_name %>Id(value: <% table.pk_ts_scalar %>): <% ta
 /** Stored reference identity for &<% table.name %> (not an ORM relation object). */
 export type <% table.name %>Reference = {
     readonly __irisRef: "<% table.name %>";
-    <% table.pk_name %>: <% table.name %>Id;
+    <% table.pk_ts_name %>: <% table.name %>Id;
 };
 
 /** Values accepted when writing &<% table.name %>. */
 export type <% table.name %>RefInput =
     | <% table.name %>Id
-    | { <% table.pk_name %>: <% table.name %>Id }
+    | { <% table.pk_ts_name %>: <% table.name %>Id }
     | <% table.name %>Reference;
 
 <%- end loop %>

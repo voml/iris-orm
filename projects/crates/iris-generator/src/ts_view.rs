@@ -10,6 +10,7 @@ use crate::{Error, FieldModel, GenerationModel, MacroModel, Result, TableModel};
 #[derive(Debug, Clone, Serialize)]
 struct TsFieldView {
     name: String,
+    ts_name: String,
     ts_model_type: String,
     where_line: Option<String>,
     select_line: Option<String>,
@@ -22,6 +23,7 @@ struct TsTableView {
     name: String,
     camel_name: String,
     pk_name: String,
+    pk_ts_name: String,
     pk_vos_type: String,
     pk_ts_scalar: String,
     fields: Vec<TsFieldView>,
@@ -245,7 +247,7 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
     } else {
         primary_fields
             .iter()
-            .map(|field| format!("    {}: {}Id;", field.name, table.name))
+            .map(|field| format!("    {}: {}Id;", field_ts_name(field), table.name))
             .collect::<Vec<_>>()
             .join("\n")
     };
@@ -256,6 +258,7 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
         .map(|field| {
             TsFieldView {
                 name: field.name.clone(),
+                ts_name: field_ts_name(field),
                 ts_model_type: model_field_type(table, field),
                 where_line: emit_where_field(table, field, entity_names),
                 select_line: emit_select_field(field, entity_names),
@@ -269,6 +272,7 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
         name: table.name.clone(),
         camel_name: camel_case(&table.name),
         pk_name: pk_name.into(),
+        pk_ts_name: pk.map(field_ts_name).unwrap_or_else(|| "id".into()),
         pk_vos_type: pk_vos.into(),
         pk_ts_scalar,
         fields,
@@ -403,7 +407,9 @@ fn emit_where_field(
         if entity_names.contains(target.as_str()) {
             return Some(format!(
                 "    {}?: WherePathFor<\"{}\"> | {{ readonly is: WherePathFor<\"{}\"> }};",
-                field.name, target, target
+                field_ts_name(field),
+                target,
+                target
             ));
         }
         return None;
@@ -413,7 +419,7 @@ fn emit_where_field(
     let nullable = nullable_where_suffix(field.optional);
     Some(format!(
         "    {}?: {scalar} | {filter}{nullable};",
-        field.name,
+        field_ts_name(field),
         scalar = scalar,
         filter = filter,
         nullable = nullable,
@@ -425,12 +431,13 @@ fn emit_select_field(field: &FieldModel, entity_names: &HashSet<&str>) -> Option
         if entity_names.contains(target.as_str()) {
             return Some(format!(
                 "    {}?: boolean | {{ readonly select: SelectPathFor<\"{}\"> }};",
-                field.name, target
+                field_ts_name(field),
+                target
             ));
         }
         return None;
     }
-    Some(format!("    {}?: boolean;", field.name))
+    Some(format!("    {}?: boolean;", field_ts_name(field)))
 }
 
 fn emit_create_field(
@@ -475,7 +482,7 @@ fn emit_patch_field(
     }
     Some(format!(
         "    {}?: {};",
-        field.name,
+        field_ts_name(field),
         patch_value_type(table, field, entity_names)
     ))
 }
@@ -500,7 +507,22 @@ fn macro_return_ts(return_type: &str) -> String {
 }
 
 fn field_ts_name(field: &FieldModel) -> String {
-    field.name.clone()
+    snake_to_camel(&field.name)
+}
+
+fn snake_to_camel(name: &str) -> String {
+    let parts: Vec<&str> = name.split('_').filter(|segment| !segment.is_empty()).collect();
+    if parts.is_empty() {
+        return String::new();
+    }
+    let mut out = parts[0].to_string();
+    for part in parts.iter().skip(1) {
+        if let Some(first) = part.chars().next() {
+            out.push_str(&first.to_uppercase().collect::<String>());
+            out.push_str(&part.chars().skip(1).collect::<String>());
+        }
+    }
+    out
 }
 
 fn validate_ts_naming(model: &GenerationModel) -> Result<()> {
