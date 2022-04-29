@@ -1,5 +1,6 @@
 // @ts-check
 import node from "@astrojs/node";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "astro/config";
 
 const irisNativePackages = [
@@ -15,6 +16,11 @@ export default defineConfig({
     output: "server",
     adapter: node({ mode: "standalone" }),
     vite: {
+        resolve: {
+            alias: {
+                "@iris": fileURLToPath(new URL("./src/generated/iris", import.meta.url)),
+            },
+        },
         ssr: {
             external: irisNativePackages,
         },

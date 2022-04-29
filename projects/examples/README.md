@@ -58,20 +58,39 @@ hono/
   iris.config.ts            # datasources + schema pointer (`:memory:`)
   schemas/blog.iris         # schema data (User + Post with author: &User)
   src/generated/iris/       # `iris generate --config .` output (local, gitignored)
-  src/db.ts                 # process singleton + seed over generated `createDb`
-  src/index.ts              # HTTP routes call `db.user` / `db.post` directly
+  src/db.ts                 # process singleton over generated `createDb` (host wiring only)
+  src/index.ts              # routes: `getDb()` then `db.user` / `db.post`
 ```
+
+### `@iris/*` import alias
+
+Generated client lives at `src/generated/iris/`, but app code imports through **`@iris/*`**:
+
+```ts
+import type { UserId } from "@iris/index.ts";
+import { createDb } from "@iris/node.ts";
+```
+
+Map `@iris/*` → `src/generated/iris/*` in each example:
+
+| Surface | Mapping |
+|---------|---------|
+| `tsconfig.json` | `"paths": { "@iris/*": ["src/generated/iris/*"] }` |
+| Node (`hono` / `express` / `fastify`) | `tsx` start (reads `tsconfig` paths; Node `imports` cannot remap `@iris/*`) |
+| Nuxt / Astro / SvelteKit / Next | framework `alias` / Vite / `tsconfig` paths on `@iris` |
+
+Do not import `references.ts`, `inputs.ts`, or other internal stems. Domain types from `@iris/index.ts`, host entry from `@iris/node.ts` or `@iris/browser.ts`.
 
 Full-stack (Next / Nuxt / SvelteKit / Astro) use framework-native server modules:
 
 | Framework | DB module | Accessor |
 |-----------|-----------|----------|
-| Next | `lib/db.ts` | `getDb()` via `react.cache()` |
+| Next | — | route handlers call `createDb` from `@iris/node.ts` |
 | Nuxt | `server/utils/db.ts` | `useDb()` |
 | SvelteKit | `src/lib/server/db.ts` | `getDb()` |
 | Astro | `src/lib/server/db.ts` | `getDb()` |
 
-Full-stack configs use `file:.iris/dev.sqlite` so seed data survives dev HMR.
+Full-stack configs use `file:.iris/dev.sqlite` so data survives dev HMR. Populate via `POST /users` and `POST /posts`, not hand-written seed in `db.ts`.
 
 ### `iris.config.ts`
 
@@ -114,7 +133,7 @@ pnpm iris generate --config projects/examples/hono
 
 `iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `src/generated/iris/` (`createDb`, `db.user`, `db.post`, …).
 
-Each example keeps a small `db.ts` module (framework-native path) that opens the generated client and seeds demo data. Route handlers import the generated API directly — no parallel `iris.ts` wrapper layer.
+Each example may keep a thin `db.ts` for process singleton only. It imports **`@iris/node.ts`** (`createDb`) and never reaches into other generated stems. Route handlers use `getDb()` / `useDb()` then the generated delegates. Domain types come from **`@iris/index.ts`**. No parallel `iris.ts` wrapper layer and no seed logic outside routes.
 
 Full-stack apps expose the same API under `/api/*` (for example `/api/posts`).
 

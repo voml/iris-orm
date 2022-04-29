@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { json, type RequestEvent } from "@sveltejs/kit";
 
 import { getDb } from "$lib/server/db.ts";
-import type { PostId, UserId } from "../../../generated/iris/references.ts";
+import type { PostId, UserId } from "@iris/index.ts";
 
 const postListSelect = {
     post_id: true,

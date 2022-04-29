@@ -8,6 +8,10 @@
         "skipLibCheck": true,
         "isolatedModules": true,
         "allowImportingTsExtensions": true,
+        "baseUrl": ".",
+        "paths": {
+            "@iris/*": ["src/generated/iris/*"]
+        },
         "types": ["node"]
     },
     "include": ["src/**/*.ts"]

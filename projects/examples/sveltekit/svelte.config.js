@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import adapter from "@sveltejs/adapter-node";
 import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 
@@ -15,6 +17,13 @@ const config = {
     preprocess: vitePreprocess(),
     kit: {
         adapter: adapter(),
+        vite: {
+            resolve: {
+                alias: {
+                    "@iris": fileURLToPath(new URL("./src/generated/iris", import.meta.url)),
+                },
+            },
+        },
     },
 };
 
