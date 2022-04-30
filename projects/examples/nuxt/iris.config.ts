@@ -11,7 +11,7 @@ export default defineConfig({
         },
     },
     generate: {
-        out: ".",
+        out: "server/generated/iris",
         target: "typescript",
     },
 });

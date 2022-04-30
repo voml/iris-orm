@@ -15,7 +15,7 @@
         "allowImportingTsExtensions": true,
         "baseUrl": ".",
         "paths": {
-            "@iris/*": ["src/generated/iris/*"]
+            "@iris/*": ["lib/generated/iris/*"]
         },
         "plugins": [{ "name": "next" }]
     },
