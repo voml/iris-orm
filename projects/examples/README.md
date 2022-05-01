@@ -55,7 +55,7 @@ HTTP servers (Hono / Express / Fastify):
 
 ```text
 hono/
-  iris.config.ts            # datasources + schema pointer (`:memory:`)
+  iris.config.ts            # datasources + schema pointer (YYDB `:memory:`)
   schemas/blog.iris         # schema data (User + Post with author: &User)
   src/generated/iris/       # `iris generate --config .` output (local, gitignored)
   src/db.ts                 # process singleton over generated `createDb` (host wiring only)
@@ -90,11 +90,11 @@ Full-stack (Next / Nuxt / SvelteKit / Astro) use framework-native server modules
 | SvelteKit | `src/lib/server/db.ts` | `getDb()` |
 | Astro | `src/lib/server/db.ts` | `getDb()` |
 
-Full-stack configs use `file:.iris/dev.sqlite` so data survives dev HMR. Populate via `POST /users` and `POST /posts`, not hand-written seed in `db.ts`.
+Full-stack configs use file-backed `.iris/dev.yydb` so data survives dev HMR. Populate via `POST /users` and `POST /posts`, not hand-written seed in `db.ts`.
 
 ### `iris.config.ts`
 
-Standalone server (`:memory:`):
+Standalone server (in-memory YYDB):
 
 ```ts
 import { defineConfig } from "@yydb/iris/types";
@@ -102,23 +102,25 @@ import { defineConfig } from "@yydb/iris/types";
 export default defineConfig({
     schema: "schemas/blog.iris",
     datasources: {
-        default: { kind: "sqlite", mode: "managed_push", path: ":memory:" },
+        default: { kind: "yydb", mode: "native_pull", path: ":memory:" },
     },
     generate: { out: ".", target: "typescript" },
 });
 ```
 
-Full-stack dev (`file:.iris/dev.sqlite`):
+Full-stack dev (file-backed YYDB):
 
 ```ts
 export default defineConfig({
     schema: "schemas/blog.iris",
     datasources: {
-        default: { kind: "sqlite", mode: "managed_push", path: "file:.iris/dev.sqlite" },
+        default: { kind: "yydb", mode: "native_pull", path: ".iris/dev.yydb" },
     },
     generate: { out: ".", target: "typescript" },
 });
 ```
+
+Examples default to **YYDB** (`native_pull`). SQLite `managed_push` remains available for foreign-adapter experiments but is not the recommended path.
 
 ## Generate TypeScript client
 
