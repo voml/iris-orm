@@ -56,9 +56,9 @@ fn typescript_emit_writes_ux_layout() {
             .unwrap()
             .as_nanos()
     ));
-    let paths = write_typescript_client(&model, &dir).expect("write");
+    let root = dir.join("generated/iris");
+    let paths = write_typescript_client(&model, &root).expect("write");
     assert_eq!(paths.len(), 10);
-    let root = dir.join("src/generated/iris");
     assert!(root.join("index.ts").is_file());
     assert!(root.join("models.ts").is_file());
     assert!(root.join("operations.ts").is_file());
@@ -87,14 +87,11 @@ fn generate_dispatch_typescript_target() {
             .unwrap()
             .as_nanos()
     ));
+    let root = dir.join("generated/iris");
     let (_, paths) =
-        iris_generator::generate_from_source(USER_SCHEMA, "typescript", &dir).expect("generate");
+        iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root).expect("generate");
     assert_eq!(paths.len(), 10);
-    assert!(
-        paths
-            .iter()
-            .all(|path| { path.starts_with(dir.join("src/generated/iris")) })
-    );
+    assert!(paths.iter().all(|path| path.starts_with(&root)));
     assert!(
         paths
             .iter()
