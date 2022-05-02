@@ -8,21 +8,21 @@ const db = createClient(binding);
 async function run() {
     const author = await db.user.create({
         data: {
-            user_id: userId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            user_name: "Ada",
+            userId: userId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+            userName: "Ada",
             active: true,
         },
-        select: { user_id: true, user_name: true },
+        select: { userId: true, userName: true },
     });
 
     await db.post.create({
         data: {
-            post_id: postId("bbbbbbbb-cccc-dddd-eeee-ffff00000000"),
-            author: author.user_id,
+            postId: postId("bbbbbbbb-cccc-dddd-eeee-ffff00000000"),
+            author: author.userId,
             title: "Hello Iris",
             published: true,
         },
-        select: { post_id: true, title: true },
+        select: { postId: true, title: true },
     });
 }
 

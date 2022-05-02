@@ -219,17 +219,19 @@ async function run() {
   const args = {
     where: {
       author: {
-        user_name: { not: "" },
+        is: {
+          userName: { not: "" },
+        },
       },
       title: { contains: "Iris" },
     },
     select: {
-      post_id: true,
+      postId: true,
       title: true,
       author: {
         select: {
-          user_id: true,
-          user_name: true,
+          userId: true,
+          userName: true,
         },
       },
     },
@@ -237,7 +239,7 @@ async function run() {
 
   const posts = await db.post.findMany(args);
   const _title: string = posts[0]!.title;
-  const _name: string = posts[0]!.author.user_name;
+  const _name: string = posts[0]!.author.userName;
   void _title;
   void _name;
 }
@@ -379,8 +381,10 @@ test("createIrisDbBinding splits DML query and DDL execute", async (t) => {
     const rows = await binding.query("User.filter(x => x.active).collect()");
     assert.equal(Array.isArray(rows), true);
 
-    const unit = await binding.execute("User.filter(x => x.active).collect()");
-    assert.equal(unit, undefined);
+    await assert.rejects(
+        () => binding.execute("User.filter(x => x.active).collect()"),
+        /unit-valued execute/,
+    );
 
     await binding.close();
 });

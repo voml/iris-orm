@@ -8,7 +8,7 @@ async function run() {
     const posts = await db.post.findMany({
         select: { title: true },
     });
-    const missing: string = posts[0]!.post_id;
+    const missing: string = posts[0]!.postId;
     void missing;
 }
 

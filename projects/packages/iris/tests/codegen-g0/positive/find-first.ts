@@ -7,7 +7,7 @@ const db = createClient(binding);
 async function run() {
     const first = await db.post.findFirst({
         where: { published: true },
-        select: { post_id: true, title: true },
+        select: { postId: true, title: true },
     });
     if (first) {
         const title: string = first.title;
