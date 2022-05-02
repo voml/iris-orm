@@ -8,7 +8,7 @@ The schema highlights **VOS references** — `author: &User` on `Post` — and r
 
 Example packages use the `@yydb-examples/*` scope so an accidental publish is rejected without `@yydb` registry access.
 
-## Schema (`schemas/blog.iris`)
+## Schema (`schemas/blog.iris` + `schemas/seed.iris`)
 
 ```vos
 table User {
@@ -31,6 +31,8 @@ table Post {
 Post.filter(x => x.author.user_name == $name).collect()
 Post.map(x => { title: x.title, author_name: x.author.user_name }).collect()
 ```
+
+Demo fixtures live in `schemas/seed.iris` as the durable macro `seed_blog()` (users `ada` / `linus`, one post each). Examples call `await db.$macros.seed_blog()` on boot. `iris.config.ts` uses `schemas/**/*.iris` so `blog.iris` and `seed.iris` merge at generate and runtime.
 
 ## HTTP servers
 
@@ -100,7 +102,7 @@ Full-stack (Next / Nuxt / SvelteKit / Astro) import directly from `@iris/node.ts
 
 HTTP servers call `openDatabase` once at startup and `closeDatabase` on shutdown. No hand-written `db.ts` wrapper.
 
-Full-stack configs use file-backed `.iris/dev.yydb` so data survives dev HMR. Populate via `POST /users` and `POST /posts`.
+Full-stack configs use file-backed `.iris/dev.yydb` so data survives dev HMR. Boot hooks call `seed_blog` once, or use `POST /users` and `POST /posts`.
 
 ### `iris.config.ts`
 
@@ -110,7 +112,7 @@ Standalone server (in-memory YYDB):
 import { defineConfig } from "@yydb/iris/types";
 
 export default defineConfig({
-    schema: "schemas/blog.iris",
+    schema: "schemas/**/*.iris",
     datasources: {
         default: { kind: "yydb", mode: "native_pull", path: ":memory:" },
     },
@@ -122,7 +124,7 @@ Full-stack dev (file-backed YYDB, Next layout):
 
 ```ts
 export default defineConfig({
-    schema: "schemas/blog.iris",
+    schema: "schemas/**/*.iris",
     datasources: {
         default: { kind: "yydb", mode: "native_pull", path: ".iris/dev.yydb" },
     },
@@ -185,7 +187,7 @@ curl -X POST http://127.0.0.1:8787/posts \
   -d "{\"author_user_id\":\"<user_id from GET /users>\",\"title\":\"New post\"}"
 ```
 
-Seed data creates users `ada` / `linus` and one post each so `?author=ada` returns a row immediately.
+`seed_blog` creates users `ada` / `linus` and one post each so `?author=ada` returns a row immediately.
 
 ## Typecheck
 
