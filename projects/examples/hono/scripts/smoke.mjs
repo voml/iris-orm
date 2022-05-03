@@ -13,6 +13,11 @@ if (users.length !== 2) {
     throw new Error(`expected 2 seeded users, got ${users.length}`);
 }
 
+const posts = await db.post.findMany({ where: { published: true } });
+if (posts.length !== 2) {
+    throw new Error(`expected 2 seeded posts, got ${posts.length}`);
+}
+
 const created = await db.user.create({
     data: {
         user_id: randomUUID(),
