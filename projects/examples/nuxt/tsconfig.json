@@ -9,7 +9,7 @@
         "allowImportingTsExtensions": true,
         "baseUrl": ".",
         "paths": {
-            "@iris/*": ["src/generated/iris/*"]
+            "@iris/*": ["server/generated/iris/*"]
         },
         "types": ["node"]
     },

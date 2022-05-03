@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import cac from "cac";
 
 import { resolveNativeProjectConfig } from "../src/node/config.mjs";
+import { DEFAULT_TYPESCRIPT_GENERATE_OUT, resolveGenerateRoot } from "../src/node/generate-path.mjs";
 
 const require = createRequire(import.meta.url);
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -87,7 +88,7 @@ cli.command("check [schema]", "Validate schema")
 
 cli.command("generate [schema]", "Generate client from .iris schema")
     .option("--config <path>", "Project root or iris.config.ts")
-    .option("--out <dir>", "Output project root")
+    .option("--out <dir>", "Generated client root (defaults to iris.config.ts generate.out)")
     .option("--target <name>", "Emitter target")
     .action(async (schema, options) => {
         try {
@@ -98,13 +99,13 @@ cli.command("generate [schema]", "Generate client from .iris schema")
             if (schema) {
                 source = readFileSync(resolve(schema), "utf8");
                 target = target || "typescript";
-                outRoot = outRoot || resolve(".");
+                outRoot = outRoot || resolve(DEFAULT_TYPESCRIPT_GENERATE_OUT);
             } else {
                 const project = await resolveRuntimeConfig(options?.config);
                 const loaded = core.loadProject(project.runtimeConfig);
                 source = core.readSchema(loaded.root, loaded.schemaGlob);
                 target = target || loaded.generateTarget || "typescript";
-                outRoot = outRoot || resolve(loaded.root, loaded.generateOut);
+                outRoot = outRoot || resolveGenerateRoot(loaded.root, loaded.generateOut);
             }
             const result = core.generate(source, target, outRoot);
             if (!result.ok) {

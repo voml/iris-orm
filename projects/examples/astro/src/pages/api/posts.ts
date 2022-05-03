@@ -8,7 +8,7 @@ const postListSelect = {
     post_id: true,
     title: true,
     published: true,
-    author: { user_name: true },
+    author: { select: { user_name: true } },
 } as const;
 
 export const GET: APIRoute = async ({ request }) => {

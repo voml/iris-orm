@@ -23,7 +23,7 @@ export interface IrisDatasourceConfig {
 
 /** Optional generate defaults in `iris.config.ts`. */
 export interface IrisGenerateConfig {
-    /** Output directory relative to the project root. */
+    /** Generated client root relative to the project root (e.g. `lib/generated/iris`, `src/generated/iris`). */
     out?: string;
     /** Emitter target (`typescript`, `rust`, …). */
     target?: string;
