@@ -14,7 +14,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const examplesRoot = join(root, "projects/examples");
 const irisCli = join(root, "projects/packages/iris/bin/iris.ts");
 
-const EXAMPLES = ["hono", "express", "fastify", "next", "nuxt", "sveltekit", "astro"];
+const EXAMPLES = ["hono", "express", "fastify", "next", "nuxt", "sveltekit", "astro", "cloudflare"];
 
 function ensureNativeArtifact() {
     const resolveScript = join(root, "scripts/resolve-native-artifact.mjs");

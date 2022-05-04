@@ -7,3 +7,4 @@ packages:
   - "projects/examples/nuxt"
   - "projects/examples/sveltekit"
   - "projects/examples/astro"
+  - "projects/examples/cloudflare"
