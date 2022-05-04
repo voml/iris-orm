@@ -139,6 +139,9 @@ pub struct GenerationModel {
 impl GenerationModel {
     /// Build from a VOS schema document string.
     pub fn from_vos_schema(source: &str) -> Result<Self> {
+        vos::validate_schema(source).map_err(Error::Vos)?;
+        // Compatibility adapter: GenerationModel still consumes the legacy
+        // document shape until resolved-contract lowering replaces it.
         let document = vos::parser::parse_document(source).map_err(|d| {
             Error::Vos(
                 d.errors
