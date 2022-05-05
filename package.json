@@ -13,8 +13,8 @@
     "packageManager": "pnpm@10.0.0",
     "type": "module",
     "scripts": {
-        "fmt": "node scripts/format.mjs",
-        "fmt:check": "node scripts/format.mjs --check",
+        "fmt": "nifty format",
+        "fmt:check": "nifty format --check",
         "check:rs": "node scripts/check-rs.mjs",
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
@@ -36,7 +36,6 @@
         "placeholder:trust": "nifty trust"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.4.8",
         "@doki-land/nifty": "^0.0.12",
         "@napi-rs/cli": "^3.10.6",
         "typescript": "^5.9.2"
