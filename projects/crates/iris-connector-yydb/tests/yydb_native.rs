@@ -13,6 +13,21 @@ table User {
 }
 "#;
 
+const BLOG_SCHEMA: &str = r#"
+table User {
+    @@user_id: uuid,
+    user_name: utf8,
+    active: bool,
+}
+
+table Post {
+    @@post_id: uuid,
+    author: &User,
+    title: utf8,
+    published: bool,
+}
+"#;
+
 fn temp_db_path(label: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -81,6 +96,42 @@ fn query_roundtrips_active_users() {
         rows[0].get("user_name"),
         Some(iris_types::Value::Str(name)) if name == "ada"
     ));
+}
+
+#[test]
+fn execute_runs_seed_blog_insert_program() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(1, BLOG_SCHEMA).unwrap();
+    db.execute(
+        r#"
+        User {
+            user_id: "550e8400-e29b-41d4-a716-446655440000",
+            user_name: "ada",
+            active: true,
+        }.insert()
+        User {
+            user_id: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+            user_name: "linus",
+            active: true,
+        }.insert()
+        Post {
+            post_id: "11111111-1111-4111-8111-111111111101",
+            author: "550e8400-e29b-41d4-a716-446655440000",
+            title: "Ada post",
+            published: true,
+        }.insert()
+        "#,
+    )
+    .expect("execute");
+
+    let users = db
+        .query(r#"User.filter(x => true).collect()"#)
+        .expect("users");
+    let posts = db
+        .query(r#"Post.filter(x => x.published).collect()"#)
+        .expect("posts");
+    assert_eq!(users.len(), 2);
+    assert_eq!(posts.len(), 1);
 }
 
 #[test]
