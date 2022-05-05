@@ -285,6 +285,13 @@ fn value_to_iris(value: &yydb::Value) -> iris_types::Value {
         yydb::Value::Bool(b) => iris_types::Value::Bool(*b),
         yydb::Value::I64(i) => iris_types::Value::Int(*i),
         yydb::Value::Text(s) => iris_types::Value::Str(s.clone()),
+        yydb::Value::Uuid(id) => iris_types::Value::Str(id.to_string()),
+        yydb::Value::Row(fields) => iris_types::Value::Object(
+            fields
+                .iter()
+                .map(|(key, value)| (key.clone(), value_to_iris(value)))
+                .collect(),
+        ),
         _ => iris_types::Value::Null,
     }
 }

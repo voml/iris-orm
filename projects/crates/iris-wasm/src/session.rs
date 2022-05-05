@@ -23,6 +23,13 @@ fn value_to_json(value: &iris::Value) -> JsonValue {
         iris::Value::Bool(b) => json!(b),
         iris::Value::Int(i) => json!(i),
         iris::Value::Str(s) => json!(s),
+        iris::Value::Object(fields) => {
+            let mut obj = serde_json::Map::new();
+            for (key, value) in fields {
+                obj.insert(key.clone(), value_to_json(value));
+            }
+            JsonValue::Object(obj)
+        }
     }
 }
 
