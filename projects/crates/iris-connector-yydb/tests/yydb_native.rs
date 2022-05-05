@@ -53,7 +53,7 @@ fn ensure_schema_and_handshake_work_on_public_facade() {
     let db = YydbSource::open_in_memory().expect("open");
     assert_eq!(YydbSource::capabilities().backend_id, BACKEND_ID);
 
-    db.ensure_schema(1, USER_SCHEMA).expect("schema");
+    db.ensure_schema(USER_SCHEMA).expect("schema");
     let hs = db.schema_handshake().expect("handshake");
     assert_eq!(hs.backend_id, BACKEND_ID);
     assert_eq!(hs.schema_version, Some(1));
@@ -66,7 +66,7 @@ fn query_roundtrips_active_users() {
     use std::collections::BTreeMap;
 
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
     db.connection()
         .upsert_row(
             "User",
@@ -101,7 +101,7 @@ fn query_roundtrips_active_users() {
 #[test]
 fn execute_runs_seed_blog_insert_program() {
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, BLOG_SCHEMA).unwrap();
+    db.ensure_schema(BLOG_SCHEMA).unwrap();
     db.execute(
         r#"
         User {
@@ -137,7 +137,7 @@ fn execute_runs_seed_blog_insert_program() {
 #[test]
 fn transaction_commit_makes_execute_visible() {
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, BLOG_SCHEMA).unwrap();
+    db.ensure_schema(BLOG_SCHEMA).unwrap();
     db.begin().unwrap();
     assert!(db.in_transaction());
     db.execute(
@@ -160,7 +160,7 @@ fn transaction_commit_makes_execute_visible() {
 #[test]
 fn prepared_query_executes_when_ddl_revision_matches() {
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
     db.connection()
         .upsert_row(
             "User",
@@ -185,7 +185,7 @@ fn prepared_query_executes_when_ddl_revision_matches() {
 #[test]
 fn prepared_execute_rejects_stale_ddl_revision() {
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
     let prepared = db
         .prepare(r#"User.filter(x => true).collect()"#)
         .expect("prepare");
@@ -200,7 +200,7 @@ fn prepared_execute_rejects_stale_ddl_revision() {
 #[test]
 fn session_ddl_revision_rejects_stale_sessions() {
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
     let revision = db.schema_handshake().unwrap().ddl_revision;
     db.check_session_ddl_revision(revision)
         .expect("fresh session");
@@ -216,7 +216,7 @@ fn session_ddl_revision_rejects_stale_sessions() {
 #[test]
 fn execute_inserts_via_static_insert_program() {
     let db = YydbSource::open_in_memory().unwrap();
-    db.ensure_schema(1, USER_SCHEMA).unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
     db.execute(
         r#"User::insert({
             user_id: "550e8400-e29b-41d4-a716-446655440000",
@@ -237,7 +237,7 @@ fn reopen_preserves_schema_document() {
     let path = temp_db_path("reopen");
     {
         let db = YydbSource::open(&path).unwrap();
-        db.ensure_schema(1, USER_SCHEMA).unwrap();
+        db.ensure_schema(USER_SCHEMA).unwrap();
     }
     assert!(fs::metadata(&path).is_ok());
     let db = YydbSource::open(&path).unwrap();

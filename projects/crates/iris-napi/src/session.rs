@@ -197,7 +197,7 @@ impl MemorySession {
                     .map_err(|err| Error::from_reason(err))?;
                 let schema = read_schema(&project_dir, &project)
                     .map_err(|err| Error::from_reason(err))?;
-                db.ensure_schema(1, &schema)
+                db.ensure_schema(&schema)
                     .map_err(|err| Error::from_reason(err.to_string()))?;
                 let revision = db
                     .schema_handshake()
@@ -348,7 +348,7 @@ impl MemorySession {
         }
         match &self.store {
             SessionStore::Yydb(db) => {
-                db.ensure_schema(1, &schema)
+                db.ensure_schema(&schema)
                     .map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }

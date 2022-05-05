@@ -51,7 +51,7 @@ impl ReadinessReport {
         let schema_handshake_ready = Connection::open_in_memory().is_ok();
         let vos_executor_ready = Connection::open_in_memory()
             .and_then(|conn| {
-                conn.ensure_schema(1, "table T { @@id: uuid }")?;
+                conn.ensure_schema("table T { @@id: uuid }")?;
                 conn.query("T.filter(x => true).collect()")?;
                 Ok(())
             })
@@ -165,8 +165,8 @@ impl YydbSource {
     }
 
     /// Install / verify schema (Native Pull handshake input).
-    pub fn ensure_schema(&self, version: u32, document: &str) -> Result<()> {
-        self.conn.ensure_schema(version, document)?;
+    pub fn ensure_schema(&self, document: &str) -> Result<()> {
+        self.conn.ensure_schema(document)?;
         Ok(())
     }
 
