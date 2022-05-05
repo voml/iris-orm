@@ -243,6 +243,7 @@ fn to_mysql(
         Value::Bool(b) => MysqlValue::Int(i64::from(*b)),
         Value::Int(i) => MysqlValue::Int(*i),
         Value::Str(s) => encode_str(s, table, field, uuid_fields),
+        Value::Object(_) => MysqlValue::NULL,
     }
 }
 

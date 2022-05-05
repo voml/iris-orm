@@ -49,6 +49,7 @@ fn to_owned(value: &Value) -> OwnedSql {
         Value::Bool(b) => OwnedSql::Bool(*b),
         Value::Int(i) => OwnedSql::Int(*i),
         Value::Str(s) => OwnedSql::Text(s.clone()),
+        Value::Object(_) => OwnedSql::Null,
     }
 }
 

@@ -11,7 +11,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-iris = { workspace = true }
+iris-types = { workspace = true }
 iris-generator = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
@@ -19,7 +19,7 @@ wasm-bindgen = { workspace = true }
 getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
-iris = { workspace = true }
+iris-types = { workspace = true }
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false

@@ -8,6 +8,7 @@ pub(crate) fn to_sql_value(value: &Value) -> rusqlite::types::Value {
         Value::Bool(b) => rusqlite::types::Value::Integer(i64::from(*b)),
         Value::Int(i) => rusqlite::types::Value::Integer(*i),
         Value::Str(s) => rusqlite::types::Value::Text(s.clone()),
+        Value::Object(_) => rusqlite::types::Value::Null,
     }
 }
 
