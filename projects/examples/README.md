@@ -42,6 +42,12 @@ Demo fixtures live in `schemas/seed.iris` as the durable macro `seed_blog()` (us
 | [Express](./express/) | `@yydb-examples/express`    | `3000`       |
 | [Fastify](./fastify/) | `@yydb-examples/fastify`    | `3001`       |
 
+## Edge (Cloudflare Workers + D1)
+
+| Example | Package | Notes |
+|---------|---------|-------|
+| [Cloudflare](./cloudflare/) | `@yydb-examples/cloudflare` | D1 for `/users` `/posts`; WASM Iris on `/iris/*`. See [cloudflare/README](./cloudflare/README.md). |
+
 ## Full-stack frameworks
 
 | Example       | Package                      | Default port |
