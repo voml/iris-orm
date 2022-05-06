@@ -1379,8 +1379,8 @@ name = "iris-wasm"
 version = "0.1.0"
 dependencies = [
  "getrandom 0.4.3",
- "iris",
  "iris-generator",
+ "iris-types",
  "serde_json",
  "wasm-bindgen",
 ]
@@ -1604,9 +1604,9 @@ dependencies = [
 
 [[package]]
 name = "mio"
-version = "1.2.3"
+version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b18443e9c262bfe8fa82f51666e2642c53393f7e5c27b3e1aeab922cff5b9d8"
+checksum = "1788edb87fdc09c7e26304471e2f5be8cdefb1b6930d6e3985fc02ff53bf86ee"
 dependencies = [
  "libc",
  "wasi 0.11.1+wasi-snapshot-preview1",
@@ -1832,7 +1832,7 @@ dependencies = [
 [[package]]
 name = "oak-core"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=90d58391#90d58391fff6cd509baef50cdb571bdba062d1cc"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=d40b8f60de795d7b0773d0a1e8061bdb423a9507#d40b8f60de795d7b0773d0a1e8061bdb423a9507"
 dependencies = [
  "smallvec",
  "triomphe",
@@ -1842,7 +1842,7 @@ dependencies = [
 [[package]]
 name = "oak-vos"
 version = "0.0.12"
-source = "git+https://github.com/yggdrasil-language/oaks.git?rev=90d58391#90d58391fff6cd509baef50cdb571bdba062d1cc"
+source = "git+https://github.com/yggdrasil-language/oaks.git?rev=d40b8f60de795d7b0773d0a1e8061bdb423a9507#d40b8f60de795d7b0773d0a1e8061bdb423a9507"
 dependencies = [
  "oak-core",
 ]
@@ -2791,9 +2791,9 @@ checksum = "fd3ca314f692efd6c868f8408f53fe444634a845f96c028b97d35f6a1f79f0ee"
 
 [[package]]
 name = "tokio"
-version = "1.53.1"
+version = "1.53.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed"
+checksum = "e95f91fcc7a621e8b030f6aa23c71fe9838ae2fb4d8118b75602a328f5144044"
 dependencies = [
  "bytes",
  "libc",
@@ -3063,6 +3063,7 @@ dependencies = [
 [[package]]
 name = "vos"
 version = "0.1.0"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#2424fff46f18ab4ac2d43916fa766d639e260d67"
 dependencies = [
  "uuid",
  "vos-ast",
@@ -3075,6 +3076,7 @@ dependencies = [
 [[package]]
 name = "vos-ast"
 version = "0.1.0"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#2424fff46f18ab4ac2d43916fa766d639e260d67"
 dependencies = [
  "serde",
  "serde_json",
@@ -3084,6 +3086,7 @@ dependencies = [
 [[package]]
 name = "vos-contract"
 version = "0.1.0"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#2424fff46f18ab4ac2d43916fa766d639e260d67"
 dependencies = [
  "oak-vos",
  "serde",
@@ -3094,6 +3097,7 @@ dependencies = [
 [[package]]
 name = "vos-generator"
 version = "0.1.0"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#2424fff46f18ab4ac2d43916fa766d639e260d67"
 dependencies = [
  "dejavu",
  "once_cell",
@@ -3105,6 +3109,7 @@ dependencies = [
 [[package]]
 name = "vos-inspect"
 version = "0.1.0"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#2424fff46f18ab4ac2d43916fa766d639e260d67"
 dependencies = [
  "serde",
  "vos-ast",
@@ -3113,6 +3118,7 @@ dependencies = [
 [[package]]
 name = "vos-parser"
 version = "0.1.0"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#2424fff46f18ab4ac2d43916fa766d639e260d67"
 dependencies = [
  "miette",
  "oak-vos",
@@ -3397,6 +3403,7 @@ dependencies = [
 [[package]]
 name = "yydb"
 version = "0.1.0"
+source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#d7870ac4012e5bce4b722b55e93259a4cdd47311"
 dependencies = [
  "base64 0.22.1",
  "blake3",
@@ -3413,10 +3420,12 @@ dependencies = [
 [[package]]
 name = "yydb-execution"
 version = "0.1.0"
+source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#d7870ac4012e5bce4b722b55e93259a4cdd47311"
 
 [[package]]
 name = "yydb-query"
 version = "0.1.0"
+source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#d7870ac4012e5bce4b722b55e93259a4cdd47311"
 dependencies = [
  "serde_json",
  "vos",
@@ -3426,6 +3435,7 @@ dependencies = [
 [[package]]
 name = "yydb-types"
 version = "0.1.0"
+source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#d7870ac4012e5bce4b722b55e93259a4cdd47311"
 dependencies = [
  "uuid",
 ]
@@ -3433,6 +3443,7 @@ dependencies = [
 [[package]]
 name = "yydb-udf"
 version = "0.1.0"
+source = "git+https://github.com/yy-database/yydb.rs.git?branch=dev#d7870ac4012e5bce4b722b55e93259a4cdd47311"
 dependencies = [
  "blake3",
  "vos",
