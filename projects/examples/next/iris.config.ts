@@ -2,7 +2,7 @@ import { defineConfig } from "@yydb/iris/types";
 
 /** Next.js App Router — file-backed YYDB survives dev HMR (`.iris/dev.yydb`). */
 export default defineConfig({
-    schema: "schemas/blog.iris",
+    schema: "schemas/**/*.iris",
     datasources: {
         default: {
             kind: "yydb",
