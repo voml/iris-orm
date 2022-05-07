@@ -3,7 +3,7 @@
 use std::fs;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use iris_connector_yydb::{BACKEND_ID, READINESS_CODE, YydbSource};
+use iris_connector_yydb::{BACKEND_ID, YydbSource};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -24,13 +24,13 @@ fn temp_db_path(label: &str) -> std::path::PathBuf {
 }
 
 #[test]
-fn readiness_probe_is_not_ready_for_vos_executor() {
+fn readiness_probe_reports_vos_query_executor() {
     let report = YydbSource::readiness();
     assert_eq!(report.backend_id, BACKEND_ID);
-    assert_eq!(report.code, READINESS_CODE);
     assert!(report.schema_handshake_ready);
-    assert!(!report.vos_executor_ready);
-    assert!(!report.is_ready());
+    assert!(report.vos_executor_ready);
+    assert!(report.is_ready());
+    assert_eq!(report.code, "IRIS-YYDB-VOS-EXECUTOR-READY");
 }
 
 #[test]
@@ -47,13 +47,40 @@ fn ensure_schema_and_handshake_work_on_public_facade() {
 }
 
 #[test]
-fn query_refuses_until_yydb_executor_ships() {
+fn query_roundtrips_active_users() {
+    use std::collections::BTreeMap;
+
     let db = YydbSource::open_in_memory().unwrap();
     db.ensure_schema(1, USER_SCHEMA).unwrap();
-    let err = db
-        .query(r#"User.filter(x => true).collect()"#)
-        .expect_err("must not query yet");
-    assert!(err.to_string().contains(READINESS_CODE));
+    db.connection()
+        .upsert_row(
+            "User",
+            "ada",
+            BTreeMap::from([
+                ("user_name".into(), yydb::Value::Text("ada".into())),
+                ("active".into(), yydb::Value::Bool(true)),
+            ]),
+        )
+        .unwrap();
+    db.connection()
+        .upsert_row(
+            "User",
+            "grace",
+            BTreeMap::from([
+                ("user_name".into(), yydb::Value::Text("grace".into())),
+                ("active".into(), yydb::Value::Bool(false)),
+            ]),
+        )
+        .unwrap();
+
+    let rows = db
+        .query(r#"User.filter(x => x.active).collect()"#)
+        .expect("query");
+    assert_eq!(rows.len(), 1);
+    assert!(matches!(
+        rows[0].get("user_name"),
+        Some(iris_types::Value::Str(name)) if name == "ada"
+    ));
 }
 
 #[test]
