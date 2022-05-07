@@ -27,6 +27,9 @@ pub const READINESS_CODE: &str = "IRIS-YYDB-VOS-EXECUTOR-NOT-READY";
 /// Stable code when a prepared plan was built against an older DDL revision.
 pub const PREPARED_STALE_CODE: &str = "VOS-PREPARED-STALE";
 
+/// Stable code when a session was opened against an older DDL revision.
+pub const SESSION_STALE_CODE: &str = "VOS-SESSION-STALE";
+
 /// What Iris requires from YYDB before enabling native VOS execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReadinessReport {
@@ -235,6 +238,20 @@ impl YydbSource {
     /// Whether a data transaction is open.
     pub fn in_transaction(&self) -> bool {
         self.conn.in_transaction()
+    }
+
+    /// Reject use when the database DDL revision drifted since session open.
+    pub fn check_session_ddl_revision(&self, expected: u64) -> Result<()> {
+        self.require_vos_executor()?;
+        let handshake = self.schema_handshake()?;
+        if handshake.ddl_revision != expected {
+            return Err(Error::Policy(format!(
+                "{SESSION_STALE_CODE}: session opened at ddl revision {} but database is at {}",
+                expected,
+                handshake.ddl_revision
+            )));
+        }
+        Ok(())
     }
 
     /// Re-open the same file path (drop + open). In-memory sources error.
