@@ -190,11 +190,9 @@ impl YydbSource {
     /// Execute unit-valued / DDL-shaped VOS on the native YYDB executor.
     ///
     /// Counterpart of `Session::execute` / generated `db.$execute`.
-    pub fn execute(&self, _program: &str) -> Result<()> {
+    pub fn execute(&self, program: &str) -> Result<()> {
         self.require_vos_executor()?;
-        Err(Error::Policy(
-            "readiness cleared but VOS client binding is not implemented yet".into(),
-        ))
+        self.conn.execute(program).map_err(Error::from)
     }
 
     /// Execute a VOS operation program on the native YYDB executor.
