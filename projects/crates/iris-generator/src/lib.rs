@@ -41,6 +41,16 @@ pub enum Error {
     /// Unsupported generate target.
     #[error("unsupported generate target `{0}` (use rust or typescript)")]
     UnsupportedTarget(String),
+    /// Two VOS fields map to the same TypeScript author name.
+    #[error(
+        "TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`"
+    )]
+    NamingCollision {
+        entity: String,
+        wire_a: String,
+        wire_b: String,
+        ts_name: String,
+    },
     /// I/O while writing generated files.
     #[error(transparent)]
     Io(#[from] std::io::Error),
