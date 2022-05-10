@@ -162,6 +162,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+          # Do NOT set registry-url: it writes _authToken into npmrc and blocks OIDC.
 
       - name: Ensure npm supports Trusted Publishing
         run: npm install -g npm@latest

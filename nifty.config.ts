@@ -37,4 +37,11 @@ export default defineConfig({
             "@yydb/iris-darwin-arm64",
         ],
     },
+    trust: {
+        npm: {
+            repo: "voml/iris-orm",
+            file: "publish-npm.yml",
+            environment: "NPM_PUBLISH",
+        },
+    },
 });
