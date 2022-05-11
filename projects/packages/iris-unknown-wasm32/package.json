@@ -8,17 +8,19 @@
     "exports": {
         ".": {
             "types": "./src/index.ts",
-            "import": "./src/index.ts",
-            "default": "./src/index.ts"
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
         },
         "./wasm": "./lib/iris_wasm_bg.wasm"
     },
     "files": [
+        "dist",
         "src",
         "lib",
         "readme.md"
     ],
     "scripts": {
+        "build": "node ./scripts/build-dist.mjs",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
