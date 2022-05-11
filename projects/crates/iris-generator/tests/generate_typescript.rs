@@ -128,7 +128,9 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
         "single newline between imports and GeneratedMacros when macros are empty"
     );
     assert!(inputs.contains("active?: boolean | BooleanFilter"));
-    assert!(inputs.contains("user_name?: string | StringFilter"));
+    assert!(inputs.contains("userName?: string | StringFilter"));
+    assert!(inputs.contains("userId: UserId"));
+    assert!(!inputs.contains("user_name?:"));
     assert!(!inputs.contains("&quot;"));
     assert!(!inputs.contains("&lt;"));
 }
@@ -154,6 +156,34 @@ fn typescript_emit_unescapes_conditional_types() {
         .expect("inputs.ts");
     assert!(inputs.contains("type EntityName = \"User\""));
     assert!(inputs.contains("[S] extends [undefined]"));
+}
+
+#[test]
+fn typescript_emit_maps_wire_names_in_metadata() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let metadata = files
+        .iter()
+        .find(|(name, _)| name == "metadata.ts")
+        .map(|(_, content)| content.as_str())
+        .expect("metadata.ts");
+    assert!(metadata.contains("userName: \"user_name\""));
+    assert!(metadata.contains("postId: \"post_id\""));
+}
+
+#[test]
+fn typescript_emit_rejects_field_naming_collision() {
+    const COLLISION_SCHEMA: &str = r#"
+table User {
+    @@id: uuid,
+    user_id: uuid,
+    user_Id: uuid,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(COLLISION_SCHEMA).expect("schema");
+    let err = iris_generator::emit_typescript_client(&model).unwrap_err();
+    let message = err.to_string();
+    assert!(message.contains("collision") || message.contains("NamingCollision"));
 }
 
 #[test]
