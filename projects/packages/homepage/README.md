@@ -42,7 +42,7 @@ UI components are used as **bare tags** (`<Button>`, `<Card>`, `<Icon>`, …) di
 | Field                  | Value                        |
 |------------------------|------------------------------|
 | Root directory         | `projects/packages/homepage` |
-| Build command          | `pnpm build`                 |
+| Build command          | `pnpm build` (prebuilds `@yydb/iris` `dist/` via `scripts/build.mjs`) |
 | Build output directory | `dist/cdn`                   |
 | Node version           | 20 or 22                     |
 
