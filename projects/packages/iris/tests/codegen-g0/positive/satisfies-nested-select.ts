@@ -11,17 +11,17 @@ async function run() {
             published: true,
             author: {
                 is: {
-                    user_name: { contains: "Ada" },
+                    userName: { contains: "Ada" },
                 },
             },
         },
         select: {
-            post_id: true,
+            postId: true,
             title: true,
             author: {
                 select: {
-                    user_id: true,
-                    user_name: true,
+                    userId: true,
+                    userName: true,
                 },
             },
         },
@@ -29,7 +29,7 @@ async function run() {
 
     const posts = await db.post.findMany(args);
     const title: string = posts[0]!.title;
-    const authorName: string = posts[0]!.author.user_name;
+    const authorName: string = posts[0]!.author.userName;
     void title;
     void authorName;
 }

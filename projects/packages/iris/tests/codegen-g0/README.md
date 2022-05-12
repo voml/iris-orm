@@ -21,5 +21,6 @@ Contract fixtures for `iris-generate-ux-dx.md` §8–§9 (G0 gate). Each file is
 | `access-unselected-field.ts` | field not included in `select` |
 | `cross-entity-id.ts` | branded ID from another entity |
 | `missing-create-field.ts` | required create field omitted |
+| `snake-case-field.ts` | wire-style snake_case key on TypeScript author surface |
 
 Run via `pnpm --filter @yydb/iris test` (`codegen-g0.test.ts`).

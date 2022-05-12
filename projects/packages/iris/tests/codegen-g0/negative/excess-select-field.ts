@@ -8,7 +8,7 @@ const db = createClient(binding);
 async function run() {
     const args = {
         select: {
-            post_id: true,
+            postId: true,
             not_a_field: true,
         },
     } satisfies PostFindManyArgs;

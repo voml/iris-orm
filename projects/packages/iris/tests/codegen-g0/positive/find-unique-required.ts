@@ -8,7 +8,7 @@ const db = createClient(binding);
 async function run() {
     const post = await db.post.findUnique({
         where: {
-            post_id: postId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
+            postId: postId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         },
         select: { title: true },
     });
