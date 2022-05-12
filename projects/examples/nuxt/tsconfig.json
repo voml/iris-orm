@@ -13,5 +13,5 @@
         },
         "types": ["node"]
     },
-    "include": ["server/**/*.ts", "nuxt.config.ts", "app.vue"]
+    "include": ["server/**/*.ts", "nuxt.config.ts", "app.vue", "iris.config.ts"]
 }

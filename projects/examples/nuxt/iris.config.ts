@@ -1,6 +1,6 @@
-import { defineConfig } from "@yydb/iris/types";
+import { defineConfig } from "@yydb/iris";
 
-/** Nuxt Nitro — file-backed YYDB survives dev HMR (`openDatabase` from `@iris/node.ts`). */
+/** Nuxt Nitro - file-backed YYDB survives dev HMR (`openDatabase` from `@iris/node.ts`). */
 export default defineConfig({
     schema: "schemas/**/*.iris",
     datasources: {
