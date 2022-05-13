@@ -1,6 +1,8 @@
 //! Phase 8: Dejavu generation golden + determinism.
 
 use iris_generator::{GenerationModel, TEMPLATE_NAMES, emit_rust_domain, prefers_aot};
+use vos::{parse_oak, resolve_contract};
+use vos::contract::{FieldIdentity, IdentityManifest, TypeContractKind, TypeIdentity, IDENTITY_MANIFEST_VERSION};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -39,6 +41,33 @@ fn generation_model_from_vos_is_deterministic() {
 #[test]
 fn generation_rejects_schema_without_a_table_primary() {
     assert!(GenerationModel::from_vos_schema("table User { id: utf8 }").is_err());
+}
+
+#[test]
+fn generation_model_consumes_resolved_contract_identity() {
+    let projection = parse_oak("table User { @@id: uuid, active: bool }")
+        .unwrap()
+        .project_schema()
+        .unwrap();
+    let manifest = IdentityManifest {
+        format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
+        types: vec![TypeIdentity {
+            canonical_path: vec!["User".to_owned()],
+            type_id: 7,
+            kind: TypeContractKind::Table,
+            fields: vec![
+                FieldIdentity { canonical_name: "id".to_owned(), field_id: 8, virtual_field_index: 0 },
+                FieldIdentity { canonical_name: "active".to_owned(), field_id: 9, virtual_field_index: 1 },
+            ],
+        }],
+    };
+    let contract = resolve_contract(&projection, &manifest).unwrap();
+    let model = GenerationModel::from_resolved_artifact(&contract.to_json().unwrap()).unwrap();
+    assert_eq!(model.schema_fingerprint, contract.schema_fingerprint);
+    assert_eq!(model.tables[0].type_id, Some(7));
+    assert_eq!(model.tables[0].fields[0].field_id, Some(8));
+    assert_eq!(model.tables[0].fields[0].virtual_field_index, Some(0));
+    assert!(model.tables[0].fields[0].primary);
 }
 
 #[test]
