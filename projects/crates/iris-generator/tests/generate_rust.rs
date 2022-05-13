@@ -37,6 +37,11 @@ fn generation_model_from_vos_is_deterministic() {
 }
 
 #[test]
+fn generation_rejects_schema_without_a_table_primary() {
+    assert!(GenerationModel::from_vos_schema("table User { id: utf8 }").is_err());
+}
+
+#[test]
 fn rust_emit_contains_structs_fingerprint_and_no_sql() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
     let out = emit_rust_domain(&model).unwrap();
