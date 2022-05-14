@@ -5,31 +5,16 @@
  * VMZ delivery profile (`static` / static-cdn) is the build contract; `cdn` is
  * the upload-facing folder name (any static host / CDN).
  *
+ * `@yydb/iris` is installed from the npm registry (see `package.json`). Cloudflare
+ * Pages and other static hosts must not rely on monorepo workspace links or local
+ * WASM / TypeScript dist builds.
+ *
  * Usage:
  *   node scripts/build.mjs [--release] [--target cdn] [--profile static]
  *   VMZ_OUT_TARGET=cdn VMZ_PROFILE=static node scripts/build.mjs --release
  */
-import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { distDirForTarget, DEFAULT_OUT_TARGET, readDefaultProfile } from "./profile-out-dir.mjs";
 import { runVmz } from "./run-vmz.mjs";
-
-const homepageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-
-function prebuildWorkspaceDeps() {
-    for (const pkg of ["iris-unknown-wasm32", "iris"]) {
-        const buildScript = join(homepageRoot, "..", pkg, "scripts", "build-dist.mjs");
-        console.log(`@yydb/iris-homepage prebuild → @yydb/${pkg}`);
-        const run = spawnSync(process.execPath, [buildScript], {
-            cwd: homepageRoot,
-            stdio: "inherit",
-        });
-        if ((run.status ?? 1) !== 0) {
-            process.exit(run.status ?? 1);
-        }
-    }
-}
 
 function parseArgs(argv) {
     let profile = process.env.VMZ_PROFILE || "";
@@ -63,8 +48,6 @@ if (release) args.push("--release");
 console.log(
     `@yydb/iris-homepage build → ${outDir} (target=${target}, profile=${profile}${release ? ", release" : ""})`,
 );
-
-prebuildWorkspaceDeps();
 
 const run = runVmz("build", args);
 if ((run.status ?? 1) !== 0) {

@@ -25,7 +25,7 @@
         "napi:build": "node scripts/build-napi.mjs",
         "wasm:build": "node scripts/build-wasm.mjs",
         "test:ts": "pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 run test",
-        "homepage": "pnpm build:ts && pnpm --filter @yydb/iris-homepage build",
+        "homepage": "pnpm --filter @yydb/iris-homepage build",
         "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
         "homepage:build": "pnpm homepage",
         "homepage:check": "pnpm --filter @yydb/iris-homepage check",
