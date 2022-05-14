@@ -1,4 +1,5 @@
-// Nifty project configuration for iris-orm (hybrid cargo + pnpm).
+﻿// Nifty project configuration for iris-orm (hybrid cargo + pnpm).
+// Trusted Publisher contract: repo voml/iris-orm, workflow publish-npm.yml, environment NPM_PUBLISH (see scripts/README.md).
 import { defineConfig } from "@doki-land/nifty";
 
 export default defineConfig({
@@ -36,12 +37,5 @@ export default defineConfig({
             "@yydb/iris-darwin-x64",
             "@yydb/iris-darwin-arm64",
         ],
-    },
-    trust: {
-        npm: {
-            repo: "voml/iris-orm",
-            file: "publish-npm.yml",
-            environment: "NPM_PUBLISH",
-        },
     },
 });

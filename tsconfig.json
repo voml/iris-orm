@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "types": [
+            "node"
+        ],
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "isolatedModules": true,
+        "allowImportingTsExtensions": true,
+        "baseUrl": ".",
+        "paths": {
+            "@doki-land/nifty": [
+                "./types/doki-land-nifty.d.ts"
+            ]
+        }
+    },
+    "include": [
+        "nifty.config.ts",
+        "types/**/*.d.ts"
+    ]
+}

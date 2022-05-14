@@ -1,173 +1,315 @@
 # Iris ORM
 
 <p align="center">
-  <a href="https://iris-orm.pages.dev/"><img src=".github/social-preview.jpg" alt="Iris ORM — VOS data access layer. One Rust core, Node N-API, Browser WASM." width="100%"></a>
+  <a href="https://iris-orm.pages.dev/"><img src=".github/social-preview.jpg" alt="Iris ORM — generative ORM on VOS. schemas/ as source of truth, git + iris push for DB versioning." width="100%"></a>
 </p>
 
 <p align="center">
   <a href="https://iris-orm.pages.dev/"><strong>Website</strong></a> ·
-  <a href="https://iris-orm.pages.dev/d/en-us/">Docs</a> ·
-  <a href="https://github.com/voml/iris-orm/issues">Issues</a>
+  <a href="https://iris-orm.pages.dev/d/en-us/"><strong>Docs</strong></a> ·
+  <a href="https://github.com/voml/iris-orm/tree/dev/projects/examples"><strong>Examples</strong></a> ·
+  <a href="https://github.com/voml/iris-orm/issues"><strong>Issues</strong></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/github/stars/voml/iris-orm?style=social" alt="GitHub stars">
-  <img src="https://img.shields.io/badge/Rust-core-DEA584?logo=rust&logoColor=white" alt="Rust core">
-  <img src="https://img.shields.io/badge/Node-N--API-339933?logo=nodedotjs&logoColor=white" alt="Node N-API">
-  <img src="https://img.shields.io/badge/Browser-WASM-654FF0?logo=webassembly&logoColor=white" alt="Browser WASM">
+  <img src="https://img.shields.io/badge/language-VOS-0d7a62" alt="VOS">
   <img src="https://img.shields.io/badge/schema-.iris-0d7a62" alt=".iris schema">
+  <img src="https://img.shields.io/badge/ORM-generative-2563eb" alt="generative ORM">
 </p>
 
-**Site:** [iris-orm.pages.dev](https://iris-orm.pages.dev/) ·
-**Repo:** [github.com/voml/iris-orm](https://github.com/voml/iris-orm)
+## 💡 What is Iris?
 
-Iris is the **VOS data-access layer** for backend applications. It is not a
-database and not a new schema language.
+**Iris** is a **generative ORM framework** on **VOS** — **not** a database. It is the **codegen + runtime layer** that
+turns schema in your local **`schemas/`** directory into typed data access and keeps backing stores aligned with that
+definition.
 
-Applications use:
+VOS schema and operations live in `.iris` files under `schemas/` — the **single source of truth**. **`git`** tracks
+schema history; **`iris push`** applies DDL to target databases. **`iris check`** / **`iris generate`** emit the typed
+client (`db.account.findMany`, `db.record.create`, …) your application compiles against.
 
-- VOS schema / operations / queries — on-disk extension **`.iris`**
-- the typed Iris session API for **this language**
+| Layer               | What it is                                                                                                    |
+|---------------------|---------------------------------------------------------------------------------------------------------------|
+| **`schemas/`**      | **Canonical standard** — tables, references, macros in `.iris`; this is what you review in PRs                |
+| **`git`**           | Version control for schema evolution — diffs, blame, rollback of the source of truth                          |
+| **`iris push`**     | Applies planned DDL to a target DB (human ops) — bridges `schemas/` to live storage                           |
+| **`iris generate`** | Emits the typed `db.*` client your app compiles against                                                       |
+| **Runtime**         | Plans and executes VOS against configured datasources — uses committed `generated/`, not live `.iris` parsing |
 
-This repository has one runtime semantic implementation: the **Rust Iris
-core**. JavaScript hosts expose that core through host-specific bindings while
-keeping ecosystem-specific driver and storage integration outside the core.
-Node.js uses N-API; browsers use browser-safe WebAssembly. WASI is not currently a supported host contract.
+Project config (`iris.config.ts` or equivalent) only wires datasources and generate output; it does **not** replace
+`schemas/` as the schema authority.
 
-Public binding packages use coarse host/CPU names: `@yydb/iris-win32-x64`,
-`@yydb/iris-linux-x64`, `@yydb/iris-linux-arm64`, `@yydb/iris-darwin-x64`,
-`@yydb/iris-darwin-arm64`, and `@yydb/iris-unknown-wasm32`. Each native package
-is a thin `index.js` loader over `lib/*.node` (panduck-style). Toolchain details
-such as MSVC, GNU, and musl remain internal build targets rather than public import
-names. The WASM package is browser-safe WebAssembly, not WASI.
+**Backends Iris talks to:** YYDB (native VOS), plus PostgreSQL, MySQL, SQLite, and Redis (keyspace-only) — all driven
+by `schemas/`, not hand-written SQL migrations.
 
-| Tree                            | User facade         | Role                                                                                  |
-|---------------------------------|---------------------|---------------------------------------------------------------------------------------|
-| `projects/crates`               | `iris::*`           | Sole semantic runtime + Rust facade / CLI / generate + N-API and browser-WASM exports |
-| `projects/packages`             | `@yydb/iris`        | Node/browser facades, `iris` CLI, N-API/WASM loaders, platform packages               |
-| `projects/packages/iris-skills` | `@yydb/iris-skills` | Agent Skills catalog (`npx skills`)                                                   |
+**Parallel product:** [`@yydb/sql-studio-orm`](https://www.npmjs.com/package/@yydb/sql-studio-orm) is a SQL-shaped query
+and schema toolkit. Iris and SQL Studio may share drivers where useful but **never stack** — Iris routes only through
+VOS.
 
-Codegen shares `.dejavu` templates; each host facade runs generate locally so
-TS users do not need the Rust `iris` executable. TypeScript must not implement
-a second VOS parser, semantic planner, optimizer, consistency model, or
-diagnostic system.
+---
 
-Backends (per host):
+## 🚀 Getting started
 
-- **Native VOS connectors** — YYDB (ready); YYDS (readiness-gated until VOS executor ships)
-- **Isolated foreign-store adapters** — SQLite, PostgreSQL, MySQL, Redis (keyspace-only)
+### 1. Agentic workflow (recommended)
 
-Iris does **not** expose raw SQL, SQL query builders, SQL AST/parsers, or
-SQL-shaped public APIs. Foreign commands stay inside adapter packages.
+Install the official Agent Skills catalog so Cursor, Codex, Claude Code, or similar tools follow the real Iris workflow
+(VOS in `.iris`, not SQL bypass):
 
-Iris and `@yydb/sql-studio-orm` are parallel products, not stacked ORMs:
+```bash
+npx skills add @yydb/iris-skills
+```
 
-- `@yydb/sql-studio-orm` is a TypeScript-first Kysely/Drizzle-style query and
-  schema toolkit.
-- Iris is a Prisma-like DSL-driven workflow whose only DSL and schema truth is
-  VOS.
-- Both may reuse `@yydb/postgres`, `@yydb/mysql`, `@yydb/sqlite`, and other
-  database drivers. Iris must not depend on `@yydb/sql-studio-orm` or route VOS
-  operations through its query AST.
-
-The VOS DSL is also Iris's optimization boundary. Because Iris sees stable
-schema identities, operation inputs/results, references, read/write sets,
-consistency intent, capabilities, and datasource topology before driver
-lowering, it can perform proven projection/predicate pushdown, batching,
-command fusion, routing, invalidation, retry/outbox planning, and generated
-decoder specialization. Such rewrites must preserve observable VOS semantics;
-unsupported semantics are rejected before execution rather than silently
-lowered to an approximate backend command.
-
-## Workspace
+Then prompt your agent — for example:
 
 ```text
-projects/crates/
-  iris/                 public Rust facade
-  iris-types/           session / planner / capability / runtime
-  iris-ir/              physical plan + envelopes
-  iris-generator/       Dejavu AOT for Rust host (shared templates)
-  iris-connector-*      native VOS connectors
-  iris-adapter-*        foreign-store adapters
-
-projects/packages/
-  iris/                 @yydb/iris — browser default + /node + /types + iris CLI
-  iris-{platform}/      optional N-API platform packages (`index.js` + `lib/*.node`)
-  iris-unknown-wasm32/  browser WASM artifact package (`lib/` from `iris-wasm` crate)
-  iris-skills/          @yydb/iris-skills
-  homepage/             official site → https://iris-orm.pages.dev/
-
-projects/examples/
-  hono/ express/ fastify/              @yydb-examples/* HTTP servers
-  next/ nuxt/ sveltekit/ astro/        @yydb-examples/* full-stack server routes
-
-Native builds: `projects/crates/iris-napi` + `scripts/build-napi.mjs` (not npm workspace members).
-WASM builds: `projects/crates/iris-wasm` + `scripts/build-wasm.mjs`.
+Add Iris to this project.
+- Install @yydb/iris and add project config pointing at schemas/
+- Add schemas/domain.iris with tables and references as needed
+- Run iris check and iris generate, commit generated/
+- Wire routes through the generated client
+Follow @yydb/iris-skills: VOS only, no SQL, no CI migrate.
 ```
 
-VOS language sources are **not** vendored. The Rust workspace depends on the
-public `vos` facade from a sibling checkout of [`vos-language`](https://github.com/voml/vos-language)
-on branch `dev` (`../../../vos-language/projects/vos.rs/vos` from `projects/crates`).
-YYDB native tests also need a sibling [`yydb.rs`](https://github.com/yy-database/yydb.rs)
-checkout. VON config uses sibling [`von-language`](https://github.com/voml/von-language).
+Skills cover schema authoring, generate, migrate (`iris push`), runtime operations, explain, topology, and conformance.
+See [`@yydb/iris-skills`](./projects/packages/iris-skills/README.md).
 
-## Status
+**Canonical local loop** (agents and humans):
 
-Phases 0–4, 6–9, and 10-A…G landed (Composite conformance §15.6, topology
-activate, projection verify). Phase 5 YYDS remains readiness-gated.
+```text
+edit schemas/  →  iris check  →  iris generate  →  commit generated/
+              →  iris push --plan  →  iris push     # human ops only, never CI
+deploy:        runtime + generated only              # no CLI on the server
+```
 
-## Escape hatch naming (TS ↔ Rust)
+### 2. Manual install
 
-Public VOS text entry points (not a second query dialect):
-
-| Intent                       | TypeScript generated client         | Rust                                                              |
-|------------------------------|-------------------------------------|-------------------------------------------------------------------|
-| Typed CRUD (primary)         | `db.user.findMany` / `create`       | `Db::user().find_many` / `insert` (generate `--target rust`)      |
-| DML escape hatch             | `db.$query(vosText, parameters?)`   | `Db::query` / `Session::query`                                    |
-| DDL / unit                   | `db.$execute(vosText, parameters?)` | `Db::execute` / `Session::execute`                                |
-| Plan only                    | (via binding / explain)             | `session.plan(vosText)`                                           |
-| Held connection (txn / test) | (txn on client)                     | `Db::transaction` / `Db::with_rollback` → `Txn` (same CRUD names) |
-
-Rust `iris generate --target rust` emits domain structs **and** a thin MySQL `Db`/`Txn`
-CRUD shim (synthesizes `.filter` VOS). That is **not** knife-B `GeneratedCall` / identity IR.
-Pooling stays inside `MysqlSource`; apps do not build a second pool.
-
-Pipeline predicates: prefer **`.filter(x => …)`**. `.where(…)` is accepted only as a
-compatibility alias of `.filter` (same physical `Filter` op); **do not document or
-generate SQL-style `.where` in new examples**.
-
-Inside `transaction` / `with_rollback`, use **`Txn`** (same method names as `Db`).
-Do not call `MysqlSource::insert` / `execute_plan` from the closure — those check out
-another connection and leave the transaction.
-
-Legacy Rust names `execute_vos` / `plan_vos` / `interpret_vos` are deprecated
-aliases of `query` / `plan` / `interpret`.
-
-## Develop / clean checkout smoke
+**Install Iris:**
 
 ```bash
-# sibling layout: vos-language/, yydb.rs/, von-language/, iris-orm/
-pnpm install
-pnpm run fmt:check
-pnpm run check:rs
-pnpm run test:rs
-pnpm run typecheck:ts
-pnpm run iris -- doctor   # @yydb/iris CLI
+pnpm add @yydb/iris
+# or: npm install @yydb/iris
 ```
 
-The `iris` CLI ships from `@yydb/iris` (`projects/packages/iris`). Use `pnpm run iris -- …` or `pnpm exec iris …` after install.
+**Point config at `schemas/`** (example `iris.config.ts`):
+
+```ts
+import {defineConfig} from "@yydb/iris";
+
+export default defineConfig({
+    schema: "schemas/**/*.iris",
+    datasources: {
+        default: {kind: "yydb", mode: "native_pull", path: ".iris/dev.yydb"},
+    },
+    generate: {out: "generated/iris", target: "<your-host>"},
+});
+```
+
+**Author schema** (`schemas/domain.iris`):
+
+```vos
+table Account {
+    @@account_id: uuid,
+    display_name: utf8,
+    enabled: bool,
+}
+
+table Record {
+    @@record_id: uuid,
+    owner: &Account,
+    label: utf8,
+    archived: bool,
+}
+```
+
+**Check, generate, use:**
 
 ```bash
-pnpm run iris -- check path/to/schema.iris
-pnpm run iris -- generate path/to/schema.iris
+npx iris check --config .
+npx iris generate --config .
 ```
 
-HTTP and full-stack backend examples live under `projects/examples/`. See that README for `pnpm run build:napi` and run commands.
+```text
+const db = await openDatabase({ source: "default" });
+const rows = await db.record.findMany({ filter: (x) => !x.archived });
+```
 
-Optional live backends (CI enables these when services are up):
+Host-specific import paths, CLI wiring, and framework
+layout: [Getting started](https://iris-orm.pages.dev/d/en-us/guide/getting-started) · [Examples](./projects/examples/README.md)
+
+**CLI:**
 
 ```bash
-export IRIS_TEST_POSTGRES_URL='host=127.0.0.1 user=iris password=iris dbname=iris'
-export IRIS_TEST_MYSQL_URL='mysql://iris:iris@127.0.0.1:3306/iris'
-export IRIS_TEST_REDIS_URL='redis://127.0.0.1:6379/'
+npx iris doctor
+npx iris check path/to/schema.iris
+npx iris generate --config .
+npx iris push --plan
+npx iris push
 ```
+
+---
+
+## ✨ Highlights
+
+- **`schemas/` as the only standard** — VOS in `.iris` is canonical; **git** records history, **`iris push`** rolls DDL
+  forward on target databases.
+- **Generative ORM on VOS** — `iris generate` emits typed `db.*` clients; runtime executes planned VOS, not ad-hoc SQL.
+- **Prisma-like workflow** — schema-first `schemas/`, local generate, typed client; escape hatch `$query` / `$execute`
+  for rare VOS text.
+- **VOS as optimization boundary** — Iris sees schema identity, read/write sets, and consistency intent before storage
+  lowering, so it can batch, push predicates, fuse commands, and specialize decoders without silent semantic drift.
+- **References in the schema** — `owner: &Account` is a first-class edge; queries traverse `x.owner.display_name` in
+  VOS,
+  not hand-joined SQL.
+- **Human-gated DDL** — `iris push` plans and applies migrations from ops shells; CI and container boot never mutate
+  production schema.
+- **Agent-ready** — [`@yydb/iris-skills`](./projects/packages/iris-skills) teaches the real CLI and hard rules (no SQL
+  bypass, commit `generated/`, deploy runtime only).
+
+---
+
+## 📊 How Iris compares
+
+|                       | **Iris**                                            | **Prisma / Drizzle (SQL-shaped)**   | **`@yydb/sql-studio-orm`**             |
+|-----------------------|-----------------------------------------------------|-------------------------------------|----------------------------------------|
+| Schema truth          | `schemas/` + VOS `.iris`                            | SQL / ORM schema files              | SQL / query-builder types              |
+| Versioning            | **git** on `schemas/` + **`iris push`** to DB       | migration files + deploy tooling    | migration / schema tooling             |
+| Query surface         | Generated VOS client + rare `$query`                | SQL or ORM builder                  | SQL AST / builder                      |
+| Raw SQL as public API | **No** — storage commands stay inside Iris adapters | Yes                                 | Yes                                    |
+| Relationship to Iris  | —                                                   | Different DSL; do not stack on Iris | **Parallel product** — different layer |
+
+Iris is closest in **workflow** to Prisma (schema → generate → typed client) but the **only** DSL and planner input is
+**VOS**, not SQL.
+
+---
+
+## 📝 VOS syntax primer
+
+**VOS** is the language Iris is built on. `.iris` files under **`schemas/`** are the only schema standard — not SQL, not
+project config. Grammar lives in [`vos-language`](https://github.com/voml/vos-language); Iris checks, generates, plans,
+and executes VOS against configured storage.
+
+### Files and layout
+
+| Piece                | Location                              | Role                                                                                                          |
+|----------------------|---------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| **Canonical schema** | `schemas/**/*.iris`                   | **Single source of truth** — tables, references, macros; versioned with **git**, applied with **`iris push`** |
+| Project config       | `iris.config.ts` (or host equivalent) | Datasource targets + `generate.out` — configuration only                                                      |
+| Generated client     | e.g. `generated/iris/`                | Typed `db.account`, `db.record`, … — **commit this** into your app repo                                       |
+
+One domain per file when table groups differ (`accounts.iris`, `records.iris`, …). Avoid a single mega-file.
+
+### Tables and fields
+
+```vos
+table Account {
+    @@account_id: uuid,   # primary key (@@ marks the PK column)
+    display_name: utf8,
+    enabled: bool,
+}
+
+table Record {
+    @@record_id: uuid,
+    owner: &Account,      # reference — FK edge to Account
+    label: utf8,
+    archived: bool,
+}
+```
+
+| Syntax                              | Meaning                                  |
+|-------------------------------------|------------------------------------------|
+| `table Name { … }`                  | Declares a persisted entity              |
+| `@@field: type`                     | Primary key column                       |
+| `field: utf8` / `bool` / `uuid` / … | Scalar field types                       |
+| `field: &Other`                     | Reference to another table's primary key |
+| PascalCase table names              | Convention (`Account`, `Record`, …)      |
+
+New `uuid` primary keys use **UUID v7** at insert time. Do not use random v4 generators for Iris-managed keys.
+
+### Query pipelines
+
+VOS queries read as **pipelines** on a table root. Prefer **`.filter(x => …)`** — not SQL-style `.where`.
+
+```vos
+# rows where owner display name matches a bound parameter
+Record.filter(x => x.owner.display_name == $name).collect()
+
+# project fields, including across a reference edge
+Record.map(x => { label: x.label, owner_name: x.owner.display_name }).collect()
+
+# enabled accounts only
+Account.filter(x => x.enabled).collect()
+```
+
+| Stage              | Role                           |
+|--------------------|--------------------------------|
+| `TableName`        | Start from a table root        |
+| `.filter(x => …)`  | Keep rows matching a predicate |
+| `.map(x => { … })` | Shape each row (projection)    |
+| `.collect()`       | Terminate and return a row set |
+
+In application code the **generated client** is the primary API (`db.record.findMany`, `db.account.create`). Raw VOS
+text (`$query`, `$execute`) is an escape hatch for rare cases — not the everyday CRUD layer.
+
+### Inserts and macros
+
+Row literals insert through method chaining:
+
+```vos
+Account {
+    account_id: "550e8400-e29b-41d4-a716-446655440000",
+    display_name: "alpha",
+    enabled: true,
+}.insert()
+```
+
+Reference fields accept the **referenced primary key** value (`owner: "<account_uuid>"` for `owner: &Account`).
+
+Reusable fixture / seed logic lives in **macros**:
+
+```vos
+macro seed_fixture() -> unit {
+    Account { account_id: "…", display_name: "alpha", enabled: true }.insert()
+    Record { record_id: "…", owner: "…", label: "sample", archived: false }.insert()
+}
+```
+
+After `iris generate`, invoke macros through the generated client (e.g. `db.$macros.seed_fixture()`).
+
+### Mental model
+
+```text
+schemas/*.iris  →  git (history)  →  iris check  →  iris generate  →  db.* client
+                          ↓
+                   iris push (DDL to target DB, human ops)
+                          ↓
+                   runtime + generated  →  datasource  →  storage
+```
+
+**Do not** hand-write `CREATE TABLE` / `ALTER TABLE` for Iris-managed tables. **Do not** bypass Iris with raw SQL on
+the same tables. Schema changes flow: edit `schemas/` → commit to **git** → `iris check` → `iris generate` → commit
+`generated/` → **`iris push`** from an ops shell.
+
+More examples: [`projects/examples/README.md`](./projects/examples/README.md) · VOS language: [
+`vos-language`](https://github.com/voml/vos-language)
+
+---
+
+## 🧪 Examples
+
+Sample applications (HTTP servers, full-stack frameworks, edge workers) live under [
+`projects/examples/`](./projects/examples/README.md).
+
+| Kind         | Examples                        |
+|--------------|---------------------------------|
+| HTTP servers | Hono, Express, Fastify          |
+| Full-stack   | Next.js, Nuxt, SvelteKit, Astro |
+| Edge         | Cloudflare Workers              |
+
+Each example keeps `schemas/` beside the app and follows the same `check → generate → run` loop. See the examples README
+for per-stack commands.
+
+---
+
+## 📜 License
+
+[MPL-2.0](./LICENSE)
