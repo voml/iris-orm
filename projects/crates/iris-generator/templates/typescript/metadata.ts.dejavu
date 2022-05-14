@@ -1,2 +1,12 @@
 export const IRIS_SCHEMA_FINGERPRINT = "<% schema_fingerprint %>";
 export const IRIS_GENERATOR_VERSION = "<% generator_version %>";
+
+/** TypeScript author field name → VOS wire field name (per entity). */
+export const IRIS_FIELD_WIRE_NAMES: Record<string, Readonly<Record<string, string>>> = {
+<% wire_map_lines %>
+};
+
+/** Reference field → target entity (per entity). */
+export const IRIS_REFERENCE_TARGETS: Record<string, Readonly<Record<string, string>>> = {
+<% reference_target_lines %>
+};
