@@ -2,15 +2,12 @@
 
 use std::collections::BTreeMap;
 
-use iris_ir::{
-    AccessKind, CommitToken, ConsistencyIntent, ProjectionDocument, ProjectionGeneration,
-};
+use iris_ir::{AccessKind, CommitToken, ConsistencyIntent, ProjectionDocument, ProjectionGeneration};
 use iris_types::{
-    AppliedWatermarkState, AuthorityEntity, CachePolicy, CacheReadAction, CacheReadContext,
-    ComponentRole, FallbackPolicy, LocalProjectionStore, MapAuthorityLookup, ObjectPolicy,
-    OutboxPolicy, ProjectionPolicy, RouteRule, StampedeBudget, StampedePermit, TOPOLOGY_FORMAT,
-    TableBinding, TopologyComponent, TopologyContract, activate_topology, decide_cache_read,
-    hydrate_candidates, verify_projection,
+    AppliedWatermarkState, AuthorityEntity, CachePolicy, CacheReadAction, CacheReadContext, ComponentRole, FallbackPolicy,
+    LocalProjectionStore, MapAuthorityLookup, ObjectPolicy, OutboxPolicy, ProjectionPolicy, RouteRule, StampedeBudget, StampedePermit,
+    TOPOLOGY_FORMAT, TableBinding, TopologyComponent, TopologyContract, activate_topology, decide_cache_read, hydrate_candidates,
+    verify_projection,
 };
 
 fn commerce() -> TopologyContract {
@@ -26,38 +23,18 @@ fn commerce() -> TopologyContract {
     );
     components.insert(
         "redis".into(),
-        TopologyComponent {
-            role: ComponentRole::Cache,
-            adapter: "redis".into(),
-            adapter_version: None,
-            datasource: Some("cache".into()),
-        },
+        TopologyComponent { role: ComponentRole::Cache, adapter: "redis".into(), adapter_version: None, datasource: Some("cache".into()) },
     );
     components.insert(
         "search".into(),
-        TopologyComponent {
-            role: ComponentRole::SearchProjection,
-            adapter: "local".into(),
-            adapter_version: None,
-            datasource: None,
-        },
+        TopologyComponent { role: ComponentRole::SearchProjection, adapter: "local".into(), adapter_version: None, datasource: None },
     );
     components.insert(
         "outbox".into(),
-        TopologyComponent {
-            role: ComponentRole::Outbox,
-            adapter: "postgres".into(),
-            adapter_version: None,
-            datasource: Some("main".into()),
-        },
+        TopologyComponent { role: ComponentRole::Outbox, adapter: "postgres".into(), adapter_version: None, datasource: Some("main".into()) },
     );
     let mut tables = BTreeMap::new();
-    tables.insert(
-        "User".into(),
-        TableBinding {
-            authority: "pg".into(),
-        },
-    );
+    tables.insert("User".into(), TableBinding { authority: "pg".into() });
     let mut routes = BTreeMap::new();
     routes.insert(
         "identity_read".into(),
@@ -83,17 +60,10 @@ fn commerce() -> TopologyContract {
         components,
         tables,
         routes,
-        cache: CachePolicy {
-            stampede_budget: Some(4),
-            ..CachePolicy::default()
-        },
+        cache: CachePolicy { stampede_budget: Some(4), ..CachePolicy::default() },
         outbox: OutboxPolicy::default(),
         object: ObjectPolicy::default(),
-        projection: ProjectionPolicy {
-            require_nonempty_rebuild: true,
-            covered_fields: vec!["title".into()],
-            ..ProjectionPolicy::default()
-        },
+        projection: ProjectionPolicy { require_nonempty_rebuild: true, covered_fields: vec!["title".into()], ..ProjectionPolicy::default() },
     }
 }
 
@@ -115,9 +85,7 @@ fn step_kinds(plan: &iris_ir::CompositePlan) -> Vec<&'static str> {
 
 #[test]
 fn s15_6_write_never_promotes_cache_as_write_truth() {
-    let plan = commerce()
-        .plan(AccessKind::Write, ConsistencyIntent::Authoritative, None)
-        .unwrap();
+    let plan = commerce().plan(AccessKind::Write, ConsistencyIntent::Authoritative, None).unwrap();
     assert!(!plan.rejected);
     assert!(step_kinds(&plan).contains(&"authority"));
     assert!(!step_kinds(&plan).contains(&"derived_read"));
@@ -128,34 +96,12 @@ fn s15_6_ryw_and_bounded_stale_freshness() {
     let intent = ConsistencyIntent::ReadYourWrites;
     let wm = AppliedWatermarkState::new(1, 1000);
     let fence = CommitToken::new(9);
-    let ctx = CacheReadContext {
-        intent: &intent,
-        cache_wm: Some(&wm),
-        session_fence: Some(&fence),
-        now_unix_ms: 2000,
-        cache_reachable: true,
-    };
-    assert_eq!(
-        decide_cache_read(&ctx),
-        CacheReadAction::BypassAuthority {
-            reason: "ryw_fence_not_covered"
-        }
-    );
+    let ctx = CacheReadContext { intent: &intent, cache_wm: Some(&wm), session_fence: Some(&fence), now_unix_ms: 2000, cache_reachable: true };
+    assert_eq!(decide_cache_read(&ctx), CacheReadAction::BypassAuthority { reason: "ryw_fence_not_covered" });
 
     let intent = ConsistencyIntent::BoundedStale { max_lag_secs: 30 };
-    let ctx = CacheReadContext {
-        intent: &intent,
-        cache_wm: None,
-        session_fence: None,
-        now_unix_ms: 2000,
-        cache_reachable: true,
-    };
-    assert_eq!(
-        decide_cache_read(&ctx),
-        CacheReadAction::BypassAuthority {
-            reason: "bounded_stale_unknown_watermark"
-        }
-    );
+    let ctx = CacheReadContext { intent: &intent, cache_wm: None, session_fence: None, now_unix_ms: 2000, cache_reachable: true };
+    assert_eq!(decide_cache_read(&ctx), CacheReadAction::BypassAuthority { reason: "bounded_stale_unknown_watermark" });
 }
 
 #[test]
@@ -163,21 +109,11 @@ fn s15_6_search_fail_closed_without_projection_and_hydrates_with() {
     let mut topo = commerce();
     topo.components.remove("search");
     topo.routes.remove("search");
-    let rejected = topo
-        .plan(AccessKind::Search, ConsistencyIntent::Eventual, None)
-        .unwrap();
+    let rejected = topo.plan(AccessKind::Search, ConsistencyIntent::Eventual, None).unwrap();
     assert!(rejected.rejected);
-    assert!(
-        rejected
-            .rejection
-            .as_deref()
-            .unwrap_or("")
-            .contains("refuse approximate")
-    );
+    assert!(rejected.rejection.as_deref().unwrap_or("").contains("refuse approximate"));
 
-    let ok = commerce()
-        .plan(AccessKind::Search, ConsistencyIntent::Eventual, None)
-        .unwrap();
+    let ok = commerce().plan(AccessKind::Search, ConsistencyIntent::Eventual, None).unwrap();
     let kinds = step_kinds(&ok);
     assert!(kinds.contains(&"derived_read"));
     assert!(kinds.contains(&"hydrate"));
@@ -187,15 +123,7 @@ fn s15_6_search_fail_closed_without_projection_and_hydrates_with() {
 #[test]
 fn s15_6_hydrate_drops_ghosts_and_stampede_budget() {
     let mut auth = MapAuthorityLookup::default();
-    auth.rows.insert(
-        "a".into(),
-        AuthorityEntity {
-            entity_id: "a".into(),
-            entity_version: 2,
-            deleted: false,
-            payload: None,
-        },
-    );
+    auth.rows.insert("a".into(), AuthorityEntity { entity_id: "a".into(), entity_version: 2, deleted: false, payload: None });
     let cands = vec![iris_ir::ProjectionCandidate {
         entity_id: "a".into(),
         score: 1.0,
@@ -215,13 +143,8 @@ fn s15_6_hydrate_drops_ghosts_and_stampede_budget() {
 #[test]
 fn s15_6_rebuild_isolation_activate_handshake_and_projection_verify() {
     let topo = commerce();
-    let root = std::env::temp_dir().join(format!(
-        "iris-c15-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let root = std::env::temp_dir()
+        .join(format!("iris-c15-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let store = LocalProjectionStore::open(&root, topo.projection.clone()).unwrap();
     let h = store.begin_rebuild("search", "fp", 10).unwrap();
     store
@@ -266,12 +189,7 @@ fn s15_6_dual_authority_rejected() {
     let mut topo = commerce();
     topo.components.insert(
         "mysql".into(),
-        TopologyComponent {
-            role: ComponentRole::Authority,
-            adapter: "mysql".into(),
-            adapter_version: None,
-            datasource: None,
-        },
+        TopologyComponent { role: ComponentRole::Authority, adapter: "mysql".into(), adapter_version: None, datasource: None },
     );
     assert!(topo.validate().is_err());
 }

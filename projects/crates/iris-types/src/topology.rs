@@ -2,12 +2,12 @@
 //!
 //! Offline load / validate / plan only. No live multi-middleware execution.
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
-
-use iris_ir::{
-    AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent, RouteProof,
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
 };
+
+use iris_ir::{AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent, RouteProof};
 use serde::{Deserialize, Serialize};
 
 /// Filename convention directory for topology documents.
@@ -48,10 +48,7 @@ impl ComponentRole {
 
     /// True when role is a derived reader.
     pub fn is_derived_reader(self) -> bool {
-        matches!(
-            self,
-            Self::Cache | Self::SearchProjection | Self::VectorProjection | Self::Replica
-        )
+        matches!(self, Self::Cache | Self::SearchProjection | Self::VectorProjection | Self::Replica)
     }
 }
 
@@ -226,52 +223,31 @@ impl TopologyContract {
             return Err(TopologyError::UnsupportedVersion(self.version));
         }
         if self.id.trim().is_empty() {
-            return Err(TopologyError::Invalid(
-                "topology id must not be empty".into(),
-            ));
+            return Err(TopologyError::Invalid("topology id must not be empty".into()));
         }
         if self.topology_version < 1 {
-            return Err(TopologyError::Invalid(
-                "topology_version must be >= 1".into(),
-            ));
+            return Err(TopologyError::Invalid("topology_version must be >= 1".into()));
         }
         if self.components.is_empty() {
-            return Err(TopologyError::Invalid(
-                "topology must declare at least one component".into(),
-            ));
+            return Err(TopologyError::Invalid("topology must declare at least one component".into()));
         }
 
-        let authorities: Vec<_> = self
-            .components
-            .iter()
-            .filter(|(_, c)| c.role.is_authority())
-            .map(|(id, _)| id.as_str())
-            .collect();
+        let authorities: Vec<_> = self.components.iter().filter(|(_, c)| c.role.is_authority()).map(|(id, _)| id.as_str()).collect();
         if authorities.is_empty() {
-            return Err(TopologyError::Invalid(
-                "topology must declare exactly one Authority component".into(),
-            ));
+            return Err(TopologyError::Invalid("topology must declare exactly one Authority component".into()));
         }
         if authorities.len() > 1 {
-            return Err(TopologyError::Invalid(format!(
-                "topology must declare exactly one Authority; found {}",
-                authorities.join(", ")
-            )));
+            return Err(TopologyError::Invalid(format!("topology must declare exactly one Authority; found {}", authorities.join(", "))));
         }
         let authority_id = authorities[0];
 
         for (name, binding) in &self.tables {
-            let Some(comp) = self.components.get(&binding.authority) else {
-                return Err(TopologyError::Invalid(format!(
-                    "table `{name}` authority `{}` is not a component",
-                    binding.authority
-                )));
+            let Some(comp) = self.components.get(&binding.authority)
+            else {
+                return Err(TopologyError::Invalid(format!("table `{name}` authority `{}` is not a component", binding.authority)));
             };
             if !comp.role.is_authority() {
-                return Err(TopologyError::Invalid(format!(
-                    "table `{name}` authority `{}` does not have role=authority",
-                    binding.authority
-                )));
+                return Err(TopologyError::Invalid(format!("table `{name}` authority `{}` does not have role=authority", binding.authority)));
             }
             if binding.authority != authority_id {
                 return Err(TopologyError::Invalid(format!(
@@ -286,24 +262,18 @@ impl TopologyContract {
             if let Some(pref) = &rule.preferred_component
                 && !self.components.contains_key(pref)
             {
-                return Err(TopologyError::Invalid(format!(
-                    "route `{access_key}` preferred_component `{pref}` unknown"
-                )));
+                return Err(TopologyError::Invalid(format!("route `{access_key}` preferred_component `{pref}` unknown")));
             }
             if let ConsistencyIntent::ProjectionRequired { component } = &rule.default_intent
                 && !self.components.contains_key(component)
             {
-                return Err(TopologyError::Invalid(format!(
-                    "route `{access_key}` ProjectionRequired component `{component}` unknown"
-                )));
+                return Err(TopologyError::Invalid(format!("route `{access_key}` ProjectionRequired component `{component}` unknown")));
             }
         }
 
         for (id, c) in &self.components {
             if c.adapter.trim().is_empty() {
-                return Err(TopologyError::Invalid(format!(
-                    "component `{id}` adapter must not be empty"
-                )));
+                return Err(TopologyError::Invalid(format!("component `{id}` adapter must not be empty")));
             }
         }
 
@@ -313,12 +283,7 @@ impl TopologyContract {
     /// Sole authority component id (after validate).
     pub fn authority_id(&self) -> Result<&str, TopologyError> {
         self.validate()?;
-        Ok(self
-            .components
-            .iter()
-            .find(|(_, c)| c.role.is_authority())
-            .map(|(id, _)| id.as_str())
-            .expect("validated"))
+        Ok(self.components.iter().find(|(_, c)| c.role.is_authority()).map(|(id, _)| id.as_str()).expect("validated"))
     }
 
     /// Resolve table authority (or topology sole authority when table unbound).
@@ -335,12 +300,7 @@ impl TopologyContract {
     /// Offline composite plan for an access kind + consistency intent.
     ///
     /// Does not open connections or emit private middleware commands.
-    pub fn plan(
-        &self,
-        access: AccessKind,
-        consistency: ConsistencyIntent,
-        table: Option<&str>,
-    ) -> Result<CompositePlan, TopologyError> {
+    pub fn plan(&self, access: AccessKind, consistency: ConsistencyIntent, table: Option<&str>) -> Result<CompositePlan, TopologyError> {
         self.validate()?;
         let authority_id = self.authority_for_table(table)?.to_string();
         let access_key = access_route_key(access);
@@ -348,7 +308,8 @@ impl TopologyContract {
 
         if let ConsistencyIntent::ProjectionRequired { component } = &consistency {
             let component = component.clone();
-            let Some(comp) = self.components.get(&component) else {
+            let Some(comp) = self.components.get(&component)
+            else {
                 return Ok(CompositePlan::rejected(
                     &self.id,
                     self.topology_version,
@@ -358,105 +319,60 @@ impl TopologyContract {
                     format!("ProjectionRequired component `{component}` not in topology"),
                 ));
             };
-            if matches!(access, AccessKind::Search)
-                && !matches!(comp.role, ComponentRole::SearchProjection)
-            {
+            if matches!(access, AccessKind::Search) && !matches!(comp.role, ComponentRole::SearchProjection) {
                 return Ok(CompositePlan::rejected(
                     &self.id,
                     self.topology_version,
                     authority_id,
                     access,
                     consistency,
-                    format!(
-                        "ProjectionRequired `{component}` role {:?} cannot serve search",
-                        comp.role
-                    ),
+                    format!("ProjectionRequired `{component}` role {:?} cannot serve search", comp.role),
                 ));
             }
-            if matches!(access, AccessKind::VectorNearest)
-                && !matches!(comp.role, ComponentRole::VectorProjection)
-            {
+            if matches!(access, AccessKind::VectorNearest) && !matches!(comp.role, ComponentRole::VectorProjection) {
                 return Ok(CompositePlan::rejected(
                     &self.id,
                     self.topology_version,
                     authority_id,
                     access,
                     consistency,
-                    format!(
-                        "ProjectionRequired `{component}` role {:?} cannot serve vector",
-                        comp.role
-                    ),
+                    format!("ProjectionRequired `{component}` role {:?} cannot serve vector", comp.role),
                 ));
             }
         }
 
         match access {
             AccessKind::Write => Ok(self.plan_write(authority_id, consistency)),
-            AccessKind::IdentityRead => {
-                Ok(self.plan_identity_read(authority_id, consistency, rule))
-            }
+            AccessKind::IdentityRead => Ok(self.plan_identity_read(authority_id, consistency, rule)),
             AccessKind::FilteredQuery => Ok(self.plan_authority_read(
                 authority_id,
                 access,
                 consistency,
                 "filtered query has no proven projection coverage in Phase 10-A; authority only",
             )),
-            AccessKind::Search => Ok(self.plan_search_or_vector(
-                authority_id,
-                access,
-                consistency,
-                ComponentRole::SearchProjection,
-                rule,
-            )),
-            AccessKind::VectorNearest => Ok(self.plan_search_or_vector(
-                authority_id,
-                access,
-                consistency,
-                ComponentRole::VectorProjection,
-                rule,
-            )),
+            AccessKind::Search => Ok(self.plan_search_or_vector(authority_id, access, consistency, ComponentRole::SearchProjection, rule)),
+            AccessKind::VectorNearest => {
+                Ok(self.plan_search_or_vector(authority_id, access, consistency, ComponentRole::VectorProjection, rule))
+            }
             AccessKind::BytesRange => Ok(self.plan_bytes_range(authority_id, consistency)),
             AccessKind::Effect => Ok(self.plan_effect(authority_id, consistency)),
         }
     }
 
     fn plan_write(&self, authority_id: String, consistency: ConsistencyIntent) -> CompositePlan {
-        let outbox = self
-            .components
-            .iter()
-            .find(|(_, c)| c.role == ComponentRole::Outbox)
-            .map(|(id, _)| id.clone());
-        let object_store = self
-            .components
-            .iter()
-            .find(|(_, c)| c.role == ComponentRole::ObjectStore)
-            .map(|(id, _)| id.clone());
+        let outbox = self.components.iter().find(|(_, c)| c.role == ComponentRole::Outbox).map(|(id, _)| id.clone());
+        let object_store = self.components.iter().find(|(_, c)| c.role == ComponentRole::ObjectStore).map(|(id, _)| id.clone());
 
         let mut steps = Vec::new();
         if let Some(ref obj) = object_store {
             // Bytes land pending/verified before authority publishes a committed reference.
-            steps.push(CompositeStep::ObjectStep {
-                component: obj.clone(),
-                action: "pending".into(),
-            });
-            steps.push(CompositeStep::ObjectStep {
-                component: obj.clone(),
-                action: "write".into(),
-            });
-            steps.push(CompositeStep::ObjectStep {
-                component: obj.clone(),
-                action: "verify".into(),
-            });
+            steps.push(CompositeStep::ObjectStep { component: obj.clone(), action: "pending".into() });
+            steps.push(CompositeStep::ObjectStep { component: obj.clone(), action: "write".into() });
+            steps.push(CompositeStep::ObjectStep { component: obj.clone(), action: "verify".into() });
         }
-        steps.push(CompositeStep::AuthorityStep {
-            component: authority_id.clone(),
-            append_outbox: outbox.is_some(),
-        });
+        steps.push(CompositeStep::AuthorityStep { component: authority_id.clone(), append_outbox: outbox.is_some() });
         if let Some(ref obj) = object_store {
-            steps.push(CompositeStep::ObjectStep {
-                component: obj.clone(),
-                action: "finalize".into(),
-            });
+            steps.push(CompositeStep::ObjectStep { component: obj.clone(), action: "finalize".into() });
         }
         if let Some(ob) = outbox {
             steps.push(CompositeStep::EffectStep { component: ob });
@@ -464,7 +380,8 @@ impl TopologyContract {
 
         let proof = if object_store.is_some() {
             "write: object pending?verify then authority; finalize publishes committed reference (not sync dual-write)"
-        } else {
+        }
+        else {
             "write: authority transaction; outbox append when declared (not sync dual-write)"
         };
         let mut budget_notes = Vec::new();
@@ -489,22 +406,12 @@ impl TopologyContract {
         }
     }
 
-    fn plan_identity_read(
-        &self,
-        authority_id: String,
-        consistency: ConsistencyIntent,
-        rule: Option<&RouteRule>,
-    ) -> CompositePlan {
+    fn plan_identity_read(&self, authority_id: String, consistency: ConsistencyIntent, rule: Option<&RouteRule>) -> CompositePlan {
         match &consistency {
-            ConsistencyIntent::Authoritative => self.plan_authority_read(
-                authority_id,
-                AccessKind::IdentityRead,
-                consistency,
-                "Authoritative identity read -> authority",
-            ),
-            ConsistencyIntent::ReadYourWrites
-            | ConsistencyIntent::Eventual
-            | ConsistencyIntent::BoundedStale { .. } => {
+            ConsistencyIntent::Authoritative => {
+                self.plan_authority_read(authority_id, AccessKind::IdentityRead, consistency, "Authoritative identity read -> authority")
+            }
+            ConsistencyIntent::ReadYourWrites | ConsistencyIntent::Eventual | ConsistencyIntent::BoundedStale { .. } => {
                 let cache = self.pick_cache(rule);
                 if let Some(cache_id) = cache {
                     let mut steps = vec![
@@ -514,29 +421,16 @@ impl TopologyContract {
                         },
                         CompositeStep::FallbackStep {
                             reason: "cache miss/stale/unavailable -> authority".into(),
-                            steps: vec![CompositeStep::AuthorityStep {
-                                component: authority_id.clone(),
-                                append_outbox: false,
-                            }],
+                            steps: vec![CompositeStep::AuthorityStep { component: authority_id.clone(), append_outbox: false }],
                         },
                     ];
                     let proof_note = match &consistency {
                         ConsistencyIntent::ReadYourWrites => {
-                            steps.insert(
-                                0,
-                                CompositeStep::FenceStep {
-                                    fence: "session_fence".into(),
-                                },
-                            );
+                            steps.insert(0, CompositeStep::FenceStep { fence: "session_fence".into() });
                             "ReadYourWrites: cache only when AppliedWatermark covers session fence; else authority"
                         }
                         ConsistencyIntent::BoundedStale { .. } => {
-                            steps.insert(
-                                0,
-                                CompositeStep::FenceStep {
-                                    fence: "bounded_stale_watermark".into(),
-                                },
-                            );
+                            steps.insert(0, CompositeStep::FenceStep { fence: "bounded_stale_watermark".into() });
                             "BoundedStale: cache only when watermark proves lag within bound; else authority"
                         }
                         _ => "Eventual identity read via cache when reachable; else authority",
@@ -554,16 +448,12 @@ impl TopologyContract {
                         steps,
                         proof: RouteProof::note(proof_note, false),
                         required_watermarks: watermarks,
-                        budget_notes: self
-                            .cache
-                            .stampede_budget
-                            .map(|b| format!("stampede_budget={b}"))
-                            .into_iter()
-                            .collect(),
+                        budget_notes: self.cache.stampede_budget.map(|b| format!("stampede_budget={b}")).into_iter().collect(),
                         rejected: false,
                         rejection: None,
                     }
-                } else {
+                }
+                else {
                     self.plan_authority_read(
                         authority_id,
                         AccessKind::IdentityRead,
@@ -574,7 +464,8 @@ impl TopologyContract {
             }
             ConsistencyIntent::ProjectionRequired { component } => {
                 let component = component.clone();
-                let Some(comp) = self.components.get(&component) else {
+                let Some(comp) = self.components.get(&component)
+                else {
                     return CompositePlan::rejected(
                         &self.id,
                         self.topology_version,
@@ -602,14 +493,8 @@ impl TopologyContract {
                     authority_id,
                     access: AccessKind::IdentityRead,
                     consistency,
-                    steps: vec![CompositeStep::DerivedReadStep {
-                        component,
-                        required_watermark: None,
-                    }],
-                    proof: RouteProof::note(
-                        "ProjectionRequired identity read; fail if component unhealthy (live later)",
-                        false,
-                    ),
+                    steps: vec![CompositeStep::DerivedReadStep { component, required_watermark: None }],
+                    proof: RouteProof::note("ProjectionRequired identity read; fail if component unhealthy (live later)", false),
                     required_watermarks: BTreeMap::new(),
                     budget_notes: Vec::new(),
                     rejected: false,
@@ -619,13 +504,7 @@ impl TopologyContract {
         }
     }
 
-    fn plan_authority_read(
-        &self,
-        authority_id: String,
-        access: AccessKind,
-        consistency: ConsistencyIntent,
-        proof: &str,
-    ) -> CompositePlan {
+    fn plan_authority_read(&self, authority_id: String, access: AccessKind, consistency: ConsistencyIntent, proof: &str) -> CompositePlan {
         CompositePlan {
             format: COMPOSITE_PLAN_FORMAT.into(),
             version: 1,
@@ -634,10 +513,7 @@ impl TopologyContract {
             authority_id: authority_id.clone(),
             access,
             consistency,
-            steps: vec![CompositeStep::AuthorityStep {
-                component: authority_id,
-                append_outbox: false,
-            }],
+            steps: vec![CompositeStep::AuthorityStep { component: authority_id, append_outbox: false }],
             proof: RouteProof::note(proof, true),
             required_watermarks: BTreeMap::new(),
             budget_notes: Vec::new(),
@@ -656,17 +532,10 @@ impl TopologyContract {
     ) -> CompositePlan {
         let proj = rule
             .and_then(|r| r.preferred_component.clone())
-            .or_else(|| {
-                self.components
-                    .iter()
-                    .find(|(_, c)| c.role == need_role)
-                    .map(|(id, _)| id.clone())
-            });
-        let Some(proj_id) = proj else {
-            return match rule
-                .map(|r| r.fallback)
-                .unwrap_or(FallbackPolicy::FailClosed)
-            {
+            .or_else(|| self.components.iter().find(|(_, c)| c.role == need_role).map(|(id, _)| id.clone()));
+        let Some(proj_id) = proj
+        else {
+            return match rule.map(|r| r.fallback).unwrap_or(FallbackPolicy::FailClosed) {
                 FallbackPolicy::Authority | FallbackPolicy::FailClosed => CompositePlan::rejected(
                     &self.id,
                     self.topology_version,
@@ -687,10 +556,7 @@ impl TopologyContract {
             budget_notes.push(format!("projection_max_lag_secs={lag}"));
         }
         if !self.projection.covered_fields.is_empty() {
-            budget_notes.push(format!(
-                "covered_fields={}",
-                self.projection.covered_fields.join(",")
-            ));
+            budget_notes.push(format!("covered_fields={}", self.projection.covered_fields.join(",")));
         }
         budget_notes.push("candidates_only; hydrate_required".into());
         CompositePlan {
@@ -702,21 +568,11 @@ impl TopologyContract {
             access,
             consistency,
             steps: vec![
-                CompositeStep::DerivedReadStep {
-                    component: proj_id,
-                    required_watermark: Some("authority_commit_token".into()),
-                },
-                CompositeStep::HydrateStep {
-                    component: authority_id,
-                },
-                CompositeStep::CompletenessCheck {
-                    policy: "drop deleted/stale candidates; no partial by default".into(),
-                },
+                CompositeStep::DerivedReadStep { component: proj_id, required_watermark: Some("authority_commit_token".into()) },
+                CompositeStep::HydrateStep { component: authority_id },
+                CompositeStep::CompletenessCheck { policy: "drop deleted/stale candidates; no partial by default".into() },
             ],
-            proof: RouteProof::note(
-                "search/vector -> candidate identities -> authority hydrate/validate (no fake results)",
-                false,
-            ),
+            proof: RouteProof::note("search/vector -> candidate identities -> authority hydrate/validate (no fake results)", false),
             required_watermarks: watermarks,
             budget_notes,
             rejected: false,
@@ -724,17 +580,10 @@ impl TopologyContract {
         }
     }
 
-    fn plan_bytes_range(
-        &self,
-        authority_id: String,
-        consistency: ConsistencyIntent,
-    ) -> CompositePlan {
-        let obj = self
-            .components
-            .iter()
-            .find(|(_, c)| c.role == ComponentRole::ObjectStore)
-            .map(|(id, _)| id.clone());
-        let Some(obj_id) = obj else {
+    fn plan_bytes_range(&self, authority_id: String, consistency: ConsistencyIntent) -> CompositePlan {
+        let obj = self.components.iter().find(|(_, c)| c.role == ComponentRole::ObjectStore).map(|(id, _)| id.clone());
+        let Some(obj_id) = obj
+        else {
             return CompositePlan::rejected(
                 &self.id,
                 self.topology_version,
@@ -753,19 +602,10 @@ impl TopologyContract {
             access: AccessKind::BytesRange,
             consistency,
             steps: vec![
-                CompositeStep::AuthorityStep {
-                    component: authority_id,
-                    append_outbox: false,
-                },
-                CompositeStep::ObjectStep {
-                    component: obj_id,
-                    action: "range_read".into(),
-                },
+                CompositeStep::AuthorityStep { component: authority_id, append_outbox: false },
+                CompositeStep::ObjectStep { component: obj_id, action: "range_read".into() },
             ],
-            proof: RouteProof::note(
-                "bytes range: authority object metadata then object-store range_read",
-                true,
-            ),
+            proof: RouteProof::note("bytes range: authority object metadata then object-store range_read", true),
             required_watermarks: BTreeMap::new(),
             budget_notes: Vec::new(),
             rejected: false,
@@ -774,12 +614,9 @@ impl TopologyContract {
     }
 
     fn plan_effect(&self, authority_id: String, consistency: ConsistencyIntent) -> CompositePlan {
-        let outbox = self
-            .components
-            .iter()
-            .find(|(_, c)| c.role == ComponentRole::Outbox)
-            .map(|(id, _)| id.clone());
-        let Some(ob) = outbox else {
+        let outbox = self.components.iter().find(|(_, c)| c.role == ComponentRole::Outbox).map(|(id, _)| id.clone());
+        let Some(ob) = outbox
+        else {
             return CompositePlan::rejected(
                 &self.id,
                 self.topology_version,
@@ -808,17 +645,11 @@ impl TopologyContract {
 
     fn pick_cache(&self, rule: Option<&RouteRule>) -> Option<String> {
         if let Some(pref) = rule.and_then(|r| r.preferred_component.as_ref())
-            && self
-                .components
-                .get(pref)
-                .is_some_and(|c| c.role == ComponentRole::Cache)
+            && self.components.get(pref).is_some_and(|c| c.role == ComponentRole::Cache)
         {
             return Some(pref.clone());
         }
-        self.components
-            .iter()
-            .find(|(_, c)| c.role == ComponentRole::Cache)
-            .map(|(id, _)| id.clone())
+        self.components.iter().find(|(_, c)| c.role == ComponentRole::Cache).map(|(id, _)| id.clone())
     }
 }
 
@@ -838,39 +669,16 @@ fn access_route_key(access: AccessKind) -> &'static str {
 pub fn verify_report(topo: &TopologyContract) -> Result<Vec<String>, TopologyError> {
     topo.validate()?;
     let mut notes = Vec::new();
-    notes.push(format!(
-        "ok: topology `{}` v{} format={}",
-        topo.id, topo.topology_version, topo.format
-    ));
+    notes.push(format!("ok: topology `{}` v{} format={}", topo.id, topo.topology_version, topo.format));
     let auth = topo.authority_id()?;
     notes.push(format!("authority: {auth}"));
-    let roles: BTreeSet<_> = topo
-        .components
-        .values()
-        .map(|c| format!("{:?}", c.role))
-        .collect();
-    notes.push(format!(
-        "roles: {}",
-        roles.into_iter().collect::<Vec<_>>().join(", ")
-    ));
-    if !topo
-        .components
-        .values()
-        .any(|c| c.role == ComponentRole::Outbox)
-    {
-        notes.push(
-            "warning: no Outbox component ? writes will not declare durable propagation duty"
-                .into(),
-        );
+    let roles: BTreeSet<_> = topo.components.values().map(|c| format!("{:?}", c.role)).collect();
+    notes.push(format!("roles: {}", roles.into_iter().collect::<Vec<_>>().join(", ")));
+    if !topo.components.values().any(|c| c.role == ComponentRole::Outbox) {
+        notes.push("warning: no Outbox component ? writes will not declare durable propagation duty".into());
     }
-    if !topo
-        .components
-        .values()
-        .any(|c| c.role == ComponentRole::Cache)
-    {
-        notes.push(
-            "note: no Cache component ? BoundedStale/Eventual identity reads use authority".into(),
-        );
+    if !topo.components.values().any(|c| c.role == ComponentRole::Cache) {
+        notes.push("note: no Cache component ? BoundedStale/Eventual identity reads use authority".into());
     }
     Ok(notes)
 }

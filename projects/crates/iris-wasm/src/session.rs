@@ -42,9 +42,7 @@ fn bind_source(source: &str, parameters_json: Option<String>) -> Result<String, 
 
 fn execute_result_json(source: &str, iris: &Iris) -> String {
     match iris.session().query(source) {
-        Ok(rows) => {
-            json!({ "ok": true, "rows": rows_to_json(rows), "error": JsonValue::Null }).to_string()
-        }
+        Ok(rows) => json!({ "ok": true, "rows": rows_to_json(rows), "error": JsonValue::Null }).to_string(),
         Err(err) => json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string(),
     }
 }
@@ -72,10 +70,7 @@ pub struct MemorySession {
 impl MemorySession {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Self {
-            iris: Iris::new(CapabilitySet::reference_full(), ReferenceStore::new()),
-            closed: false,
-        }
+        Self { iris: Iris::new(CapabilitySet::reference_full(), ReferenceStore::new()), closed: false }
     }
 
     /// VOS DML (returns row JSON). Aligns with `db.$query`.
@@ -97,19 +92,13 @@ impl MemorySession {
         let source = bind_source(source, parameters_json)?;
         match self.iris.session().execute(&source) {
             Ok(()) => Ok(json!({ "ok": true, "rows": [], "error": JsonValue::Null }).to_string()),
-            Err(err) => {
-                Ok(json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string())
-            }
+            Err(err) => Ok(json!({ "ok": false, "rows": [], "error": err.to_string() }).to_string()),
         }
     }
 
     /// Legacy alias of [`MemorySession::query`].
     #[wasm_bindgen(js_name = executeVos)]
-    pub fn execute_vos(
-        &self,
-        source: &str,
-        parameters_json: Option<String>,
-    ) -> Result<String, JsValue> {
+    pub fn execute_vos(&self, source: &str, parameters_json: Option<String>) -> Result<String, JsValue> {
         self.query(source, parameters_json)
     }
 

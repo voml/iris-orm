@@ -4,11 +4,9 @@
 
 use iris_ir::{CommitToken, DEFAULT_COMMIT_SHARD, OutboxAppend, OutboxEffect, OutboxRecord};
 use iris_types::{RowWrite, Value};
-use postgres::Client;
-use postgres::Transaction;
+use postgres::{Client, Transaction};
 
-use crate::Result;
-use crate::execute;
+use crate::{Result, execute};
 
 /// True when a physical table is Iris authority meta.
 pub(crate) fn is_meta_table(name: &str) -> bool {
@@ -36,15 +34,9 @@ pub fn ensure_schema(client: &mut Client) -> Result<()> {
          CREATE INDEX IF NOT EXISTS _iris_outbox_shard_seq
            ON _iris_outbox(shard, seq);",
     )?;
-    let row = client.query_opt(
-        "SELECT 1 FROM _iris_commit WHERE shard = $1",
-        &[&DEFAULT_COMMIT_SHARD],
-    )?;
+    let row = client.query_opt("SELECT 1 FROM _iris_commit WHERE shard = $1", &[&DEFAULT_COMMIT_SHARD])?;
     if row.is_none() {
-        client.execute(
-            "INSERT INTO _iris_commit(shard, seq) VALUES ($1, 0)",
-            &[&DEFAULT_COMMIT_SHARD],
-        )?;
+        client.execute("INSERT INTO _iris_commit(shard, seq) VALUES ($1, 0)", &[&DEFAULT_COMMIT_SHARD])?;
     }
     Ok(())
 }
@@ -52,10 +44,7 @@ pub fn ensure_schema(client: &mut Client) -> Result<()> {
 /// Current commit token.
 pub fn current_token(client: &mut Client) -> Result<CommitToken> {
     ensure_schema(client)?;
-    let row = client.query_one(
-        "SELECT seq FROM _iris_commit WHERE shard = $1",
-        &[&DEFAULT_COMMIT_SHARD],
-    )?;
+    let row = client.query_one("SELECT seq FROM _iris_commit WHERE shard = $1", &[&DEFAULT_COMMIT_SHARD])?;
     let seq: i64 = row.get(0);
     Ok(CommitToken::new(seq as u64))
 }
@@ -89,31 +78,16 @@ impl<'a> AuthorityTxn<'a> {
 }
 
 /// Atomic authority mutations + outbox append; returns [`CommitToken`].
-pub fn authority_commit<R>(
-    client: &mut Client,
-    f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>,
-) -> Result<(R, CommitToken)> {
+pub fn authority_commit<R>(client: &mut Client, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
     ensure_schema(client)?;
     let tx = client.transaction()?;
-    let mut writer = AuthorityTxn {
-        tx,
-        appends: Vec::new(),
-    };
+    let mut writer = AuthorityTxn { tx, appends: Vec::new() };
     let value = f(&mut writer)?;
     let appends = std::mem::take(&mut writer.appends);
 
-    let prev: i64 = writer
-        .tx
-        .query_one(
-            "SELECT seq FROM _iris_commit WHERE shard = $1",
-            &[&DEFAULT_COMMIT_SHARD],
-        )?
-        .get(0);
+    let prev: i64 = writer.tx.query_one("SELECT seq FROM _iris_commit WHERE shard = $1", &[&DEFAULT_COMMIT_SHARD])?.get(0);
     let next = (prev as u64).saturating_add(1);
-    writer.tx.execute(
-        "UPDATE _iris_commit SET seq = $1 WHERE shard = $2",
-        &[&(next as i64), &DEFAULT_COMMIT_SHARD],
-    )?;
+    writer.tx.execute("UPDATE _iris_commit SET seq = $1 WHERE shard = $2", &[&(next as i64), &DEFAULT_COMMIT_SHARD])?;
 
     for ev in &appends {
         let effect = match ev.effect {
@@ -124,15 +98,7 @@ pub fn authority_commit<R>(
             "INSERT INTO _iris_outbox(
                 shard, seq, operation_id, table_name, entity_id, entity_version, effect
              ) VALUES ($1, $2, $3, $4, $5, $6, $7)",
-            &[
-                &DEFAULT_COMMIT_SHARD,
-                &(next as i64),
-                &ev.operation_id,
-                &ev.table,
-                &ev.entity_id,
-                &(ev.entity_version as i64),
-                &effect,
-            ],
+            &[&DEFAULT_COMMIT_SHARD, &(next as i64), &ev.operation_id, &ev.table, &ev.entity_id, &(ev.entity_version as i64), &effect],
         )?;
     }
 
@@ -141,11 +107,7 @@ pub fn authority_commit<R>(
 }
 
 /// Poll outbox after sequence.
-pub fn outbox_after(
-    client: &mut Client,
-    after_seq: u64,
-    limit: usize,
-) -> Result<Vec<OutboxRecord>> {
+pub fn outbox_after(client: &mut Client, after_seq: u64, limit: usize) -> Result<Vec<OutboxRecord>> {
     ensure_schema(client)?;
     let rows = client.query(
         "SELECT id, shard, seq, operation_id, table_name, entity_id, entity_version, effect
@@ -166,10 +128,7 @@ pub fn outbox_after(
         let seq: i64 = row.get(2);
         out.push(OutboxRecord {
             id: row.get::<_, i64>(0) as u64,
-            commit_token: CommitToken {
-                shard,
-                seq: seq as u64,
-            },
+            commit_token: CommitToken { shard, seq: seq as u64 },
             operation_id: row.get(3),
             table: row.get(4),
             entity_id: row.get(5),
@@ -183,8 +142,6 @@ pub fn outbox_after(
 /// Outbox backlog count.
 pub fn outbox_backlog(client: &mut Client) -> Result<u64> {
     ensure_schema(client)?;
-    let n: i64 = client
-        .query_one("SELECT COUNT(*) FROM _iris_outbox", &[])?
-        .get(0);
+    let n: i64 = client.query_one("SELECT COUNT(*) FROM _iris_outbox", &[])?.get(0);
     Ok(n as u64)
 }

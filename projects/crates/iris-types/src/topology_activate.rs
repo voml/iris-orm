@@ -4,8 +4,10 @@
 //! version so rolling upgrades can handshake; writers must not silently use
 //! divergent route rules against the same authority.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -66,10 +68,7 @@ pub struct TopologyActivateReport {
 }
 
 /// Load the current activation for a topology id from `state_dir`.
-pub fn load_activation(
-    state_dir: impl AsRef<Path>,
-    topology_id: &str,
-) -> Result<Option<TopologyActivation>, TopologyError> {
+pub fn load_activation(state_dir: impl AsRef<Path>, topology_id: &str) -> Result<Option<TopologyActivation>, TopologyError> {
     let path = activation_path(state_dir.as_ref(), topology_id);
     if !path.exists() {
         return Ok(None);
@@ -77,10 +76,7 @@ pub fn load_activation(
     let text = fs::read_to_string(&path).map_err(TopologyError::Io)?;
     let act: TopologyActivation = von::from_str(&text).map_err(TopologyError::Von)?;
     if act.format != TOPOLOGY_ACTIVATION_FORMAT {
-        return Err(TopologyError::Invalid(format!(
-            "unsupported activation format {}",
-            act.format
-        )));
+        return Err(TopologyError::Invalid(format!("unsupported activation format {}", act.format)));
     }
     Ok(Some(act))
 }
@@ -120,11 +116,7 @@ pub fn activate_topology(
                 writer_version: topo.topology_version,
                 notes: vec!["idempotent re-activate of same topology_version".into()],
             };
-            (
-                Some(prev.topology_version),
-                hs,
-                vec!["re-activating identical topology_version".into()],
-            )
+            (Some(prev.topology_version), hs, vec!["re-activating identical topology_version".into()])
         }
         Some(prev) if topo.topology_version > prev.topology_version => {
             let hs = TopologyHandshake {
@@ -135,14 +127,7 @@ pub fn activate_topology(
                     "writers must use writer_version only".into(),
                 ],
             };
-            (
-                Some(prev.topology_version),
-                hs,
-                vec![format!(
-                    "upgrade {} -> {}",
-                    prev.topology_version, topo.topology_version
-                )],
-            )
+            (Some(prev.topology_version), hs, vec![format!("upgrade {} -> {}", prev.topology_version, topo.topology_version)])
         }
         Some(prev) => {
             if !force {
@@ -161,14 +146,7 @@ pub fn activate_topology(
                 writer_version: topo.topology_version,
                 notes: vec!["forced downgrade; operators must drain old writers".into()],
             };
-            (
-                Some(prev.topology_version),
-                hs,
-                vec![format!(
-                    "forced downgrade {} -> {}",
-                    prev.topology_version, topo.topology_version
-                )],
-            )
+            (Some(prev.topology_version), hs, vec![format!("forced downgrade {} -> {}", prev.topology_version, topo.topology_version)])
         }
     };
 
@@ -201,11 +179,7 @@ pub fn activate_topology(
 /// True when a reader topology_version is within the active handshake window.
 pub fn reader_version_accepted(activation: &TopologyActivation, reader_version: i64) -> bool {
     reader_version >= activation.handshake.min_reader_version
-        && reader_version
-            <= activation
-                .handshake
-                .writer_version
-                .max(activation.topology_version)
+        && reader_version <= activation.handshake.writer_version.max(activation.topology_version)
 }
 
 /// True when a writer must use exactly the activated writer_version.
@@ -229,26 +203,13 @@ fn verify_report_for_activate(topo: &TopologyContract) -> Result<Vec<String>, To
         iris_ir::AccessKind::Effect,
     ] {
         let plan = topo.plan(access, iris_ir::ConsistencyIntent::Eventual, None)?;
-        notes.push(format!(
-            "preflight {access:?}: rejected={} steps={}",
-            plan.rejected,
-            plan.steps.len()
-        ));
+        notes.push(format!("preflight {access:?}: rejected={} steps={}", plan.rejected, plan.steps.len()));
     }
     // Writes must never route through cache as truth.
-    let write = topo.plan(
-        iris_ir::AccessKind::Write,
-        iris_ir::ConsistencyIntent::Authoritative,
-        None,
-    )?;
-    let write_has_authority = write
-        .steps
-        .iter()
-        .any(|s| matches!(s, iris_ir::CompositeStep::AuthorityStep { .. }));
+    let write = topo.plan(iris_ir::AccessKind::Write, iris_ir::ConsistencyIntent::Authoritative, None)?;
+    let write_has_authority = write.steps.iter().any(|s| matches!(s, iris_ir::CompositeStep::AuthorityStep { .. }));
     if !write_has_authority && !write.rejected {
-        return Err(TopologyError::Invalid(
-            "activate preflight: write plan missing AuthorityStep".into(),
-        ));
+        return Err(TopologyError::Invalid("activate preflight: write plan missing AuthorityStep".into()));
     }
     notes.push("preflight: write path retains Authority (cache/search never write-truth)".into());
     Ok(notes)
@@ -258,8 +219,7 @@ fn verify_report_for_activate(topo: &TopologyContract) -> Result<Vec<String>, To
 mod tests {
     use super::*;
     use crate::topology::{
-        CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy,
-        RouteRule, TOPOLOGY_FORMAT, TopologyComponent,
+        CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy, RouteRule, TOPOLOGY_FORMAT, TopologyComponent,
     };
     use iris_ir::ConsistencyIntent;
     use std::collections::BTreeMap;
@@ -277,12 +237,7 @@ mod tests {
         );
         components.insert(
             "redis".into(),
-            TopologyComponent {
-                role: ComponentRole::Cache,
-                adapter: "redis".into(),
-                adapter_version: None,
-                datasource: Some("cache".into()),
-            },
+            TopologyComponent { role: ComponentRole::Cache, adapter: "redis".into(), adapter_version: None, datasource: Some("cache".into()) },
         );
         let mut routes = BTreeMap::new();
         routes.insert(
@@ -310,13 +265,8 @@ mod tests {
 
     #[test]
     fn activate_upgrade_handshake_and_reject_downgrade() {
-        let root = std::env::temp_dir().join(format!(
-            "iris-act-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let root = std::env::temp_dir()
+            .join(format!("iris-act-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
         let r1 = activate_topology(&sample(1), &root, 1000, false).unwrap();
         assert!(r1.ok);
         let act = r1.activation.unwrap();

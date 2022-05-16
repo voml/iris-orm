@@ -41,14 +41,7 @@ pub struct Diagnostic {
 impl Diagnostic {
     /// Build a planning rejection diagnostic.
     pub fn plan_rejected(message: impl Into<String>, span: Span, hint: Option<String>) -> Self {
-        Self {
-            code: "IRIS-PLAN-REJECTED".into(),
-            message: message.into(),
-            span,
-            stage: StageKind::Plan,
-            backend: None,
-            hint,
-        }
+        Self { code: "IRIS-PLAN-REJECTED".into(), message: message.into(), span, stage: StageKind::Plan, backend: None, hint }
     }
 
     /// Build a parse diagnostic from VOS diagnostics (first error).

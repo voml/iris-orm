@@ -1,7 +1,9 @@
 //! Phase 2: native YYDB connector readiness + schema handshake.
 
-use std::fs;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::{
+    fs,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use iris_connector_yydb::{BACKEND_ID, PREPARED_STALE_CODE, SESSION_STALE_CODE, YydbSource};
 
@@ -29,10 +31,7 @@ table Post {
 "#;
 
 fn temp_db_path(label: &str) -> std::path::PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let dir = std::env::temp_dir().join(format!("iris-yydb-{label}-{nanos}"));
     fs::create_dir_all(&dir).expect("temp dir");
     dir.join("db.yydb")
@@ -71,26 +70,18 @@ fn query_roundtrips_active_users() {
         .upsert_row(
             "User",
             "ada",
-            BTreeMap::from([
-                ("user_name".into(), yydb::Value::Text("ada".into())),
-                ("active".into(), yydb::Value::Bool(true)),
-            ]),
+            BTreeMap::from([("user_name".into(), yydb::Value::Text("ada".into())), ("active".into(), yydb::Value::Bool(true))]),
         )
         .unwrap();
     db.connection()
         .upsert_row(
             "User",
             "grace",
-            BTreeMap::from([
-                ("user_name".into(), yydb::Value::Text("grace".into())),
-                ("active".into(), yydb::Value::Bool(false)),
-            ]),
+            BTreeMap::from([("user_name".into(), yydb::Value::Text("grace".into())), ("active".into(), yydb::Value::Bool(false))]),
         )
         .unwrap();
 
-    let rows = db
-        .query(r#"User.filter(x => x.active).collect()"#)
-        .expect("query");
+    let rows = db.query(r#"User.filter(x => x.active).collect()"#).expect("query");
     assert_eq!(rows.len(), 1);
     assert!(matches!(
         rows[0].get("user_name"),
@@ -124,12 +115,8 @@ fn execute_runs_seed_blog_insert_program() {
     )
     .expect("execute");
 
-    let users = db
-        .query(r#"User.filter(x => true).collect()"#)
-        .expect("users");
-    let posts = db
-        .query(r#"Post.filter(x => x.published).collect()"#)
-        .expect("posts");
+    let users = db.query(r#"User.filter(x => true).collect()"#).expect("users");
+    let posts = db.query(r#"Post.filter(x => x.published).collect()"#).expect("posts");
     assert_eq!(users.len(), 2);
     assert_eq!(posts.len(), 1);
 }
@@ -151,9 +138,7 @@ fn transaction_commit_makes_execute_visible() {
     db.commit().unwrap();
     assert!(!db.in_transaction());
 
-    let rows = db
-        .query(r#"User.filter(x => true).collect()"#)
-        .expect("users");
+    let rows = db.query(r#"User.filter(x => true).collect()"#).expect("users");
     assert_eq!(rows.len(), 1);
 }
 
@@ -165,18 +150,11 @@ fn prepared_query_executes_when_ddl_revision_matches() {
         .upsert_row(
             "User",
             "ada",
-            [
-                ("user_name".into(), yydb::Value::Text("ada".into())),
-                ("active".into(), yydb::Value::Bool(true)),
-            ]
-            .into_iter()
-            .collect(),
+            [("user_name".into(), yydb::Value::Text("ada".into())), ("active".into(), yydb::Value::Bool(true))].into_iter().collect(),
         )
         .unwrap();
 
-    let prepared = db
-        .prepare(r#"User.filter(x => x.active).collect()"#)
-        .expect("prepare");
+    let prepared = db.prepare(r#"User.filter(x => x.active).collect()"#).expect("prepare");
     assert_eq!(prepared.ddl_revision(), 1);
     let rows = prepared.execute(&db).expect("execute prepared");
     assert_eq!(rows.len(), 1);
@@ -186,12 +164,8 @@ fn prepared_query_executes_when_ddl_revision_matches() {
 fn prepared_execute_rejects_stale_ddl_revision() {
     let db = YydbSource::open_in_memory().unwrap();
     db.ensure_schema(USER_SCHEMA).unwrap();
-    let prepared = db
-        .prepare(r#"User.filter(x => true).collect()"#)
-        .expect("prepare");
-    db.connection()
-        .migrate_schema(1, 2, USER_SCHEMA, &Default::default())
-        .expect("migrate");
+    let prepared = db.prepare(r#"User.filter(x => true).collect()"#).expect("prepare");
+    db.connection().migrate_schema(1, 2, USER_SCHEMA, &Default::default()).expect("migrate");
 
     let err = prepared.execute(&db).expect_err("stale prepared");
     assert!(err.to_string().contains(PREPARED_STALE_CODE));
@@ -202,14 +176,9 @@ fn session_ddl_revision_rejects_stale_sessions() {
     let db = YydbSource::open_in_memory().unwrap();
     db.ensure_schema(USER_SCHEMA).unwrap();
     let revision = db.schema_handshake().unwrap().ddl_revision;
-    db.check_session_ddl_revision(revision)
-        .expect("fresh session");
-    db.connection()
-        .migrate_schema(1, 2, USER_SCHEMA, &Default::default())
-        .expect("migrate");
-    let err = db
-        .check_session_ddl_revision(revision)
-        .expect_err("stale session");
+    db.check_session_ddl_revision(revision).expect("fresh session");
+    db.connection().migrate_schema(1, 2, USER_SCHEMA, &Default::default()).expect("migrate");
+    let err = db.check_session_ddl_revision(revision).expect_err("stale session");
     assert!(err.to_string().contains(SESSION_STALE_CODE));
 }
 
@@ -226,9 +195,7 @@ fn execute_inserts_via_static_insert_program() {
     )
     .expect("execute");
 
-    let rows = db
-        .query(r#"User.filter(x => true).collect()"#)
-        .expect("query");
+    let rows = db.query(r#"User.filter(x => true).collect()"#).expect("query");
     assert_eq!(rows.len(), 1);
 }
 
@@ -254,18 +221,8 @@ fn reopen_preserves_schema_document() {
 #[test]
 fn connector_does_not_depend_on_foreign_adapters() {
     let manifest = include_str!("../Cargo.toml");
-    for banned in [
-        "iris-adapter-mysql",
-        "iris-adapter-postgres",
-        "iris-adapter-sqlite",
-        "iris-adapter-redis",
-        "rusqlite",
-        "sqlx",
-    ] {
-        assert!(
-            !manifest.contains(banned),
-            "native YYDB connector must not depend on `{banned}`"
-        );
+    for banned in ["iris-adapter-mysql", "iris-adapter-postgres", "iris-adapter-sqlite", "iris-adapter-redis", "rusqlite", "sqlx"] {
+        assert!(!manifest.contains(banned), "native YYDB connector must not depend on `{banned}`");
     }
     assert!(manifest.contains("yydb"));
 }

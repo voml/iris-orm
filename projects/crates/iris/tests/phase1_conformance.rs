@@ -1,30 +1,15 @@
 //! Phase 1 conformance: interpreter vs planner, and spanned rejection.
 
-use iris::{
-    CapabilitySet, Iris, PhysicalOp, QueryCaps, RealizationClass, ReferenceStore, Runtime, Value,
-    WriteCaps, row_from_pairs,
-};
+use iris::{CapabilitySet, Iris, PhysicalOp, QueryCaps, RealizationClass, ReferenceStore, Runtime, Value, WriteCaps, row_from_pairs};
 
 fn sample_users() -> ReferenceStore {
     let mut store = ReferenceStore::new();
     store.seed(
         "User",
         vec![
-            row_from_pairs(&[
-                ("user_id", Value::Str("1".into())),
-                ("user_name", Value::Str("alice".into())),
-                ("active", Value::Bool(true)),
-            ]),
-            row_from_pairs(&[
-                ("user_id", Value::Str("2".into())),
-                ("user_name", Value::Str("bob".into())),
-                ("active", Value::Bool(false)),
-            ]),
-            row_from_pairs(&[
-                ("user_id", Value::Str("3".into())),
-                ("user_name", Value::Str("carol".into())),
-                ("active", Value::Bool(true)),
-            ]),
+            row_from_pairs(&[("user_id", Value::Str("1".into())), ("user_name", Value::Str("alice".into())), ("active", Value::Bool(true))]),
+            row_from_pairs(&[("user_id", Value::Str("2".into())), ("user_name", Value::Str("bob".into())), ("active", Value::Bool(false))]),
+            row_from_pairs(&[("user_id", Value::Str("3".into())), ("user_name", Value::Str("carol".into())), ("active", Value::Bool(true))]),
         ],
     );
     store
@@ -46,26 +31,13 @@ User.filter(x => x.active)
     let via_plan = session.query(source).expect("execute plan");
     assert_eq!(via_interp, via_plan);
     assert_eq!(via_plan.len(), 2);
-    assert_eq!(
-        via_plan[0].get("user_name"),
-        Some(&Value::Str("alice".into()))
-    );
-    assert_eq!(
-        via_plan[1].get("user_name"),
-        Some(&Value::Str("carol".into()))
-    );
+    assert_eq!(via_plan[0].get("user_name"), Some(&Value::Str("alice".into())));
+    assert_eq!(via_plan[1].get("user_name"), Some(&Value::Str("carol".into())));
 
     let plan = session.plan(source).expect("plan");
     assert!(!plan.is_rejected());
-    assert!(
-        plan.nodes
-            .iter()
-            .all(|n| n.realization == RealizationClass::Native)
-    );
-    assert!(matches!(
-        plan.nodes.last().map(|n| &n.op),
-        Some(PhysicalOp::Collect)
-    ));
+    assert!(plan.nodes.iter().all(|n| n.realization == RealizationClass::Native));
+    assert!(matches!(plan.nodes.last().map(|n| &n.op), Some(PhysicalOp::Collect)));
 }
 
 #[test]
@@ -93,10 +65,7 @@ fn where_alias_matches_filter_plan_and_rows() {
     assert_eq!(rows_filter, rows_where);
     assert_eq!(rows_filter, rows_bare);
     assert_eq!(rows_filter.len(), 1);
-    assert_eq!(
-        rows_filter[0].get("user_name"),
-        Some(&Value::Str("alice".into()))
-    );
+    assert_eq!(rows_filter[0].get("user_name"), Some(&Value::Str("alice".into())));
 }
 
 #[test]
@@ -129,19 +98,13 @@ fn unsupported_filter_rejected_before_execute_with_span() {
     let span = err.span().expect("spanned diagnostic");
     assert!(span.end >= span.start);
     let msg = err.to_string();
-    assert!(
-        msg.contains("filter") || msg.contains("rejected") || msg.contains("cannot"),
-        "msg={msg}"
-    );
+    assert!(msg.contains("filter") || msg.contains("rejected") || msg.contains("cannot"), "msg={msg}");
 }
 
 #[test]
 fn write_method_rejected_at_lower_with_span() {
     let iris = Runtime::new().open_reference(sample_users());
-    let err = iris
-        .session()
-        .query("User.filter(x => x.active).delete()")
-        .expect_err("writes rejected");
+    let err = iris.session().query("User.filter(x => x.active).delete()").expect_err("writes rejected");
     assert!(err.span().is_some());
 }
 

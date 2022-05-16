@@ -6,11 +6,8 @@ use serde_json::Value as JsonValue;
 
 /// Substitute `$ident` placeholders in `source` using a JSON object of parameters.
 pub fn bind_parameters(source: &str, parameters_json: &str) -> Result<String, String> {
-    let params: JsonValue = serde_json::from_str(parameters_json)
-        .map_err(|err| format!("invalid parameters JSON: {err}"))?;
-    let obj = params
-        .as_object()
-        .ok_or_else(|| "parameters must be a JSON object".to_string())?;
+    let params: JsonValue = serde_json::from_str(parameters_json).map_err(|err| format!("invalid parameters JSON: {err}"))?;
+    let obj = params.as_object().ok_or_else(|| "parameters must be a JSON object".to_string())?;
 
     let mut out = String::with_capacity(source.len());
     let bytes = source.as_bytes();
@@ -23,11 +20,8 @@ pub fn bind_parameters(source: &str, parameters_json: &str) -> Result<String, St
                 end += 1;
             }
             if end > start {
-                let name =
-                    std::str::from_utf8(&bytes[start..end]).map_err(|err| err.to_string())?;
-                let value = obj
-                    .get(name)
-                    .ok_or_else(|| format!("unbound VOS parameter `${name}`"))?;
+                let name = std::str::from_utf8(&bytes[start..end]).map_err(|err| err.to_string())?;
+                let value = obj.get(name).ok_or_else(|| format!("unbound VOS parameter `${name}`"))?;
                 out.push_str(&encode_literal(value)?);
                 i = end;
                 continue;
@@ -49,10 +43,9 @@ fn encode_literal(value: &JsonValue) -> Result<String, String> {
         JsonValue::Bool(b) => Ok(if *b { "true".into() } else { "false".into() }),
         JsonValue::Number(n) => Ok(n.to_string()),
         JsonValue::String(s) => Ok(format!("\"{}\"", escape_vos_string(s))),
-        JsonValue::Array(_) | JsonValue::Object(_) => Err(
-            "parameter values must be scalar (null|bool|number|string); nested objects are not VOS literals"
-                .into(),
-        ),
+        JsonValue::Array(_) | JsonValue::Object(_) => {
+            Err("parameter values must be scalar (null|bool|number|string); nested objects are not VOS literals".into())
+        }
     }
 }
 
@@ -79,10 +72,7 @@ mod tests {
     fn binds_scalars() {
         let source = "User.filter(x => x.active == $where_active).take($take).collect()";
         let bound = bind_parameters(source, r#"{"where_active":true,"take":20}"#).unwrap();
-        assert_eq!(
-            bound,
-            "User.filter(x => x.active == true).take(20).collect()"
-        );
+        assert_eq!(bound, "User.filter(x => x.active == true).take(20).collect()");
     }
 
     #[test]

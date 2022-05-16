@@ -8,9 +8,6 @@ fn version_is_present() {
 #[test]
 fn runtime_opens_reference_session() {
     let iris = iris::Runtime::new().open_reference(iris::ReferenceStore::new());
-    let plan = iris
-        .session()
-        .plan("User.take(0).collect()")
-        .expect("empty take plans");
+    let plan = iris.session().plan("User.take(0).collect()").expect("empty take plans");
     assert_eq!(plan.envelope.ir_version, iris::IrVersion::PHASE1);
 }

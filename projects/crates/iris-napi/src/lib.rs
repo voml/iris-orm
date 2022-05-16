@@ -9,8 +9,8 @@ mod session;
 
 use std::path::Path;
 
-use iris_generator::GenerationModel;
 use iris::{migrate_plan, migrate_run, project};
+use iris_generator::GenerationModel;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use session::MemorySession;
@@ -71,8 +71,7 @@ pub struct LoadProjectResult {
 /// Load project config (`iris.von` or materialized `.iris/project.von`) from a config path.
 #[napi]
 pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
-    let (root, project) =
-        project::load_project(Path::new(&config_path)).map_err(|e| Error::from_reason(e))?;
+    let (root, project) = project::load_project(Path::new(&config_path)).map_err(|e| Error::from_reason(e))?;
     Ok(LoadProjectResult {
         root: root.display().to_string(),
         config: config_path,
@@ -85,18 +84,14 @@ pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
 /// Materialize a JSON project document from `iris.config.ts` to `.iris/project.von`.
 #[napi]
 pub fn materialize_runtime_project(project_dir: String, document_json: String) -> Result<String> {
-    let path = project::materialize_runtime_project(Path::new(&project_dir), &document_json)
-        .map_err(|e| Error::from_reason(e))?;
+    let path = project::materialize_runtime_project(Path::new(&project_dir), &document_json).map_err(|e| Error::from_reason(e))?;
     Ok(path.display().to_string())
 }
 
 /// Read merged schema text for a loaded project.
 #[napi]
 pub fn read_schema(project_root: String, schema_glob: String) -> Result<String> {
-    let project = iris::IrisProject {
-        schema: schema_glob,
-        ..Default::default()
-    };
+    let project = iris::IrisProject { schema: schema_glob, ..Default::default() };
     project::read_schema(Path::new(&project_root), &project).map_err(|e| Error::from_reason(e))
 }
 
@@ -116,9 +111,7 @@ pub fn generate(source: String, target: String, out_dir: String) -> Result<Gener
     match iris_generator::generate_from_source(&source, &target, Path::new(&out_dir)) {
         Ok((model, paths)) => {
             let output_path = match target.as_str() {
-                "rust" => iris_generator::rust_target_dir(Path::new(&out_dir))
-                    .display()
-                    .to_string(),
+                "rust" => iris_generator::rust_target_dir(Path::new(&out_dir)).display().to_string(),
                 "typescript" | "ts" => out_dir.clone(),
                 _ => out_dir.clone(),
             };
@@ -126,10 +119,7 @@ pub fn generate(source: String, target: String, out_dir: String) -> Result<Gener
                 ok: true,
                 output_path,
                 schema_fingerprint: model.schema_fingerprint,
-                files: paths
-                    .into_iter()
-                    .map(|path| path.display().to_string())
-                    .collect(),
+                files: paths.into_iter().map(|path| path.display().to_string()).collect(),
                 error: None,
             })
         }
@@ -153,23 +143,11 @@ pub struct MigratePlanResult {
 
 /// Plan a managed-push migration (same as `iris push --plan`).
 #[napi]
-pub fn migrate_plan_cmd(
-    config_path: String,
-    source: String,
-    out_dir: Option<String>,
-) -> Result<MigratePlanResult> {
+pub fn migrate_plan_cmd(config_path: String, source: String, out_dir: Option<String>) -> Result<MigratePlanResult> {
     let out = out_dir.as_deref().map(Path::new);
     match migrate_plan(Path::new(&config_path), &source, out) {
-        Ok(path) => Ok(MigratePlanResult {
-            ok: true,
-            plan_path: path.display().to_string(),
-            error: None,
-        }),
-        Err(err) => Ok(MigratePlanResult {
-            ok: false,
-            plan_path: String::new(),
-            error: Some(err),
-        }),
+        Ok(path) => Ok(MigratePlanResult { ok: true, plan_path: path.display().to_string(), error: None }),
+        Err(err) => Ok(MigratePlanResult { ok: false, plan_path: String::new(), error: Some(err) }),
     }
 }
 
@@ -185,28 +163,15 @@ pub struct MigrateRunResult {
 
 /// Plan → apply → verify (same as `iris push` / library `migrate_run`).
 #[napi]
-pub fn migrate_run_cmd(
-    config_path: String,
-    source: String,
-    plan_out: Option<String>,
-    plan_only: bool,
-) -> Result<MigrateRunResult> {
+pub fn migrate_run_cmd(config_path: String, source: String, plan_out: Option<String>, plan_only: bool) -> Result<MigrateRunResult> {
     let config = Path::new(&config_path);
-    let plan_path = plan_out.map(std::path::PathBuf::from).unwrap_or_else(|| {
-        config
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join("migrations")
-            .join(format!("{source}-plan.von"))
-    });
+    let plan_path = plan_out
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| config.parent().unwrap_or_else(|| Path::new(".")).join("migrations").join(format!("{source}-plan.von")));
     match migrate_run(config, &source, &plan_path, plan_only) {
-        Ok(None) => Ok(MigrateRunResult {
-            ok: true,
-            plan_path: plan_path.display().to_string(),
-            plan_only: true,
-            created_tables: vec![],
-            error: None,
-        }),
+        Ok(None) => {
+            Ok(MigrateRunResult { ok: true, plan_path: plan_path.display().to_string(), plan_only: true, created_tables: vec![], error: None })
+        }
         Ok(Some(report)) => Ok(MigrateRunResult {
             ok: true,
             plan_path: plan_path.display().to_string(),
@@ -261,27 +226,19 @@ pub fn open_session(options: Option<OpenSessionOptions>) -> Result<MemorySession
             MemorySession::open_sqlite(path)
         }
         "postgres" => {
-            let url = opts.postgres_url.ok_or_else(|| {
-                Error::from_reason("open_session(profile=postgres): postgres_url is required")
-            })?;
+            let url = opts.postgres_url.ok_or_else(|| Error::from_reason("open_session(profile=postgres): postgres_url is required"))?;
             MemorySession::open_postgres(url)
         }
         "mysql" => {
-            let url = opts.mysql_url.ok_or_else(|| {
-                Error::from_reason("open_session(profile=mysql): mysql_url is required")
-            })?;
+            let url = opts.mysql_url.ok_or_else(|| Error::from_reason("open_session(profile=mysql): mysql_url is required"))?;
             MemorySession::open_mysql(url)
         }
         "project" => {
-            let config = opts.project_config.ok_or_else(|| {
-                Error::from_reason("open_session(profile=project): project_config is required")
-            })?;
+            let config = opts.project_config.ok_or_else(|| Error::from_reason("open_session(profile=project): project_config is required"))?;
             let source = opts.datasource.unwrap_or_else(|| "default".into());
             MemorySession::open_project(config, source)
         }
-        other => Err(Error::from_reason(format!(
-            "open_session: unknown profile `{other}` (use memory|sqlite|postgres|mysql|project)"
-        ))),
+        other => Err(Error::from_reason(format!("open_session: unknown profile `{other}` (use memory|sqlite|postgres|mysql|project)"))),
     }
 }
 

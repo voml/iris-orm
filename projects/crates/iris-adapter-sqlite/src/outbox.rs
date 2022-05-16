@@ -6,8 +6,7 @@ use iris_ir::{CommitToken, DEFAULT_COMMIT_SHARD, OutboxAppend, OutboxEffect, Out
 use iris_types::{RowWrite, Value};
 use rusqlite::{Connection, OptionalExtension, Transaction};
 
-use crate::execute;
-use crate::{Error, Result};
+use crate::{Error, Result, execute};
 
 /// True when a physical table is Iris authority meta (hidden from business catalog).
 pub(crate) fn is_meta_table(name: &str) -> bool {
@@ -35,18 +34,9 @@ pub fn ensure_schema(conn: &Connection) -> Result<()> {
          CREATE INDEX IF NOT EXISTS _iris_outbox_shard_seq
            ON _iris_outbox(shard, seq);",
     )?;
-    let exists: Option<i64> = conn
-        .query_row(
-            "SELECT 1 FROM _iris_commit WHERE shard = ?1",
-            [DEFAULT_COMMIT_SHARD],
-            |r| r.get(0),
-        )
-        .optional()?;
+    let exists: Option<i64> = conn.query_row("SELECT 1 FROM _iris_commit WHERE shard = ?1", [DEFAULT_COMMIT_SHARD], |r| r.get(0)).optional()?;
     if exists.is_none() {
-        conn.execute(
-            "INSERT INTO _iris_commit(shard, seq) VALUES (?1, 0)",
-            [DEFAULT_COMMIT_SHARD],
-        )?;
+        conn.execute("INSERT INTO _iris_commit(shard, seq) VALUES (?1, 0)", [DEFAULT_COMMIT_SHARD])?;
     }
     Ok(())
 }
@@ -54,11 +44,7 @@ pub fn ensure_schema(conn: &Connection) -> Result<()> {
 /// Read the current commit token (seq of last successful authority commit).
 pub fn current_token(conn: &Connection) -> Result<CommitToken> {
     ensure_schema(conn)?;
-    let seq: i64 = conn.query_row(
-        "SELECT seq FROM _iris_commit WHERE shard = ?1",
-        [DEFAULT_COMMIT_SHARD],
-        |r| r.get(0),
-    )?;
+    let seq: i64 = conn.query_row("SELECT seq FROM _iris_commit WHERE shard = ?1", [DEFAULT_COMMIT_SHARD], |r| r.get(0))?;
     Ok(CommitToken::new(seq as u64))
 }
 
@@ -94,29 +80,16 @@ impl<'conn> AuthorityTxn<'conn> {
 ///
 /// On success, returns the user value and a [`CommitToken`] meaning authority committed
 /// **and** durable outbox accepted propagation duty (not that projections caught up).
-pub fn authority_commit<R>(
-    conn: &mut Connection,
-    f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>,
-) -> Result<(R, CommitToken)> {
+pub fn authority_commit<R>(conn: &mut Connection, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
     ensure_schema(conn)?;
     let tx = conn.transaction()?;
-    let mut writer = AuthorityTxn {
-        tx,
-        appends: Vec::new(),
-    };
+    let mut writer = AuthorityTxn { tx, appends: Vec::new() };
     let value = f(&mut writer)?;
     let appends = std::mem::take(&mut writer.appends);
 
-    let prev: i64 = writer.tx.query_row(
-        "SELECT seq FROM _iris_commit WHERE shard = ?1",
-        [DEFAULT_COMMIT_SHARD],
-        |r| r.get(0),
-    )?;
+    let prev: i64 = writer.tx.query_row("SELECT seq FROM _iris_commit WHERE shard = ?1", [DEFAULT_COMMIT_SHARD], |r| r.get(0))?;
     let next = (prev as u64).saturating_add(1);
-    writer.tx.execute(
-        "UPDATE _iris_commit SET seq = ?1 WHERE shard = ?2",
-        rusqlite::params![next as i64, DEFAULT_COMMIT_SHARD],
-    )?;
+    writer.tx.execute("UPDATE _iris_commit SET seq = ?1 WHERE shard = ?2", rusqlite::params![next as i64, DEFAULT_COMMIT_SHARD])?;
 
     for ev in &appends {
         let effect = match ev.effect {
@@ -127,15 +100,7 @@ pub fn authority_commit<R>(
             "INSERT INTO _iris_outbox(
                 shard, seq, operation_id, table_name, entity_id, entity_version, effect
              ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            rusqlite::params![
-                DEFAULT_COMMIT_SHARD,
-                next as i64,
-                ev.operation_id,
-                ev.table,
-                ev.entity_id,
-                ev.entity_version as i64,
-                effect,
-            ],
+            rusqlite::params![DEFAULT_COMMIT_SHARD, next as i64, ev.operation_id, ev.table, ev.entity_id, ev.entity_version as i64, effect,],
         )?;
     }
 
@@ -153,30 +118,24 @@ pub fn outbox_after(conn: &Connection, after_seq: u64, limit: usize) -> Result<V
          ORDER BY seq ASC, id ASC
          LIMIT ?3",
     )?;
-    let rows = stmt.query_map(
-        rusqlite::params![DEFAULT_COMMIT_SHARD, after_seq as i64, limit as i64],
-        |row| {
-            let effect_raw: String = row.get(7)?;
-            let effect = match effect_raw.as_str() {
-                "delete" => OutboxEffect::Delete,
-                _ => OutboxEffect::Upsert,
-            };
-            let shard: String = row.get(1)?;
-            let seq: i64 = row.get(2)?;
-            Ok(OutboxRecord {
-                id: row.get::<_, i64>(0)? as u64,
-                commit_token: CommitToken {
-                    shard,
-                    seq: seq as u64,
-                },
-                operation_id: row.get(3)?,
-                table: row.get(4)?,
-                entity_id: row.get(5)?,
-                entity_version: row.get::<_, i64>(6)? as u64,
-                effect,
-            })
-        },
-    )?;
+    let rows = stmt.query_map(rusqlite::params![DEFAULT_COMMIT_SHARD, after_seq as i64, limit as i64], |row| {
+        let effect_raw: String = row.get(7)?;
+        let effect = match effect_raw.as_str() {
+            "delete" => OutboxEffect::Delete,
+            _ => OutboxEffect::Upsert,
+        };
+        let shard: String = row.get(1)?;
+        let seq: i64 = row.get(2)?;
+        Ok(OutboxRecord {
+            id: row.get::<_, i64>(0)? as u64,
+            commit_token: CommitToken { shard, seq: seq as u64 },
+            operation_id: row.get(3)?,
+            table: row.get(4)?,
+            entity_id: row.get(5)?,
+            entity_version: row.get::<_, i64>(6)? as u64,
+            effect,
+        })
+    })?;
     let mut out = Vec::new();
     for row in rows {
         out.push(row.map_err(Error::from)?);

@@ -9,11 +9,7 @@ fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     // Prefer repo-level templates/; fall back to crate-local templates/.
     let repo_templates = manifest_dir.join("../../templates");
-    let templates_dir = if repo_templates.is_dir() {
-        repo_templates
-    } else {
-        manifest_dir.join("templates")
-    };
+    let templates_dir = if repo_templates.is_dir() { repo_templates } else { manifest_dir.join("templates") };
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let aot_dir = out_dir.join("aot");
     fs::create_dir_all(&aot_dir).expect("create OUT_DIR/aot");
@@ -69,27 +65,23 @@ pub(crate) fn render_registered(name: &str, ctx: &serde_json::Value) -> crate::R
 }
 
 fn collect_dejavu(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else {
+    let Ok(entries) = fs::read_dir(dir)
+    else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
             collect_dejavu(&path, out);
-        } else if path
-            .extension()
-            .and_then(|s| s.to_str())
-            .is_some_and(|ext| ext == "dejavu")
-        {
+        }
+        else if path.extension().and_then(|s| s.to_str()).is_some_and(|ext| ext == "dejavu") {
             out.push(path);
         }
     }
 }
 
 fn template_stem(path: &Path, templates_dir: &Path) -> String {
-    let relative = path
-        .strip_prefix(templates_dir)
-        .expect("template path must live under templates/");
+    let relative = path.strip_prefix(templates_dir).expect("template path must live under templates/");
     let file = relative.to_string_lossy();
     let without = file.strip_suffix(".dejavu").unwrap_or(&file);
     let without = without.trim_end_matches(".rs").trim_end_matches(".ts");

@@ -60,18 +60,12 @@ pub struct RouteProof {
 impl RouteProof {
     /// Empty proof (rejected / not yet filled).
     pub fn empty() -> Self {
-        Self {
-            notes: Vec::new(),
-            freshness_proven: false,
-        }
+        Self { notes: Vec::new(), freshness_proven: false }
     }
 
     /// Single-note proof.
     pub fn note(text: impl Into<String>, freshness_proven: bool) -> Self {
-        Self {
-            notes: vec![text.into()],
-            freshness_proven,
-        }
+        Self { notes: vec![text.into()], freshness_proven }
     }
 }
 

@@ -2,10 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::{
-    DatasourceKind, DriftReport, LogicalMigrationPlan, TruthMode, default_migration_plan,
-    resolve_path,
-};
+use crate::{DatasourceKind, DriftReport, LogicalMigrationPlan, TruthMode, default_migration_plan, resolve_path};
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
 use iris_adapter_sqlite::SqliteSource;
@@ -23,12 +20,11 @@ pub struct ApplyReport {
 
 fn refuse_redis_migrate(kind: DatasourceKind) -> Result<(), String> {
     if kind == DatasourceKind::Redis {
-        Err(
-            "Redis is a keyspace adapter — migrate plan/apply/verify is not supported; \
+        Err("Redis is a keyspace adapter — migrate plan/apply/verify is not supported; \
              use adopt plan for explicit mappings"
-                .into(),
-        )
-    } else {
+            .into())
+    }
+    else {
         Ok(())
     }
 }
@@ -42,7 +38,8 @@ fn print_drift(source: &str, drift: &DriftReport) -> Result<(), String> {
             );
         }
         Ok(())
-    } else {
+    }
+    else {
         Err(format!("drift detected for source={source}: {drift:?}"))
     }
 }
@@ -53,10 +50,7 @@ pub fn migrate_plan(config: &Path, source: &str, out: Option<&Path>) -> Result<P
     let ds = project.datasource(source).map_err(|e| e.to_string())?;
     refuse_redis_migrate(ds.kind)?;
     if ds.mode != TruthMode::ManagedPush {
-        return Err(format!(
-            "migrate plan requires managed_push mode (got {:?})",
-            ds.mode
-        ));
+        return Err(format!("migrate plan requires managed_push mode (got {:?})", ds.mode));
     }
     let schema = read_schema(&project_dir, &project)?;
     let plan = match ds.kind {
@@ -76,15 +70,10 @@ pub fn migrate_plan(config: &Path, source: &str, out: Option<&Path>) -> Result<P
             db.plan_managed_push(&schema).map_err(|e| e.to_string())?
         }
         other => {
-            return Err(format!(
-                "migrate plan does not support {:?} (relational: sqlite/postgres/mysql)",
-                other
-            ));
+            return Err(format!("migrate plan does not support {:?} (relational: sqlite/postgres/mysql)", other));
         }
     };
-    let out_path = out
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| default_migration_plan(&project_dir, source));
+    let out_path = out.map(Path::to_path_buf).unwrap_or_else(|| default_migration_plan(&project_dir, source));
     let text = von::to_string_indented(&plan).map_err(|e| e.to_string())?;
     write_file(&out_path, &text)?;
     Ok(out_path)
@@ -102,35 +91,26 @@ pub fn migrate_apply(config: &Path, source: &str, plan_path: &Path) -> Result<Ap
         DatasourceKind::Sqlite => {
             let path = resolve_path(&project_dir, &expand_endpoint(ds, source)?);
             let db = SqliteSource::open(path).map_err(|e| e.to_string())?;
-            let report = db
-                .apply_managed_push(&plan, &schema)
-                .map_err(|e| e.to_string())?;
+            let report = db.apply_managed_push(&plan, &schema).map_err(|e| e.to_string())?;
             (report.plan_id, report.created_tables)
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;
             let db = PostgresSource::connect(&url).map_err(|e| e.to_string())?;
-            let report = db
-                .apply_managed_push(&plan, &schema)
-                .map_err(|e| e.to_string())?;
+            let report = db.apply_managed_push(&plan, &schema).map_err(|e| e.to_string())?;
             (report.plan_id, report.created_tables)
         }
         DatasourceKind::Mysql => {
             let url = expand_endpoint(ds, source)?;
             let db = MysqlSource::connect(&url).map_err(|e| e.to_string())?;
-            let report = db
-                .apply_managed_push(&plan, &schema)
-                .map_err(|e| e.to_string())?;
+            let report = db.apply_managed_push(&plan, &schema).map_err(|e| e.to_string())?;
             (report.plan_id, report.created_tables)
         }
         other => {
             return Err(format!("migrate apply does not support {:?}", other));
         }
     };
-    Ok(ApplyReport {
-        plan_id,
-        created_tables: created,
-    })
+    Ok(ApplyReport { plan_id, created_tables: created })
 }
 
 /// Re-inspect and fail when schema drift is detected.
@@ -163,12 +143,7 @@ pub fn migrate_verify(config: &Path, source: &str) -> Result<(), String> {
 }
 
 /// Plan → apply → verify (embedder default for offline DDL).
-pub fn migrate_run(
-    config: &Path,
-    source: &str,
-    plan_out: &Path,
-    plan_only: bool,
-) -> Result<Option<ApplyReport>, String> {
+pub fn migrate_run(config: &Path, source: &str, plan_out: &Path, plan_only: bool) -> Result<Option<ApplyReport>, String> {
     let plan_path = migrate_plan(config, source, Some(plan_out))?;
     if plan_only {
         return Ok(None);

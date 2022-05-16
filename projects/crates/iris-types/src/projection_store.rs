@@ -1,11 +1,13 @@
-﻿//! Local filesystem Search/Vector projection store (Phase 10-F).
+//! Local filesystem Search/Vector projection store (Phase 10-F).
 //!
 //! Rebuild fills a **new generation** while the active alias keeps serving.
 //! Alias switch is atomic (rewrite `alias.von`). Never clear-and-refill the
 //! live generation in place.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use iris_ir::{ProjectionCandidate, ProjectionDocument, ProjectionGeneration};
 use serde::{Deserialize, Serialize};
@@ -159,12 +161,7 @@ impl LocalProjectionStore {
     }
 
     /// Begin a generation-isolated rebuild (does not touch the active alias).
-    pub fn begin_rebuild(
-        &self,
-        component: &str,
-        schema_fingerprint: &str,
-        now_unix_ms: u64,
-    ) -> ProjectionStoreResult<RebuildHandle> {
+    pub fn begin_rebuild(&self, component: &str, schema_fingerprint: &str, now_unix_ms: u64) -> ProjectionStoreResult<RebuildHandle> {
         self.ensure_component(component)?;
         let gen_id = format!("g{}", now_unix_ms);
         let generation = ProjectionGeneration(gen_id.clone());
@@ -183,41 +180,22 @@ impl LocalProjectionStore {
             notes: Some("building; not readable via alias".into()),
         };
         self.write_gen_meta(component, &gen_id, &meta)?;
-        Ok(RebuildHandle {
-            component: component.into(),
-            generation,
-            schema_fingerprint: schema_fingerprint.into(),
-        })
+        Ok(RebuildHandle { component: component.into(), generation, schema_fingerprint: schema_fingerprint.into() })
     }
 
     /// Upsert a document into the building generation.
-    pub fn upsert_building(
-        &self,
-        handle: &RebuildHandle,
-        mut doc: ProjectionDocument,
-        now_unix_ms: u64,
-    ) -> ProjectionStoreResult<()> {
+    pub fn upsert_building(&self, handle: &RebuildHandle, mut doc: ProjectionDocument, now_unix_ms: u64) -> ProjectionStoreResult<()> {
         let mut meta = self.load_gen_meta(&handle.component, handle.generation.as_str())?;
         if meta.state != GenerationState::Building {
-            return Err(ProjectionStoreError::Policy(format!(
-                "generation `{}` is {:?}, expected building",
-                handle.generation, meta.state
-            )));
+            return Err(ProjectionStoreError::Policy(format!("generation `{}` is {:?}, expected building", handle.generation, meta.state)));
         }
         if doc.schema_fingerprint != handle.schema_fingerprint {
-            return Err(ProjectionStoreError::Policy(
-                "document schema_fingerprint does not match rebuild handle".into(),
-            ));
+            return Err(ProjectionStoreError::Policy("document schema_fingerprint does not match rebuild handle".into()));
         }
         doc.generation = handle.generation.clone();
-        let path = self.doc_path(
-            &handle.component,
-            handle.generation.as_str(),
-            &doc.entity_id,
-        );
+        let path = self.doc_path(&handle.component, handle.generation.as_str(), &doc.entity_id);
         let existed = path.exists();
-        let text = von::to_string_indented(&doc)
-            .map_err(|e| ProjectionStoreError::Codec(format!("serialize projection doc: {e}")))?;
+        let text = von::to_string_indented(&doc).map_err(|e| ProjectionStoreError::Codec(format!("serialize projection doc: {e}")))?;
         fs::write(path, text).map_err(ProjectionStoreError::Io)?;
         if !existed {
             meta.doc_count = meta.doc_count.saturating_add(1);
@@ -228,10 +206,7 @@ impl LocalProjectionStore {
     }
 
     /// Validate a building generation before activate.
-    pub fn validate_building(
-        &self,
-        handle: &RebuildHandle,
-    ) -> ProjectionStoreResult<RebuildValidation> {
+    pub fn validate_building(&self, handle: &RebuildHandle) -> ProjectionStoreResult<RebuildValidation> {
         let meta = self.load_gen_meta(&handle.component, handle.generation.as_str())?;
         let mut notes = Vec::new();
         let mut ok = meta.state == GenerationState::Building;
@@ -249,12 +224,7 @@ impl LocalProjectionStore {
         if ok {
             notes.push("validation ok; safe to activate (alias switch)".into());
         }
-        Ok(RebuildValidation {
-            generation: handle.generation.as_str().into(),
-            doc_count: meta.doc_count,
-            ok,
-            notes,
-        })
+        Ok(RebuildValidation { generation: handle.generation.as_str().into(), doc_count: meta.doc_count, ok, notes })
     }
 
     /// Mark building 鈫?ready then atomically switch the read alias.
@@ -264,10 +234,7 @@ impl LocalProjectionStore {
     pub fn activate(&self, handle: &RebuildHandle, now_unix_ms: u64) -> ProjectionStoreResult<()> {
         let validation = self.validate_building(handle)?;
         if !validation.ok {
-            return Err(ProjectionStoreError::Policy(format!(
-                "rebuild validation failed: {}",
-                validation.notes.join("; ")
-            )));
+            return Err(ProjectionStoreError::Policy(format!("rebuild validation failed: {}", validation.notes.join("; "))));
         }
         let mut meta = self.load_gen_meta(&handle.component, handle.generation.as_str())?;
         meta.state = GenerationState::Ready;
@@ -303,16 +270,10 @@ impl LocalProjectionStore {
     }
 
     /// Abort a building generation (mark failed).
-    pub fn abort_rebuild(
-        &self,
-        handle: &RebuildHandle,
-        now_unix_ms: u64,
-    ) -> ProjectionStoreResult<()> {
+    pub fn abort_rebuild(&self, handle: &RebuildHandle, now_unix_ms: u64) -> ProjectionStoreResult<()> {
         let mut meta = self.load_gen_meta(&handle.component, handle.generation.as_str())?;
         if meta.state != GenerationState::Building {
-            return Err(ProjectionStoreError::Policy(
-                "abort_rebuild only applies to building generations".into(),
-            ));
+            return Err(ProjectionStoreError::Policy("abort_rebuild only applies to building generations".into()));
         }
         meta.state = GenerationState::Failed;
         meta.updated_unix_ms = now_unix_ms;
@@ -328,46 +289,26 @@ impl LocalProjectionStore {
             return Ok(None);
         }
         let text = fs::read_to_string(&path)?;
-        let alias: AliasWire = von::from_str(&text)
-            .map_err(|e| ProjectionStoreError::Codec(format!("corrupt alias: {e}")))?;
+        let alias: AliasWire = von::from_str(&text).map_err(|e| ProjectionStoreError::Codec(format!("corrupt alias: {e}")))?;
         Ok(alias.active_generation)
     }
 
     /// Full-text-ish candidate search over the **active** generation.
     ///
     /// Returns candidates only 鈥?callers must hydrate through Authority.
-    pub fn search(
-        &self,
-        component: &str,
-        query: &str,
-        limit: usize,
-    ) -> ProjectionStoreResult<Vec<ProjectionCandidate>> {
-        let Some(gen_id) = self.active_generation(component)? else {
-            return Err(ProjectionStoreError::NotFound(format!(
-                "no active generation for `{component}`"
-            )));
+    pub fn search(&self, component: &str, query: &str, limit: usize) -> ProjectionStoreResult<Vec<ProjectionCandidate>> {
+        let Some(gen_id) = self.active_generation(component)?
+        else {
+            return Err(ProjectionStoreError::NotFound(format!("no active generation for `{component}`")));
         };
         let q = query.to_ascii_lowercase();
-        let tokens: Vec<_> = q
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|t| !t.is_empty())
-            .collect();
+        let tokens: Vec<_> = q.split(|c: char| !c.is_alphanumeric()).filter(|t| !t.is_empty()).collect();
         let mut hits = Vec::new();
         for doc in self.load_docs(component, &gen_id)? {
             let hay = doc.text.clone().unwrap_or_default().to_ascii_lowercase();
-            let field_blob = doc
-                .fields
-                .values()
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(" ")
-                .to_ascii_lowercase();
+            let field_blob = doc.fields.values().cloned().collect::<Vec<_>>().join(" ").to_ascii_lowercase();
             let blob = format!("{hay} {field_blob}");
-            let score = if tokens.is_empty() {
-                0.0
-            } else {
-                tokens.iter().filter(|t| blob.contains(*t)).count() as f64 / tokens.len() as f64
-            };
+            let score = if tokens.is_empty() { 0.0 } else { tokens.iter().filter(|t| blob.contains(*t)).count() as f64 / tokens.len() as f64 };
             if score > 0.0 {
                 hits.push(ProjectionCandidate {
                     entity_id: doc.entity_id,
@@ -378,34 +319,25 @@ impl LocalProjectionStore {
                 });
             }
         }
-        hits.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.entity_id.cmp(&b.entity_id))
-        });
+        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.entity_id.cmp(&b.entity_id)));
         hits.truncate(limit);
         Ok(hits)
     }
 
     /// Brute-force nearest over active generation vectors (L2 鈫?score = 1/(1+d)).
-    pub fn nearest(
-        &self,
-        component: &str,
-        query: &[f32],
-        k: usize,
-    ) -> ProjectionStoreResult<Vec<ProjectionCandidate>> {
-        let Some(gen_id) = self.active_generation(component)? else {
-            return Err(ProjectionStoreError::NotFound(format!(
-                "no active generation for `{component}`"
-            )));
+    pub fn nearest(&self, component: &str, query: &[f32], k: usize) -> ProjectionStoreResult<Vec<ProjectionCandidate>> {
+        let Some(gen_id) = self.active_generation(component)?
+        else {
+            return Err(ProjectionStoreError::NotFound(format!("no active generation for `{component}`")));
         };
         let mut hits = Vec::new();
         for doc in self.load_docs(component, &gen_id)? {
-            let Some(ref vec_s) = doc.vector else {
+            let Some(ref vec_s) = doc.vector
+            else {
                 continue;
             };
-            let Ok(vec) = parse_vector(vec_s) else {
+            let Ok(vec) = parse_vector(vec_s)
+            else {
                 continue;
             };
             if vec.len() != query.len() {
@@ -421,21 +353,13 @@ impl LocalProjectionStore {
                 schema_fingerprint: doc.schema_fingerprint,
             });
         }
-        hits.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.entity_id.cmp(&b.entity_id))
-        });
+        hits.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal).then_with(|| a.entity_id.cmp(&b.entity_id)));
         hits.truncate(k);
         Ok(hits)
     }
 
     /// Rebuild/status snapshot for a component.
-    pub fn rebuild_status(
-        &self,
-        component: &str,
-    ) -> ProjectionStoreResult<ProjectionRebuildStatus> {
+    pub fn rebuild_status(&self, component: &str) -> ProjectionStoreResult<ProjectionRebuildStatus> {
         self.ensure_component(component)?;
         let active = self.active_generation(component)?;
         let mut generations = Vec::new();
@@ -445,7 +369,8 @@ impl LocalProjectionStore {
             for entry in fs::read_dir(&gens_root)? {
                 let entry = entry?;
                 let name = entry.file_name();
-                let Some(gen_id) = name.to_str() else {
+                let Some(gen_id) = name.to_str()
+                else {
                     continue;
                 };
                 generations.push(gen_id.to_string());
@@ -479,14 +404,12 @@ impl LocalProjectionStore {
         for entry in fs::read_dir(&gens_root)? {
             let entry = entry?;
             let name = entry.file_name();
-            let Some(gen_id) = name.to_str() else {
+            let Some(gen_id) = name.to_str()
+            else {
                 continue;
             };
             if let Ok(meta) = self.load_gen_meta(component, gen_id)
-                && matches!(
-                    meta.state,
-                    GenerationState::Retired | GenerationState::Failed
-                )
+                && matches!(meta.state, GenerationState::Retired | GenerationState::Failed)
             {
                 retired.push((gen_id.to_string(), meta.updated_unix_ms));
             }
@@ -502,12 +425,7 @@ impl LocalProjectionStore {
         fs::create_dir_all(self.component_dir(component).join("generations"))?;
         let alias = self.alias_path(component);
         if !alias.exists() {
-            let wire = AliasWire {
-                format: PROJECTION_ALIAS_FORMAT.into(),
-                version: 1,
-                component: component.into(),
-                active_generation: None,
-            };
+            let wire = AliasWire { format: PROJECTION_ALIAS_FORMAT.into(), version: 1, component: component.into(), active_generation: None };
             self.write_alias(component, &wire)?;
         }
         Ok(())
@@ -522,20 +440,15 @@ impl LocalProjectionStore {
     }
 
     fn gen_dir(&self, component: &str, gen_id: &str) -> PathBuf {
-        self.component_dir(component)
-            .join("generations")
-            .join(gen_id)
+        self.component_dir(component).join("generations").join(gen_id)
     }
 
     fn doc_path(&self, component: &str, gen_id: &str, entity_id: &str) -> PathBuf {
-        self.gen_dir(component, gen_id)
-            .join("docs")
-            .join(format!("{entity_id}.von"))
+        self.gen_dir(component, gen_id).join("docs").join(format!("{entity_id}.von"))
     }
 
     fn write_alias(&self, component: &str, alias: &AliasWire) -> ProjectionStoreResult<()> {
-        let text = von::to_string_indented(alias)
-            .map_err(|e| ProjectionStoreError::Codec(format!("serialize alias: {e}")))?;
+        let text = von::to_string_indented(alias).map_err(|e| ProjectionStoreError::Codec(format!("serialize alias: {e}")))?;
         let path = self.alias_path(component);
         let tmp = path.with_extension("von.tmp");
         fs::write(&tmp, &text)?;
@@ -543,39 +456,22 @@ impl LocalProjectionStore {
         Ok(())
     }
 
-    fn write_gen_meta(
-        &self,
-        component: &str,
-        gen_id: &str,
-        meta: &GenerationMetaWire,
-    ) -> ProjectionStoreResult<()> {
-        let text = von::to_string_indented(meta)
-            .map_err(|e| ProjectionStoreError::Codec(format!("serialize generation meta: {e}")))?;
+    fn write_gen_meta(&self, component: &str, gen_id: &str, meta: &GenerationMetaWire) -> ProjectionStoreResult<()> {
+        let text = von::to_string_indented(meta).map_err(|e| ProjectionStoreError::Codec(format!("serialize generation meta: {e}")))?;
         fs::write(self.gen_dir(component, gen_id).join("meta.von"), text)?;
         Ok(())
     }
 
-    fn load_gen_meta(
-        &self,
-        component: &str,
-        gen_id: &str,
-    ) -> ProjectionStoreResult<GenerationMetaWire> {
+    fn load_gen_meta(&self, component: &str, gen_id: &str) -> ProjectionStoreResult<GenerationMetaWire> {
         let path = self.gen_dir(component, gen_id).join("meta.von");
         if !path.exists() {
-            return Err(ProjectionStoreError::NotFound(format!(
-                "generation `{gen_id}` not found for `{component}`"
-            )));
+            return Err(ProjectionStoreError::NotFound(format!("generation `{gen_id}` not found for `{component}`")));
         }
         let text = fs::read_to_string(path)?;
-        von::from_str(&text)
-            .map_err(|e| ProjectionStoreError::Codec(format!("corrupt generation meta: {e}")))
+        von::from_str(&text).map_err(|e| ProjectionStoreError::Codec(format!("corrupt generation meta: {e}")))
     }
 
-    fn load_docs(
-        &self,
-        component: &str,
-        gen_id: &str,
-    ) -> ProjectionStoreResult<Vec<ProjectionDocument>> {
+    fn load_docs(&self, component: &str, gen_id: &str) -> ProjectionStoreResult<Vec<ProjectionDocument>> {
         let dir = self.gen_dir(component, gen_id).join("docs");
         let mut out = Vec::new();
         if !dir.exists() {
@@ -584,8 +480,8 @@ impl LocalProjectionStore {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let text = fs::read_to_string(entry.path())?;
-            let doc: ProjectionDocument = von::from_str(&text)
-                .map_err(|e| ProjectionStoreError::Codec(format!("corrupt projection doc: {e}")))?;
+            let doc: ProjectionDocument =
+                von::from_str(&text).map_err(|e| ProjectionStoreError::Codec(format!("corrupt projection doc: {e}")))?;
             out.push(doc);
         }
         Ok(out)
@@ -593,10 +489,7 @@ impl LocalProjectionStore {
 }
 
 fn parse_vector(parts: &[String]) -> Result<Vec<f32>, ()> {
-    parts
-        .iter()
-        .map(|s| s.parse::<f32>().map_err(|_| ()))
-        .collect()
+    parts.iter().map(|s| s.parse::<f32>().map_err(|_| ())).collect()
 }
 
 fn l2(a: &[f32], b: &[f32]) -> f64 {
@@ -617,10 +510,7 @@ mod tests {
     use iris_ir::ProjectionGeneration;
 
     fn tmp() -> (LocalProjectionStore, PathBuf) {
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let root = std::env::temp_dir().join(format!("iris-proj-{stamp}"));
         let store = LocalProjectionStore::open(
             &root,
@@ -655,10 +545,7 @@ mod tests {
             )
             .unwrap();
         store.activate(&h1, 1_002).unwrap();
-        assert_eq!(
-            store.active_generation("search").unwrap().as_deref(),
-            Some(h1.generation.as_str())
-        );
+        assert_eq!(store.active_generation("search").unwrap().as_deref(), Some(h1.generation.as_str()));
 
         // Live search works on g1 while g2 builds.
         let hits = store.search("search", "hello", 10).unwrap();
@@ -729,15 +616,8 @@ mod tests {
         assert_eq!(cands.len(), 2);
 
         let mut auth = MapAuthorityLookup::default();
-        auth.rows.insert(
-            "a".into(),
-            AuthorityEntity {
-                entity_id: "a".into(),
-                entity_version: 1,
-                deleted: false,
-                payload: Some("row-a".into()),
-            },
-        );
+        auth.rows
+            .insert("a".into(), AuthorityEntity { entity_id: "a".into(), entity_version: 1, deleted: false, payload: Some("row-a".into()) });
         // ghost missing -> dropped
         let hydrated = hydrate_candidates(&cands, &auth).unwrap();
         assert_eq!(hydrated.entities.len(), 1);
@@ -750,10 +630,7 @@ mod tests {
     fn vector_nearest_returns_ranked_candidates() {
         let (store, root) = tmp();
         let h = store.begin_rebuild("vecs", "fp", 4_000).unwrap();
-        for (id, vec) in [
-            ("near", vec!["1".into(), "0".into()]),
-            ("far", vec!["0".into(), "1".into()]),
-        ] {
+        for (id, vec) in [("near", vec!["1".into(), "0".into()]), ("far", vec!["0".into(), "1".into()])] {
             store
                 .upsert_building(
                     &h,

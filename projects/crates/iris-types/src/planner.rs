@@ -1,15 +1,14 @@
 //! Plan + capability negotiation.
 
-use iris_ir::{
-    EffectKind, IrEnvelope, IrVersion, PhysicalOp, PhysicalPlan, PlannedNode, RealizationClass,
-    SchemaFingerprint, hash_ops,
-};
+use iris_ir::{EffectKind, IrEnvelope, IrVersion, PhysicalOp, PhysicalPlan, PlannedNode, RealizationClass, SchemaFingerprint, hash_ops};
 use vos::ast::Span;
 
-use crate::capability::CapabilitySet;
-use crate::diagnostic::Diagnostic;
-use crate::error::{Error, Result};
-use crate::lower;
+use crate::{
+    capability::CapabilitySet,
+    diagnostic::Diagnostic,
+    error::{Error, Result},
+    lower,
+};
 
 /// Planner: parse-ready program -> physical plan with realization classes.
 #[derive(Debug, Clone)]
@@ -55,9 +54,7 @@ impl Planner {
             }
             let (realization, note) = self.classify(&op);
             if realization == RealizationClass::Rejected {
-                let message = note
-                    .clone()
-                    .unwrap_or_else(|| "operation rejected by capability policy".into());
+                let message = note.clone().unwrap_or_else(|| "operation rejected by capability policy".into());
                 // Still build a rejected plan node, but fail before execute via Result
                 // so callers get a spanned diagnostic immediately.
                 return Err(Error::diagnostic(Diagnostic {
@@ -69,11 +66,7 @@ impl Planner {
                     hint: Some("enable the missing capability or rewrite the VOS operation".into()),
                 }));
             }
-            nodes.push(PlannedNode {
-                op,
-                realization,
-                note,
-            });
+            nodes.push(PlannedNode { op, realization, note });
         }
 
         let semantic_hash = hash_ops(&nodes.iter().map(|n| n.op.clone()).collect::<Vec<_>>());
@@ -99,41 +92,33 @@ impl Planner {
             PhysicalOp::Filter { .. } => {
                 if q.filter_bool || q.filter_cmp {
                     (RealizationClass::Native, None)
-                } else {
-                    (
-                        RealizationClass::Rejected,
-                        Some("backend cannot filter rows".into()),
-                    )
+                }
+                else {
+                    (RealizationClass::Rejected, Some("backend cannot filter rows".into()))
                 }
             }
             PhysicalOp::Project { .. } => {
                 if q.project {
                     (RealizationClass::Native, None)
-                } else {
-                    (
-                        RealizationClass::Rejected,
-                        Some("backend cannot project fields".into()),
-                    )
+                }
+                else {
+                    (RealizationClass::Rejected, Some("backend cannot project fields".into()))
                 }
             }
             PhysicalOp::Sort { .. } => {
                 if q.sort {
                     (RealizationClass::Native, None)
-                } else {
-                    (
-                        RealizationClass::Rejected,
-                        Some("backend cannot sort rows".into()),
-                    )
+                }
+                else {
+                    (RealizationClass::Rejected, Some("backend cannot sort rows".into()))
                 }
             }
             PhysicalOp::Skip { .. } | PhysicalOp::Take { .. } => {
                 if q.page {
                     (RealizationClass::Native, None)
-                } else {
-                    (
-                        RealizationClass::Rejected,
-                        Some("backend cannot page with skip/take".into()),
-                    )
+                }
+                else {
+                    (RealizationClass::Rejected, Some("backend cannot page with skip/take".into()))
                 }
             }
         }

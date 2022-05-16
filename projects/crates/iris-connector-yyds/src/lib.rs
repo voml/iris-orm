@@ -69,10 +69,7 @@ impl ReadinessReport {
             message: "YYDS formal VOS IR executor / .yyds+.yykv lifecycle facade is not yet \
                       available for Iris; connector refuses connect and will not use SQL gateways"
                 .into(),
-            forbidden_legacy_surfaces: FORBIDDEN_LEGACY_SURFACES
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect(),
+            forbidden_legacy_surfaces: FORBIDDEN_LEGACY_SURFACES.iter().map(|s| (*s).to_string()).collect(),
         }
     }
 
@@ -142,9 +139,7 @@ impl YydsSource {
             return Err(Error::NotReady(report));
         }
         // Future: open formal VOS protocol client here.
-        Err(Error::Policy(
-            "readiness bits set but VOS client binding is not implemented yet".into(),
-        ))
+        Err(Error::Policy("readiness bits set but VOS client binding is not implemented yet".into()))
     }
 
     /// Reject any attempt to attach a legacy SQL surface by name.
@@ -152,9 +147,7 @@ impl YydsSource {
         let lowered = name.to_ascii_lowercase();
         for banned in FORBIDDEN_LEGACY_SURFACES {
             if lowered.contains(&banned.to_ascii_lowercase()) {
-                return Err(Error::ForbiddenLegacy(format!(
-                    "refusing legacy YYDS surface `{name}` (matched `{banned}`)"
-                )));
+                return Err(Error::ForbiddenLegacy(format!("refusing legacy YYDS surface `{name}` (matched `{banned}`)")));
             }
         }
         Ok(())

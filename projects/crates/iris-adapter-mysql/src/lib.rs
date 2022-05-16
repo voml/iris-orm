@@ -15,12 +15,8 @@ mod uuid_util;
 use std::collections::HashSet;
 
 use iris_ir::{IrVersion, PhysicalPlan};
-use iris_types::{
-    CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps,
-    Row, RowWrite, WriteCaps,
-};
-use mysql::Pool;
-use mysql::prelude::*;
+use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
+use mysql::{Pool, prelude::*};
 use vos::ast::Document;
 
 pub use catalog::{adopt_plan, classify_type};
@@ -43,9 +39,7 @@ pub struct MysqlSource {
 
 impl std::fmt::Debug for MysqlSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MysqlSource")
-            .field("backend", &BACKEND_ID)
-            .finish_non_exhaustive()
+        f.debug_struct("MysqlSource").field("backend", &BACKEND_ID).finish_non_exhaustive()
     }
 }
 
@@ -66,10 +60,7 @@ impl MysqlSource {
     pub fn connect(url: &str) -> Result<Self> {
         let opts = mysql::Opts::from_url(url).map_err(|e| Error::Config(e.to_string()))?;
         let pool = Pool::new(opts).map_err(Error::Mysql)?;
-        Ok(Self {
-            pool,
-            uuid_fields: HashSet::new(),
-        })
+        Ok(Self { pool, uuid_fields: HashSet::new() })
     }
 
     /// Register VOS schema so `uuid` columns encode/decode as MySQL `BINARY(16)`.
@@ -86,10 +77,7 @@ impl MysqlSource {
         T: Into<String>,
         F: Into<String>,
     {
-        self.uuid_fields = fields
-            .into_iter()
-            .map(|(table, field)| (table.into(), field.into()))
-            .collect();
+        self.uuid_fields = fields.into_iter().map(|(table, field)| (table.into(), field.into())).collect();
         self
     }
 
@@ -127,11 +115,7 @@ impl MysqlSource {
     }
 
     /// Apply a previously reviewed Managed Push plan.
-    pub fn apply_managed_push(
-        &self,
-        plan: &LogicalMigrationPlan,
-        vos_schema: &str,
-    ) -> Result<PushReport> {
+    pub fn apply_managed_push(&self, plan: &LogicalMigrationPlan, vos_schema: &str) -> Result<PushReport> {
         let document = parse_vos(vos_schema)?;
         let mut conn = self.pool.get_conn()?;
         migrate::apply_push(&mut conn, plan, &document)
@@ -141,9 +125,7 @@ impl MysqlSource {
     pub fn managed_push(&self, vos_schema: &str) -> Result<PushReport> {
         let plan = self.plan_managed_push(vos_schema)?;
         if plan.destructive {
-            return Err(Error::Policy(
-                "destructive managed push requires explicit review/apply".into(),
-            ));
+            return Err(Error::Policy("destructive managed push requires explicit review/apply".into()));
         }
         self.apply_managed_push(&plan, vos_schema)
     }
@@ -162,15 +144,9 @@ impl MysqlSource {
     }
 
     /// Execute a plan on an existing connection (same session / transaction).
-    pub fn execute_plan_on(
-        &self,
-        conn: &mut mysql::PooledConn,
-        plan: &PhysicalPlan,
-    ) -> Result<Vec<Row>> {
+    pub fn execute_plan_on(&self, conn: &mut mysql::PooledConn, plan: &PhysicalPlan) -> Result<Vec<Row>> {
         if plan.is_rejected() {
-            return Err(Error::Policy(
-                plan.rejection_note().unwrap_or("plan rejected").to_string(),
-            ));
+            return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         execute::execute_plan(conn, plan, &self.uuid_fields)
     }
@@ -204,13 +180,7 @@ impl MysqlSource {
     }
 
     /// Delete on an existing connection (same session / transaction).
-    pub fn delete_on(
-        &self,
-        conn: &mut mysql::PooledConn,
-        table: &str,
-        primary_key: &str,
-        key: &iris_types::Value,
-    ) -> Result<u64> {
+    pub fn delete_on(&self, conn: &mut mysql::PooledConn, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<u64> {
         execute::delete_row(conn, table, primary_key, key, &self.uuid_fields)
     }
 
@@ -237,10 +207,7 @@ impl MysqlSource {
 
     /// Like [`Self::transaction`], but **always** `ROLLBACK` — for integration
     /// tests against a shared database (insert fixtures, assert, leave no residue).
-    pub fn with_rollback<R>(
-        &self,
-        f: impl FnOnce(&mut mysql::PooledConn) -> Result<R>,
-    ) -> Result<R> {
+    pub fn with_rollback<R>(&self, f: impl FnOnce(&mut mysql::PooledConn) -> Result<R>) -> Result<R> {
         let mut conn = self.pool.get_conn()?;
         conn.query_drop("START TRANSACTION")?;
         let result = f(&mut conn);
@@ -250,15 +217,8 @@ impl MysqlSource {
 }
 
 fn parse_vos(vos_schema: &str) -> Result<vos::ast::Document> {
-    vos::parser::parse_document(vos_schema).map_err(|d| {
-        Error::Vos(format!(
-            "parse schema: {}",
-            d.errors
-                .first()
-                .map(|e| e.message.as_str())
-                .unwrap_or("unknown")
-        ))
-    })
+    vos::parser::parse_document(vos_schema)
+        .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))
 }
 
 /// Adapter errors.

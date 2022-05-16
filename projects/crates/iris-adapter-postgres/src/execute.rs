@@ -2,9 +2,10 @@
 
 use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred};
 use iris_types::{Row, RowWrite, Value};
-use postgres::Client;
-use postgres::GenericClient;
-use postgres::types::{IsNull, ToSql, Type, to_sql_checked};
+use postgres::{
+    Client, GenericClient,
+    types::{IsNull, ToSql, Type, to_sql_checked},
+};
 
 use crate::Result;
 
@@ -17,11 +18,7 @@ enum OwnedSql {
 }
 
 impl ToSql for OwnedSql {
-    fn to_sql(
-        &self,
-        ty: &Type,
-        out: &mut bytes::BytesMut,
-    ) -> std::result::Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
+    fn to_sql(&self, ty: &Type, out: &mut bytes::BytesMut) -> std::result::Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
         match self {
             Self::Null => Ok(IsNull::Yes),
             Self::Bool(v) => v.to_sql(ty, out),
@@ -34,10 +31,7 @@ impl ToSql for OwnedSql {
         <bool as ToSql>::accepts(ty)
             || <i64 as ToSql>::accepts(ty)
             || <String as ToSql>::accepts(ty)
-            || matches!(
-                *ty,
-                Type::UNKNOWN | Type::TEXT | Type::VARCHAR | Type::BPCHAR
-            )
+            || matches!(*ty, Type::UNKNOWN | Type::TEXT | Type::VARCHAR | Type::BPCHAR)
     }
 
     to_sql_checked!();
@@ -78,26 +72,13 @@ pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<V
                         .iter()
                         .map(|f| {
                             let src = f.from.as_deref().unwrap_or(f.name.as_str());
-                            if src == f.name {
-                                format!("\"{src}\"")
-                            } else {
-                                format!("\"{src}\" AS \"{}\"", f.name)
-                            }
+                            if src == f.name { format!("\"{src}\"") } else { format!("\"{src}\" AS \"{}\"", f.name) }
                         })
                         .collect(),
                 );
             }
             PhysicalOp::Sort { keys } => {
-                let parts: Vec<String> = keys
-                    .iter()
-                    .map(|k| {
-                        format!(
-                            "\"{}\" {}",
-                            k.field,
-                            if k.ascending { "ASC" } else { "DESC" }
-                        )
-                    })
-                    .collect();
+                let parts: Vec<String> = keys.iter().map(|k| format!("\"{}\" {}", k.field, if k.ascending { "ASC" } else { "DESC" })).collect();
                 order = Some(parts.join(", "));
             }
             PhysicalOp::Skip { count } => offset = Some(*count),
@@ -107,9 +88,7 @@ pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<V
     }
 
     let table = table.ok_or_else(|| crate::Error::Policy("plan missing Scan".into()))?;
-    let select = projection
-        .map(|p| p.join(", "))
-        .unwrap_or_else(|| "*".into());
+    let select = projection.map(|p| p.join(", ")).unwrap_or_else(|| "*".into());
     let mut sql = format!("SELECT {select} FROM \"{table}\"");
     if let Some(w) = &where_sql {
         sql.push_str(" WHERE ");
@@ -126,10 +105,7 @@ pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<V
         sql.push_str(&format!(" OFFSET {o}"));
     }
 
-    let param_refs: Vec<&(dyn ToSql + Sync)> = where_params
-        .iter()
-        .map(|p| p as &(dyn ToSql + Sync))
-        .collect();
+    let param_refs: Vec<&(dyn ToSql + Sync)> = where_params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
     let rows = client.query(&sql, &param_refs[..])?;
     let mut out = Vec::new();
     for row in rows {
@@ -146,60 +122,29 @@ pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<V
 pub(crate) fn insert_row(client: &mut impl GenericClient, write: &RowWrite) -> Result<()> {
     let cols: Vec<String> = write.fields.keys().map(|k| format!("\"{k}\"")).collect();
     let placeholders: Vec<String> = (1..=cols.len()).map(|i| format!("${i}")).collect();
-    let sql = format!(
-        "INSERT INTO \"{}\" ({}) VALUES ({})",
-        write.table,
-        cols.join(", "),
-        placeholders.join(", ")
-    );
+    let sql = format!("INSERT INTO \"{}\" ({}) VALUES ({})", write.table, cols.join(", "), placeholders.join(", "));
     let params: Vec<OwnedSql> = write.fields.values().map(to_owned).collect();
-    let param_refs: Vec<&(dyn ToSql + Sync)> =
-        params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+    let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
     client.execute(&sql, &param_refs[..])?;
     Ok(())
 }
 
 pub(crate) fn update_row(client: &mut impl GenericClient, write: &RowWrite) -> Result<u64> {
-    let key = write
-        .fields
-        .get(&write.primary_key)
-        .ok_or_else(|| crate::Error::Policy("update missing primary key value".into()))?;
-    let set_fields: Vec<&String> = write
-        .fields
-        .keys()
-        .filter(|k| *k != &write.primary_key)
-        .collect();
+    let key = write.fields.get(&write.primary_key).ok_or_else(|| crate::Error::Policy("update missing primary key value".into()))?;
+    let set_fields: Vec<&String> = write.fields.keys().filter(|k| *k != &write.primary_key).collect();
     if set_fields.is_empty() {
         return Ok(0);
     }
-    let sets: Vec<String> = set_fields
-        .iter()
-        .enumerate()
-        .map(|(i, k)| format!("\"{k}\" = ${}", i + 1))
-        .collect();
+    let sets: Vec<String> = set_fields.iter().enumerate().map(|(i, k)| format!("\"{k}\" = ${}", i + 1)).collect();
     let key_idx = set_fields.len() + 1;
-    let sql = format!(
-        "UPDATE \"{}\" SET {} WHERE \"{}\" = ${key_idx}",
-        write.table,
-        sets.join(", "),
-        write.primary_key
-    );
-    let mut params: Vec<OwnedSql> = set_fields
-        .iter()
-        .map(|k| to_owned(write.fields.get(*k).expect("field")))
-        .collect();
+    let sql = format!("UPDATE \"{}\" SET {} WHERE \"{}\" = ${key_idx}", write.table, sets.join(", "), write.primary_key);
+    let mut params: Vec<OwnedSql> = set_fields.iter().map(|k| to_owned(write.fields.get(*k).expect("field"))).collect();
     params.push(to_owned(key));
-    let param_refs: Vec<&(dyn ToSql + Sync)> =
-        params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+    let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
     Ok(client.execute(&sql, &param_refs[..])?)
 }
 
-pub(crate) fn delete_row(
-    client: &mut impl GenericClient,
-    table: &str,
-    primary_key: &str,
-    key: &Value,
-) -> Result<u64> {
+pub(crate) fn delete_row(client: &mut impl GenericClient, table: &str, primary_key: &str, key: &Value) -> Result<u64> {
     let sql = format!("DELETE FROM \"{table}\" WHERE \"{primary_key}\" = $1");
     let param = to_owned(key);
     Ok(client.execute(&sql, &[&param])?)
@@ -207,17 +152,8 @@ pub(crate) fn delete_row(
 
 fn pred_to_sql(pred: &Pred, start: usize) -> Result<(String, Vec<OwnedSql>, usize)> {
     match pred {
-        Pred::FieldBool { field, value } => Ok((
-            format!("\"{field}\" = ${start}"),
-            vec![OwnedSql::Bool(*value)],
-            start + 1,
-        )),
-        Pred::FieldCmp {
-            field,
-            op,
-            literal,
-            kind,
-        } => {
+        Pred::FieldBool { field, value } => Ok((format!("\"{field}\" = ${start}"), vec![OwnedSql::Bool(*value)], start + 1)),
+        Pred::FieldCmp { field, op, literal, kind } => {
             let op_sql = match op {
                 CmpOp::Eq => "=",
                 CmpOp::Ne => "!=",
@@ -226,11 +162,7 @@ fn pred_to_sql(pred: &Pred, start: usize) -> Result<(String, Vec<OwnedSql>, usiz
                 CmpOp::Gt => ">",
                 CmpOp::Ge => ">=",
             };
-            Ok((
-                format!("\"{field}\" {op_sql} ${start}"),
-                vec![literal_to_owned(literal, *kind)],
-                start + 1,
-            ))
+            Ok((format!("\"{field}\" {op_sql} ${start}"), vec![literal_to_owned(literal, *kind)], start + 1))
         }
         Pred::And(a, b) => {
             let (sa, mut pa, n1) = pred_to_sql(a, start)?;

@@ -2,9 +2,7 @@
 
 use iris_adapter_mysql::{BACKEND_ID, MysqlSource, adopt_plan, classify_type};
 use iris_ir::RealizationClass;
-use iris_types::{
-    MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, Planner, RowWrite, Value,
-};
+use iris_types::{MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, Planner, RowWrite, Value};
 use std::collections::BTreeMap;
 
 const USER_SCHEMA: &str = r#"
@@ -16,9 +14,7 @@ table User {
 "#;
 
 fn live_url() -> Option<String> {
-    std::env::var("IRIS_TEST_MYSQL_URL")
-        .ok()
-        .filter(|s| !s.is_empty())
+    std::env::var("IRIS_TEST_MYSQL_URL").ok().filter(|s| !s.is_empty())
 }
 
 #[test]
@@ -35,10 +31,7 @@ fn adapter_is_not_sqlite_or_postgres() {
 
 #[test]
 fn mysql_type_mapping_is_dialect_specific() {
-    assert_eq!(
-        classify_type("bool", "tinyint").0,
-        MappingQuality::Compatible
-    );
+    assert_eq!(classify_type("bool", "tinyint").0, MappingQuality::Compatible);
     assert_eq!(classify_type("utf8", "text").0, MappingQuality::Exact);
     assert_eq!(classify_type("uuid", "char").0, MappingQuality::Compatible);
     assert_eq!(classify_type("uuid", "binary").0, MappingQuality::Exact);
@@ -50,12 +43,7 @@ fn adopt_plan_blocks_missing_pk_without_live_db() {
         backend_id: BACKEND_ID.into(),
         tables: vec![ObservedTable {
             name: "Legacy".into(),
-            columns: vec![ObservedColumn {
-                name: "name".into(),
-                type_name: "text".into(),
-                nullable: true,
-                primary_key: false,
-            }],
+            columns: vec![ObservedColumn { name: "name".into(), type_name: "text".into(), nullable: true, primary_key: false }],
         }],
     };
     let doc = vos::parser::parse_document(
@@ -68,16 +56,8 @@ fn adopt_plan_blocks_missing_pk_without_live_db() {
     )
     .expect("parse");
     let manifest = adopt_plan(&doc, &catalog);
-    let legacy = manifest
-        .tables
-        .iter()
-        .find(|t| t.vos_table == "Legacy")
-        .unwrap();
-    assert!(
-        legacy.blockers.iter().any(|b| b.contains("no primary key")),
-        "{:?}",
-        legacy.blockers
-    );
+    let legacy = manifest.tables.iter().find(|t| t.vos_table == "Legacy").unwrap();
+    assert!(legacy.blockers.iter().any(|b| b.contains("no primary key")), "{:?}", legacy.blockers);
 }
 
 #[test]
@@ -90,18 +70,8 @@ fn plan_push_emits_add_field_for_missing_columns() {
         tables: vec![ObservedTable {
             name: "Goods".into(),
             columns: vec![
-                ObservedColumn {
-                    name: "sku_id".into(),
-                    type_name: "varchar".into(),
-                    nullable: false,
-                    primary_key: true,
-                },
-                ObservedColumn {
-                    name: "name".into(),
-                    type_name: "text".into(),
-                    nullable: false,
-                    primary_key: false,
-                },
+                ObservedColumn { name: "sku_id".into(), type_name: "varchar".into(), nullable: false, primary_key: true },
+                ObservedColumn { name: "name".into(), type_name: "text".into(), nullable: false, primary_key: false },
             ],
         }],
     };
@@ -121,26 +91,19 @@ fn plan_push_emits_add_field_for_missing_columns() {
         .changes
         .iter()
         .filter_map(|c| match c {
-            LogicalChange::AddField {
-                vos_table,
-                vos_field,
-            } => Some((vos_table.as_str(), vos_field.as_str())),
+            LogicalChange::AddField { vos_table, vos_field } => Some((vos_table.as_str(), vos_field.as_str())),
             _ => None,
         })
         .collect();
     assert!(adds.contains(&("Goods", "cover_url")), "{adds:?}");
     assert!(adds.contains(&("Goods", "status")), "{adds:?}");
-    assert!(
-        !plan
-            .changes
-            .iter()
-            .any(|c| matches!(c, LogicalChange::CreateTable { .. }))
-    );
+    assert!(!plan.changes.iter().any(|c| matches!(c, LogicalChange::CreateTable { .. })));
 }
 
 #[test]
 fn live_managed_push_crud_txn_drift_and_pool() {
-    let Some(url) = live_url() else {
+    let Some(url) = live_url()
+    else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
         return;
     };
@@ -164,10 +127,7 @@ fn live_managed_push_crud_txn_drift_and_pool() {
         table: "User".into(),
         primary_key: "user_id".into(),
         fields: BTreeMap::from([
-            (
-                "user_id".into(),
-                Value::Str("550e8400-e29b-41d4-a716-446655440000".into()),
-            ),
+            ("user_id".into(), Value::Str("550e8400-e29b-41d4-a716-446655440000".into())),
             ("user_name".into(), Value::Str("alice".into())),
             ("active".into(), Value::Bool(true)),
         ]),
@@ -177,10 +137,7 @@ fn live_managed_push_crud_txn_drift_and_pool() {
         table: "User".into(),
         primary_key: "user_id".into(),
         fields: BTreeMap::from([
-            (
-                "user_id".into(),
-                Value::Str("6ba7b810-9dad-11d1-80b4-00c04fd430c8".into()),
-            ),
+            ("user_id".into(), Value::Str("6ba7b810-9dad-11d1-80b4-00c04fd430c8".into())),
             ("user_name".into(), Value::Str("bob".into())),
             ("active".into(), Value::Bool(false)),
         ]),
@@ -208,10 +165,7 @@ fn live_managed_push_crud_txn_drift_and_pool() {
     let rows_where = db.execute_plan(&plan_where).unwrap();
     assert_eq!(rows, rows_where);
     assert_eq!(rows.len(), 1);
-    assert_eq!(
-        rows[0].get("user_id"),
-        Some(&Value::Str("550e8400-e29b-41d4-a716-446655440000".into()))
-    );
+    assert_eq!(rows[0].get("user_id"), Some(&Value::Str("550e8400-e29b-41d4-a716-446655440000".into())));
 
     let plan = Planner::new(MysqlSource::capabilities())
         .plan_source(
@@ -222,11 +176,7 @@ fn live_managed_push_crud_txn_drift_and_pool() {
             "#,
         )
         .unwrap();
-    assert!(
-        plan.nodes
-            .iter()
-            .all(|n| n.realization == RealizationClass::Native)
-    );
+    assert!(plan.nodes.iter().all(|n| n.realization == RealizationClass::Native));
     let rows = db.execute_plan(&plan).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].get("user_name"), Some(&Value::Str("alice".into())));
@@ -236,22 +186,13 @@ fn live_managed_push_crud_txn_drift_and_pool() {
             table: "User".into(),
             primary_key: "user_id".into(),
             fields: BTreeMap::from([
-                (
-                    "user_id".into(),
-                    Value::Str("6ba7b810-9dad-11d1-80b4-00c04fd430c8".into()),
-                ),
+                ("user_id".into(), Value::Str("6ba7b810-9dad-11d1-80b4-00c04fd430c8".into())),
                 ("active".into(), Value::Bool(true)),
             ]),
         })
         .unwrap();
     assert!(n >= 1);
-    let n = db
-        .delete(
-            "User",
-            "user_id",
-            &Value::Str("550e8400-e29b-41d4-a716-446655440000".into()),
-        )
-        .unwrap();
+    let n = db.delete("User", "user_id", &Value::Str("550e8400-e29b-41d4-a716-446655440000".into())).unwrap();
     assert!(n >= 1);
 
     let again = db.plan_managed_push(USER_SCHEMA).unwrap();
@@ -270,14 +211,12 @@ fn live_managed_push_crud_txn_drift_and_pool() {
 
 #[test]
 fn live_same_connection_txn_visible_and_rolls_back_on_err() {
-    let Some(url) = live_url() else {
+    let Some(url) = live_url()
+    else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
         return;
     };
-    let db = MysqlSource::connect(&url)
-        .expect("connect")
-        .with_vos_schema(USER_SCHEMA)
-        .expect("uuid schema map");
+    let db = MysqlSource::connect(&url).expect("connect").with_vos_schema(USER_SCHEMA).expect("uuid schema map");
 
     db.transaction(|conn| {
         use mysql::prelude::*;
@@ -297,21 +236,15 @@ fn live_same_connection_txn_visible_and_rolls_back_on_err() {
             ("active".into(), Value::Bool(true)),
         ]),
     };
-    let plan = Planner::new(MysqlSource::capabilities())
-        .plan_source(&format!(
-            r#"User.filter(x => x.user_id == "{fixture_id}").collect()"#
-        ))
-        .unwrap();
+    let plan =
+        Planner::new(MysqlSource::capabilities()).plan_source(&format!(r#"User.filter(x => x.user_id == "{fixture_id}").collect()"#)).unwrap();
 
     // Same connection: insert_on then execute_plan_on must see the row before commit.
     db.transaction(|conn| {
         db.insert_on(conn, &write)?;
         let rows = db.execute_plan_on(conn, &plan)?;
         assert_eq!(rows.len(), 1);
-        assert_eq!(
-            rows[0].get("user_name"),
-            Some(&Value::Str("txn_visible".into()))
-        );
+        assert_eq!(rows[0].get("user_name"), Some(&Value::Str("txn_visible".into())));
         Ok(())
     })
     .unwrap();
@@ -330,11 +263,8 @@ fn live_same_connection_txn_visible_and_rolls_back_on_err() {
             ("active".into(), Value::Bool(false)),
         ]),
     };
-    let ghost_plan = Planner::new(MysqlSource::capabilities())
-        .plan_source(&format!(
-            r#"User.filter(x => x.user_id == "{ghost_id}").collect()"#
-        ))
-        .unwrap();
+    let ghost_plan =
+        Planner::new(MysqlSource::capabilities()).plan_source(&format!(r#"User.filter(x => x.user_id == "{ghost_id}").collect()"#)).unwrap();
     let err = db
         .transaction(|conn| -> iris_adapter_mysql::Result<()> {
             db.insert_on(conn, &ghost)?;
@@ -354,14 +284,12 @@ fn live_same_connection_txn_visible_and_rolls_back_on_err() {
 
 #[test]
 fn live_with_rollback_leaves_no_residue_on_success() {
-    let Some(url) = live_url() else {
+    let Some(url) = live_url()
+    else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
         return;
     };
-    let db = MysqlSource::connect(&url)
-        .expect("connect")
-        .with_vos_schema(USER_SCHEMA)
-        .expect("uuid schema map");
+    let db = MysqlSource::connect(&url).expect("connect").with_vos_schema(USER_SCHEMA).expect("uuid schema map");
 
     db.transaction(|conn| {
         use mysql::prelude::*;
@@ -381,11 +309,8 @@ fn live_with_rollback_leaves_no_residue_on_success() {
             ("active".into(), Value::Bool(true)),
         ]),
     };
-    let plan = Planner::new(MysqlSource::capabilities())
-        .plan_source(&format!(
-            r#"User.filter(x => x.user_id == "{fixture_id}").collect()"#
-        ))
-        .unwrap();
+    let plan =
+        Planner::new(MysqlSource::capabilities()).plan_source(&format!(r#"User.filter(x => x.user_id == "{fixture_id}").collect()"#)).unwrap();
 
     db.with_rollback(|conn| {
         db.insert_on(conn, &write)?;

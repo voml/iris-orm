@@ -33,27 +33,15 @@ pub fn encode_operation_json(json: &str) -> Result<String, String> {
 
 fn encode_operation(op: &IrisOperation) -> Result<String, String> {
     match op {
-        IrisOperation::FindMany {
-            entity,
-            filter,
-            take: _,
-        } => {
+        IrisOperation::FindMany { entity, filter, take: _ } => {
             let pipeline = match filter {
                 None => format!("{entity}.collect()"),
-                Some(pred) => format!(
-                    "{entity}.filter(x => x.{field}{cmp}).collect()",
-                    field = pred.field,
-                    cmp = cmp_suffix(&pred.value)?
-                ),
+                Some(pred) => format!("{entity}.filter(x => x.{field}{cmp}).collect()", field = pred.field, cmp = cmp_suffix(&pred.value)?),
             };
             Ok(pipeline)
         }
         IrisOperation::FindUnique { entity, filter } => {
-            let pipeline = format!(
-                "{entity}.filter(x => x.{field}{cmp}).collect()",
-                field = filter.field,
-                cmp = cmp_suffix(&filter.value)?
-            );
+            let pipeline = format!("{entity}.filter(x => x.{field}{cmp}).collect()", field = filter.field, cmp = cmp_suffix(&filter.value)?);
             Ok(pipeline)
         }
     }

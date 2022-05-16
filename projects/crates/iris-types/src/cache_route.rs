@@ -19,10 +19,7 @@ pub struct AppliedWatermarkState {
 impl AppliedWatermarkState {
     /// Construct state for the default shard.
     pub fn new(seq: u64, applied_unix_ms: u64) -> Self {
-        Self {
-            watermark: AppliedWatermark::new(seq),
-            applied_unix_ms,
-        }
+        Self { watermark: AppliedWatermark::new(seq), applied_unix_ms }
     }
 }
 
@@ -64,91 +61,64 @@ pub enum CacheReadAction {
 /// Decide cache vs authority for an identity/cacheable read.
 pub fn decide_cache_read(ctx: &CacheReadContext<'_>) -> CacheReadAction {
     match ctx.intent {
-        ConsistencyIntent::Authoritative => CacheReadAction::BypassAuthority {
-            reason: "authoritative_requires_authority",
-        },
+        ConsistencyIntent::Authoritative => CacheReadAction::BypassAuthority { reason: "authoritative_requires_authority" },
         ConsistencyIntent::ReadYourWrites => decide_read_your_writes(ctx),
-        ConsistencyIntent::BoundedStale { max_lag_secs } => {
-            decide_bounded_stale(ctx, *max_lag_secs)
-        }
+        ConsistencyIntent::BoundedStale { max_lag_secs } => decide_bounded_stale(ctx, *max_lag_secs),
         ConsistencyIntent::Eventual => {
             if !ctx.cache_reachable {
-                return CacheReadAction::BypassAuthority {
-                    reason: "cache_unreachable",
-                };
+                return CacheReadAction::BypassAuthority { reason: "cache_unreachable" };
             }
-            CacheReadAction::UseCache {
-                freshness_proven: ctx.cache_wm.is_some(),
-            }
+            CacheReadAction::UseCache { freshness_proven: ctx.cache_wm.is_some() }
         }
         ConsistencyIntent::ProjectionRequired { .. } => {
             if !ctx.cache_reachable {
-                return CacheReadAction::FailClosed {
-                    reason: "projection_required_unreachable",
-                };
+                return CacheReadAction::FailClosed { reason: "projection_required_unreachable" };
             }
             if ctx.cache_wm.is_none() {
-                return CacheReadAction::FailClosed {
-                    reason: "projection_required_unknown_watermark",
-                };
+                return CacheReadAction::FailClosed { reason: "projection_required_unknown_watermark" };
             }
-            CacheReadAction::UseCache {
-                freshness_proven: true,
-            }
+            CacheReadAction::UseCache { freshness_proven: true }
         }
     }
 }
 
 fn decide_read_your_writes(ctx: &CacheReadContext<'_>) -> CacheReadAction {
     if !ctx.cache_reachable {
-        return CacheReadAction::BypassAuthority {
-            reason: "cache_unreachable",
-        };
+        return CacheReadAction::BypassAuthority { reason: "cache_unreachable" };
     }
-    let Some(fence) = ctx.session_fence else {
+    let Some(fence) = ctx.session_fence
+    else {
         // No session writes yet -- cache is acceptable without a fence.
-        return CacheReadAction::UseCache {
-            freshness_proven: ctx.cache_wm.is_some(),
-        };
+        return CacheReadAction::UseCache { freshness_proven: ctx.cache_wm.is_some() };
     };
-    let Some(state) = ctx.cache_wm else {
-        return CacheReadAction::BypassAuthority {
-            reason: "ryw_unknown_watermark",
-        };
+    let Some(state) = ctx.cache_wm
+    else {
+        return CacheReadAction::BypassAuthority { reason: "ryw_unknown_watermark" };
     };
     if fence.is_covered_by(&state.watermark) {
-        CacheReadAction::UseCache {
-            freshness_proven: true,
-        }
-    } else {
-        CacheReadAction::BypassAuthority {
-            reason: "ryw_fence_not_covered",
-        }
+        CacheReadAction::UseCache { freshness_proven: true }
+    }
+    else {
+        CacheReadAction::BypassAuthority { reason: "ryw_fence_not_covered" }
     }
 }
 
 fn decide_bounded_stale(ctx: &CacheReadContext<'_>, max_lag_secs: u64) -> CacheReadAction {
     if !ctx.cache_reachable {
-        return CacheReadAction::BypassAuthority {
-            reason: "cache_unreachable",
-        };
+        return CacheReadAction::BypassAuthority { reason: "cache_unreachable" };
     }
-    let Some(state) = ctx.cache_wm else {
+    let Some(state) = ctx.cache_wm
+    else {
         // Unknown watermark cannot prove lag -- must not use cache.
-        return CacheReadAction::BypassAuthority {
-            reason: "bounded_stale_unknown_watermark",
-        };
+        return CacheReadAction::BypassAuthority { reason: "bounded_stale_unknown_watermark" };
     };
     let max_lag_ms = max_lag_secs.saturating_mul(1000);
     let lag_ms = ctx.now_unix_ms.saturating_sub(state.applied_unix_ms);
     if lag_ms <= max_lag_ms {
-        CacheReadAction::UseCache {
-            freshness_proven: true,
-        }
-    } else {
-        CacheReadAction::BypassAuthority {
-            reason: "bounded_stale_lag_exceeded",
-        }
+        CacheReadAction::UseCache { freshness_proven: true }
+    }
+    else {
+        CacheReadAction::BypassAuthority { reason: "bounded_stale_lag_exceeded" }
     }
 }
 
@@ -162,10 +132,7 @@ pub struct StampedeBudget {
 impl StampedeBudget {
     /// Create a budget (`0` means no concurrent fills allowed).
     pub fn new(budget: u32) -> Self {
-        Self {
-            budget,
-            in_flight: AtomicU32::new(0),
-        }
+        Self { budget, in_flight: AtomicU32::new(0) }
     }
 
     /// Configured concurrency limit.
@@ -185,11 +152,7 @@ impl StampedeBudget {
             if cur >= self.budget {
                 return false;
             }
-            if self
-                .in_flight
-                .compare_exchange(cur, cur + 1, Ordering::AcqRel, Ordering::Acquire)
-                .is_ok()
-            {
+            if self.in_flight.compare_exchange(cur, cur + 1, Ordering::AcqRel, Ordering::Acquire).is_ok() {
                 return true;
             }
         }
@@ -210,11 +173,7 @@ pub struct StampedePermit<'a> {
 impl<'a> StampedePermit<'a> {
     /// Acquire or return `None` when the budget is full.
     pub fn try_acquire(budget: &'a StampedeBudget) -> Option<Self> {
-        if budget.try_acquire() {
-            Some(Self { budget })
-        } else {
-            None
-        }
+        if budget.try_acquire() { Some(Self { budget }) } else { None }
     }
 }
 
@@ -233,19 +192,8 @@ mod tests {
     fn authoritative_always_bypasses() {
         let intent = ConsistencyIntent::Authoritative;
         let wm = AppliedWatermarkState::new(10, 1_000);
-        let ctx = CacheReadContext {
-            intent: &intent,
-            cache_wm: Some(&wm),
-            session_fence: None,
-            now_unix_ms: 2_000,
-            cache_reachable: true,
-        };
-        assert_eq!(
-            decide_cache_read(&ctx),
-            CacheReadAction::BypassAuthority {
-                reason: "authoritative_requires_authority"
-            }
-        );
+        let ctx = CacheReadContext { intent: &intent, cache_wm: Some(&wm), session_fence: None, now_unix_ms: 2_000, cache_reachable: true };
+        assert_eq!(decide_cache_read(&ctx), CacheReadAction::BypassAuthority { reason: "authoritative_requires_authority" });
     }
 
     #[test]
@@ -253,19 +201,9 @@ mod tests {
         let intent = ConsistencyIntent::ReadYourWrites;
         let wm = AppliedWatermarkState::new(5, 1_000);
         let fence = CommitToken::new(9);
-        let ctx = CacheReadContext {
-            intent: &intent,
-            cache_wm: Some(&wm),
-            session_fence: Some(&fence),
-            now_unix_ms: 2_000,
-            cache_reachable: true,
-        };
-        assert_eq!(
-            decide_cache_read(&ctx),
-            CacheReadAction::BypassAuthority {
-                reason: "ryw_fence_not_covered"
-            }
-        );
+        let ctx =
+            CacheReadContext { intent: &intent, cache_wm: Some(&wm), session_fence: Some(&fence), now_unix_ms: 2_000, cache_reachable: true };
+        assert_eq!(decide_cache_read(&ctx), CacheReadAction::BypassAuthority { reason: "ryw_fence_not_covered" });
     }
 
     #[test]
@@ -273,56 +211,24 @@ mod tests {
         let intent = ConsistencyIntent::ReadYourWrites;
         let wm = AppliedWatermarkState::new(9, 1_000);
         let fence = CommitToken::new(9);
-        let ctx = CacheReadContext {
-            intent: &intent,
-            cache_wm: Some(&wm),
-            session_fence: Some(&fence),
-            now_unix_ms: 2_000,
-            cache_reachable: true,
-        };
-        assert_eq!(
-            decide_cache_read(&ctx),
-            CacheReadAction::UseCache {
-                freshness_proven: true
-            }
-        );
+        let ctx =
+            CacheReadContext { intent: &intent, cache_wm: Some(&wm), session_fence: Some(&fence), now_unix_ms: 2_000, cache_reachable: true };
+        assert_eq!(decide_cache_read(&ctx), CacheReadAction::UseCache { freshness_proven: true });
     }
 
     #[test]
     fn bounded_stale_rejects_unknown_watermark() {
         let intent = ConsistencyIntent::BoundedStale { max_lag_secs: 30 };
-        let ctx = CacheReadContext {
-            intent: &intent,
-            cache_wm: None,
-            session_fence: None,
-            now_unix_ms: 10_000,
-            cache_reachable: true,
-        };
-        assert_eq!(
-            decide_cache_read(&ctx),
-            CacheReadAction::BypassAuthority {
-                reason: "bounded_stale_unknown_watermark"
-            }
-        );
+        let ctx = CacheReadContext { intent: &intent, cache_wm: None, session_fence: None, now_unix_ms: 10_000, cache_reachable: true };
+        assert_eq!(decide_cache_read(&ctx), CacheReadAction::BypassAuthority { reason: "bounded_stale_unknown_watermark" });
     }
 
     #[test]
     fn bounded_stale_ok_within_lag() {
         let intent = ConsistencyIntent::BoundedStale { max_lag_secs: 5 };
         let wm = AppliedWatermarkState::new(3, 8_000);
-        let ctx = CacheReadContext {
-            intent: &intent,
-            cache_wm: Some(&wm),
-            session_fence: None,
-            now_unix_ms: 12_000,
-            cache_reachable: true,
-        };
-        assert_eq!(
-            decide_cache_read(&ctx),
-            CacheReadAction::UseCache {
-                freshness_proven: true
-            }
-        );
+        let ctx = CacheReadContext { intent: &intent, cache_wm: Some(&wm), session_fence: None, now_unix_ms: 12_000, cache_reachable: true };
+        assert_eq!(decide_cache_read(&ctx), CacheReadAction::UseCache { freshness_proven: true });
     }
 
     #[test]

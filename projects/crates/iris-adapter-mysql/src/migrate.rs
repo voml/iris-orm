@@ -1,11 +1,12 @@
 //! Managed Push for MySQL (private DDL).
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 use iris_types::{LogicalChange, LogicalMigrationPlan, ObservedCatalog};
-use mysql::PooledConn;
-use mysql::prelude::*;
+use mysql::{PooledConn, prelude::*};
 use vos::ast::{BuiltinType, Document, Field, Item, TypeExpr};
 
 use crate::{Error, Result};
@@ -24,22 +25,18 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
     let target = fingerprint_document(document);
     let mut changes = Vec::new();
     for item in &document.items {
-        let Item::Table(table) = item else {
+        let Item::Table(table) = item
+        else {
             continue;
         };
         match observed.table(&table.name) {
             None => {
-                changes.push(LogicalChange::CreateTable {
-                    vos_table: table.name.clone(),
-                });
+                changes.push(LogicalChange::CreateTable { vos_table: table.name.clone() });
             }
             Some(obs) => {
                 for field in &table.fields {
                     if !obs.columns.iter().any(|c| c.name == field.name) {
-                        changes.push(LogicalChange::AddField {
-                            vos_table: table.name.clone(),
-                            vos_field: field.name.clone(),
-                        });
+                        changes.push(LogicalChange::AddField { vos_table: table.name.clone(), vos_field: field.name.clone() });
                     }
                 }
             }
@@ -55,15 +52,9 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
 }
 
 /// Apply a reviewed logical plan by emitting private MySQL DDL.
-pub fn apply_push(
-    conn: &mut PooledConn,
-    plan: &LogicalMigrationPlan,
-    document: &Document,
-) -> Result<PushReport> {
+pub fn apply_push(conn: &mut PooledConn, plan: &LogicalMigrationPlan, document: &Document) -> Result<PushReport> {
     if plan.destructive {
-        return Err(Error::Policy(
-            "refusing to apply destructive plan without explicit policy".into(),
-        ));
+        return Err(Error::Policy("refusing to apply destructive plan without explicit policy".into()));
     }
     let mut created = Vec::new();
     conn.query_drop("START TRANSACTION")?;
@@ -78,19 +69,12 @@ pub fn apply_push(
                             Item::Table(t) if t.name == *vos_table => Some(t),
                             _ => None,
                         })
-                        .ok_or_else(|| {
-                            Error::Policy(format!(
-                                "plan references unknown VOS table `{vos_table}`"
-                            ))
-                        })?;
+                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
                     let ddl = create_table_sql(table)?;
                     conn.query_drop(ddl)?;
                     created.push(vos_table.clone());
                 }
-                LogicalChange::AddField {
-                    vos_table,
-                    vos_field,
-                } => {
+                LogicalChange::AddField { vos_table, vos_field } => {
                     let table = document
                         .items
                         .iter()
@@ -98,24 +82,14 @@ pub fn apply_push(
                             Item::Table(t) if t.name == *vos_table => Some(t),
                             _ => None,
                         })
-                        .ok_or_else(|| {
-                            Error::Policy(format!(
-                                "plan references unknown VOS table `{vos_table}`"
-                            ))
-                        })?;
+                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
                     let field = table
                         .fields
                         .iter()
                         .find(|f| f.name == *vos_field)
-                        .ok_or_else(|| {
-                            Error::Policy(format!(
-                                "plan references unknown VOS field `{vos_table}.{vos_field}`"
-                            ))
-                        })?;
+                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS field `{vos_table}.{vos_field}`")))?;
                     if field.is_primary() {
-                        return Err(Error::Policy(format!(
-                            "refusing AddField for primary key `{vos_table}.{vos_field}` — recreate table"
-                        )));
+                        return Err(Error::Policy(format!("refusing AddField for primary key `{vos_table}.{vos_field}` — recreate table")));
                     }
                     let ddl = add_field_sql(vos_table, field)?;
                     conn.query_drop(ddl)?;
@@ -127,10 +101,7 @@ pub fn apply_push(
     match apply {
         Ok(()) => {
             conn.query_drop("COMMIT")?;
-            Ok(PushReport {
-                plan_id: plan.id.clone(),
-                created_tables: created,
-            })
+            Ok(PushReport { plan_id: plan.id.clone(), created_tables: created })
         }
         Err(e) => {
             let _ = conn.query_drop("ROLLBACK");
@@ -154,17 +125,10 @@ fn create_table_sql(table: &vos::ast::Table) -> Result<String> {
         cols.push(piece);
     }
     if pks.is_empty() {
-        return Err(Error::Policy(format!(
-            "table `{}` has no primary key -- cannot push",
-            table.name
-        )));
+        return Err(Error::Policy(format!("table `{}` has no primary key -- cannot push", table.name)));
     }
     cols.push(format!("PRIMARY KEY ({})", pks.join(", ")));
-    Ok(format!(
-        "CREATE TABLE IF NOT EXISTS `{}` ({}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
-        table.name,
-        cols.join(", ")
-    ))
+    Ok(format!("CREATE TABLE IF NOT EXISTS `{}` ({}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;", table.name, cols.join(", ")))
 }
 
 fn add_field_sql(table: &str, field: &Field) -> Result<String> {
@@ -175,7 +139,8 @@ fn add_field_sql(table: &str, field: &Field) -> Result<String> {
         // Prefer VARCHAR over TEXT so DEFAULT is portable across MySQL versions.
         piece.push_str(" NOT NULL");
         piece.push_str(&format!(" DEFAULT {}", default_literal(field)?));
-    } else {
+    }
+    else {
         piece.push_str(" NULL");
     }
     Ok(format!("ALTER TABLE `{table}` ADD COLUMN {piece};"))
@@ -223,9 +188,7 @@ fn default_literal(field: &Field) -> Result<String> {
         | TypeExpr::Builtin(BuiltinType::DateTimeUtc) => Ok("''".into()),
         TypeExpr::Builtin(BuiltinType::Uuid) => Ok("0x00000000000000000000000000000000".into()),
         TypeExpr::Builtin(BuiltinType::Bytes) => Ok("''".into()),
-        other => Err(Error::Policy(format!(
-            "no AddField default for VOS type {other:?}"
-        ))),
+        other => Err(Error::Policy(format!("no AddField default for VOS type {other:?}"))),
     }
 }
 
@@ -240,9 +203,7 @@ fn map_field_type(field: &Field) -> Result<(String, bool)> {
         | TypeExpr::Builtin(BuiltinType::I16)
         | TypeExpr::Builtin(BuiltinType::U16) => "SMALLINT".into(),
         TypeExpr::Builtin(BuiltinType::I32) | TypeExpr::Builtin(BuiltinType::U32) => "INT".into(),
-        TypeExpr::Builtin(BuiltinType::I64) | TypeExpr::Builtin(BuiltinType::U64) => {
-            "BIGINT".into()
-        }
+        TypeExpr::Builtin(BuiltinType::I64) | TypeExpr::Builtin(BuiltinType::U64) => "BIGINT".into(),
         TypeExpr::Builtin(BuiltinType::F32) => "FLOAT".into(),
         TypeExpr::Builtin(BuiltinType::F64) => "DOUBLE".into(),
         TypeExpr::Builtin(BuiltinType::Utf8)
@@ -254,21 +215,18 @@ fn map_field_type(field: &Field) -> Result<(String, bool)> {
             if pk {
                 // utf8mb4 indexable PK (InnoDB max index prefix for VARCHAR).
                 "VARCHAR(191)".into()
-            } else {
+            }
+            else {
                 "TEXT".into()
             }
         }
         TypeExpr::Builtin(BuiltinType::Uuid) => "BINARY(16)".into(),
         TypeExpr::Builtin(BuiltinType::Bytes) => "BLOB".into(),
         TypeExpr::Builtin(_) => {
-            return Err(Error::Policy(
-                "unsupported builtin VOS type for MySQL push".into(),
-            ));
+            return Err(Error::Policy("unsupported builtin VOS type for MySQL push".into()));
         }
         other => {
-            return Err(Error::Policy(format!(
-                "unsupported VOS type for MySQL push: {other:?}"
-            )));
+            return Err(Error::Policy(format!("unsupported VOS type for MySQL push: {other:?}")));
         }
     };
     Ok((sql, !optional))

@@ -57,11 +57,9 @@ impl ReadinessReport {
             })
             .is_ok();
         let (code, message) = if vos_executor_ready {
-            (
-                "IRIS-YYDB-VOS-EXECUTOR-READY".to_string(),
-                "YYDB Phase 1 VOS read query is available on Connection::query".to_string(),
-            )
-        } else {
+            ("IRIS-YYDB-VOS-EXECUTOR-READY".to_string(), "YYDB Phase 1 VOS read query is available on Connection::query".to_string())
+        }
+        else {
             (
                 READINESS_CODE.into(),
                 "YYDB formal VOS executor (query / sessions / prepared plans) is not yet \
@@ -69,13 +67,7 @@ impl ReadinessReport {
                     .into(),
             )
         };
-        Self {
-            backend_id: BACKEND_ID.into(),
-            schema_handshake_ready,
-            vos_executor_ready,
-            code,
-            message,
-        }
+        Self { backend_id: BACKEND_ID.into(), schema_handshake_ready, vos_executor_ready, code, message }
     }
 
     /// True only when every readiness bit is set.
@@ -105,10 +97,7 @@ pub struct YydbSource {
 
 impl std::fmt::Debug for YydbSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("YydbSource")
-            .field("backend", &BACKEND_ID)
-            .field("path", &self.path)
-            .finish_non_exhaustive()
+        f.debug_struct("YydbSource").field("backend", &BACKEND_ID).field("path", &self.path).finish_non_exhaustive()
     }
 }
 
@@ -139,19 +128,13 @@ impl YydbSource {
 
     /// Open an in-memory YYDB (tests / ephemeral).
     pub fn open_in_memory() -> Result<Self> {
-        Ok(Self {
-            conn: Connection::open_in_memory()?,
-            path: None,
-        })
+        Ok(Self { conn: Connection::open_in_memory()?, path: None })
     }
 
     /// Open or create a file-backed `.yydb`.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        Ok(Self {
-            conn: Connection::open(&path)?,
-            path: Some(path),
-        })
+        Ok(Self { conn: Connection::open(&path)?, path: Some(path) })
     }
 
     /// On-disk path when file-backed.
@@ -187,10 +170,7 @@ impl YydbSource {
     /// Counterpart of `Session::query` / generated `db.$query`.
     pub fn query(&self, program: &str) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
-        self.conn
-            .query(program)
-            .map_err(Error::from)
-            .map(|rows| rows.into_iter().map(row_to_iris).collect())
+        self.conn.query(program).map_err(Error::from).map(|rows| rows.into_iter().map(row_to_iris).collect())
     }
 
     /// Execute unit-valued / DDL-shaped VOS on the native YYDB executor.
@@ -211,10 +191,7 @@ impl YydbSource {
     pub fn prepare(&self, program: &str) -> Result<PreparedVos> {
         self.require_vos_executor()?;
         let handshake = self.schema_handshake()?;
-        Ok(PreparedVos {
-            program: program.to_owned(),
-            ddl_revision: handshake.ddl_revision,
-        })
+        Ok(PreparedVos { program: program.to_owned(), ddl_revision: handshake.ddl_revision })
     }
 
     /// Begin a data transaction.
@@ -247,8 +224,7 @@ impl YydbSource {
         if handshake.ddl_revision != expected {
             return Err(Error::Policy(format!(
                 "{SESSION_STALE_CODE}: session opened at ddl revision {} but database is at {}",
-                expected,
-                handshake.ddl_revision
+                expected, handshake.ddl_revision
             )));
         }
         Ok(())
@@ -256,10 +232,9 @@ impl YydbSource {
 
     /// Re-open the same file path (drop + open). In-memory sources error.
     pub fn reopen(self) -> Result<Self> {
-        let Some(path) = self.path.clone() else {
-            return Err(Error::Runtime(
-                "in-memory YYDB cannot reopen by path".into(),
-            ));
+        let Some(path) = self.path.clone()
+        else {
+            return Err(Error::Runtime("in-memory YYDB cannot reopen by path".into()));
         };
         drop(self);
         Self::open(path)
@@ -274,9 +249,7 @@ pub struct PreparedVos {
 }
 
 fn row_to_iris(row: yydb::query::QueryRow) -> iris_types::Row {
-    row.into_iter()
-        .map(|(key, value)| (key, value_to_iris(&value)))
-        .collect()
+    row.into_iter().map(|(key, value)| (key, value_to_iris(&value))).collect()
 }
 
 fn value_to_iris(value: &yydb::Value) -> iris_types::Value {
@@ -286,12 +259,7 @@ fn value_to_iris(value: &yydb::Value) -> iris_types::Value {
         yydb::Value::I64(i) => iris_types::Value::Int(*i),
         yydb::Value::Text(s) => iris_types::Value::Str(s.clone()),
         yydb::Value::Uuid(id) => iris_types::Value::Str(id.to_string()),
-        yydb::Value::Row(fields) => iris_types::Value::Object(
-            fields
-                .iter()
-                .map(|(key, value)| (key.clone(), value_to_iris(value)))
-                .collect(),
-        ),
+        yydb::Value::Row(fields) => iris_types::Value::Object(fields.iter().map(|(key, value)| (key.clone(), value_to_iris(value))).collect()),
         _ => iris_types::Value::Null,
     }
 }

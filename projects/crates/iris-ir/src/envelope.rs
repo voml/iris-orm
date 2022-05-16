@@ -2,8 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::SemanticHash;
-use crate::op::PhysicalOp;
+use crate::{SemanticHash, op::PhysicalOp};
 
 /// Major.minor IR envelope version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -74,16 +73,10 @@ impl IrEnvelope {
     /// Validate this envelope against a supported IR version.
     pub fn check_version(&self, supported: IrVersion) -> crate::Result<()> {
         if supported.major != self.ir_version.major {
-            return Err(crate::Error::UnsupportedVersion(
-                self.ir_version.major,
-                self.ir_version.minor,
-            ));
+            return Err(crate::Error::UnsupportedVersion(self.ir_version.major, self.ir_version.minor));
         }
         if self.ir_version.minor > supported.minor {
-            return Err(crate::Error::UnsupportedVersion(
-                self.ir_version.major,
-                self.ir_version.minor,
-            ));
+            return Err(crate::Error::UnsupportedVersion(self.ir_version.major, self.ir_version.minor));
         }
         Ok(())
     }
@@ -91,8 +84,10 @@ impl IrEnvelope {
 
 /// Hash a physical op list deterministically for envelope stamping.
 pub fn hash_ops(ops: &[PhysicalOp]) -> SemanticHash {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use std::{
+        collections::hash_map::DefaultHasher,
+        hash::{Hash, Hasher},
+    };
     let mut h = DefaultHasher::new();
     // Debug is stable enough for Phase 1 local conformance (not a crypto seal).
     format!("{ops:?}").hash(&mut h);

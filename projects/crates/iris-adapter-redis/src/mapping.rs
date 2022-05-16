@@ -47,10 +47,6 @@ pub struct MappingManifest {
 impl MappingManifest {
     /// Construct a manifest stamped with this adapter's identity.
     pub fn with_tables(tables: Vec<KeyspaceMapping>) -> Self {
-        Self {
-            adapter_id: crate::BACKEND_ID.into(),
-            adapter_version: crate::ADAPTER_VERSION.into(),
-            tables,
-        }
+        Self { adapter_id: crate::BACKEND_ID.into(), adapter_version: crate::ADAPTER_VERSION.into(), tables }
     }
 }

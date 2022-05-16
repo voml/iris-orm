@@ -8,7 +8,8 @@ use vos::ast::{BuiltinType, Document, Item, TypeExpr};
 pub fn collect_uuid_fields(document: &Document) -> HashSet<(String, String)> {
     let mut out = HashSet::new();
     for item in &document.items {
-        let Item::Table(table) = item else {
+        let Item::Table(table) = item
+        else {
             continue;
         };
         for field in &table.fields {

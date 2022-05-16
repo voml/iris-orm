@@ -5,8 +5,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::projection_store::{GenerationState, LocalProjectionStore};
-use crate::topology::{ComponentRole, TopologyContract, TopologyError};
+use crate::{
+    projection_store::{GenerationState, LocalProjectionStore},
+    topology::{ComponentRole, TopologyContract, TopologyError},
+};
 
 /// Format marker.
 pub const PROJECTION_VERIFY_FORMAT: &str = "iris.projection_verify";
@@ -56,21 +58,17 @@ pub fn verify_projection(
     store: Option<&LocalProjectionStore>,
 ) -> Result<ProjectionVerifyReport, TopologyError> {
     topo.validate()?;
-    let comp = topo.components.get(component).ok_or_else(|| {
-        TopologyError::Invalid(format!(
-            "component `{component}` not found in topology `{}`",
-            topo.id
-        ))
-    })?;
+    let comp = topo
+        .components
+        .get(component)
+        .ok_or_else(|| TopologyError::Invalid(format!("component `{component}` not found in topology `{}`", topo.id)))?;
 
     let role = match comp.role {
         ComponentRole::Cache => "cache",
         ComponentRole::SearchProjection => "search_projection",
         ComponentRole::VectorProjection => "vector_projection",
         other => {
-            return Err(TopologyError::Invalid(format!(
-                "projection verify targets Cache/Search/Vector; `{component}` is {other:?}"
-            )));
+            return Err(TopologyError::Invalid(format!("projection verify targets Cache/Search/Vector; `{component}` is {other:?}")));
         }
     };
 
@@ -80,32 +78,24 @@ pub fn verify_projection(
         "verify does not activate topology (use iris topology activate)".into(),
     ];
 
-    checks.push(ProjectionVerifyCheck {
-        id: "component_declared".into(),
-        ok: true,
-        detail: format!("role={role} adapter={}", comp.adapter),
-    });
+    checks.push(ProjectionVerifyCheck { id: "component_declared".into(), ok: true, detail: format!("role={role} adapter={}", comp.adapter) });
 
     match comp.role {
         ComponentRole::SearchProjection | ComponentRole::VectorProjection => {
-            let access = if comp.role == ComponentRole::SearchProjection {
-                iris_ir::AccessKind::Search
-            } else {
-                iris_ir::AccessKind::VectorNearest
-            };
+            let access =
+                if comp.role == ComponentRole::SearchProjection { iris_ir::AccessKind::Search } else { iris_ir::AccessKind::VectorNearest };
             let plan = topo.plan(access, iris_ir::ConsistencyIntent::Eventual, None)?;
-            let has_hydrate = plan
-                .steps
-                .iter()
-                .any(|s| matches!(s, iris_ir::CompositeStep::HydrateStep { .. }));
+            let has_hydrate = plan.steps.iter().any(|s| matches!(s, iris_ir::CompositeStep::HydrateStep { .. }));
             checks.push(ProjectionVerifyCheck {
                 id: "route_requires_hydrate".into(),
                 ok: has_hydrate && !plan.rejected,
                 detail: if plan.rejected {
                     plan.rejection.unwrap_or_else(|| "plan rejected".into())
-                } else if has_hydrate {
+                }
+                else if has_hydrate {
                     "search/vector plan includes HydrateStep".into()
-                } else {
+                }
+                else {
                     "missing HydrateStep".into()
                 },
             });
@@ -115,8 +105,7 @@ pub fn verify_projection(
                     checks.push(ProjectionVerifyCheck {
                         id: "store_bound".into(),
                         ok: false,
-                        detail: "LocalProjectionStore root required for search/vector verify"
-                            .into(),
+                        detail: "LocalProjectionStore root required for search/vector verify".into(),
                     });
                     notes.push("pass --root to verify active generation".into());
                 }
@@ -126,11 +115,7 @@ pub fn verify_projection(
             }
         }
         ComponentRole::Cache => {
-            let plan = topo.plan(
-                iris_ir::AccessKind::IdentityRead,
-                iris_ir::ConsistencyIntent::Eventual,
-                None,
-            )?;
+            let plan = topo.plan(iris_ir::AccessKind::IdentityRead, iris_ir::ConsistencyIntent::Eventual, None)?;
             let uses_cache = plan.steps.iter().any(|s| {
                 matches!(
                     s,
@@ -142,14 +127,13 @@ pub fn verify_projection(
                 ok: uses_cache || plan.rejected,
                 detail: if uses_cache {
                     "Eventual identity plan includes this cache".into()
-                } else {
+                }
+                else {
                     "cache not selected on Eventual identity plan".into()
                 },
             });
             if store.is_some() {
-                notes.push(
-                    "cache store root ignored in 10-G verify (use projection status --live)".into(),
-                );
+                notes.push("cache store root ignored in 10-G verify (use projection status --live)".into());
             }
         }
         _ => unreachable!(),
@@ -169,63 +153,38 @@ pub fn verify_projection(
     })
 }
 
-fn push_store_checks(
-    checks: &mut Vec<ProjectionVerifyCheck>,
-    store: &LocalProjectionStore,
-    component: &str,
-) {
+fn push_store_checks(checks: &mut Vec<ProjectionVerifyCheck>, store: &LocalProjectionStore, component: &str) {
     let status = match store.rebuild_status(component) {
         Ok(s) => s,
         Err(e) => {
-            checks.push(ProjectionVerifyCheck {
-                id: "store_readable".into(),
-                ok: false,
-                detail: e.to_string(),
-            });
+            checks.push(ProjectionVerifyCheck { id: "store_readable".into(), ok: false, detail: e.to_string() });
             return;
         }
     };
 
-    let Some(active) = status.active_generation.clone() else {
-        checks.push(ProjectionVerifyCheck {
-            id: "active_alias".into(),
-            ok: false,
-            detail: "no active generation alias".into(),
-        });
+    let Some(active) = status.active_generation.clone()
+    else {
+        checks.push(ProjectionVerifyCheck { id: "active_alias".into(), ok: false, detail: "no active generation alias".into() });
         return;
     };
-    checks.push(ProjectionVerifyCheck {
-        id: "active_alias".into(),
-        ok: true,
-        detail: format!("active_generation={active}"),
-    });
+    checks.push(ProjectionVerifyCheck { id: "active_alias".into(), ok: true, detail: format!("active_generation={active}") });
 
     if status.building_generation.is_some() {
         checks.push(ProjectionVerifyCheck {
             id: "no_hanging_build".into(),
             ok: true,
-            detail: format!(
-                "building generation {:?} present (ok; isolated from alias)",
-                status.building_generation
-            ),
+            detail: format!("building generation {:?} present (ok; isolated from alias)", status.building_generation),
         });
-    } else {
-        checks.push(ProjectionVerifyCheck {
-            id: "no_hanging_build".into(),
-            ok: true,
-            detail: "no building generation".into(),
-        });
+    }
+    else {
+        checks.push(ProjectionVerifyCheck { id: "no_hanging_build".into(), ok: true, detail: "no building generation".into() });
     }
 
     // Inspect documents under active generation via public search/list APIs.
     match store.search(component, "", 0) {
         Ok(_) => {
             // empty query returns score 0 hits; still proves readable
-            checks.push(ProjectionVerifyCheck {
-                id: "active_readable".into(),
-                ok: true,
-                detail: "active generation searchable".into(),
-            });
+            checks.push(ProjectionVerifyCheck { id: "active_readable".into(), ok: true, detail: "active generation searchable".into() });
         }
         Err(e) => {
             // nearest empty may also fail; try rebuild_status gens membership
@@ -233,11 +192,7 @@ fn push_store_checks(
             checks.push(ProjectionVerifyCheck {
                 id: "active_readable".into(),
                 ok: listed,
-                detail: if listed {
-                    format!("active listed; search note: {e}")
-                } else {
-                    e.to_string()
-                },
+                detail: if listed { format!("active listed; search note: {e}") } else { e.to_string() },
             });
         }
     }
@@ -248,18 +203,19 @@ fn push_store_checks(
     checks.push(ProjectionVerifyCheck {
         id: "generation_isolation".into(),
         ok: true,
-        detail: "rebuild fills isolated generations; alias switch is atomic (10-F invariant)"
-            .into(),
+        detail: "rebuild fills isolated generations; alias switch is atomic (10-F invariant)".into(),
     });
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::projection_store::LocalProjectionStore;
-    use crate::topology::{
-        CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy,
-        RouteRule, TOPOLOGY_FORMAT, TopologyComponent,
+    use crate::{
+        projection_store::LocalProjectionStore,
+        topology::{
+            CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy, RouteRule, TOPOLOGY_FORMAT,
+            TopologyComponent,
+        },
     };
     use iris_ir::{ConsistencyIntent, ProjectionDocument, ProjectionGeneration};
     use std::collections::BTreeMap;
@@ -268,21 +224,11 @@ mod tests {
         let mut components = BTreeMap::new();
         components.insert(
             "pg".into(),
-            TopologyComponent {
-                role: ComponentRole::Authority,
-                adapter: "postgres".into(),
-                adapter_version: None,
-                datasource: None,
-            },
+            TopologyComponent { role: ComponentRole::Authority, adapter: "postgres".into(), adapter_version: None, datasource: None },
         );
         components.insert(
             "search".into(),
-            TopologyComponent {
-                role: ComponentRole::SearchProjection,
-                adapter: "local".into(),
-                adapter_version: None,
-                datasource: None,
-            },
+            TopologyComponent { role: ComponentRole::SearchProjection, adapter: "local".into(), adapter_version: None, datasource: None },
         );
         let mut routes = BTreeMap::new();
         routes.insert(
@@ -304,10 +250,7 @@ mod tests {
             cache: CachePolicy::default(),
             outbox: OutboxPolicy::default(),
             object: ObjectPolicy::default(),
-            projection: ProjectionPolicy {
-                require_nonempty_rebuild: true,
-                ..ProjectionPolicy::default()
-            },
+            projection: ProjectionPolicy { require_nonempty_rebuild: true, ..ProjectionPolicy::default() },
         }
     }
 
@@ -317,13 +260,8 @@ mod tests {
         let report = verify_projection(&t, "search", None).unwrap();
         assert!(!report.ok);
 
-        let root = std::env::temp_dir().join(format!(
-            "iris-pv-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
+        let root = std::env::temp_dir()
+            .join(format!("iris-pv-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
         let store = LocalProjectionStore::open(&root, t.projection.clone()).unwrap();
         let h = store.begin_rebuild("search", "fp", 1).unwrap();
         store

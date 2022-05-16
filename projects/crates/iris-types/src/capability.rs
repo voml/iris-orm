@@ -22,26 +22,12 @@ pub struct QueryCaps {
 impl QueryCaps {
     /// Everything supported (reference adapter).
     pub fn full() -> Self {
-        Self {
-            filter_cmp: true,
-            filter_bool: true,
-            filter_logic: true,
-            sort: true,
-            page: true,
-            project: true,
-        }
+        Self { filter_cmp: true, filter_bool: true, filter_logic: true, sort: true, page: true, project: true }
     }
 
     /// Read-only scans without filter (forces reject on filter).
     pub fn scan_only() -> Self {
-        Self {
-            filter_cmp: false,
-            filter_bool: false,
-            filter_logic: false,
-            sort: false,
-            page: false,
-            project: false,
-        }
+        Self { filter_cmp: false, filter_bool: false, filter_logic: false, sort: false, page: false, project: false }
     }
 }
 
@@ -59,20 +45,12 @@ pub struct WriteCaps {
 impl WriteCaps {
     /// No writes.
     pub fn none() -> Self {
-        Self {
-            insert: false,
-            update: false,
-            delete: false,
-        }
+        Self { insert: false, update: false, delete: false }
     }
 
     /// Full writes.
     pub fn full() -> Self {
-        Self {
-            insert: true,
-            update: true,
-            delete: true,
-        }
+        Self { insert: true, update: true, delete: true }
     }
 }
 
@@ -109,36 +87,20 @@ impl Default for CompensationBudget {
 impl CompensationBudget {
     /// Fail when a result set would exceed the row budget.
     pub fn enforce_rows(&self, rows: u64) -> Result<(), String> {
-        if rows > self.max_rows {
-            Err(format!(
-                "compensation budget exceeded: {rows} rows > max_rows {}",
-                self.max_rows
-            ))
-        } else {
-            Ok(())
-        }
+        if rows > self.max_rows { Err(format!("compensation budget exceeded: {rows} rows > max_rows {}", self.max_rows)) } else { Ok(()) }
     }
 
     /// Fail when estimated bytes would exceed the byte budget.
     pub fn enforce_bytes(&self, bytes: u64) -> Result<(), String> {
-        if bytes > self.max_bytes {
-            Err(format!(
-                "compensation budget exceeded: {bytes} bytes > max_bytes {}",
-                self.max_bytes
-            ))
-        } else {
-            Ok(())
-        }
+        if bytes > self.max_bytes { Err(format!("compensation budget exceeded: {bytes} bytes > max_bytes {}", self.max_bytes)) } else { Ok(()) }
     }
 
     /// Fail when round-trips would exceed the budget.
     pub fn enforce_round_trips(&self, trips: u64) -> Result<(), String> {
         if trips > self.max_round_trips {
-            Err(format!(
-                "compensation budget exceeded: {trips} round-trips > max_round_trips {}",
-                self.max_round_trips
-            ))
-        } else {
+            Err(format!("compensation budget exceeded: {trips} round-trips > max_round_trips {}", self.max_round_trips))
+        }
+        else {
             Ok(())
         }
     }

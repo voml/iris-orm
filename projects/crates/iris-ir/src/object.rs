@@ -18,9 +18,7 @@ impl ObjectId {
             return Err(ObjectError::InvalidId("empty object id".into()));
         }
         if id.contains('/') || id.contains('\\') || id.contains("..") {
-            return Err(ObjectError::InvalidId(
-                "object id must not contain path separators".into(),
-            ));
+            return Err(ObjectError::InvalidId("object id must not contain path separators".into()));
         }
         Ok(Self(id))
     }
@@ -134,17 +132,8 @@ pub struct ObjectReference {
 
 impl ObjectReference {
     /// Build a committed reference; rejects non-committed state.
-    pub fn committed(
-        object_id: ObjectId,
-        content_hash: ObjectHash,
-        length: u64,
-    ) -> Result<Self, ObjectError> {
-        Ok(Self {
-            object_id,
-            content_hash,
-            length,
-            state: ObjectLifecycleState::Committed,
-        })
+    pub fn committed(object_id: ObjectId, content_hash: ObjectHash, length: u64) -> Result<Self, ObjectError> {
+        Ok(Self { object_id, content_hash, length, state: ObjectLifecycleState::Committed })
     }
 }
 
@@ -195,13 +184,6 @@ pub enum ObjectError {
 pub type ObjectResult<T> = std::result::Result<T, ObjectError>;
 
 /// Require a legal transition or return [`ObjectError::IllegalTransition`].
-pub fn require_transition(
-    from: ObjectLifecycleState,
-    to: ObjectLifecycleState,
-) -> ObjectResult<()> {
-    if from.can_transition_to(to) {
-        Ok(())
-    } else {
-        Err(ObjectError::IllegalTransition { from, to })
-    }
+pub fn require_transition(from: ObjectLifecycleState, to: ObjectLifecycleState) -> ObjectResult<()> {
+    if from.can_transition_to(to) { Ok(()) } else { Err(ObjectError::IllegalTransition { from, to }) }
 }

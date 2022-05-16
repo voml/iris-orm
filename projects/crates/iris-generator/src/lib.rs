@@ -9,10 +9,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
+use std::{
+    collections::{HashMap, hash_map::DefaultHasher},
+    hash::{Hash, Hasher},
+    sync::Mutex,
+};
 
 use dejavu::{Dejavu, IrDocument};
 use once_cell::sync::OnceCell;
@@ -42,15 +43,8 @@ pub enum Error {
     #[error("unsupported generate target `{0}` (use rust or typescript)")]
     UnsupportedTarget(String),
     /// Two VOS fields map to the same TypeScript author name.
-    #[error(
-        "TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`"
-    )]
-    NamingCollision {
-        entity: String,
-        wire_a: String,
-        wire_b: String,
-        ts_name: String,
-    },
+    #[error("TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`")]
+    NamingCollision { entity: String, wire_a: String, wire_b: String, ts_name: String },
     /// I/O while writing generated files.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -148,8 +142,7 @@ pub struct GenerationModel {
 impl GenerationModel {
     /// Builds from a strict VOS resolved artifact without parsing source or allocating identities.
     pub fn from_resolved_artifact(artifact: &str) -> Result<Self> {
-        let contract = vos::ResolvedContract::from_json(artifact)
-            .map_err(|error| Error::Vos(format!("{}: {}", error.code, error.message)))?;
+        let contract = vos::ResolvedContract::from_json(artifact).map_err(|error| Error::Vos(format!("{}: {}", error.code, error.message)))?;
         let mut tables = Vec::new();
         for item in &contract.types {
             if item.kind != vos::contract::TypeContractKind::Table || item.canonical_path.len() != 1 {
@@ -190,14 +183,8 @@ impl GenerationModel {
     /// Build from a VOS schema document string.
     pub fn from_vos_schema(source: &str) -> Result<Self> {
         vos::validate_schema(source).map_err(Error::Vos)?;
-        let document = vos::parser::parse_document(source).map_err(|d| {
-            Error::Vos(
-                d.errors
-                    .first()
-                    .map(|e| e.message.clone())
-                    .unwrap_or_else(|| "parse failed".into()),
-            )
-        })?;
+        let document = vos::parser::parse_document(source)
+            .map_err(|d| Error::Vos(d.errors.first().map(|e| e.message.clone()).unwrap_or_else(|| "parse failed".into())))?;
         Self::from_document(&document)
     }
 
@@ -223,12 +210,7 @@ impl GenerationModel {
                             reference_target: mapped.reference_target,
                         });
                     }
-                    tables.push(TableModel {
-                        type_id: None,
-                        name: table.name.clone(),
-                        rust_type: table.name.clone(),
-                        fields,
-                    });
+                    tables.push(TableModel { type_id: None, name: table.name.clone(), rust_type: table.name.clone(), fields });
                 }
                 Item::Macro(macro_def) => {
                     let params = macro_def
@@ -236,32 +218,19 @@ impl GenerationModel {
                         .iter()
                         .map(|param| {
                             let vos_type = type_label(&param.ty);
-                            MacroParamModel {
-                                name: param.name.clone(),
-                                vos_type: vos_type.clone(),
-                                ts_type: vos_type_to_ts(&vos_type),
-                            }
+                            MacroParamModel { name: param.name.clone(), vos_type: vos_type.clone(), ts_type: vos_type_to_ts(&vos_type) }
                         })
                         .collect();
                     macros.push(MacroModel {
                         name: macro_def.name.clone(),
-                        return_type: macro_def
-                            .return_ty
-                            .as_ref()
-                            .map(type_label)
-                            .unwrap_or_else(|| "unit".into()),
+                        return_type: macro_def.return_ty.as_ref().map(type_label).unwrap_or_else(|| "unit".into()),
                         params,
                     });
                 }
                 _ => {}
             }
         }
-        Ok(Self {
-            generator_version: env!("CARGO_PKG_VERSION").into(),
-            schema_fingerprint: fingerprint_document(document),
-            tables,
-            macros,
-        })
+        Ok(Self { generator_version: env!("CARGO_PKG_VERSION").into(), schema_fingerprint: fingerprint_document(document), tables, macros })
     }
 
     /// JSON value for Dejavu contexts.
@@ -284,15 +253,8 @@ pub const fn prefers_aot() -> bool {
 pub const DEFAULT_TYPESCRIPT_GENERATE_OUT: &str = "src/generated/iris";
 
 /// Resolve `generate.out` (project-relative) to the TypeScript client root.
-pub fn resolve_typescript_generate_root(
-    project_root: &std::path::Path,
-    generate_out: &str,
-) -> std::path::PathBuf {
-    let relative = if generate_out == "." {
-        DEFAULT_TYPESCRIPT_GENERATE_OUT
-    } else {
-        generate_out
-    };
+pub fn resolve_typescript_generate_root(project_root: &std::path::Path, generate_out: &str) -> std::path::PathBuf {
+    let relative = if generate_out == "." { DEFAULT_TYPESCRIPT_GENERATE_OUT } else { generate_out };
     project_root.join(relative)
 }
 
@@ -337,10 +299,7 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
     let models = format!("{header}\n{structs}\n{helpers}\n{impls}");
     let metadata = format!("{header}\n{}\n", render("rust/metadata", &ctx)?);
     let errors = format!("{header}\n{}\n", render("rust/errors", &ctx)?);
-    let operations = format!(
-        "{header}\n{}\n",
-        unescape_rust_template(&render("rust/operations", &ctx)?),
-    );
+    let operations = format!("{header}\n{}\n", unescape_rust_template(&render("rust/operations", &ctx)?),);
     let index = format!("{header}\n{}\n", render("rust/rust_index", &ctx)?);
 
     Ok(vec![
@@ -354,11 +313,7 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
 
 /// Dejavu template mode HTML-escapes output; generated source must be unescaped.
 pub(crate) fn unescape_dejavu_template(text: &str) -> String {
-    text.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&#39;", "'")
+    text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
 }
 
 /// Rust-only alias (angle brackets in generics and lifetimes).
@@ -366,10 +321,7 @@ fn unescape_rust_template(text: &str) -> String {
     unescape_dejavu_template(text)
 }
 
-fn write_files_atomic(
-    root: &std::path::Path,
-    files: Vec<(String, String)>,
-) -> Result<Vec<std::path::PathBuf>> {
+fn write_files_atomic(root: &std::path::Path, files: Vec<(String, String)>) -> Result<Vec<std::path::PathBuf>> {
     std::fs::create_dir_all(root)?;
     let mut written = Vec::new();
     for (name, content) in files {
@@ -386,20 +338,13 @@ fn write_files_atomic(
 }
 
 /// Write Rust bindings into `{generate_root}/rust/`.
-pub fn write_rust_domain(
-    model: &GenerationModel,
-    generate_root: &std::path::Path,
-) -> Result<Vec<std::path::PathBuf>> {
+pub fn write_rust_domain(model: &GenerationModel, generate_root: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
     let root = rust_target_dir(generate_root);
     write_files_atomic(&root, emit_rust_files(model)?)
 }
 
 /// Generate bindings for `target` (`rust` | `typescript`) under `generate_root`.
-pub fn generate(
-    model: &GenerationModel,
-    target: &str,
-    generate_root: &std::path::Path,
-) -> Result<Vec<std::path::PathBuf>> {
+pub fn generate(model: &GenerationModel, target: &str, generate_root: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
     match target {
         "rust" => write_rust_domain(model, generate_root),
         "typescript" | "ts" => write_typescript_client(model, generate_root),
@@ -408,11 +353,7 @@ pub fn generate(
 }
 
 /// Parse schema source and generate bindings for `target`.
-pub fn generate_from_source(
-    source: &str,
-    target: &str,
-    generate_root: &std::path::Path,
-) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
+pub fn generate_from_source(source: &str, target: &str, generate_root: &std::path::Path) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
     let model = GenerationModel::from_vos_schema(source)?;
     let paths = generate(&model, target, generate_root)?;
     Ok((model, paths))
@@ -430,17 +371,10 @@ fn vos_type_to_ts(vos_type: &str) -> String {
     let base = vos_type.trim_end_matches('?').trim_start_matches('&');
     match base {
         "bool" => "boolean".into(),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => {
-            "number".into()
-        }
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "number".into(),
         "unit" => "void".into(),
         "utf8" | "utf16" | "uuid" | "decimal" | "datetime" | "bytes" => "string".into(),
-        other
-            if other.contains("::")
-                || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) =>
-        {
-            other.into()
-        }
+        other if other.contains("::") || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) => other.into(),
         _ => "unknown".into(),
     }
 }
@@ -476,13 +410,7 @@ fn map_resolved_field_type(ty: &vos::contract::ResolvedCanonicalType) -> Result<
                 "bytes" => "Vec<u8>".to_owned(),
                 other => return Err(Error::UnsupportedType(other.to_owned())),
             };
-            Ok(MappedFieldType {
-                rust_ty,
-                vos_type: name.to_owned(),
-                optional: false,
-                is_uuid: name == "uuid",
-                reference_target: None,
-            })
+            Ok(MappedFieldType { rust_ty, vos_type: name.to_owned(), optional: false, is_uuid: name == "uuid", reference_target: None })
         }
         other => Err(Error::UnsupportedType(format!("resolved type {other:?}"))),
     }
@@ -517,13 +445,9 @@ fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
                 reference_target: None,
             })
         }
-        TypeExpr::Named(name) => Ok(MappedFieldType {
-            rust_ty: name.clone(),
-            vos_type: name.clone(),
-            optional: false,
-            is_uuid: false,
-            reference_target: None,
-        }),
+        TypeExpr::Named(name) => {
+            Ok(MappedFieldType { rust_ty: name.clone(), vos_type: name.clone(), optional: false, is_uuid: false, reference_target: None })
+        }
         other => Err(Error::UnsupportedType(format!("{other:?}"))),
     }
 }
@@ -532,9 +456,7 @@ fn reference_target_name(ty: &TypeExpr) -> Result<String> {
     match ty {
         TypeExpr::Named(name) => Ok(name.clone()),
         TypeExpr::Builtin(b) => Ok(format!("{b:?}").to_ascii_lowercase()),
-        other => Err(Error::UnsupportedType(format!(
-            "reference target `{other:?}`"
-        ))),
+        other => Err(Error::UnsupportedType(format!("reference target `{other:?}`"))),
     }
 }
 
@@ -554,9 +476,7 @@ fn map_builtin(b: &BuiltinType) -> Result<(&'static str, &'static str)> {
         BuiltinType::Utf8 | BuiltinType::Utf16 => Ok(("String", "utf8")),
         BuiltinType::Uuid => Ok(("String", "uuid")),
         BuiltinType::Decimal => Ok(("String", "decimal")),
-        BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => {
-            Ok(("String", "datetime"))
-        }
+        BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => Ok(("String", "datetime")),
         BuiltinType::Bytes => Ok(("Vec<u8>", "bytes")),
         _ => Err(Error::UnsupportedType(format!("{b:?}"))),
     }
@@ -583,9 +503,9 @@ fn render_aot_ir(ir_json: &'static str, ctx: &Value) -> Result<String> {
         let mut guard = cache.lock().expect("ir cache lock");
         if let Some(doc) = guard.get(&key) {
             doc.clone()
-        } else {
-            let doc: IrDocument = serde_json::from_str(ir_json)
-                .map_err(|e| Error::InvalidIr("embedded".into(), e.to_string()))?;
+        }
+        else {
+            let doc: IrDocument = serde_json::from_str(ir_json).map_err(|e| Error::InvalidIr("embedded".into(), e.to_string()))?;
             guard.insert(key, doc.clone());
             doc
         }

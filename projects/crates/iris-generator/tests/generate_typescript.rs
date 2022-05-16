@@ -29,33 +29,19 @@ table Post {
 
 fn assert_compact_ts_layout(name: &str, content: &str) {
     assert!(!content.starts_with('\n'), "{name} must not start with a blank line");
-    assert!(
-        !content.contains("\n\n"),
-        "{name} must not contain consecutive blank lines"
-    );
+    assert!(!content.contains("\n\n"), "{name} must not contain consecutive blank lines");
     assert!(content.ends_with('\n'), "{name} must end with a single newline");
-    assert!(
-        !content.contains("import type {\n\n"),
-        "{name} must not have blank lines inside import type braces"
-    );
+    assert!(!content.contains("import type {\n\n"), "{name} must not have blank lines inside import type braces");
     for entity in ["&quot;", "&lt;", "&gt;", "&amp;", "&#39;"] {
-        assert!(
-            !content.contains(entity),
-            "{name} must not contain HTML entity {entity}"
-        );
+        assert!(!content.contains(entity), "{name} must not contain HTML entity {entity}");
     }
 }
 
 #[test]
 fn typescript_emit_writes_ux_layout() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
-    let dir = std::env::temp_dir().join(format!(
-        "iris-ts-gen-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let dir = std::env::temp_dir()
+        .join(format!("iris-ts-gen-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let paths = write_typescript_client(&model, &root).expect("write");
     assert_eq!(paths.len(), 10);
@@ -80,23 +66,13 @@ fn typescript_emit_writes_ux_layout() {
 
 #[test]
 fn generate_dispatch_typescript_target() {
-    let dir = std::env::temp_dir().join(format!(
-        "iris-ts-dispatch-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let dir = std::env::temp_dir()
+        .join(format!("iris-ts-dispatch-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
-    let (_, paths) =
-        iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root).expect("generate");
+    let (_, paths) = iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root).expect("generate");
     assert_eq!(paths.len(), 10);
     assert!(paths.iter().all(|path| path.starts_with(&root)));
-    assert!(
-        paths
-            .iter()
-            .any(|path| path.file_name().is_some_and(|name| name == "metadata.ts"))
-    );
+    assert!(paths.iter().any(|path| path.file_name().is_some_and(|name| name == "metadata.ts")));
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -104,11 +80,7 @@ fn generate_dispatch_typescript_target() {
 fn typescript_emit_has_typed_filters_patch_and_payload() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    let inputs = files
-        .iter()
-        .find(|(name, _)| name == "inputs.ts")
-        .map(|(_, content)| content.as_str())
-        .expect("inputs.ts");
+    let inputs = files.iter().find(|(name, _)| name == "inputs.ts").map(|(_, content)| content.as_str()).expect("inputs.ts");
     assert!(inputs.contains("export type StringFilter"));
     assert!(inputs.contains("export type BooleanFilter"));
     assert!(inputs.contains("export type PatchValue<"));
@@ -116,11 +88,7 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
     assert!(!inputs.contains("UpdateInput"));
     assert!(inputs.contains("UserGetPayload<"));
 
-    let ops = files
-        .iter()
-        .find(|(name, _)| name == "operations.ts")
-        .map(|(_, content)| content.as_str())
-        .expect("operations.ts");
+    let ops = files.iter().find(|(name, _)| name == "operations.ts").map(|(_, content)| content.as_str()).expect("operations.ts");
     assert!(ops.contains("findMany<const A extends UserFindManyArgs>"));
     assert!(ops.contains("ReadonlyArray<UserGetPayload<A>>"));
     assert!(
@@ -149,11 +117,7 @@ fn typescript_emit_compact_layout_for_all_files() {
 fn typescript_emit_unescapes_conditional_types() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    let inputs = files
-        .iter()
-        .find(|(name, _)| name == "inputs.ts")
-        .map(|(_, content)| content.as_str())
-        .expect("inputs.ts");
+    let inputs = files.iter().find(|(name, _)| name == "inputs.ts").map(|(_, content)| content.as_str()).expect("inputs.ts");
     assert!(inputs.contains("type EntityName = \"User\""));
     assert!(inputs.contains("[S] extends [undefined]"));
 }
@@ -162,11 +126,7 @@ fn typescript_emit_unescapes_conditional_types() {
 fn typescript_emit_maps_wire_names_in_metadata() {
     let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    let metadata = files
-        .iter()
-        .find(|(name, _)| name == "metadata.ts")
-        .map(|(_, content)| content.as_str())
-        .expect("metadata.ts");
+    let metadata = files.iter().find(|(name, _)| name == "metadata.ts").map(|(_, content)| content.as_str()).expect("metadata.ts");
     assert!(metadata.contains("userName: \"user_name\""));
     assert!(metadata.contains("postId: \"post_id\""));
 }
@@ -188,7 +148,6 @@ table User {
 
 #[test]
 fn generate_rejects_unknown_target() {
-    let err =
-        iris_generator::generate_from_source(USER_SCHEMA, "kotlin", Path::new(".")).unwrap_err();
+    let err = iris_generator::generate_from_source(USER_SCHEMA, "kotlin", Path::new(".")).unwrap_err();
     assert!(err.to_string().contains("kotlin"));
 }

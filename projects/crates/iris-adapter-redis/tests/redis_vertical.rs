@@ -14,9 +14,7 @@ fn sample_mapping() -> MappingManifest {
 }
 
 fn live_url() -> Option<String> {
-    std::env::var("IRIS_TEST_REDIS_URL")
-        .ok()
-        .filter(|s| !s.is_empty())
+    std::env::var("IRIS_TEST_REDIS_URL").ok().filter(|s| !s.is_empty())
 }
 
 #[test]
@@ -66,14 +64,9 @@ fn draft_keyspace_mapping_rejects_missing_pk() {
 #[test]
 fn physical_plans_with_filter_are_rejected_at_plan() {
     let caps = RedisSource::capabilities();
-    let err = Planner::new(caps)
-        .plan_source(r#"User.filter(x => x.active).collect()"#)
-        .expect_err("filter must be rejected under redis caps");
+    let err = Planner::new(caps).plan_source(r#"User.filter(x => x.active).collect()"#).expect_err("filter must be rejected under redis caps");
     let msg = err.to_string();
-    assert!(
-        msg.contains("IRIS-PLAN-REJECTED") || msg.contains("reject") || msg.contains("filter"),
-        "{msg}"
-    );
+    assert!(msg.contains("IRIS-PLAN-REJECTED") || msg.contains("reject") || msg.contains("filter"), "{msg}");
 }
 
 #[test]
@@ -91,17 +84,15 @@ fn json_encoding_rejects_non_json_offline() {
 
 #[test]
 fn live_pk_crud_ttl_nx_and_anti_scan() {
-    let Some(url) = live_url() else {
+    let Some(url) = live_url()
+    else {
         eprintln!("skip: set IRIS_TEST_REDIS_URL for live Redis conformance");
         return;
     };
     let db = RedisSource::connect(&url, sample_mapping()).expect("connect");
 
     db.put_primary("User", "u1", "alice").unwrap();
-    assert_eq!(
-        db.get_primary("User", "u1").unwrap().as_deref(),
-        Some("alice")
-    );
+    assert_eq!(db.get_primary("User", "u1").unwrap().as_deref(), Some("alice"));
     let ttl = db.ttl_primary("User", "u1").unwrap();
     assert!(ttl > 0 && ttl <= 60, "ttl={ttl}");
 
@@ -112,14 +103,9 @@ fn live_pk_crud_ttl_nx_and_anti_scan() {
     assert_eq!(db.get_primary("User", "u1").unwrap(), None);
     let _ = db.delete_primary("User", "u2");
 
-    let plan = Planner::new(RedisSource::capabilities())
-        .plan_source(r#"User.collect()"#)
-        .unwrap();
+    let plan = Planner::new(RedisSource::capabilities()).plan_source(r#"User.collect()"#).unwrap();
     let err = db.execute_plan(&plan).expect_err("scan must fail");
-    assert!(
-        err.to_string().contains("rejects") || err.to_string().contains("Scan"),
-        "{err}"
-    );
+    assert!(err.to_string().contains("rejects") || err.to_string().contains("Scan"), "{err}");
 
     let json_map = MappingManifest::with_tables(vec![KeyspaceMapping {
         vos_table: "Doc".into(),

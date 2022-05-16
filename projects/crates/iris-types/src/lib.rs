@@ -26,60 +26,45 @@ mod uuid_v7;
 mod value;
 
 pub use adapter::{
-    DriftReport, FieldMapping, LogicalChange, LogicalMigrationPlan, MappingManifest,
-    MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, RowWrite, TableMapping,
+    DriftReport, FieldMapping, LogicalChange, LogicalMigrationPlan, MappingManifest, MappingQuality, ObservedCatalog, ObservedColumn,
+    ObservedTable, RowWrite, TableMapping,
 };
 
-pub use cache_route::{
-    AppliedWatermarkState, CacheReadAction, CacheReadContext, StampedeBudget, StampedePermit,
-    decide_cache_read,
-};
+pub use cache_route::{AppliedWatermarkState, CacheReadAction, CacheReadContext, StampedeBudget, StampedePermit, decide_cache_read};
 pub use capability::{CapabilitySet, CompensationBudget, QueryCaps, WriteCaps};
 pub use diagnostic::{Diagnostic, StageKind};
 pub use error::{Error, Result};
 pub use explain::{
-    EXPLAIN_FORMAT, ExplainReport, ExplainSafety, ExplainStep, PhysicalExplain,
-    assert_explain_safe, explain_from_plan, explain_topology, physical_explain_from_plan,
-    scan_explain_text,
+    EXPLAIN_FORMAT, ExplainReport, ExplainSafety, ExplainStep, PhysicalExplain, assert_explain_safe, explain_from_plan, explain_topology,
+    physical_explain_from_plan, scan_explain_text,
 };
 pub use hydrate::{AuthorityEntity, AuthorityEntityLookup, MapAuthorityLookup, hydrate_candidates};
-pub use object_store::{
-    FsObjectStore, OBJECT_HASH_ALG_BLAKE3, OBJECT_REF_FORMAT, ObjectStateCounts, ObjectStatusRow,
-    ObjectStoreStatusReport,
-};
+pub use object_store::{FsObjectStore, OBJECT_HASH_ALG_BLAKE3, OBJECT_REF_FORMAT, ObjectStateCounts, ObjectStatusRow, ObjectStoreStatusReport};
 pub use planner::Planner;
 pub use project::{
-    DEFAULT_CACHE_ROOT, DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH, DEFAULT_MIGRATIONS_DIR,
-    DEFAULT_SCHEMA, DatasourceConfig, DatasourceKind, GenerateConfig, IrisLock, IrisProject,
-    LOCK_FILE, PROJECT_FILE, PROJECT_FORMAT, ProjectError, TruthMode, default_migration_plan,
+    DEFAULT_CACHE_ROOT, DEFAULT_GENERATE_DIR, DEFAULT_LOCK_PATH, DEFAULT_MIGRATIONS_DIR, DEFAULT_SCHEMA, DatasourceConfig, DatasourceKind,
+    GenerateConfig, IrisLock, IrisProject, LOCK_FILE, PROJECT_FILE, PROJECT_FORMAT, ProjectError, TruthMode, default_migration_plan,
     expand_env, find_workspace_root, resolve_path,
 };
 pub use projection_status::{
-    CacheWatermarkProbe, LiveWatermarkView, PROJECTION_STATUS_FORMAT, ProjectionComponentStatus,
-    ProjectionStatusReport, projection_status, projection_status_offline, watermark_covers,
+    CacheWatermarkProbe, LiveWatermarkView, PROJECTION_STATUS_FORMAT, ProjectionComponentStatus, ProjectionStatusReport, projection_status,
+    projection_status_offline, watermark_covers,
 };
 pub use projection_store::{
-    GenerationState, LocalProjectionStore, PROJECTION_ALIAS_FORMAT, PROJECTION_GENERATION_FORMAT,
-    ProjectionRebuildStatus, ProjectionStoreError, ProjectionStoreResult, RebuildHandle,
-    RebuildValidation,
+    GenerationState, LocalProjectionStore, PROJECTION_ALIAS_FORMAT, PROJECTION_GENERATION_FORMAT, ProjectionRebuildStatus,
+    ProjectionStoreError, ProjectionStoreResult, RebuildHandle, RebuildValidation,
 };
-pub use projection_verify::{
-    PROJECTION_VERIFY_FORMAT, ProjectionVerifyCheck, ProjectionVerifyReport, verify_projection,
-};
+pub use projection_verify::{PROJECTION_VERIFY_FORMAT, ProjectionVerifyCheck, ProjectionVerifyReport, verify_projection};
 pub use reference::{ReferenceStore, row_from_pairs};
-pub use schema::{
-    collect_schema_paths, load_schema_document, read_schema, table_name_class_hints,
-    table_name_class_hints_from_source,
-};
+pub use schema::{collect_schema_paths, load_schema_document, read_schema, table_name_class_hints, table_name_class_hints_from_source};
 pub use session::{Iris, Session};
 pub use topology::{
-    CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy,
-    RouteRule, TOPOLOGY_DIR, TOPOLOGY_FORMAT, TableBinding, TopologyComponent, TopologyContract,
-    TopologyError, verify_report,
+    CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy, RouteRule, TOPOLOGY_DIR, TOPOLOGY_FORMAT,
+    TableBinding, TopologyComponent, TopologyContract, TopologyError, verify_report,
 };
 pub use topology_activate::{
-    TOPOLOGY_ACTIVATION_FORMAT, TopologyActivateReport, TopologyActivation, TopologyHandshake,
-    activate_topology, load_activation, reader_version_accepted, writer_version_ok,
+    TOPOLOGY_ACTIVATION_FORMAT, TopologyActivateReport, TopologyActivation, TopologyHandshake, activate_topology, load_activation,
+    reader_version_accepted, writer_version_ok,
 };
 pub use uuid_v7::{is_v7, uuid};
 pub use value::{Row, Value};
@@ -96,9 +81,7 @@ pub struct Runtime {
 impl Runtime {
     /// Create a runtime with full reference-adapter capabilities.
     pub fn new() -> Self {
-        Self {
-            capabilities: CapabilitySet::reference_full(),
-        }
+        Self { capabilities: CapabilitySet::reference_full() }
     }
 
     /// Open the process Iris facade bound to an in-memory reference store.
@@ -108,9 +91,7 @@ impl Runtime {
 
     /// Deprecated Phase 0 helper -- returns a rejected empty plan.
     pub fn placeholder_plan(&self) -> PhysicalPlan {
-        use iris_ir::{
-            EffectKind, IrEnvelope, PhysicalOp, PlannedNode, SchemaFingerprint, SemanticHash,
-        };
+        use iris_ir::{EffectKind, IrEnvelope, PhysicalOp, PlannedNode, SchemaFingerprint, SemanticHash};
         PhysicalPlan {
             envelope: IrEnvelope {
                 vos_contract_version: "0".into(),

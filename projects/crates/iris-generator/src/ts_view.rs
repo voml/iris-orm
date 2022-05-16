@@ -77,32 +77,14 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
     let entity_names: HashSet<&str> = model.tables.iter().map(|t| t.name.as_str()).collect();
     let entity_union = if model.tables.is_empty() {
         "never".into()
-    } else {
-        model
-            .tables
-            .iter()
-            .map(|t| format!("\"{}\"", t.name))
-            .collect::<Vec<_>>()
-            .join(" | ")
+    }
+    else {
+        model.tables.iter().map(|t| format!("\"{}\"", t.name)).collect::<Vec<_>>().join(" | ")
     };
-    let entity_map_lines = model
-        .tables
-        .iter()
-        .map(|t| format!("    {}: {};", t.name, t.name))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let models_import_lines = model
-        .tables
-        .iter()
-        .map(|t| format!("    {},", t.name))
-        .collect::<Vec<_>>()
-        .join("\n");
-    let refs_import_lines = model
-        .tables
-        .iter()
-        .flat_map(|t| [format!("    {}Id,", t.name), format!("    {}RefInput,", t.name)])
-        .collect::<Vec<_>>()
-        .join("\n");
+    let entity_map_lines = model.tables.iter().map(|t| format!("    {}: {};", t.name, t.name)).collect::<Vec<_>>().join("\n");
+    let models_import_lines = model.tables.iter().map(|t| format!("    {},", t.name)).collect::<Vec<_>>().join("\n");
+    let refs_import_lines =
+        model.tables.iter().flat_map(|t| [format!("    {}Id,", t.name), format!("    {}RefInput,", t.name)]).collect::<Vec<_>>().join("\n");
     let input_import_names = model
         .tables
         .iter()
@@ -118,17 +100,9 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .collect::<Vec<_>>()
         .join(", ");
     let needed = reference_targets(model);
-    let ref_type_imports = needed
-        .iter()
-        .flat_map(|name| [format!("{name}Id"), format!("{name}Reference")])
-        .collect::<Vec<_>>()
-        .join(", ");
+    let ref_type_imports = needed.iter().flat_map(|name| [format!("{name}Id"), format!("{name}Reference")]).collect::<Vec<_>>().join(", ");
 
-    let tables_view = model
-        .tables
-        .iter()
-        .map(|table| build_table_view(table, &entity_names))
-        .collect();
+    let tables_view = model.tables.iter().map(|table| build_table_view(table, &entity_names)).collect();
 
     let wire_map_lines = model
         .tables
@@ -137,13 +111,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
             let fields = table
                 .fields
                 .iter()
-                .map(|field| {
-                    format!(
-                        "{}: \"{}\"",
-                        field_ts_name(field),
-                        field.name.replace('\\', "\\\\").replace('"', "\\\"")
-                    )
-                })
+                .map(|field| format!("{}: \"{}\"", field_ts_name(field), field.name.replace('\\', "\\\\").replace('"', "\\\"")))
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("    {}: {{ {} }},", table.name, fields)
@@ -163,13 +131,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                         .reference_target
                         .as_ref()
                         .filter(|target| entity_names.contains(target.as_str()))
-                        .map(|target| {
-                            format!(
-                                "{}: \"{}\"",
-                                field_ts_name(field),
-                                target.replace('\\', "\\\\").replace('"', "\\\"")
-                            )
-                        })
+                        .map(|target| format!("{}: \"{}\"", field_ts_name(field), target.replace('\\', "\\\\").replace('"', "\\\"")))
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
@@ -186,33 +148,16 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
             let params = macro_def
                 .params
                 .iter()
-                .map(|param| TsMacroParamView {
-                    name: param.name.clone(),
-                    ts_type: param.ts_type.clone(),
-                })
+                .map(|param| TsMacroParamView { name: param.name.clone(), ts_type: param.ts_type.clone() })
                 .collect::<Vec<_>>();
             let param_signature = if params.is_empty() {
                 String::new()
-            } else {
-                params
-                    .iter()
-                    .map(|param| format!("{}: {}", param.name, param.ts_type))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            };
-            let param_names = params
-                .iter()
-                .map(|param| param.name.clone())
-                .collect::<Vec<_>>()
-                .join(", ");
-            TsMacroView {
-                name: macro_def.name.clone(),
-                uses_execute: ts_return == "void",
-                ts_return,
-                params,
-                param_signature,
-                param_names,
             }
+            else {
+                params.iter().map(|param| format!("{}: {}", param.name, param.ts_type)).collect::<Vec<_>>().join(", ")
+            };
+            let param_names = params.iter().map(|param| param.name.clone()).collect::<Vec<_>>().join(", ");
+            TsMacroView { name: macro_def.name.clone(), uses_execute: ts_return == "void", ts_return, params, param_signature, param_names }
         })
         .collect();
 
@@ -244,27 +189,22 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
     let primary_fields: Vec<_> = table.fields.iter().filter(|f| f.primary).collect();
     let unique_where_lines = if primary_fields.is_empty() {
         format!("    id?: {}Id;", table.name)
-    } else {
-        primary_fields
-            .iter()
-            .map(|field| format!("    {}: {}Id;", field_ts_name(field), table.name))
-            .collect::<Vec<_>>()
-            .join("\n")
+    }
+    else {
+        primary_fields.iter().map(|field| format!("    {}: {}Id;", field_ts_name(field), table.name)).collect::<Vec<_>>().join("\n")
     };
 
     let fields = table
         .fields
         .iter()
-        .map(|field| {
-            TsFieldView {
-                name: field.name.clone(),
-                ts_name: field_ts_name(field),
-                ts_model_type: model_field_type(table, field),
-                where_line: emit_where_field(table, field, entity_names),
-                select_line: emit_select_field(field, entity_names),
-                create_line: emit_create_field(table, field, entity_names),
-                patch_line: emit_patch_field(table, field, entity_names),
-            }
+        .map(|field| TsFieldView {
+            name: field.name.clone(),
+            ts_name: field_ts_name(field),
+            ts_model_type: model_field_type(table, field),
+            where_line: emit_where_field(table, field, entity_names),
+            select_line: emit_select_field(field, entity_names),
+            create_line: emit_create_field(table, field, entity_names),
+            patch_line: emit_patch_field(table, field, entity_names),
         })
         .collect();
 
@@ -301,9 +241,7 @@ fn vos_filter_name(vos_type: &str) -> &'static str {
     let base = vos_type.trim_end_matches('?').trim_start_matches('&');
     match base {
         "bool" => "BooleanFilter",
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => {
-            "NumberFilter"
-        }
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "NumberFilter",
         "utf8" | "utf16" => "StringFilter",
         "uuid" => "UuidFilter",
         "decimal" => "DecimalFilter",
@@ -316,61 +254,38 @@ fn vos_filter_name(vos_type: &str) -> &'static str {
 fn model_field_type(table: &TableModel, field: &FieldModel) -> String {
     if let Some(ref target) = field.reference_target {
         let reference = format!("{target}Reference");
-        return if field.optional {
-            format!("{reference} | null")
-        } else {
-            reference
-        };
+        return if field.optional { format!("{reference} | null") } else { reference };
     }
     if field.primary {
         return format!("{}Id", table.name);
     }
     let base = scalar_base_type(&field.vos_type);
-    if field.optional {
-        format!("{base} | null")
-    } else {
-        base.into()
-    }
+    if field.optional { format!("{base} | null") } else { base.into() }
 }
 
 fn scalar_filter_type(table: &TableModel, field: &FieldModel) -> String {
-    if field.primary {
-        format!("{}Id", table.name)
-    } else {
-        scalar_base_type(&field.vos_type).into()
-    }
+    if field.primary { format!("{}Id", table.name) } else { scalar_base_type(&field.vos_type).into() }
 }
 
 fn nullable_where_suffix(optional: bool) -> &'static str {
-    if optional {
-        " | { readonly isNull: true } | { readonly isNotNull: true }"
-    } else {
-        ""
-    }
+    if optional { " | { readonly isNull: true } | { readonly isNotNull: true }" } else { "" }
 }
 
 fn patch_value_type(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> String {
     if let Some(ref target) = field.reference_target {
         if entity_names.contains(target.as_str()) {
             let inner = format!("{}RefInput", target);
-            return if field.optional {
-                format!("NullablePatchValue<{inner}>")
-            } else {
-                format!("PatchValue<{inner}>")
-            };
+            return if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") };
         }
     }
     let inner = if field.primary {
         format!("{}Id", table.name)
-    } else {
+    }
+    else {
         let model_ty = model_field_type(table, field);
         strip_null_union(&model_ty)
     };
-    if field.optional {
-        format!("NullablePatchValue<{inner}>")
-    } else {
-        format!("PatchValue<{inner}>")
-    }
+    if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") }
 }
 
 fn strip_null_union(ty: &str) -> String {
@@ -378,11 +293,7 @@ fn strip_null_union(ty: &str) -> String {
 }
 
 fn primary_key_field(table: &TableModel) -> Option<&FieldModel> {
-    table
-        .fields
-        .iter()
-        .find(|f| f.primary)
-        .or(table.fields.first())
+    table.fields.iter().find(|f| f.primary).or(table.fields.first())
 }
 
 fn reference_targets(model: &GenerationModel) -> HashSet<String> {
@@ -398,11 +309,7 @@ fn reference_targets(model: &GenerationModel) -> HashSet<String> {
     targets
 }
 
-fn emit_where_field(
-    table: &TableModel,
-    field: &FieldModel,
-    entity_names: &HashSet<&str>,
-) -> Option<String> {
+fn emit_where_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
     if let Some(ref target) = field.reference_target {
         if entity_names.contains(target.as_str()) {
             return Some(format!(
@@ -417,34 +324,20 @@ fn emit_where_field(
     let scalar = scalar_filter_type(table, field);
     let filter = vos_filter_name(&field.vos_type);
     let nullable = nullable_where_suffix(field.optional);
-    Some(format!(
-        "    {}?: {scalar} | {filter}{nullable};",
-        field_ts_name(field),
-        scalar = scalar,
-        filter = filter,
-        nullable = nullable,
-    ))
+    Some(format!("    {}?: {scalar} | {filter}{nullable};", field_ts_name(field), scalar = scalar, filter = filter, nullable = nullable,))
 }
 
 fn emit_select_field(field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
     if let Some(ref target) = field.reference_target {
         if entity_names.contains(target.as_str()) {
-            return Some(format!(
-                "    {}?: boolean | {{ readonly select: SelectPathFor<\"{}\"> }};",
-                field_ts_name(field),
-                target
-            ));
+            return Some(format!("    {}?: boolean | {{ readonly select: SelectPathFor<\"{}\"> }};", field_ts_name(field), target));
         }
         return None;
     }
     Some(format!("    {}?: boolean;", field_ts_name(field)))
 }
 
-fn emit_create_field(
-    table: &TableModel,
-    field: &FieldModel,
-    entity_names: &HashSet<&str>,
-) -> Option<String> {
+fn emit_create_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
     if let Some(ref target) = field.reference_target {
         if !entity_names.contains(target.as_str()) {
             return None;
@@ -453,25 +346,14 @@ fn emit_create_field(
         return Some(format!("    {}{}: {}RefInput;", field_ts_name(field), req, target));
     }
     if field.optional {
-        Some(format!(
-            "    {}?: {};",
-            field_ts_name(field),
-            model_field_type(table, field)
-        ))
-    } else {
-        Some(format!(
-            "    {}: {};",
-            field_ts_name(field),
-            model_field_type(table, field)
-        ))
+        Some(format!("    {}?: {};", field_ts_name(field), model_field_type(table, field)))
+    }
+    else {
+        Some(format!("    {}: {};", field_ts_name(field), model_field_type(table, field)))
     }
 }
 
-fn emit_patch_field(
-    table: &TableModel,
-    field: &FieldModel,
-    entity_names: &HashSet<&str>,
-) -> Option<String> {
+fn emit_patch_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
     if field.primary {
         return None;
     }
@@ -480,11 +362,7 @@ fn emit_patch_field(
             return None;
         }
     }
-    Some(format!(
-        "    {}?: {};",
-        field_ts_name(field),
-        patch_value_type(table, field, entity_names)
-    ))
+    Some(format!("    {}?: {};", field_ts_name(field), patch_value_type(table, field, entity_names)))
 }
 
 fn macro_return_ts(return_type: &str) -> String {
@@ -493,15 +371,8 @@ fn macro_return_ts(return_type: &str) -> String {
         "utf8" | "uuid" | "decimal" | "datetime" | "bytes" => "string".into(),
         "bool" => "boolean".into(),
         "unit" => "void".into(),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => {
-            "number".into()
-        }
-        other
-            if other.contains("::")
-                || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) =>
-        {
-            other.into()
-        }
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "number".into(),
+        other if other.contains("::") || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) => other.into(),
         _ => "unknown".into(),
     }
 }
@@ -533,12 +404,7 @@ fn validate_ts_naming(model: &GenerationModel) -> Result<()> {
         for field in &table.fields {
             let ts_name = field_ts_name(field);
             if let Some(wire_a) = seen.get(&ts_name) {
-                return Err(Error::NamingCollision {
-                    entity: table.name.clone(),
-                    wire_a: wire_a.clone(),
-                    wire_b: field.name.clone(),
-                    ts_name,
-                });
+                return Err(Error::NamingCollision { entity: table.name.clone(), wire_a: wire_a.clone(), wire_b: field.name.clone(), ts_name });
             }
             seen.insert(ts_name, field.name.clone());
         }

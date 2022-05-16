@@ -2,14 +2,17 @@
 
 use std::path::Path;
 
-use iris_wasm::bind;
 use crate::operation;
-use iris::{CapabilitySet, DatasourceKind, Iris, Planner, ReferenceStore, Row, resolve_path};
+use iris::{
+    CapabilitySet, DatasourceKind, Iris, Planner, ReferenceStore, Row,
+    project::{expand_endpoint, load_project, read_schema},
+    resolve_path,
+};
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
 use iris_adapter_sqlite::SqliteSource;
 use iris_connector_yydb::YydbSource;
-use iris::project::{expand_endpoint, load_project, read_schema};
+use iris_wasm::bind;
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use serde_json::{Map, Value as JsonValue, json};
@@ -43,19 +46,11 @@ fn value_to_json(value: &iris::Value) -> JsonValue {
 }
 
 fn ok_result(rows: Vec<Row>) -> ExecuteResult {
-    ExecuteResult {
-        ok: true,
-        rows_json: JsonValue::Array(rows_to_json(rows)).to_string(),
-        error: None,
-    }
+    ExecuteResult { ok: true, rows_json: JsonValue::Array(rows_to_json(rows)).to_string(), error: None }
 }
 
 fn err_result(message: String) -> ExecuteResult {
-    ExecuteResult {
-        ok: false,
-        rows_json: "[]".into(),
-        error: Some(message),
-    }
+    ExecuteResult { ok: false, rows_json: "[]".into(), error: Some(message) }
 }
 
 enum SessionStore {
@@ -100,10 +95,9 @@ impl SessionStore {
         match self {
             Self::Memory(iris) => iris.session().execute(source).map_err(|err| err.to_string()),
             Self::Yydb(db) => db.execute(source).map_err(|err| err.to_string()),
-            Self::Sqlite(_) | Self::Postgres(_) | Self::Mysql(_) => Err(
-                "unit-valued execute is only wired for yydb and reference sessions in Phase 2"
-                    .into(),
-            ),
+            Self::Sqlite(_) | Self::Postgres(_) | Self::Mysql(_) => {
+                Err("unit-valued execute is only wired for yydb and reference sessions in Phase 2".into())
+            }
         }
     }
 }
@@ -141,30 +135,18 @@ fn open_yydb_endpoint(project_dir: &Path, endpoint: &str) -> std::result::Result
 impl MemorySession {
     fn new_store(store: SessionStore, session_ddl_revision: Option<u64>) -> Self {
         let planner = Planner::new(store.capabilities());
-        Self {
-            store,
-            planner,
-            closed: false,
-            session_ddl_revision,
-        }
+        Self { store, planner, closed: false, session_ddl_revision }
     }
 
     fn ensure_yydb_session_fresh(&self, db: &YydbSource) -> std::result::Result<(), String> {
         if let Some(expected) = self.session_ddl_revision {
-            db.check_session_ddl_revision(expected)
-                .map_err(|err| err.to_string())?;
+            db.check_session_ddl_revision(expected).map_err(|err| err.to_string())?;
         }
         Ok(())
     }
 
     pub(crate) fn open_memory() -> Self {
-        Self::new_store(
-            SessionStore::Memory(Iris::new(
-                CapabilitySet::reference_full(),
-                ReferenceStore::new(),
-            )),
-            None,
-        )
+        Self::new_store(SessionStore::Memory(Iris::new(CapabilitySet::reference_full(), ReferenceStore::new())), None)
     }
 
     pub(crate) fn open_sqlite(path: String) -> Result<Self> {
@@ -173,8 +155,7 @@ impl MemorySession {
     }
 
     pub(crate) fn open_postgres(url: String) -> Result<Self> {
-        let db =
-            PostgresSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?;
+        let db = PostgresSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?;
         Ok(Self::new_store(SessionStore::Postgres(db), None))
     }
 
@@ -184,59 +165,28 @@ impl MemorySession {
     }
 
     pub(crate) fn open_project(config_path: String, source: String) -> Result<Self> {
-        let (project_dir, project) =
-            load_project(Path::new(&config_path)).map_err(|err| Error::from_reason(err))?;
-        let ds = project
-            .datasource(&source)
-            .map_err(|err| Error::from_reason(err.to_string()))?;
+        let (project_dir, project) = load_project(Path::new(&config_path)).map_err(|err| Error::from_reason(err))?;
+        let ds = project.datasource(&source).map_err(|err| Error::from_reason(err.to_string()))?;
         let (store, session_ddl_revision) = match ds.kind {
             DatasourceKind::Yydb => {
-                let endpoint =
-                    expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
-                let db = open_yydb_endpoint(&project_dir, &endpoint)
-                    .map_err(|err| Error::from_reason(err))?;
-                let schema = read_schema(&project_dir, &project)
-                    .map_err(|err| Error::from_reason(err))?;
-                db.ensure_schema(&schema)
-                    .map_err(|err| Error::from_reason(err.to_string()))?;
-                let revision = db
-                    .schema_handshake()
-                    .map_err(|err| Error::from_reason(err.to_string()))?
-                    .ddl_revision;
+                let endpoint = expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
+                let db = open_yydb_endpoint(&project_dir, &endpoint).map_err(|err| Error::from_reason(err))?;
+                let schema = read_schema(&project_dir, &project).map_err(|err| Error::from_reason(err))?;
+                db.ensure_schema(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
+                let revision = db.schema_handshake().map_err(|err| Error::from_reason(err.to_string()))?.ddl_revision;
                 (SessionStore::Yydb(db), Some(revision))
             }
             DatasourceKind::Sqlite => {
-                let path = resolve_path(
-                    &project_dir,
-                    &expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?,
-                );
-                (
-                    SessionStore::Sqlite(
-                        SqliteSource::open(path)
-                            .map_err(|err| Error::from_reason(err.to_string()))?,
-                    ),
-                    None,
-                )
+                let path = resolve_path(&project_dir, &expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?);
+                (SessionStore::Sqlite(SqliteSource::open(path).map_err(|err| Error::from_reason(err.to_string()))?), None)
             }
             DatasourceKind::Postgres => {
                 let url = expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
-                (
-                    SessionStore::Postgres(
-                        PostgresSource::connect(&url)
-                            .map_err(|err| Error::from_reason(err.to_string()))?,
-                    ),
-                    None,
-                )
+                (SessionStore::Postgres(PostgresSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?), None)
             }
             DatasourceKind::Mysql => {
                 let url = expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
-                (
-                    SessionStore::Mysql(
-                        MysqlSource::connect(&url)
-                            .map_err(|err| Error::from_reason(err.to_string()))?,
-                    ),
-                    None,
-                )
+                (SessionStore::Mysql(MysqlSource::connect(&url).map_err(|err| Error::from_reason(err.to_string()))?), None)
             }
             other => {
                 return Err(Error::from_reason(format!(
@@ -267,8 +217,7 @@ impl MemorySession {
             None => source,
         };
         if let SessionStore::Yydb(db) = &self.store {
-            self.ensure_yydb_session_fresh(db)
-                .map_err(Error::from_reason)?;
+            self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
         }
         match self.store.query(&self.planner, &source) {
             Ok(rows) => Ok(ok_result(rows)),
@@ -278,11 +227,7 @@ impl MemorySession {
 
     /// Execute unit-valued / DDL-shaped VOS. Aligns with generated `db.$execute`.
     #[napi]
-    pub fn execute(
-        &self,
-        source: String,
-        parameters_json: Option<String>,
-    ) -> Result<ExecuteResult> {
+    pub fn execute(&self, source: String, parameters_json: Option<String>) -> Result<ExecuteResult> {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
@@ -291,34 +236,21 @@ impl MemorySession {
             None => source,
         };
         if let SessionStore::Yydb(db) = &self.store {
-            self.ensure_yydb_session_fresh(db)
-                .map_err(Error::from_reason)?;
+            self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
             return match db.execute(&source) {
-                Ok(()) => Ok(ExecuteResult {
-                    ok: true,
-                    rows_json: "[]".into(),
-                    error: None,
-                }),
+                Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
                 Err(err) => Ok(err_result(err.to_string())),
             };
         }
         match self.store.execute_unit(&source) {
-            Ok(()) => Ok(ExecuteResult {
-                ok: true,
-                rows_json: "[]".into(),
-                error: None,
-            }),
+            Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
             Err(err) => Ok(err_result(err)),
         }
     }
 
     /// Plan + execute VOS DML (legacy name).
     #[napi]
-    pub fn execute_vos(
-        &self,
-        source: String,
-        parameters_json: Option<String>,
-    ) -> Result<ExecuteResult> {
+    pub fn execute_vos(&self, source: String, parameters_json: Option<String>) -> Result<ExecuteResult> {
         self.query(source, parameters_json)
     }
 
@@ -328,11 +260,9 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let source = operation::encode_operation_json(&operation_json)
-            .map_err(|err| Error::from_reason(err))?;
+        let source = operation::encode_operation_json(&operation_json).map_err(|err| Error::from_reason(err))?;
         if let SessionStore::Yydb(db) = &self.store {
-            self.ensure_yydb_session_fresh(db)
-                .map_err(Error::from_reason)?;
+            self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
         }
         match self.store.query(&self.planner, &source) {
             Ok(rows) => Ok(ok_result(rows)),
@@ -348,18 +278,14 @@ impl MemorySession {
         }
         match &self.store {
             SessionStore::Yydb(db) => {
-                db.ensure_schema(&schema)
-                    .map_err(|err| Error::from_reason(err.to_string()))?;
+                db.ensure_schema(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
             SessionStore::Sqlite(db) => {
-                db.managed_push(&schema)
-                    .map_err(|err| Error::from_reason(err.to_string()))?;
+                db.managed_push(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
-            _ => Err(Error::from_reason(
-                "managed_push is only supported on yydb and sqlite sessions",
-            )),
+            _ => Err(Error::from_reason("managed_push is only supported on yydb and sqlite sessions")),
         }
     }
 
