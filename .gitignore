@@ -18,7 +18,6 @@ target/
 node_modules/
 .astro/
 dist/
-pnpm-lock.yaml
 *.node
 *.wasm
 

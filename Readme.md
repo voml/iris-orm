@@ -124,8 +124,8 @@ table Record {
 **Check, generate, use:**
 
 ```bash
-npx iris check --config .
-npx iris generate --config .
+npx iris check
+npx iris generate
 ```
 
 ```text
@@ -140,8 +140,8 @@ layout: [Getting started](https://iris-orm.pages.dev/d/en-us/guide/getting-start
 
 ```bash
 npx iris doctor
-npx iris check path/to/schema.iris
-npx iris generate --config .
+npx iris check schemas/domain.iris
+npx iris generate
 npx iris push --plan
 npx iris push
 ```

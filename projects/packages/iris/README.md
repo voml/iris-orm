@@ -53,8 +53,8 @@ runtime.checkSource(`table Account { @@account_id: uuid, display_name: utf8 }`);
 **CLI**
 
 ```bash
-npx iris check --config .
-npx iris generate --config .
+npx iris check
+npx iris generate
 ```
 
 Do not branch on `typeof window` in a shared entry — bundlers may pull both N-API and WASM.
