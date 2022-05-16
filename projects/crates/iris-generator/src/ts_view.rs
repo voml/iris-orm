@@ -450,18 +450,18 @@ fn emit_create_field(
             return None;
         }
         let req = if field.optional { "?" } else { "" };
-        return Some(format!("    {}{}: {}RefInput;", field.name, req, target));
+        return Some(format!("    {}{}: {}RefInput;", field_ts_name(field), req, target));
     }
     if field.optional {
         Some(format!(
             "    {}?: {};",
-            field.name,
+            field_ts_name(field),
             model_field_type(table, field)
         ))
     } else {
         Some(format!(
             "    {}: {};",
-            field.name,
+            field_ts_name(field),
             model_field_type(table, field)
         ))
     }
