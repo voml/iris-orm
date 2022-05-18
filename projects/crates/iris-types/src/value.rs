@@ -15,6 +15,8 @@ pub enum Value {
     Int(i64),
     /// UTF-8 string.
     Str(String),
+    /// Nested object row (query projection).
+    Object(BTreeMap<String, Value>),
 }
 
 impl Value {
@@ -25,6 +27,7 @@ impl Value {
             Self::Bool(b) => (b.to_string(), iris_ir::LiteralKind::Bool),
             Self::Int(i) => (i.to_string(), iris_ir::LiteralKind::Int),
             Self::Str(s) => (s.clone(), iris_ir::LiteralKind::Str),
+            Self::Object(_) => ("null".into(), iris_ir::LiteralKind::Null),
         }
     }
 }
