@@ -70,6 +70,12 @@ pub use typescript::{emit_typescript_client, write_typescript_client};
 /// One VOS field in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FieldModel {
+    /// VOS-assigned durable field identity, absent only in legacy source models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_id: Option<u64>,
+    /// VOS-assigned virtual slot, absent only in legacy source models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub virtual_field_index: Option<u32>,
     /// Field name.
     pub name: String,
     /// Rust type text for the emitter.
@@ -114,6 +120,9 @@ pub struct MacroModel {
 /// One VOS table in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableModel {
+    /// VOS-assigned durable type identity, absent only in legacy source models.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub type_id: Option<u64>,
     /// VOS table name.
     pub name: String,
     /// Rust struct name (same as table for Phase 8).
@@ -137,11 +146,50 @@ pub struct GenerationModel {
 }
 
 impl GenerationModel {
+    /// Builds from a strict VOS resolved artifact without parsing source or allocating identities.
+    pub fn from_resolved_artifact(artifact: &str) -> Result<Self> {
+        let contract = vos::ResolvedContract::from_json(artifact)
+            .map_err(|error| Error::Vos(format!("{}: {}", error.code, error.message)))?;
+        let mut tables = Vec::new();
+        for item in &contract.types {
+            if item.kind != vos::contract::TypeContractKind::Table || item.canonical_path.len() != 1 {
+                return Err(Error::UnsupportedType(format!("resolved entity {}", item.canonical_path.join("::"))));
+            }
+            let mut fields = Vec::new();
+            for field in &item.fields {
+                let mapped = map_resolved_field_type(&field.canonical_type)?;
+                fields.push(FieldModel {
+                    field_id: Some(field.field_id),
+                    virtual_field_index: Some(field.virtual_field_index),
+                    name: field.canonical_name.clone(),
+                    rust_ty: mapped.rust_ty,
+                    vos_type: mapped.vos_type,
+                    primary: field.attributes.iter().any(|attribute| attribute.name == "primary"),
+                    optional: mapped.optional,
+                    is_uuid: mapped.is_uuid,
+                    reference_target: mapped.reference_target,
+                });
+            }
+            fields.sort_by_key(|field| field.virtual_field_index);
+            tables.push(TableModel {
+                type_id: Some(item.type_id),
+                name: item.canonical_path[0].clone(),
+                rust_type: item.canonical_path[0].clone(),
+                fields,
+            });
+        }
+        tables.sort_by_key(|table| table.type_id);
+        Ok(Self {
+            generator_version: env!("CARGO_PKG_VERSION").into(),
+            schema_fingerprint: contract.schema_fingerprint,
+            tables,
+            macros: Vec::new(),
+        })
+    }
+
     /// Build from a VOS schema document string.
     pub fn from_vos_schema(source: &str) -> Result<Self> {
         vos::validate_schema(source).map_err(Error::Vos)?;
-        // Compatibility adapter: GenerationModel still consumes the legacy
-        // document shape until resolved-contract lowering replaces it.
         let document = vos::parser::parse_document(source).map_err(|d| {
             Error::Vos(
                 d.errors
@@ -164,6 +212,8 @@ impl GenerationModel {
                     for field in &table.fields {
                         let mapped = map_field_type(&field.ty)?;
                         fields.push(FieldModel {
+                            field_id: None,
+                            virtual_field_index: None,
                             name: field.name.clone(),
                             rust_ty: mapped.rust_ty,
                             vos_type: mapped.vos_type,
@@ -174,6 +224,7 @@ impl GenerationModel {
                         });
                     }
                     tables.push(TableModel {
+                        type_id: None,
                         name: table.name.clone(),
                         rust_type: table.name.clone(),
                         fields,
@@ -404,6 +455,36 @@ fn type_label(ty: &TypeExpr) -> String {
         TypeExpr::Vector { dim } => format!("vector<{dim}>"),
         TypeExpr::File => "file".into(),
         other => format!("{other:?}"),
+    }
+}
+
+fn map_resolved_field_type(ty: &vos::contract::ResolvedCanonicalType) -> Result<MappedFieldType> {
+    use vos::contract::ResolvedCanonicalType;
+    match ty {
+        ResolvedCanonicalType::Optional(inner) => {
+            let mut mapped = map_resolved_field_type(inner)?;
+            mapped.optional = true;
+            mapped.vos_type.push('?');
+            mapped.rust_ty = format!("Option<{}>", mapped.rust_ty);
+            Ok(mapped)
+        }
+        ResolvedCanonicalType::Builtin(path) if path.len() == 1 => {
+            let name = path[0].as_str();
+            let rust_ty = match name {
+                "bool" | "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => name.to_owned(),
+                "utf8" | "utf16" | "uuid" => "String".to_owned(),
+                "bytes" => "Vec<u8>".to_owned(),
+                other => return Err(Error::UnsupportedType(other.to_owned())),
+            };
+            Ok(MappedFieldType {
+                rust_ty,
+                vos_type: name.to_owned(),
+                optional: false,
+                is_uuid: name == "uuid",
+                reference_target: None,
+            })
+        }
+        other => Err(Error::UnsupportedType(format!("resolved type {other:?}"))),
     }
 }
 
