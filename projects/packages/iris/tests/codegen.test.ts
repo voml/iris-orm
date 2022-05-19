@@ -72,14 +72,16 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
     assert.match(nodeEntry, /createIrisDbBinding/);
-    assert.match(nodeEntry, /export async function createDatabase/);
-    assert.match(nodeEntry, /export async function openDatabase/);
-    assert.match(nodeEntry, /export async function closeDatabase/);
+    assert.match(nodeEntry, /export class Database/);
+    assert.match(nodeEntry, /static async create/);
+    assert.match(nodeEntry, /static async open/);
+    assert.match(nodeEntry, /static async close/);
 
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris\/wasm/);
     assert.match(browserEntry, /createIrisDbBinding/);
-    assert.match(browserEntry, /export async function createDatabase/);
+    assert.match(browserEntry, /export class Database/);
+    assert.match(browserEntry, /static async create/);
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");

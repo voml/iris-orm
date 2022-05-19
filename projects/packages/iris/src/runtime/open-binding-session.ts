@@ -2,7 +2,7 @@ import type { IrisBindings, MemorySessionBinding } from "../bindings.ts";
 import type { IrisHost } from "../types/binding.ts";
 import type { CreateIrisDbBindingOptions } from "../types/executor.ts";
 
-/** Node-only project wiring for generated `createDatabase` (`profile: "project"`). */
+/** Node-only project wiring for generated `Database.create` (`profile: "project"`). */
 export type BindingSessionHooks = {
     openProjectSession?: (
         configPath: string,
