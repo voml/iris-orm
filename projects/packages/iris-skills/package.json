@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris-skills",
-    "version": "0.1.0",
+    "version": "0.0.5",
     "description": "Agent Skills for Iris / VOS workflows (docs catalog until tool DTO freeze)",
     "type": "module",
     "license": "MPL-2.0",
