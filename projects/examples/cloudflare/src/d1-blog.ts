@@ -1,6 +1,6 @@
 /**
  * Thin D1 access layer — proves the `DB` binding until Iris ships a D1 / foreign-sqlite session.
- * Shapes align with `@iris/index.ts` domain types; replace with `createDatabase({ binding: env.DB })` later.
+ * Shapes align with `@iris/index.ts` domain types; replace with `Database.create({ binding: env.DB })` later.
  */
 
 export type D1UserRow = {

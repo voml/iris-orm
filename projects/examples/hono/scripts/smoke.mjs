@@ -3,10 +3,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { userId } from "../src/generated/iris/references.ts";
-import { closeDatabase, openDatabase } from "../src/generated/iris/node.ts";
+import { Database } from "../src/generated/iris/node.ts";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const db = await openDatabase({ config: projectRoot, source: "default" });
+const db = await Database.open({ config: projectRoot, source: "default" });
 
 await db.$macros.seed_blog();
 const users = await db.user.findMany({ where: { active: true } });
@@ -38,5 +38,5 @@ if (createdName !== "smoke") {
     throw new Error(`unexpected created user: ${JSON.stringify(created)}`);
 }
 
-await closeDatabase();
+await Database.close();
 console.log("hono smoke ok");
