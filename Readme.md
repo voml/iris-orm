@@ -129,7 +129,7 @@ npx iris generate
 ```
 
 ```text
-const db = await openDatabase({ source: "default" });
+const db = await Database.open({ source: "default" });
 const rows = await db.record.findMany({ filter: (x) => !x.archived });
 ```
 
