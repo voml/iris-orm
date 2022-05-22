@@ -53,8 +53,8 @@
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "dependencies": {
+        "@vmz/commander": "^0.2.0",
         "@yydb/iris-unknown-wasm32": "workspace:*",
-        "cac": "^6.7.14",
         "jiti": "^2.4.2"
     },
     "optionalDependencies": {
