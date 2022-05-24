@@ -1,4 +1,5 @@
 import type { ExecutionWireResult } from "./execution-result.ts";
+import type { IrisBindingProfile } from "./profile.ts";
 
 /** VOS parameter bindings for direct text execution. */
 export type VosParameters = Readonly<Record<string, unknown>>;
@@ -10,16 +11,22 @@ export type VosParameters = Readonly<Record<string, unknown>>;
  * binary encoding, and execution.
  */
 export interface IrisDbBinding {
-    /** DML entry: returns the VOS operation value (host-mapped). */
+    /**
+     * DML entry: returns the VOS operation value (host-mapped).
+     * @deprecated CLI, migration, and diagnostics only. Prefer `OperationExecutor`.
+     */
     query(source: string, parameters?: VosParameters): Promise<unknown>;
-    /** DDL entry: returns VOS unit (mapped to void in TypeScript). */
+    /**
+     * DDL entry: returns VOS unit (mapped to void in TypeScript).
+     * @deprecated CLI, migration, and diagnostics only. Prefer `OperationExecutor`.
+     */
     execute(source: string, parameters?: VosParameters): Promise<void>;
     close(): Promise<void>;
 }
 
 /** Generated-client wiring options (host-only; users import `db` from `./generated`). */
 export interface CreateIrisDbBindingOptions {
-    profile?: "memory" | "sqlite" | "project";
+    profile?: IrisBindingProfile;
     sqlitePath?: string;
     /** Project root or `iris.config.ts` path. Preferred over legacy `project`. */
     config?: string;

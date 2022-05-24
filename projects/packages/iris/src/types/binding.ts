@@ -1,16 +1,14 @@
+import type { IrisCapabilityMatrix } from "./capabilities.ts";
 import type { CheckSourceResult } from "./check-source.ts";
 import type { SchemaIntrospection } from "./schema-introspection.ts";
+import type { IrisHost } from "./profile.ts";
 import type { IrisSession, OpenSessionOptions } from "./session.ts";
 
-/** Host that owns the Iris runtime binding. */
-export type IrisHost = "node" | "web";
+export type { IrisHost, IrisStorageProfile, IrisBindingProfile, IrisDurability } from "./profile.ts";
+export type { IrisCapabilityMatrix } from "./capabilities.ts";
 
-/** Capability surface negotiated for the current host. */
-export interface IrisCapabilities {
-    readonly host: IrisHost;
-    /** Whether the semantic core binding is loaded (N-API or WASM). */
-    readonly bindingReady: boolean;
-}
+/** @deprecated Use `IrisCapabilityMatrix`. */
+export type IrisCapabilities = IrisCapabilityMatrix;
 
 /**
  * Binding bring-up / conformance host (not the application ORM surface).
@@ -20,7 +18,7 @@ export interface IrisCapabilities {
  */
 export interface IrisBindingHost {
     readonly host: IrisHost;
-    readonly capabilities: IrisCapabilities;
+    readonly capabilities: IrisCapabilityMatrix;
     version(): string;
     /** Tooling: validate schema source (CLI / agents). */
     checkSource(source: string): CheckSourceResult;
