@@ -14,30 +14,39 @@
     "type": "module",
     "license": "MPL-2.0",
     "sideEffects": false,
+    "types": "./src/browser/index.ts",
+    "typesVersions": {
+        "*": {
+            "types": ["./src/types/index.ts"],
+            "node": ["./src/node/index.ts"],
+            "wasm": ["./src/wasm/index.ts"],
+            "node/tooling": ["./src/node/tooling.ts"]
+        }
+    },
     "exports": {
         ".": {
             "types": "./src/browser/index.ts",
-            "browser": "./src/browser/index.ts",
-            "default": "./src/browser/index.ts"
+            "browser": "./dist/browser/index.js",
+            "default": "./dist/browser/index.js"
         },
         "./node": {
             "types": "./src/node/index.ts",
-            "node": "./src/node/index.ts",
-            "default": "./src/node/unsupported.ts"
+            "node": "./dist/node/index.js",
+            "default": "./dist/node/unsupported.js"
         },
         "./wasm": {
             "types": "./src/wasm/index.ts",
-            "browser": "./src/wasm/index.ts",
-            "default": "./src/wasm/index.ts"
+            "browser": "./dist/wasm/index.js",
+            "default": "./dist/wasm/index.js"
         },
         "./types": {
             "types": "./src/types/index.ts",
-            "default": "./src/types/index.ts"
+            "default": "./dist/types/index.js"
         },
         "./node/tooling": {
             "types": "./src/node/tooling.ts",
-            "node": "./src/node/tooling.ts",
-            "default": "./src/node/unsupported.ts"
+            "node": "./dist/node/tooling.js",
+            "default": "./dist/node/unsupported.js"
         }
     },
     "bin": {
@@ -45,9 +54,11 @@
     },
     "files": [
         "bin",
+        "dist",
         "src"
     ],
     "scripts": {
+        "build": "node ./scripts/build-dist.mjs",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "iris": "node ./bin/iris.mjs",
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
