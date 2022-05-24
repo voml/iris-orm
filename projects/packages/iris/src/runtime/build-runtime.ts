@@ -3,6 +3,7 @@ import type { IrisBindingHost, IrisHost } from "../types/binding.ts";
 import type { IrisOperation } from "../types/operation.ts";
 import type { SchemaIntrospection } from "../types/schema-introspection.ts";
 import type { IrisSession, OpenSessionOptions } from "../types/session.ts";
+import { negotiateCapabilities } from "./negotiate-capabilities.ts";
 import { parseExecuteJson, parseIntrospectionJson, parseRowsJson } from "./parse.ts";
 
 export type { IrisBindings as SemanticCoreBinding, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
@@ -80,17 +81,32 @@ function resolveSessionBinding(host: IrisHost, core: IrisBindings, options?: Ope
     return core.openMemorySession();
 }
 
+function sessionProfile(options?: OpenSessionOptions): "memory" | "sqlite" | "project" {
+    if (options?.profile === "sqlite" || options?.sqlitePath) {
+        return "sqlite";
+    }
+    if (options?.profile === "project" || options?.project) {
+        return "project";
+    }
+    if (options?.postgresUrl || options?.mysqlUrl) {
+        return "project";
+    }
+    return "memory";
+}
+
 /** Build the symmetric Iris runtime facade from a loaded semantic core. */
-export function buildRuntime(host: IrisHost, core: IrisBindings): IrisBindingHost {
+export function buildRuntime(host: IrisHost, core: IrisBindings, profile: "memory" | "sqlite" | "project" = "memory"): IrisBindingHost {
     return {
         host,
-        capabilities: {
-            host,
-            bindingReady: true,
-        },
+        capabilities: negotiateCapabilities({ host, profile, bindingReady: true }),
         version: () => core.irisVersion(),
         checkSource: (source) => core.checkSource(source),
         introspectSchema: (source): SchemaIntrospection => parseIntrospectionJson(core.introspectSchema(source)),
         openSession: (options?: OpenSessionOptions) => wrapSession(resolveSessionBinding(host, core, options)),
     };
+}
+
+/** Build runtime with capabilities derived from session open options. */
+export function buildRuntimeForSession(host: IrisHost, core: IrisBindings, options?: OpenSessionOptions): IrisBindingHost {
+    return buildRuntime(host, core, sessionProfile(options));
 }

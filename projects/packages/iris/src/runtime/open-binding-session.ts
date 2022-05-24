@@ -1,6 +1,7 @@
 import type { IrisBindings, MemorySessionBinding } from "../bindings.ts";
-import type { IrisHost } from "../types/binding.ts";
 import type { CreateIrisDbBindingOptions } from "../types/executor.ts";
+import type { IrisHost } from "../types/profile.ts";
+import { normalizeIrisHost } from "../types/profile.ts";
 
 /** Node-only project wiring for generated `Database.create` (`profile: "project"`). */
 export type BindingSessionHooks = {
@@ -37,16 +38,17 @@ function pushSchemaIfPresent(session: MemorySessionBinding, schema?: string): vo
  * accepts inline `schema` for managed-push when the binding exposes it.
  */
 export async function openBindingSession(
-    host: IrisHost,
+    host: IrisHost | "web",
     core: IrisBindings,
     options: CreateIrisDbBindingOptions = {},
     hooks: BindingSessionHooks = {},
 ): Promise<MemorySessionBinding> {
+    const normalizedHost = normalizeIrisHost(host);
     const configPath = options.config ?? options.project;
     const profile = resolveBindingProfile(options);
     let schemaData = options.schema;
 
-    if (host === "node") {
+    if (normalizedHost === "node") {
         let session: MemorySessionBinding;
         if (profile === "sqlite" && core.openSqliteSession) {
             session = core.openSqliteSession(options.sqlitePath ?? ":memory:");
