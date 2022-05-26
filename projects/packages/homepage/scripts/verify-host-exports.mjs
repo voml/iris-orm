@@ -35,12 +35,12 @@ console.log(`  @yydb/iris        → ${webBrowser}`);
 console.log(`  @yydb/iris/node   → ${nodeBrowser}`);
 
 let failed = false;
-if (!webBrowser.includes("/src/browser/")) {
+if (!webBrowser.includes("/dist/browser/") && !webBrowser.includes("/src/browser/")) {
     console.error("FAIL: default entry must stay on browser facade under browser conditions");
     failed = true;
 }
-if (!nodeBrowser.includes("/src/node/unsupported")) {
-    console.error("FAIL: /node must resolve to unsupported.ts under browser conditions");
+if (!nodeBrowser.includes("/dist/node/unsupported") && !nodeBrowser.includes("/src/node/unsupported")) {
+    console.error("FAIL: /node must resolve to unsupported under browser conditions");
     failed = true;
 }
 if (webBrowser.includes("/src/node/")) {
