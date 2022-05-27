@@ -10,7 +10,7 @@ import { getWasmSemanticCore } from "../wasm/state.ts";
  * Generated `browser.ts` imports the same factory from `@yydb/iris/wasm`.
  */
 export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
-    const session = await openBindingSession("web", getWasmSemanticCore(), options);
+    const session = await openBindingSession("browser", getWasmSemanticCore(), options);
     return createIrisDbBindingFromSession(session);
 }
 

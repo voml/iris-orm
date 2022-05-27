@@ -12,5 +12,5 @@ export type CreateIrisNodeOptions = {
  */
 export async function createIris(_options: CreateIrisNodeOptions = {}): Promise<IrisBindingHost> {
     const core = loadIrisNative();
-    return buildRuntime("node", core);
+    return buildRuntime("node", core, "memory");
 }
