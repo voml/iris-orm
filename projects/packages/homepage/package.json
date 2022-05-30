@@ -27,7 +27,7 @@
         "@vmz/core": "0.1.12",
         "@vmz/plugin-shiki": "0.1.12",
         "@vmz/ui": "0.1.12",
-        "@yydb/iris": "link:../iris",
+        "@yydb/iris": "workspace:0.0.6",
         "shiki": "^3.0.0"
     },
     "devDependencies": {
