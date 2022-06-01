@@ -42,7 +42,7 @@ UI components are used as **bare tags** (`<Button>`, `<Card>`, `<Icon>`, …) di
 | Field                  | Value                        |
 |------------------------|------------------------------|
 | Root directory         | `projects/packages/homepage` |
-| Build command          | `pnpm build` (prebuilds `@yydb/iris` `dist/` via `scripts/build.mjs`) |
+| Build command          | `pnpm build`                 |
 | Build output directory | `dist/cdn`                   |
 | Node version           | 20 or 22                     |
 
@@ -52,7 +52,7 @@ Do **not** enable SPA fallback — routes are pre-rendered HTML.
 
 | Scenario         | Rule                                                                                                  |
 |------------------|-------------------------------------------------------------------------------------------------------|
-| CI / commits     | **npm registry only** for `@vmz/*@0.1.12`. Pin `@yydb/iris` with `workspace:0.0.6` (matches npm publish set) |
+| CI / commits     | **npm registry only** — pin `@vmz/*@0.1.12` and `npm:@yydb/iris@0.0.6` (published `dist/` + WASM assets) |
 | Local VMZ bugfix | Temporary `pnpm link` or `file:` **on your machine only** — never commit linked `package.json` / lock |
 | After local test | Restore npm deps and re-run `check` + `build` before push                                             |
 
