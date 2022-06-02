@@ -19,4 +19,9 @@ export type IrisOperation =
           kind: "find-unique";
           entity: string;
           where: IrisWhereEq;
+      }
+    | {
+          /** Build-time synthesized VOS (parameters live on `OperationRequest.parameters`). */
+          kind: "declared-vos";
+          source: string;
       };
