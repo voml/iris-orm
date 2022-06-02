@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { negotiateCapabilities } from "../src/runtime/negotiate-capabilities.ts";
-import { defaultDurability, normalizeIrisHost, resolveStorageProfile } from "../src/types/profile.ts";
+import {
+    defaultDurability,
+    normalizeIrisHost,
+    resolveStorageProfile,
+    resolveStorageProfileForHost,
+} from "../src/types/profile.ts";
 
 test("normalizeIrisHost maps legacy web to browser", () => {
     assert.equal(normalizeIrisHost("web"), "browser");
@@ -36,7 +41,13 @@ test("negotiateCapabilities separates host and storage profile", () => {
 
     const workerProject = negotiateCapabilities({ host: "cloudflare-worker", profile: "project", bindingReady: false });
     assert.equal(workerProject.host, "cloudflare-worker");
-    assert.equal(workerProject.profile, "local-fs");
+    assert.equal(workerProject.profile, "d1");
+    assert.equal(workerProject.durability, "remote-durable");
     assert.equal(workerProject.storage.d1, true);
-    assert.equal(workerProject.transaction.batch, false);
+    assert.equal(workerProject.transaction.batch, true);
+});
+
+test("resolveStorageProfileForHost maps Cloudflare worker to d1", () => {
+    assert.equal(resolveStorageProfileForHost("cloudflare-worker", "project"), "d1");
+    assert.equal(resolveStorageProfileForHost("node", "project"), "local-fs");
 });
