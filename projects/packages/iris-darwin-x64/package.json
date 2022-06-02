@@ -1,14 +1,29 @@
-{
-    "name": "@yydb/iris-darwin-x64",
-    "version": "0.0.6",
-    "description": "Iris ORM Node-API binary for macOS x64",
-    "type": "module",
-    "license": "MPL-2.0",
-    "main": "./index.js",
-    "files": ["index.js", "lib", "readme.md"],
-    "os": ["darwin"],
-    "cpu": ["x64"],
-    "publishConfig": {
-        "access": "public"
-    }
-}
+{
+    "name": "@yydb/iris-darwin-x64",
+    "version": "0.0.6",
+    "description": "Prebuilt Iris ORM N-API binary for macOS x64",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/packages/iris-darwin-x64"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
+    "keywords": ["iris", "napi", "native", "macos", "darwin", "x64"],
+    "readme": "readme.md",
+    "type": "module",
+    "license": "MPL-2.0",
+    "main": "./index.js",
+    "exports": {
+        ".": "./index.js"
+    },
+    "files": ["index.js", "lib", "readme.md"],
+    "os": ["darwin"],
+    "cpu": ["x64"],
+    "publishConfig": {
+        "access": "public"
+    }
+}
+

@@ -1,8 +1,10 @@
 {
     "name": "@yydb/iris",
     "version": "0.0.6",
-    "description": "Iris ORM — TypeScript facade + iris CLI. Rust semantic core via N-API / WASM. Site: https://iris-orm.pages.dev/",
+    "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API + WASM facades, iris CLI)",
     "homepage": "https://iris-orm.pages.dev/",
+    "keywords": ["iris", "orm", "vos", "yydb", "wasm", "napi", "typescript"],
+    "readme": "README.md",
     "repository": {
         "type": "git",
         "url": "git+https://github.com/voml/iris-orm.git",
@@ -55,9 +57,11 @@
     "files": [
         "bin",
         "dist",
-        "src"
+        "src",
+        "README.md"
     ],
     "scripts": {
+        "prepublishOnly": "node ./scripts/build-dist.mjs",
         "build": "node ./scripts/build-dist.mjs",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "iris": "node ./bin/iris.mjs",

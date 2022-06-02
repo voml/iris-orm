@@ -1,46 +1,33 @@
 # `@yydb/iris-skills`
 
-Official Agent Skills for **Iris / VOS**.
+Agent Skills catalog for Iris / VOS workflows. Product context:
+[repository README](https://github.com/voml/iris-orm/blob/dev/README.md).
 
-```text
-Agent → iris-skills → npm `@yydb/iris` CLI (local) / Iris runtime (deploy)
-```
-
-## Correct workflow (mandatory)
-
-Read **[skills/references/workflow.md](./skills/references/workflow.md)** before any Iris work.
-
-```text
-edit .iris → iris check → iris generate → COMMIT generated/
-          → iris push --plan → iris push        # human ops, never CI
-deploy:   runtime crates + generated only       # no CLI / no migrate / no seed
-```
-
-Also: [consumer-hard-rules.md](./skills/references/consumer-hard-rules.md) · [tool-protocol.md](./skills/references/tool-protocol.md)
-
-Agents edit **VOS / `.iris`** — **not** SQL. Parallel: `@yydb/sql-studio-skills` (SQL Studio only).
-Runtime: **generated client first** (Rust `Db` / TS `db.user`); escape-hatch VOS text is rare.
-Prefer **`.filter(x => …)`** in any VOS text; do not teach SQL-style `.where`.
-
-## Skills
-
-| Skill              | Role                                        | Delivery                  |
-|--------------------|---------------------------------------------|---------------------------|
-| `iris-schema`      | Author/check `.iris`                        | CLI-backed (`iris check`) |
-| `iris-migrate`     | `iris push` plan/apply — **local/ops only** | CLI-backed                |
-| `iris-generate`    | Local `iris generate`; **commit** outputs   | CLI-backed                |
-| `iris-operation`   | Runtime VOS / generated client              | docs + host API           |
-| `iris-explain`     | Planner / capability explain                | docs / CLI when present   |
-| `iris-topology`    | Composite topology                          | docs / CLI when present   |
-| `iris-diagnose`    | Failures & drift; upstream fixes            | CLI-backed habits         |
-| `iris-conformance` | Host conformance evidence                   | docs / host tests         |
-
-Structured Agent tool DTOs (`migration.apply`, …) are **not live**. Teach the real CLI.
-
-## Install
+## Example
 
 ```bash
 npx skills add @yydb/iris-skills
-# or local checkout:
-npx skills add ./projects/packages/iris-skills --skill '*' -y --copy
 ```
+
+```text
+Add Iris to this repo: schemas/domain.iris with Account and Record,
+iris.config.ts, iris check, iris generate, commit generated/.
+VOS only — follow @yydb/iris-skills workflow.
+```
+
+Mandatory reading: [skills/references/workflow.md](./skills/references/workflow.md) ·
+[consumer-hard-rules.md](./skills/references/consumer-hard-rules.md) ·
+[tool-protocol.md](./skills/references/tool-protocol.md).
+
+## Skills
+
+| Skill | Role |
+|-------|------|
+| `iris-schema` | Author / check `.iris` |
+| `iris-migrate` | `iris push` plan / apply (ops only) |
+| `iris-generate` | `iris generate`; commit `generated/` |
+| `iris-operation` | Runtime generated client |
+| `iris-explain` | Planner / capability explain |
+| `iris-topology` | Composite topology |
+| `iris-diagnose` | Failures and drift |
+| `iris-conformance` | Host conformance evidence |

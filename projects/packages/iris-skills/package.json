@@ -2,6 +2,17 @@
     "name": "@yydb/iris-skills",
     "version": "0.0.6",
     "description": "Agent Skills for Iris / VOS workflows (docs catalog until tool DTO freeze)",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/packages/iris-skills"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
+    "keywords": ["iris", "vos", "agent-skills", "cli"],
+    "readme": "README.md",
     "type": "module",
     "license": "MPL-2.0",
     "sideEffects": false,
