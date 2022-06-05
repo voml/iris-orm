@@ -9,6 +9,6 @@
 export { defineConfig, toProjectDocument } from "../types/config.ts";
 export type { IrisUserConfig, IrisProjectDocument } from "../types/config.ts";
 export { createIris, type CreateIrisBrowserOptions } from "./create.ts";
-export { createIrisDbBinding, createBrowserIrisDbBinding } from "./executor.ts";
+export { createIrisDbBinding, createBrowserIrisDbBinding, createIrisOperationExecutor } from "./executor.ts";
 export { initIris, loadIrisWeb, type InitIrisOptions, type WasmSource } from "../wasm/index.ts";
 export { openLocalStore, type LocalStore, type LocalStoreBackend, type OpenLocalStoreOptions } from "./local-store.ts";

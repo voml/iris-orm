@@ -6,7 +6,7 @@ export type { IrisBindings, IrisWasmOptions, WasmSource } from "../bindings.ts";
 /** @deprecated Use `IrisWasmOptions`. */
 export type InitIrisOptions = IrisWasmOptions;
 export { loadIrisWasm } from "./load.ts";
-export { createIrisDbBinding } from "./executor.ts";
+export { createIrisDbBinding, createIrisOperationExecutor } from "./executor.ts";
 export { getWasmSemanticCore, resetInitStateForTests } from "./state.ts";
 export { isBrowserSemanticCoreInstalled } from "./install-check.ts";
 
