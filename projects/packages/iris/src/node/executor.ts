@@ -3,6 +3,7 @@ import type { OperationExecutor } from "../types/operation-executor.ts";
 import { createIrisDbBindingFromSession } from "../runtime/db-binding.ts";
 import { createOperationExecutorFromSession } from "../runtime/operation-binding.ts";
 import { openBindingSession, resolveBindingProfile } from "../runtime/open-binding-session.ts";
+import { guardOperationExecutor } from "../runtime/validate-contract.ts";
 import { loadIrisNative } from "./load.ts";
 import { loadProject, readProjectSchema } from "./project.ts";
 
@@ -31,7 +32,11 @@ export async function createIrisOperationExecutor(options: CreateIrisDbBindingOp
             return { session: binding, schema };
         },
     });
-    return createOperationExecutorFromSession(session);
+    const executor = createOperationExecutorFromSession(session);
+    if (options.contractFingerprint) {
+        return guardOperationExecutor(executor, options.contractFingerprint);
+    }
+    return executor;
 }
 
 /** Negotiated binding profile for Node wiring (maps to storage profile in capabilities). */

@@ -1,6 +1,6 @@
 import type { IrisBindings, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
 import type { IrisBindingHost, IrisHost } from "../types/binding.ts";
-import type { IrisOperation } from "../types/operation.ts";
+import type { OperationRequest } from "../types/contract.ts";
 import type { SchemaIntrospection } from "../types/schema-introspection.ts";
 import type { IrisSession, OpenSessionOptions } from "../types/session.ts";
 import { negotiateCapabilities } from "./negotiate-capabilities.ts";
@@ -25,8 +25,8 @@ function wrapSession(binding: MemorySessionBinding): IrisSession {
         execute(source: string) {
             return parseWire(runQuery(source));
         },
-        executeOperation(operation: IrisOperation) {
-            const json = JSON.stringify(operation);
+        executeOperation(request: OperationRequest) {
+            const json = JSON.stringify(request);
             const raw = binding.executeOperation ? binding.executeOperation(json) : runQuery(json);
             return parseWire(raw);
         },

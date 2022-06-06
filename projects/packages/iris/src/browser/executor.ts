@@ -3,6 +3,7 @@ import type { OperationExecutor } from "../types/operation-executor.ts";
 import { createIrisDbBindingFromSession } from "../runtime/db-binding.ts";
 import { createOperationExecutorFromSession } from "../runtime/operation-binding.ts";
 import { openBindingSession } from "../runtime/open-binding-session.ts";
+import { guardOperationExecutor } from "../runtime/validate-contract.ts";
 import { getWasmSemanticCore } from "../wasm/state.ts";
 
 /**
@@ -19,7 +20,11 @@ export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = 
 /** Create the async operation executor for generated browser clients (preferred ABI). */
 export async function createIrisOperationExecutor(options: CreateIrisDbBindingOptions = {}): Promise<OperationExecutor> {
     const session = await openBindingSession("browser", getWasmSemanticCore(), options);
-    return createOperationExecutorFromSession(session);
+    const executor = createOperationExecutorFromSession(session);
+    if (options.contractFingerprint) {
+        return guardOperationExecutor(executor, options.contractFingerprint);
+    }
+    return executor;
 }
 
 /** @deprecated Use `createIrisDbBinding` or import from `@yydb/iris/wasm`. */
