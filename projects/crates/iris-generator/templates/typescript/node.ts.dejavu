@@ -1,14 +1,14 @@
-import { createIrisDbBinding } from "@yydb/iris/node";
+import { createIrisOperationExecutor } from "@yydb/iris/node";
 import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
 import { createClient, type DbClient } from "./operations.js";
 
 let openDatabaseClient: DbClient | null = null;
 
-/** Node host: construct and reuse generated clients with N-API binding. */
+/** Node host: construct and reuse generated clients with N-API operation executor. */
 export class Database {
     /** Construct a new client for this call site (no process singleton). */
     static async create(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
-        return createClient(await createIrisDbBinding(options));
+        return createClient(await createIrisOperationExecutor(options));
     }
 
     /** Reuse one client per process. Options apply only on the first call. */

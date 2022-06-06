@@ -1,6 +1,8 @@
 /** Runtime VOS synthesis for generated delegates (use-site reference paths, not include/relation). */
 
-import { IRIS_FIELD_WIRE_NAMES, IRIS_REFERENCE_TARGETS } from "../metadata.js";
+import type { OperationRequest, ResultEnvelope } from "@yydb/iris/types";
+import type { IrisGeneratedError } from "../errors.js";
+import { IRIS_FIELD_WIRE_NAMES, IRIS_REFERENCE_TARGETS, IRIS_SCHEMA_FINGERPRINT } from "../metadata.js";
 
 export type VosParameters = Record<string, unknown>;
 
@@ -287,4 +289,23 @@ export function synthesizeMacroCall(name: string, args: readonly unknown[]): Vos
         source: `${name}(${placeholders.join(", ")})`,
         parameters,
     };
+}
+
+/** Build a declared operation request for the generated client primary ABI. */
+export function buildDeclaredOperationRequest(operationId: string, synthesis: VosSynthesis): OperationRequest {
+    return {
+        identity: { operationId, contractFingerprint: IRIS_SCHEMA_FINGERPRINT },
+        operation: { kind: "declared-vos", source: synthesis.source },
+        parameters: synthesis.parameters,
+    };
+}
+
+/** Throw a generated-client error from a failed result envelope. */
+export function throwOperationEnvelopeError(envelope: Extract<ResultEnvelope<unknown>, { ok: false }>): never {
+    const diagnostic = envelope.diagnostics[0];
+    const error: IrisGeneratedError = {
+        code: diagnostic?.code ?? "IRIS-EXEC-FAILED",
+        message: diagnostic?.message ?? "iris operation failed",
+    };
+    throw error;
 }
