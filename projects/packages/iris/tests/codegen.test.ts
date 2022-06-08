@@ -72,6 +72,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
     assert.match(nodeEntry, /createIrisOperationExecutor/);
+    assert.match(nodeEntry, /IRIS_SCHEMA_FINGERPRINT/);
+    assert.match(nodeEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
     assert.match(nodeEntry, /export class Database/);
     assert.match(nodeEntry, /static async create/);
     assert.match(nodeEntry, /static async open/);
@@ -80,6 +82,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris\/wasm/);
     assert.match(browserEntry, /createIrisOperationExecutor/);
+    assert.match(browserEntry, /IRIS_SCHEMA_FINGERPRINT/);
+    assert.match(browserEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
     assert.match(browserEntry, /export class Database/);
     assert.match(browserEntry, /static async create/);
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
@@ -378,6 +382,52 @@ void run;
             shell: true,
         }).status;
     assert.notEqual(negativeStatus, 0, "invalid filter value types must fail tsc");
+});
+
+test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {
+    const node = await import(srcImport("src/node/index.ts"));
+    const { buildOperationRequest, declaredVosOperation } = await import(
+        srcImport("src/runtime/build-operation-request.ts")
+    );
+
+    let executor;
+    try {
+        executor = await node.createIrisOperationExecutor({
+            profile: "sqlite",
+            sqlitePath: ":memory:",
+            schema: USER_SCHEMA,
+            contractFingerprint: "integration-fp",
+        });
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
+            t.skip("Node semantic core not installed");
+            return;
+        }
+        throw error;
+    }
+
+    const request = buildOperationRequest(
+        { operationId: "user.findMany", contractFingerprint: "integration-fp" },
+        declaredVosOperation("User.filter(x => x.active).collect()"),
+    );
+    const result = await executor.execute(request);
+    assert.equal(result.ok, true);
+    if (result.ok) {
+        assert.equal(Array.isArray(result.value), true);
+    }
+
+    const mismatch = await executor.execute(
+        buildOperationRequest(
+            { operationId: "user.findMany", contractFingerprint: "wrong-fp" },
+            declaredVosOperation("User.filter(x => x.active).collect()"),
+        ),
+    );
+    assert.equal(mismatch.ok, false);
+    if (!mismatch.ok) {
+        assert.equal(mismatch.diagnostics[0]?.code, "IRIS-CONTRACT-MISMATCH");
+    }
+
+    await executor.close();
 });
 
 test("createIrisDbBinding binds parameters through Rust", async (t) => {
