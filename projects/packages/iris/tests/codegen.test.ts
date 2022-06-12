@@ -414,11 +414,15 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
     const payload = JSON.parse(child.stdout.trim()) as {
         ok: boolean;
         fingerprint: string;
-        count: number;
+        directCount: number;
+        clientCount: number;
+        databaseCount: number;
     };
     assert.equal(payload.ok, true);
     assert.equal(payload.fingerprint, result.schemaFingerprint);
-    assert.equal(typeof payload.count, "number");
+    assert.equal(typeof payload.directCount, "number");
+    assert.equal(typeof payload.clientCount, "number");
+    assert.equal(typeof payload.databaseCount, "number");
 });
 
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {
