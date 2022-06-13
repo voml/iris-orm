@@ -22,6 +22,7 @@
             "types": ["./src/types/index.ts"],
             "node": ["./src/node/index.ts"],
             "wasm": ["./src/wasm/index.ts"],
+            "cloudflare": ["./src/cloudflare/index.ts"],
             "node/tooling": ["./src/node/tooling.ts"]
         }
     },
@@ -44,6 +45,11 @@
         "./types": {
             "types": "./src/types/index.ts",
             "default": "./dist/types/index.js"
+        },
+        "./cloudflare": {
+            "types": "./src/cloudflare/index.ts",
+            "workerd": "./dist/cloudflare/index.js",
+            "default": "./dist/cloudflare/index.js"
         },
         "./node/tooling": {
             "types": "./src/node/tooling.ts",
