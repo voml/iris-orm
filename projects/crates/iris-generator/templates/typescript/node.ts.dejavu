@@ -14,7 +14,8 @@ export class Database {
                 ...options,
                 contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
             }),
-        );    }
+        );
+    }
 
     /** Reuse one client per process. Options apply only on the first call. */
     static async open(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
