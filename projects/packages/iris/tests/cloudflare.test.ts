@@ -6,12 +6,16 @@ import { buildOperationRequest, declaredVosOperation } from "../src/runtime/buil
 import { negotiateCapabilities } from "../src/runtime/negotiate-capabilities.ts";
 
 const fakeD1 = {
-    prepare() {
+    lastSql: "",
+    prepare(query: string) {
+        this.lastSql = query;
         return {
             bind() {
                 return {
-                    async all() {
-                        return { results: [] };
+                    async all<T>() {
+                        return {
+                            results: [{ user_id: "u1", user_name: "Ada", active: 1 }] as T[],
+                        };
                     },
                     async run() {
                         return { success: true };
@@ -20,6 +24,18 @@ const fakeD1 = {
             },
         };
     },
+};
+
+const wireNames = {
+    User: {
+        userId: "user_id",
+        userName: "user_name",
+        active: "active",
+    },
+};
+
+const plans = {
+    "User.findMany": { sql: "SELECT user_id, user_name, active FROM User", mode: "read" as const },
 };
 
 test("negotiateCapabilities maps cloudflare-worker host to d1 profile", () => {
@@ -36,7 +52,7 @@ test("createIrisOperationExecutor requires d1 binding", async () => {
     );
 });
 
-test("D1 read executor returns structured not-wired diagnostics", async () => {
+test("D1 read executor without plans returns plan-missing diagnostic", async () => {
     const executor = createD1ReadOperationExecutor(fakeD1);
     const request = buildOperationRequest(
         { operationId: "user.findMany", contractFingerprint: "fp" },
@@ -46,10 +62,35 @@ test("D1 read executor returns structured not-wired diagnostics", async () => {
     const read = await executor.execute(request);
     assert.equal(read.ok, false);
     if (!read.ok) {
-        assert.equal(read.diagnostics[0]?.code, "IRIS-D1-READ-NOT-WIRED");
+        assert.equal(read.diagnostics[0]?.code, "IRIS-D1-PLAN-MISSING");
     }
+});
 
-    const write = await executor.executeUnit(request);
+test("D1 read executor runs build-time plan and maps wire columns", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const read = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "fp" },
+            declaredVosOperation("User.collect()"),
+        ),
+    );
+    assert.equal(read.ok, true);
+    if (read.ok) {
+        assert.equal(read.value[0]?.userId, "u1");
+        assert.equal(read.value[0]?.userName, "Ada");
+        assert.equal(read.value[0]?.active, 1);
+    }
+    assert.equal(fakeD1.lastSql, plans["User.findMany"].sql);
+});
+
+test("D1 read executor rejects mutation operations", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const write = await executor.executeUnit(
+        buildOperationRequest(
+            { operationId: "User.create", contractFingerprint: "fp" },
+            declaredVosOperation("User.insert({})"),
+        ),
+    );
     assert.equal(write.ok, false);
     if (!write.ok) {
         assert.equal(write.diagnostics[0]?.code, "IRIS-D1-WRITE-NOT-WIRED");
@@ -59,11 +100,13 @@ test("D1 read executor returns structured not-wired diagnostics", async () => {
 test("createIrisOperationExecutor applies contract fingerprint guard", async () => {
     const executor = await createIrisOperationExecutor({
         d1: fakeD1,
+        plans,
+        wireNamesByEntity: wireNames,
         contractFingerprint: "expected-fp",
     });
     const mismatch = await executor.execute(
         buildOperationRequest(
-            { operationId: "user.findMany", contractFingerprint: "wrong-fp" },
+            { operationId: "User.findMany", contractFingerprint: "wrong-fp" },
             declaredVosOperation("User.collect()"),
         ),
     );
