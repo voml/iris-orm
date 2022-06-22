@@ -49,6 +49,11 @@ test("/wasm export resolves to wasm facade", () => {
     assert.match(path.replace(/\\/g, "/"), /\/src\/wasm\/index\.ts$/);
 });
 
+test("/cloudflare export resolves to cloudflare facade", () => {
+    const path = resolveExportMap("./cloudflare", ["workerd", "import"]);
+    assert.match(path.replace(/\\/g, "/"), /\/cloudflare\/index\.(ts|js)$/);
+});
+
 test("@yydb/iris/wasm exposes symmetric binding loader", async () => {
     const wasm = await import(srcImport("src/wasm/index.ts"));
     assert.equal("loadIrisWasm" in wasm, true);
