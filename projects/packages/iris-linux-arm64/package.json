@@ -2,7 +2,7 @@
 
     "name": "@yydb/iris-linux-arm64",
 
-    "version": "0.0.4",
+    "version": "0.0.5",
 
     "description": "Prebuilt Iris ORM N-API binary for Linux arm64",
 
