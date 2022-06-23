@@ -1,7 +1,7 @@
 import type { OperationRequest, ResultEnvelope } from "../types/contract.ts";
 import type { ExecutionRow } from "../types/execution-result.ts";
 import type { OperationExecutor } from "../types/operation-executor.ts";
-import type { D1PlanRegistry, D1PhysicalPlan } from "./d1-plan.ts";
+import { bindD1Parameters, resolveD1PlanForRequest, type D1PhysicalPlan, type D1PlanRegistry } from "./d1-plan.ts";
 import type { IrisD1Database } from "./types.ts";
 
 function notWired(code: string, message: string): ResultEnvelope<never> {
@@ -42,9 +42,12 @@ async function executeReadPlan(
     d1: IrisD1Database,
     plan: D1PhysicalPlan,
     wireToTs: Readonly<Record<string, string>>,
+    parameters?: Readonly<Record<string, unknown>>,
 ): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
     try {
-        const { results } = await d1.prepare(plan.sql).bind().all<Record<string, unknown>>();
+        const bindValues = bindD1Parameters(plan, parameters);
+        const statement = d1.prepare(plan.sql).bind(...bindValues);
+        const { results } = await statement.all<Record<string, unknown>>();
         const rows = (results ?? []).map((row) => wireRowToAuthorRow(wireToTs, row));
         return { ok: true, value: rows };
     } catch (error) {
@@ -65,7 +68,7 @@ export function createD1ReadOperationExecutor(
 ): OperationExecutor {
     return {
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
-            const plan = plans[request.identity.operationId];
+            const plan = resolveD1PlanForRequest(plans, request);
             if (!plan) {
                 return notWired(
                     "IRIS-D1-PLAN-MISSING",
@@ -77,7 +80,7 @@ export function createD1ReadOperationExecutor(
             }
             const entity = entityFromOperationId(request.identity.operationId);
             const wireToTs = entity ? wireNamesByEntity[entity] ?? {} : {};
-            return executeReadPlan(d1, plan, wireToTs);
+            return executeReadPlan(d1, plan, wireToTs, request.parameters);
         },
         async executeUnit(_request: OperationRequest): Promise<ResultEnvelope<void>> {
             return notWired(
