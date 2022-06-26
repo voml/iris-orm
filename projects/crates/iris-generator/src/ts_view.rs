@@ -126,14 +126,19 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .flat_map(|table| {
             let cols = table.fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
             let entity = table.name.as_str();
-            [
-                format!(
-                    "    \"{entity}.findMany\": {{ sql: \"SELECT {cols} FROM {entity}\", mode: \"read\" }},"
-                ),
-                format!(
-                    "    \"{entity}.findFirst\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT 1\", mode: \"read\" }},"
-                ),
-            ]
+            let mut lines = vec![
+                format!("    \"{entity}.findMany\": {{ sql: \"SELECT {cols} FROM {entity}\", mode: \"read\" }},"),
+                format!("    \"{entity}.findFirst\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT 1\", mode: \"read\" }},"),
+            ];
+            for field in &table.fields {
+                if field.vos_type == "bool" {
+                    let wire = field.name.as_str();
+                    lines.push(format!(
+                        "    \"{entity}.findMany@p_{wire}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"p_{wire}\"] }},"
+                    ));
+                }
+            }
+            lines
         })
         .collect::<Vec<_>>()
         .join("\n");
