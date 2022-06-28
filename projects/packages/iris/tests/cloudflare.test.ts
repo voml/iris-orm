@@ -49,6 +49,11 @@ const plans = {
         mode: "read" as const,
         paramOrder: ["p_active"],
     },
+    "User.findMany@p_userName": {
+        sql: "SELECT user_id, user_name, active FROM User WHERE user_name = ?",
+        mode: "read" as const,
+        paramOrder: ["p_userName"],
+    },
 };
 
 test("resolveD1Plan selects parameter variant keys", () => {
@@ -56,6 +61,20 @@ test("resolveD1Plan selects parameter variant keys", () => {
     assert.equal(plan?.sql, plans["User.findMany@p_active"].sql);
     assert.deepEqual(bindD1Parameters(plan!, { p_active: true }), [1]);
     assert.equal(coerceD1BindValue(false), 0);
+});
+
+test("D1 read executor binds string eq filter parameters", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const read = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "fp" },
+            declaredVosOperation('User.filter(x => x.user_name == $p_userName).collect()'),
+            { p_userName: "Ada" },
+        ),
+    );
+    assert.equal(read.ok, true);
+    assert.match(fakeD1.lastSql, /WHERE user_name = \?/);
+    assert.deepEqual(fakeD1.lastBind, ["Ada"]);
 });
 
 test("D1 read executor binds bool filter parameters", async () => {
