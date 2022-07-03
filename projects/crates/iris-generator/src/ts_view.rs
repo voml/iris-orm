@@ -128,8 +128,18 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
             let entity = table.name.as_str();
             let mut lines = vec![
                 format!("    \"{entity}.findMany\": {{ sql: \"SELECT {cols} FROM {entity}\", mode: \"read\" }},"),
+                format!(
+                    "    \"{entity}.findMany@take\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT ?\", mode: \"read\", paramOrder: [\"take\"] }},"
+                ),
                 format!("    \"{entity}.findFirst\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT 1\", mode: \"read\" }},"),
             ];
+            for field in table.fields.iter().filter(|field| field.primary) {
+                let wire = field.name.as_str();
+                let ts_name = field_ts_name(field);
+                lines.push(format!(
+                    "    \"{entity}.findUnique@p_{ts_name}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT 1\", mode: \"read\", paramOrder: [\"p_{ts_name}\"] }},"
+                ));
+            }
             for field in &table.fields {
                 let wire = field.name.as_str();
                 let ts_name = field_ts_name(field);
@@ -137,6 +147,9 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 if matches!(base, "bool" | "utf8" | "uuid" | "decimal" | "datetime") {
                     lines.push(format!(
                         "    \"{entity}.findMany@p_{ts_name}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"p_{ts_name}\"] }},"
+                    ));
+                    lines.push(format!(
+                        "    \"{entity}.findMany@p_{ts_name},take\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT ?\", mode: \"read\", paramOrder: [\"p_{ts_name}\", \"take\"] }},"
                     ));
                 }
             }
