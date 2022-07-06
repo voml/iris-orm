@@ -15,6 +15,9 @@ function createFakeD1() {
                                 results: [{ user_id: "u1", user_name: "Ada", active: 1 }] as T[],
                             };
                         },
+                        async run() {
+                            return { success: true };
+                        },
                     };
                 },
             };
@@ -30,6 +33,9 @@ const filtered = await db.user.findMany({ where: { active: { eq: true } } });
 const limited = await db.user.findMany({ take: 2 });
 const filteredLimited = await db.user.findMany({ where: { active: { eq: true } }, take: 2 });
 const unique = await db.user.findUnique({ where: { userId: "u1" } });
+const created = await db.user.create({
+    data: { userId: "u2", userName: "Bob", active: false },
+});
 await db.$close();
 
 console.log(
@@ -40,9 +46,13 @@ console.log(
         limitedCount: limited.length,
         filteredLimitedCount: filteredLimited.length,
         uniqueUserId: unique?.userId,
+        createdUserId: created.userId,
+        createdUserName: created.userName,
+        createdActive: created.active,
         filteredTrace: traces[1],
         limitedTrace: traces[2],
         filteredLimitedTrace: traces[3],
         uniqueTrace: traces[4],
+        createTrace: traces[5],
     }),
 );

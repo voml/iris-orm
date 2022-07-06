@@ -1,9 +1,9 @@
 import type { OperationRequest } from "../types/contract.ts";
 
-/** Build-time D1 read plan entry (generated into client `_internal/d1-plans.ts`). */
+/** Build-time D1 physical plan entry (generated into client `_internal/d1-plans.ts`). */
 export interface D1PhysicalPlan {
     readonly sql: string;
-    readonly mode: "read";
+    readonly mode: "read" | "write" | "write-returning";
     /** OperationRequest parameter keys bound to SQL `?` placeholders in order. */
     readonly paramOrder?: readonly string[];
 }

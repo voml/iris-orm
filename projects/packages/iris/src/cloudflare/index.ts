@@ -6,7 +6,7 @@
  */
 
 export { createIrisOperationExecutor, type CreateIrisCloudflareExecutorOptions } from "./executor.ts";
-export { createD1ReadOperationExecutor } from "./d1-executor.ts";
+export { createD1OperationExecutor, createD1ReadOperationExecutor } from "./d1-executor.ts";
 export {
     bindD1Parameters,
     coerceD1BindValue,
