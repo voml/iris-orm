@@ -15,10 +15,10 @@ const plans = {
         mode: "read" as const,
         paramOrder: ["p_active", "take"],
     },
-    "User.findUnique@p_userId": {
+    "User.findUnique@p_user_id": {
         sql: "SELECT user_id FROM User WHERE user_id = ? LIMIT 1",
         mode: "read" as const,
-        paramOrder: ["p_userId"],
+        paramOrder: ["p_user_id"],
     },
 };
 
@@ -33,7 +33,7 @@ test("resolveD1Plan falls back to base plan without parameters", () => {
 });
 
 test("resolveD1Plan resolves findUnique primary-key variants", () => {
-    const plan = resolveD1Plan(plans, "User.findUnique", { p_userId: "u1" });
-    assert.equal(plan?.sql, plans["User.findUnique@p_userId"].sql);
-    assert.deepEqual(bindD1Parameters(plan!, { p_userId: "u1" }), ["u1"]);
+    const plan = resolveD1Plan(plans, "User.findUnique", { p_user_id: "u1" });
+    assert.equal(plan?.sql, plans["User.findUnique@p_user_id"].sql);
+    assert.deepEqual(bindD1Parameters(plan!, { p_user_id: "u1" }), ["u1"]);
 });

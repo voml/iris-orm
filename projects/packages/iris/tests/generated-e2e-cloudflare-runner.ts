@@ -1,29 +1,34 @@
 import { Database } from "./cloudflare.js";
 
-let lastSql = "";
-let lastBind: unknown[] = [];
+type Trace = { sql: string; bind: unknown[] };
 
-const fakeD1 = {
-    prepare(query: string) {
-        lastSql = query;
-        return {
-            bind(...values: unknown[]) {
-                lastBind = values;
-                return {
-                    async all<T>() {
-                        return {
-                            results: [{ user_id: "u1", user_name: "Ada", active: 1 }] as T[],
-                        };
-                    },
-                };
-            },
-        };
-    },
-};
+function createFakeD1() {
+    const traces: Trace[] = [];
+    const d1 = {
+        prepare(query: string) {
+            return {
+                bind(...values: unknown[]) {
+                    traces.push({ sql: query, bind: values });
+                    return {
+                        async all<T>() {
+                            return {
+                                results: [{ user_id: "u1", user_name: "Ada", active: 1 }] as T[],
+                            };
+                        },
+                    };
+                },
+            };
+        },
+    };
+    return { d1, traces };
+}
 
-const db = await Database.create({ d1: fakeD1 });
+const { d1, traces } = createFakeD1();
+const db = await Database.create({ d1 });
 const unfiltered = await db.user.findMany();
 const filtered = await db.user.findMany({ where: { active: { eq: true } } });
+const limited = await db.user.findMany({ take: 2 });
+const unique = await db.user.findUnique({ where: { userId: "u1" } });
 await db.$close();
 
 console.log(
@@ -31,7 +36,10 @@ console.log(
         ok: true,
         unfilteredCount: unfiltered.length,
         filteredCount: filtered.length,
-        filteredSql: lastSql,
-        filteredBind: lastBind,
+        limitedCount: limited.length,
+        uniqueUserId: unique?.userId,
+        filteredTrace: traces[1],
+        limitedTrace: traces[2],
+        uniqueTrace: traces[3],
     }),
 );

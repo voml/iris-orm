@@ -98,10 +98,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(d1Plans, /IRIS_D1_PLANS/);
     assert.match(d1Plans, /User\.findMany/);
     assert.match(d1Plans, /User\.findMany@p_active/);
-    assert.match(d1Plans, /User\.findMany@p_userName/);
+    assert.match(d1Plans, /User\.findMany@p_user_name/);
     assert.match(d1Plans, /User\.findMany@take/);
     assert.match(d1Plans, /User\.findMany@p_active,take/);
-    assert.match(d1Plans, /User\.findUnique@p_userId/);
+    assert.match(d1Plans, /User\.findUnique@p_user_id/);
     assert.match(d1Plans, /paramOrder: \["p_active"\]/);
     assert.match(d1Plans, /paramOrder: \["take"\]/);
     assert.match(d1Plans, /WHERE user_name = \?/);
@@ -475,14 +475,24 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
         ok: boolean;
         unfilteredCount: number;
         filteredCount: number;
-        filteredSql: string;
-        filteredBind: unknown[];
+        limitedCount: number;
+        uniqueUserId: string;
+        filteredTrace: { sql: string; bind: unknown[] };
+        limitedTrace: { sql: string; bind: unknown[] };
+        uniqueTrace: { sql: string; bind: unknown[] };
     };
     assert.equal(payload.ok, true);
     assert.equal(payload.unfilteredCount, 1);
     assert.equal(payload.filteredCount, 1);
-    assert.match(payload.filteredSql, /WHERE active = \?/);
-    assert.deepEqual(payload.filteredBind, [1]);
+    assert.equal(payload.limitedCount, 1);
+    assert.equal(payload.uniqueUserId, "u1");
+    assert.match(payload.filteredTrace.sql, /WHERE active = \?/);
+    assert.deepEqual(payload.filteredTrace.bind, [1]);
+    assert.match(payload.limitedTrace.sql, /LIMIT \?/);
+    assert.deepEqual(payload.limitedTrace.bind, [2]);
+    assert.match(payload.uniqueTrace.sql, /WHERE user_id = \?/);
+    assert.deepEqual(payload.uniqueTrace.bind, ["u1"]);
+    assert.match(payload.uniqueTrace.sql, /LIMIT 1/);
 });
 
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {
