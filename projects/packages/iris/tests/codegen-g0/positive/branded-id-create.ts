@@ -1,9 +1,9 @@
 import { createClient } from "../../index.js";
 import { postId, userId } from "../../references.js";
-import type { IrisDbBinding } from "@yydb/iris/types";
+import type { OperationExecutor } from "@yydb/iris/types";
 
-declare const binding: IrisDbBinding;
-const db = createClient(binding);
+declare const executor: OperationExecutor;
+const db = createClient(executor);
 
 async function run() {
     const author = await db.user.create({
