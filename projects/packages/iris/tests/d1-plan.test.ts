@@ -20,6 +20,11 @@ const plans = {
         mode: "read" as const,
         paramOrder: ["p_user_id"],
     },
+    "User.create@data_user_id": {
+        sql: "INSERT INTO User (user_id) VALUES (?) RETURNING user_id",
+        mode: "write-returning" as const,
+        paramOrder: ["data_user_id"],
+    },
     "User.create@data_active,data_user_id,data_user_name": {
         sql: "INSERT INTO User (user_id, user_name, active) VALUES (?, ?, ?) RETURNING user_id, user_name, active",
         mode: "write-returning" as const,
@@ -40,6 +45,26 @@ test("resolveD1Plan falls back to base plan without parameters", () => {
 test("resolveD1Plan resolves findUnique primary-key variants", () => {
     const plan = resolveD1Plan(plans, "User.findUnique", { p_user_id: "u1" });
     assert.equal(plan?.sql, plans["User.findUnique@p_user_id"].sql);
+    assert.deepEqual(bindD1Parameters(plan!, { p_user_id: "u1" }), ["u1"]);
+});
+
+test("resolveD1Plan resolves partial create subsets", () => {
+    const plan = resolveD1Plan(plans, "User.create", { data_user_id: "u1" });
+    assert.equal(plan?.mode, "write-returning");
+    assert.match(plan?.sql ?? "", /INSERT INTO User \(user_id\)/);
+    assert.deepEqual(bindD1Parameters(plan!, { data_user_id: "u1" }), ["u1"]);
+});
+
+test("resolveD1Plan resolves delete primary-key variants", () => {
+    const deletePlans = {
+        "User.delete@p_user_id": {
+            sql: "DELETE FROM User WHERE user_id = ?",
+            mode: "write" as const,
+            paramOrder: ["p_user_id"],
+        },
+    };
+    const plan = resolveD1Plan(deletePlans, "User.delete", { p_user_id: "u1" });
+    assert.equal(plan?.mode, "write");
     assert.deepEqual(bindD1Parameters(plan!, { p_user_id: "u1" }), ["u1"]);
 });
 

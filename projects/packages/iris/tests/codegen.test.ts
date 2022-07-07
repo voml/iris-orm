@@ -111,6 +111,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(d1Plans, /RETURNING user_id, user_name, active/);
     assert.match(d1Plans, /mode: "write-returning"/);
     assert.match(d1Plans, /paramOrder: \["data_user_id", "data_user_name", "data_active"\]/);
+    assert.match(d1Plans, /User\.create@data_user_id/);
+    assert.match(d1Plans, /User\.delete@p_user_id/);
+    assert.match(d1Plans, /DELETE FROM User WHERE user_id = \?/);
+    assert.match(d1Plans, /mode: "write"/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
     assert.match(inputs, /export type StringFilter/);
@@ -127,6 +131,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(operations, /findMany<const A extends UserFindManyArgs>/);
     assert.match(operations, /ReadonlyArray<UserGetPayload<A>>/);
     assert.match(operations, /synthesizeCreate/);
+    assert.match(operations, /synthesizeDelete/);
+    assert.match(operations, /async delete\(/);
     assert.match(operations, /\.\/_internal\/synthesize\.js/);
     assert.doesNotMatch(operations, /\.\.\.args: unknown\[\]/);
     assert.doesNotMatch(operations, /@yydb\/iris\/node/);
@@ -491,6 +497,7 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
         filteredLimitedTrace: { sql: string; bind: unknown[] };
         uniqueTrace: { sql: string; bind: unknown[] };
         createTrace: { sql: string; bind: unknown[] };
+        deleteTrace: { sql: string; bind: unknown[] };
     };
     assert.equal(payload.ok, true);
     assert.equal(payload.unfilteredCount, 1);
@@ -514,6 +521,8 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.match(payload.createTrace.sql, /INSERT INTO User/);
     assert.match(payload.createTrace.sql, /RETURNING/);
     assert.deepEqual(payload.createTrace.bind, ["u2", "Bob", 0]);
+    assert.match(payload.deleteTrace.sql, /DELETE FROM User/);
+    assert.deepEqual(payload.deleteTrace.bind, ["u2"]);
 });
 
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {

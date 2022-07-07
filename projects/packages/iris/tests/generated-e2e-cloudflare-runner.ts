@@ -36,6 +36,7 @@ const unique = await db.user.findUnique({ where: { userId: "u1" } });
 const created = await db.user.create({
     data: { userId: "u2", userName: "Bob", active: false },
 });
+await db.user.delete({ where: { userId: "u2" } });
 await db.$close();
 
 console.log(
@@ -54,5 +55,6 @@ console.log(
         filteredLimitedTrace: traces[3],
         uniqueTrace: traces[4],
         createTrace: traces[5],
+        deleteTrace: traces[6],
     }),
 );

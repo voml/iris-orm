@@ -259,6 +259,18 @@ export type CreateArgs = {
     select?: Record<string, unknown>;
 };
 
+export type DeleteArgs = {
+    where: Record<string, unknown>;
+};
+
+/** Synthesize `Entity.filter(...).delete()` with bound where parameters. */
+export function synthesizeDelete(entity: string, args: DeleteArgs): VosSynthesis {
+    const parameters: VosParameters = {};
+    let pipeline = appendFilter(entity, args.where, parameters);
+    pipeline += ".delete()";
+    return { source: pipeline, parameters };
+}
+
 /** Synthesize `Entity::insert({ field: $p, ... })` with bound parameters (no placeholders). */
 export function synthesizeCreate(entity: string, args: CreateArgs): VosSynthesis {
     const parameters: VosParameters = {};

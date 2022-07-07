@@ -2,6 +2,7 @@ import type { OperationExecutor } from "@yydb/iris/types";
 import {
     buildDeclaredOperationRequest,
     synthesizeCreate,
+    synthesizeDelete,
     synthesizeFindFirst,
     synthesizeFindMany,
     synthesizeFindUnique,
@@ -112,6 +113,16 @@ export class <% table.name %>Delegate {
             throwOperationEnvelopeError(envelope);
         }
         return envelope.value[0] as <% table.name %>GetPayload<A>;
+    }
+
+    async delete(args: <% table.name %>DeleteArgs): Promise<void> {
+        const synthesis = synthesizeDelete("<% table.name %>", args);
+        const envelope = await this.executor.executeUnit(
+            buildDeclaredOperationRequest("<% table.name %>.delete", synthesis),
+        );
+        if (!envelope.ok) {
+            throwOperationEnvelopeError(envelope);
+        }
     }
 }
 <%- end loop %>
