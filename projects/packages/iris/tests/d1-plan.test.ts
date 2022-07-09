@@ -55,6 +55,22 @@ test("resolveD1Plan resolves partial create subsets", () => {
     assert.deepEqual(bindD1Parameters(plan!, { data_user_id: "u1" }), ["u1"]);
 });
 
+test("resolveD1Plan resolves update patch and where variants", () => {
+    const updatePlans = {
+        "User.update@p_user_id,patch_user_name": {
+            sql: "UPDATE User SET user_name = ? WHERE user_id = ? RETURNING user_id",
+            mode: "write-returning" as const,
+            paramOrder: ["patch_user_name", "p_user_id"],
+        },
+    };
+    const plan = resolveD1Plan(updatePlans, "User.update", {
+        patch_user_name: "Carol",
+        p_user_id: "u1",
+    });
+    assert.equal(plan?.mode, "write-returning");
+    assert.deepEqual(bindD1Parameters(plan!, { patch_user_name: "Carol", p_user_id: "u1" }), ["Carol", "u1"]);
+});
+
 test("resolveD1Plan resolves delete primary-key variants", () => {
     const deletePlans = {
         "User.delete@p_user_id": {

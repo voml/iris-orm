@@ -180,6 +180,12 @@ export type <% table.name %>DeleteArgs = {
     where: <% table.name %>WhereUniqueInput;
 };
 
-export type <% table.name %>GetPayload<A extends <% table.name %>FindManyArgs | <% table.name %>FindUniqueArgs | <% table.name %>CreateArgs> =
+export type <% table.name %>UpdateArgs = {
+    where: <% table.name %>WhereUniqueInput;
+    data: <% table.name %>PatchInput;
+    select?: <% table.name %>Select;
+};
+
+export type <% table.name %>GetPayload<A extends <% table.name %>FindManyArgs | <% table.name %>FindUniqueArgs | <% table.name %>CreateArgs | <% table.name %>UpdateArgs> =
     SelectResultFor<"<% table.name %>", A["select"]>;
 <%- end loop %>

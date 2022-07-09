@@ -74,6 +74,11 @@ const plans = {
         mode: "write" as const,
         paramOrder: ["p_user_id"],
     },
+    "User.update@p_user_id,patch_user_name": {
+        sql: "UPDATE User SET user_name = ? WHERE user_id = ? RETURNING user_id, user_name, active",
+        mode: "write-returning" as const,
+        paramOrder: ["patch_user_name", "p_user_id"],
+    },
 };
 
 test("resolveD1Plan selects parameter variant keys", () => {
@@ -202,6 +207,26 @@ test("D1 executor runs create through write-returning plans", async () => {
     if (created.ok) {
         assert.equal(created.value[0]?.userId, "u1");
         assert.equal(created.value[0]?.userName, "Ada");
+    }
+});
+
+test("D1 executor runs update through write-returning plans", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const updated = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.update", contractFingerprint: "fp" },
+            declaredVosOperation(
+                "User.filter(x => x.user_id == $p_user_id).patch({ user_name: $patch_user_name })",
+            ),
+            { p_user_id: "u2", patch_user_name: "Carol" },
+        ),
+    );
+    assert.equal(updated.ok, true);
+    assert.match(fakeD1.lastSql, /UPDATE User SET user_name = \?/);
+    assert.match(fakeD1.lastSql, /RETURNING/);
+    assert.deepEqual(fakeD1.lastBind, ["Carol", "u2"]);
+    if (updated.ok) {
+        assert.equal(updated.value[0]?.userName, "Ada");
     }
 });
 

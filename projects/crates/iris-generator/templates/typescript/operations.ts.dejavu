@@ -3,6 +3,7 @@ import {
     buildDeclaredOperationRequest,
     synthesizeCreate,
     synthesizeDelete,
+    synthesizeUpdate,
     synthesizeFindFirst,
     synthesizeFindMany,
     synthesizeFindUnique,
@@ -108,6 +109,19 @@ export class <% table.name %>Delegate {
         const synthesis = synthesizeCreate("<% table.name %>", args);
         const envelope = await this.executor.execute(
             buildDeclaredOperationRequest("<% table.name %>.create", synthesis),
+        );
+        if (!envelope.ok) {
+            throwOperationEnvelopeError(envelope);
+        }
+        return envelope.value[0] as <% table.name %>GetPayload<A>;
+    }
+
+    async update<const A extends <% table.name %>UpdateArgs>(
+        args: A,
+    ): Promise<<% table.name %>GetPayload<A>> {
+        const synthesis = synthesizeUpdate("<% table.name %>", args);
+        const envelope = await this.executor.execute(
+            buildDeclaredOperationRequest("<% table.name %>.update", synthesis),
         );
         if (!envelope.ok) {
             throwOperationEnvelopeError(envelope);

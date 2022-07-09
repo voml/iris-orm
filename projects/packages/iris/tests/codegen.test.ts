@@ -115,6 +115,9 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(d1Plans, /User\.delete@p_user_id/);
     assert.match(d1Plans, /DELETE FROM User WHERE user_id = \?/);
     assert.match(d1Plans, /mode: "write"/);
+    assert.match(d1Plans, /User\.update@p_user_id,patch_user_name/);
+    assert.match(d1Plans, /UPDATE User SET user_name = \? WHERE user_id = \?/);
+    assert.match(d1Plans, /paramOrder: \["patch_user_name", "p_user_id"\]/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
     assert.match(inputs, /export type StringFilter/);
@@ -132,7 +135,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(operations, /ReadonlyArray<UserGetPayload<A>>/);
     assert.match(operations, /synthesizeCreate/);
     assert.match(operations, /synthesizeDelete/);
+    assert.match(operations, /synthesizeUpdate/);
+    assert.match(operations, /async update</);
     assert.match(operations, /async delete\(/);
+    assert.match(inputs, /UserUpdateArgs/);
     assert.match(operations, /\.\/_internal\/synthesize\.js/);
     assert.doesNotMatch(operations, /\.\.\.args: unknown\[\]/);
     assert.doesNotMatch(operations, /@yydb\/iris\/node/);
@@ -142,6 +148,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const synthesize = await readFile(join(root, "_internal", "synthesize.ts"), "utf8");
     assert.match(synthesize, /compileWherePredicates/);
     assert.match(synthesize, /synthesizeCreate/);
+    assert.match(synthesize, /synthesizeUpdate/);
+    assert.match(synthesize, /patch_/);
     assert.match(synthesize, /buildDeclaredOperationRequest/);
     assert.match(synthesize, /IRIS_SCHEMA_FINGERPRINT/);
 
@@ -492,11 +500,13 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
         createdUserId: string;
         createdUserName: string;
         createdActive: number;
+        updatedUserName: string;
         filteredTrace: { sql: string; bind: unknown[] };
         limitedTrace: { sql: string; bind: unknown[] };
         filteredLimitedTrace: { sql: string; bind: unknown[] };
         uniqueTrace: { sql: string; bind: unknown[] };
         createTrace: { sql: string; bind: unknown[] };
+        updateTrace: { sql: string; bind: unknown[] };
         deleteTrace: { sql: string; bind: unknown[] };
     };
     assert.equal(payload.ok, true);
@@ -508,6 +518,7 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.equal(payload.createdUserId, "u1");
     assert.equal(payload.createdUserName, "Ada");
     assert.equal(payload.createdActive, 1);
+    assert.equal(payload.updatedUserName, "Ada");
     assert.match(payload.filteredTrace.sql, /WHERE active = \?/);
     assert.deepEqual(payload.filteredTrace.bind, [1]);
     assert.match(payload.limitedTrace.sql, /LIMIT \?/);
@@ -521,6 +532,8 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.match(payload.createTrace.sql, /INSERT INTO User/);
     assert.match(payload.createTrace.sql, /RETURNING/);
     assert.deepEqual(payload.createTrace.bind, ["u2", "Bob", 0]);
+    assert.match(payload.updateTrace.sql, /UPDATE User SET user_name = \?/);
+    assert.deepEqual(payload.updateTrace.bind, ["Carol", "u2"]);
     assert.match(payload.deleteTrace.sql, /DELETE FROM User/);
     assert.deepEqual(payload.deleteTrace.bind, ["u2"]);
 });
