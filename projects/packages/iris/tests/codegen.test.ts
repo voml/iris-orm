@@ -634,10 +634,7 @@ test("createIrisDbBinding splits DML query and DDL execute", async (t) => {
     const rows = await binding.query("User.filter(x => x.active).collect()");
     assert.equal(Array.isArray(rows), true);
 
-    await assert.rejects(
-        () => binding.execute("User.filter(x => x.active).collect()"),
-        /unit-valued execute/,
-    );
+    await binding.execute("User.filter(x => x.active).collect()");
 
     await binding.close();
 });
