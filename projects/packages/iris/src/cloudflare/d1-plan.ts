@@ -10,13 +10,38 @@ export interface D1PhysicalPlan {
 
 export type D1PlanRegistry = Readonly<Record<string, D1PhysicalPlan>>;
 
+/** Operation parameters that steer RETURNING projection but are not SQL bind keys. */
+export const D1_PLAN_META_PARAM_KEYS = new Set(["select_cols"]);
+
+/** Parameter keys used for plan variant lookup (excludes meta parameters). */
+export function planLookupParamKeys(parameters?: Readonly<Record<string, unknown>>): readonly string[] {
+    if (!parameters) {
+        return [];
+    }
+    return Object.keys(parameters)
+        .filter((key) => !D1_PLAN_META_PARAM_KEYS.has(key))
+        .sort();
+}
+
+/** Rewrite a write-returning plan SQL `RETURNING` clause from `select_cols` metadata. */
+export function applyD1ReturningProjection(sql: string, selectCols?: unknown): string {
+    if (typeof selectCols !== "string") {
+        return sql;
+    }
+    const trimmed = selectCols.trim();
+    if (!trimmed) {
+        return sql;
+    }
+    return sql.replace(/RETURNING\s+.+$/i, `RETURNING ${trimmed}`);
+}
+
 /** Resolve a plan variant from operationId and runtime parameter keys. */
 export function resolveD1Plan(
     plans: D1PlanRegistry,
     operationId: string,
     parameters?: Readonly<Record<string, unknown>>,
 ): D1PhysicalPlan | undefined {
-    const paramKeys = parameters ? Object.keys(parameters).sort() : [];
+    const paramKeys = planLookupParamKeys(parameters);
     if (paramKeys.length > 0) {
         const variantKey = `${operationId}@${paramKeys.join(",")}`;
         const variant = plans[variantKey];

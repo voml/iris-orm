@@ -189,6 +189,27 @@ test("D1 read executor runs build-time plan and maps wire columns", async () => 
     assert.equal(fakeD1.lastSql, plans["User.findMany"].sql);
 });
 
+test("D1 executor trims RETURNING columns from select_cols metadata on create", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const created = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.create", contractFingerprint: "fp" },
+            declaredVosOperation(
+                "User::insert({ user_id: $data_user_id, user_name: $data_user_name, active: $data_active })",
+            ),
+            {
+                data_user_id: "u3",
+                data_user_name: "Eve",
+                data_active: false,
+                select_cols: "user_id,user_name",
+            },
+        ),
+    );
+    assert.equal(created.ok, true);
+    assert.match(fakeD1.lastSql, /RETURNING user_id,user_name/);
+    assert.doesNotMatch(fakeD1.lastSql, /RETURNING user_id, user_name, active/);
+});
+
 test("D1 executor runs create through write-returning plans", async () => {
     const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
     const created = await executor.execute(

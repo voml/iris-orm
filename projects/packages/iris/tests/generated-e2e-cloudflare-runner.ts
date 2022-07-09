@@ -11,9 +11,18 @@ function createFakeD1() {
                     traces.push({ sql: query, bind: values });
                     return {
                         async all<T>() {
-                            return {
-                                results: [{ user_id: "u1", user_name: "Ada", active: 1 }] as T[],
-                            };
+                            const full = { user_id: "u1", user_name: "Ada", active: 1 };
+                            const returningMatch = query.match(/RETURNING\s+(.+)$/i);
+                            if (!returningMatch) {
+                                return { results: [full] as T[] };
+                            }
+                            const row: Record<string, unknown> = {};
+                            for (const col of returningMatch[1].split(",").map((name) => name.trim())) {
+                                if (col in full) {
+                                    row[col] = full[col as keyof typeof full];
+                                }
+                            }
+                            return { results: [row] as T[] };
                         },
                         async run() {
                             return { success: true };
@@ -35,6 +44,7 @@ const filteredLimited = await db.user.findMany({ where: { active: { eq: true } }
 const unique = await db.user.findUnique({ where: { userId: "u1" } });
 const created = await db.user.create({
     data: { userId: "u2", userName: "Bob", active: false },
+    select: { userId: true, userName: true },
 });
 const updated = await db.user.update({
     where: { userId: "u2" },
@@ -53,7 +63,7 @@ console.log(
         uniqueUserId: unique?.userId,
         createdUserId: created.userId,
         createdUserName: created.userName,
-        createdActive: created.active,
+        createdHasActive: "active" in created,
         updatedUserName: updated.userName,
         filteredTrace: traces[1],
         limitedTrace: traces[2],

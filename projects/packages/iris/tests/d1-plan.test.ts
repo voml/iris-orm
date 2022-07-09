@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { bindD1Parameters, resolveD1Plan } from "../src/cloudflare/d1-plan.ts";
+import {
+    applyD1ReturningProjection,
+    bindD1Parameters,
+    planLookupParamKeys,
+    resolveD1Plan,
+} from "../src/cloudflare/d1-plan.ts";
 
 const plans = {
     "User.findMany": { sql: "SELECT user_id FROM User", mode: "read" as const },
@@ -31,6 +36,31 @@ const plans = {
         paramOrder: ["data_user_id", "data_user_name", "data_active"],
     },
 };
+
+test("planLookupParamKeys excludes select_cols metadata", () => {
+    assert.deepEqual(
+        planLookupParamKeys({ data_user_id: "u1", select_cols: "user_id,user_name" }),
+        ["data_user_id"],
+    );
+});
+
+test("applyD1ReturningProjection rewrites RETURNING columns", () => {
+    const sql = "INSERT INTO User (user_id, user_name) VALUES (?, ?) RETURNING user_id, user_name, active";
+    assert.equal(
+        applyD1ReturningProjection(sql, "user_id,user_name"),
+        "INSERT INTO User (user_id, user_name) VALUES (?, ?) RETURNING user_id,user_name",
+    );
+});
+
+test("resolveD1Plan ignores select_cols when matching variants", () => {
+    const plan = resolveD1Plan(plans, "User.create", {
+        data_user_id: "u1",
+        data_user_name: "Ada",
+        data_active: true,
+        select_cols: "user_id,user_name",
+    });
+    assert.equal(plan?.sql, plans["User.create@data_active,data_user_id,data_user_name"].sql);
+});
 
 test("resolveD1Plan matches sorted multi-parameter variant keys", () => {
     const plan = resolveD1Plan(plans, "User.findMany", { take: 5, p_active: true });
