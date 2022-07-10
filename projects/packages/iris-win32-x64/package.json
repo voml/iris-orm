@@ -2,7 +2,7 @@
 
     "name": "@yydb/iris-win32-x64",
 
-    "version": "0.0.6",
+    "version": "0.0.7",
 
     "description": "Prebuilt Iris ORM N-API binary for Windows x64",
 
