@@ -18,7 +18,7 @@ pub use commit::{AppliedWatermark, CommitToken, DEFAULT_COMMIT_SHARD, OutboxAppe
 pub use composite::{AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent, RouteProof};
 pub use envelope::{EffectKind, IrEnvelope, IrVersion, SchemaFingerprint, hash_ops};
 pub use object::{ObjectError, ObjectHash, ObjectId, ObjectLifecycleState, ObjectMeta, ObjectReference, ObjectResult, require_transition};
-pub use op::{CmpOp, LiteralKind, PhysicalOp, Pred, ProjectField, SortKey};
+pub use op::{CmpOp, LiteralKind, PhysicalOp, Pred, ProjectField, SortKey, WriteField};
 pub use plan::{PhysicalPlan, PlannedNode, RealizationClass};
 pub use projection::{
     HydrateCompleteness, HydrateDropReason, HydrateResult, HydratedEntity, ProjectionCandidate, ProjectionDocument, ProjectionGeneration,
