@@ -170,6 +170,9 @@ pub fn physical_explain_from_plan(plan: &PhysicalPlan, backend_sketch: &str) -> 
             iris_ir::PhysicalOp::Take { .. } => "Take",
             iris_ir::PhysicalOp::Project { .. } => "Project",
             iris_ir::PhysicalOp::Collect => "Collect",
+            iris_ir::PhysicalOp::Insert { .. } => "Insert",
+            iris_ir::PhysicalOp::Patch { .. } => "Patch",
+            iris_ir::PhysicalOp::Delete { .. } => "Delete",
         };
         let real = match n.realization {
             RealizationClass::Native => "Native",
