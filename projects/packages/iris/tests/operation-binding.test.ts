@@ -72,3 +72,58 @@ test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", asyn
     assert.equal(result.ok, true);
     await executor.close();
 });
+
+test("createIrisOperationExecutor runs generated delete on sqlite", async () => {
+    const node = await import(new URL("../src/node/index.ts", import.meta.url).href);
+    const { USER_SCHEMA } = await import(new URL("./fixtures.ts", import.meta.url).href);
+    const { buildOperationRequest, declaredVosOperation } = await import(
+        new URL("../src/runtime/build-operation-request.ts", import.meta.url).href
+    );
+
+    let executor;
+    try {
+        executor = await node.createIrisOperationExecutor({
+            profile: "sqlite",
+            sqlitePath: ":memory:",
+            schema: USER_SCHEMA,
+        });
+    } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
+            return;
+        }
+        throw error;
+    }
+
+    const create = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.create", contractFingerprint: "unused" },
+            declaredVosOperation(
+                'User::insert({ user_id: $data_user_id, user_name: $data_user_name, active: $data_active })',
+            ),
+            { data_user_id: "u-del", data_user_name: "Temp", data_active: true },
+        ),
+    );
+    assert.equal(create.ok, true);
+
+    const deleted = await executor.executeUnit(
+        buildOperationRequest(
+            { operationId: "User.delete", contractFingerprint: "unused" },
+            declaredVosOperation('User.filter(x => x.user_id == $p_user_id).delete()'),
+            { p_user_id: "u-del" },
+        ),
+    );
+    assert.equal(deleted.ok, true);
+
+    const read = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "unused" },
+            declaredVosOperation('User.filter(x => x.user_id == $p_user_id).collect()'),
+            { p_user_id: "u-del" },
+        ),
+    );
+    assert.equal(read.ok, true);
+    if (read.ok) {
+        assert.equal(read.value.length, 0);
+    }
+    await executor.close();
+});
