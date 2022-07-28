@@ -11,5 +11,6 @@ publish = false
 iris-types = { workspace = true }
 iris-ir = { workspace = true }
 vos = { workspace = true }
-rusqlite = { workspace = true }
+sqlite-provider = { workspace = true }
+sqlite-provider-rusqlite = { workspace = true }
 serde = { workspace = true }
