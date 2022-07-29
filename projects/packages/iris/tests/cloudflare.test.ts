@@ -168,7 +168,7 @@ test("D1 read executor without plans returns plan-missing diagnostic", async () 
     const read = await executor.execute(request);
     assert.equal(read.ok, false);
     if (!read.ok) {
-        assert.equal(read.diagnostics[0]?.code, "IRIS-D1-PLAN-MISSING");
+        assert.equal(read.diagnostics[0]?.code, "IRIS-SQLITE-PLAN-MISSING");
     }
 });
 
@@ -276,7 +276,7 @@ test("D1 executor rejects create on executeUnit", async () => {
     );
     assert.equal(write.ok, false);
     if (!write.ok) {
-        assert.equal(write.diagnostics[0]?.code, "IRIS-D1-PLAN-INVALID");
+        assert.equal(write.diagnostics[0]?.code, "IRIS-SQLITE-PLAN-INVALID");
     }
 });
 
