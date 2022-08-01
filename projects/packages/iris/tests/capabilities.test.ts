@@ -16,6 +16,7 @@ test("normalizeIrisHost maps legacy web to browser", () => {
 
 test("resolveStorageProfile maps binding profiles to storage profiles", () => {
     assert.equal(resolveStorageProfile("memory"), "memory");
+    assert.equal(resolveStorageProfile("opfs"), "opfs");
     assert.equal(resolveStorageProfile("sqlite"), "local-fs");
     assert.equal(resolveStorageProfile("project"), "local-fs");
 });
@@ -23,6 +24,7 @@ test("resolveStorageProfile maps binding profiles to storage profiles", () => {
 test("defaultDurability follows storage profile", () => {
     assert.equal(defaultDurability("memory"), "ephemeral");
     assert.equal(defaultDurability("local-fs"), "local-durable");
+    assert.equal(defaultDurability("opfs"), "local-durable");
     assert.equal(defaultDurability("d1"), "remote-durable");
 });
 

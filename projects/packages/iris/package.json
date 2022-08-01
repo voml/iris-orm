@@ -3,7 +3,15 @@
     "version": "0.0.8",
     "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API + WASM facades, iris CLI)",
     "homepage": "https://iris-orm.pages.dev/",
-    "keywords": ["iris", "orm", "vos", "yydb", "wasm", "napi", "typescript"],
+    "keywords": [
+        "iris",
+        "orm",
+        "vos",
+        "yydb",
+        "wasm",
+        "napi",
+        "typescript"
+    ],
     "readme": "README.md",
     "repository": {
         "type": "git",
@@ -19,11 +27,24 @@
     "types": "./src/browser/index.ts",
     "typesVersions": {
         "*": {
-            "types": ["./src/types/index.ts"],
-            "node": ["./src/node/index.ts"],
-            "wasm": ["./src/wasm/index.ts"],
-            "cloudflare": ["./src/cloudflare/index.ts"],
-            "node/tooling": ["./src/node/tooling.ts"]
+            "types": [
+                "./src/types/index.ts"
+            ],
+            "node": [
+                "./src/node/index.ts"
+            ],
+            "wasm": [
+                "./src/wasm/index.ts"
+            ],
+            "cloudflare": [
+                "./src/cloudflare/index.ts"
+            ],
+            "opfs": [
+                "./src/opfs/index.ts"
+            ],
+            "node/tooling": [
+                "./src/node/tooling.ts"
+            ]
         }
     },
     "exports": {
@@ -50,6 +71,11 @@
             "types": "./src/cloudflare/index.ts",
             "workerd": "./dist/cloudflare/index.js",
             "default": "./dist/cloudflare/index.js"
+        },
+        "./opfs": {
+            "types": "./src/opfs/index.ts",
+            "browser": "./dist/opfs/index.js",
+            "default": "./dist/opfs/index.js"
         },
         "./node/tooling": {
             "types": "./src/node/tooling.ts",
