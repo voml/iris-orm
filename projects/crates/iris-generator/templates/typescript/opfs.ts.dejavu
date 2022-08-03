@@ -1,0 +1,22 @@
+import { createIrisOperationExecutor } from "@yydb/iris/opfs";
+import type { CreateIrisOpfsExecutorOptions } from "@yydb/iris/opfs";
+import { createClient, type DbClient } from "./operations.js";
+import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT } from "./metadata.js";
+import { IRIS_D1_PLANS } from "./_internal/d1-plans.js";
+
+/** Browser OPFS host: durable SQLite operation executor with build-time physical plans. */
+export class Database {
+    static async create(options: CreateIrisOpfsExecutorOptions): Promise<DbClient> {
+        return createClient(
+            await createIrisOperationExecutor({
+                ...options,
+                profile: "opfs",
+                plans: IRIS_D1_PLANS,
+                wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
+                contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
+            }),
+        );
+    }
+}
+
+export { createClient, DbClient } from "./operations.js";
