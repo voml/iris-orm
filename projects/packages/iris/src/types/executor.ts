@@ -41,11 +41,6 @@ export interface CreateIrisDbBindingOptions {
     schema?: string;
     /** Build-time contract fingerprint from generated metadata (generated clients set this). */
     contractFingerprint?: string;
-    /**
-     * OPFS-backed SQLite file name (without extension). Browser `opfs` profile only.
-     * When omitted, generated OPFS clients default to the project name.
-     */
-    opfsPath?: string;
 }
 
 /** @deprecated Use `IrisDbBinding`. */

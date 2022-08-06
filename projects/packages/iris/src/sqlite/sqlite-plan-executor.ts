@@ -102,7 +102,7 @@ async function executeWritePlan(
 /**
  * SQLite operation executor driven by build-time physical plan artifacts.
  *
- * Shared by Cloudflare D1 and browser OPFS adapters.
+ * Shared by Cloudflare D1 and other SQLite-shaped foreign adapters.
  */
 export function createSqlitePlanOperationExecutor(
     sqlite: IrisSqliteDatabase,
