@@ -458,12 +458,26 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
         directCount: number;
         clientCount: number;
         databaseCount: number;
+        createdUserId: string;
+        createdUserName: string;
+        createdActive: boolean;
+        uniqueUserName: string;
+        afterCreateCount: number;
+        updatedUserName: string;
+        afterDeleteCount: number;
     };
     assert.equal(payload.ok, true);
     assert.equal(payload.fingerprint, result.schemaFingerprint);
     assert.equal(typeof payload.directCount, "number");
     assert.equal(typeof payload.clientCount, "number");
     assert.equal(typeof payload.databaseCount, "number");
+    assert.equal(payload.createdUserId, "e2e-1");
+    assert.equal(payload.createdUserName, "Ada");
+    assert.equal(payload.createdActive, true);
+    assert.equal(payload.uniqueUserName, "Ada");
+    assert.equal(payload.afterCreateCount, 1);
+    assert.equal(payload.updatedUserName, "Grace");
+    assert.equal(payload.afterDeleteCount, 0);
 });
 
 test("generated cloudflare Database.create runs findMany through D1 read plans", async (t) => {
