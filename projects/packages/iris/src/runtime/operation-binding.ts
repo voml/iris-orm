@@ -3,6 +3,11 @@ import type { OperationRequest, ResultEnvelope } from "../types/contract.ts";
 import type { ExecutionRow } from "../types/execution-result.ts";
 import type { OperationExecutor } from "../types/operation-executor.ts";
 import { parseExecuteJson, parseRowsJson } from "./parse.ts";
+import { entityFromOperationId, mapRowsToAuthorSurface } from "./wire-row-map.ts";
+
+export type OperationExecutorSessionOptions = {
+    wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+};
 
 function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly ExecutionRow[]> {
     if (typeof raw === "string") {
@@ -36,6 +41,19 @@ function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly Execut
     return { ok: true, value: parseRowsJson(raw.rowsJson) };
 }
 
+function mapExecuteEnvelope(
+    envelope: ResultEnvelope<readonly ExecutionRow[]>,
+    operationId: string,
+    wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>>,
+): ResultEnvelope<readonly ExecutionRow[]> {
+    if (!envelope.ok) {
+        return envelope;
+    }
+    const entity = entityFromOperationId(operationId);
+    const wireToTs = entity ? wireNamesByEntity[entity] ?? {} : {};
+    return { ok: true, value: mapRowsToAuthorSurface(envelope.value, wireToTs) };
+}
+
 function declaredVosWire(
     session: MemorySessionBinding,
     request: OperationRequest,
@@ -54,7 +72,11 @@ function declaredVosWire(
 }
 
 /** Build the async operation executor from an open in-process session. */
-export function createOperationExecutorFromSession(session: MemorySessionBinding): OperationExecutor {
+export function createOperationExecutorFromSession(
+    session: MemorySessionBinding,
+    options: OperationExecutorSessionOptions = {},
+): OperationExecutor {
+    const wireNamesByEntity = options.wireNamesByEntity ?? {};
     const runOperation = session.executeOperation?.bind(session);
     const runQuery = session.query ?? session.executeVos.bind(session);
     const runExecute = session.execute?.bind(session);
@@ -63,10 +85,10 @@ export function createOperationExecutorFromSession(session: MemorySessionBinding
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
             if (runOperation) {
                 const raw = runOperation(JSON.stringify(request));
-                return wireToEnvelope(raw);
+                return mapExecuteEnvelope(wireToEnvelope(raw), request.identity.operationId, wireNamesByEntity);
             }
             const raw = declaredVosWire(session, request, runQuery, runExecute, "query");
-            return wireToEnvelope(raw);
+            return mapExecuteEnvelope(wireToEnvelope(raw), request.identity.operationId, wireNamesByEntity);
         },
         async executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>> {
             if (request.operation.kind === "declared-vos" && runExecute) {

@@ -32,7 +32,9 @@ export async function createIrisOperationExecutor(options: CreateIrisDbBindingOp
             return { session: binding, schema };
         },
     });
-    const executor = createOperationExecutorFromSession(session);
+    const executor = createOperationExecutorFromSession(session, {
+        wireNamesByEntity: options.wireNamesByEntity,
+    });
     if (options.contractFingerprint) {
         return guardOperationExecutor(executor, options.contractFingerprint);
     }

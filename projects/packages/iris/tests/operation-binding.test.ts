@@ -55,6 +55,9 @@ test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", asyn
             profile: "sqlite",
             sqlitePath: ":memory:",
             schema: USER_SCHEMA,
+            wireNamesByEntity: {
+                User: { userId: "user_id", userName: "user_name", active: "active" },
+            },
         });
     } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
@@ -86,6 +89,9 @@ test("createIrisOperationExecutor runs generated delete on sqlite", async () => 
             profile: "sqlite",
             sqlitePath: ":memory:",
             schema: USER_SCHEMA,
+            wireNamesByEntity: {
+                User: { userId: "user_id", userName: "user_name", active: "active" },
+            },
         });
     } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "native-package-missing") {
@@ -104,6 +110,10 @@ test("createIrisOperationExecutor runs generated delete on sqlite", async () => 
         ),
     );
     assert.equal(create.ok, true);
+    if (create.ok) {
+        assert.equal(create.value[0]?.userId, "u-del");
+        assert.equal(create.value[0]?.userName, "Temp");
+    }
 
     const deleted = await executor.executeUnit(
         buildOperationRequest(
