@@ -8,10 +8,16 @@ export interface IrisExecutionCapabilities {
     readonly cancellation: boolean;
 }
 
-/** Storage backends the host may bind (not necessarily the active profile). */
+/**
+ * Storage backends Iris binds directly (not necessarily the active profile).
+ *
+ * Browser OPFS persistence is a YYDB host adapter concern. Iris must not wire
+ * OPFS or other web database APIs; consumers use YYDB when persistence is needed.
+ */
 export interface IrisStorageCapabilities {
     readonly memory: boolean;
     readonly localFs: boolean;
+    /** Always false: Iris does not implement OPFS; see YYDB Living `06` / `08`. */
     readonly opfs: boolean;
     readonly d1: boolean;
 }

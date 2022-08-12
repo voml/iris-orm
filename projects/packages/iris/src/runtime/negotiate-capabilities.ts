@@ -13,7 +13,7 @@ function storageForHost(host: IrisHost): IrisCapabilityMatrix["storage"] {
         case "node":
             return { memory: true, localFs: true, opfs: false, d1: false };
         case "browser":
-            return { memory: true, localFs: false, opfs: true, d1: false };
+            return { memory: true, localFs: false, opfs: false, d1: false };
         case "cloudflare-worker":
             return { memory: true, localFs: false, opfs: false, d1: true };
     }
