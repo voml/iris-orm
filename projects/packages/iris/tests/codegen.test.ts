@@ -483,6 +483,66 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
     assert.equal(payload.afterDeleteCount, 0);
 });
 
+test("generated project Database.open runs CRUD against on-disk sqlite", async (t) => {
+    const core = await loadCore(t);
+    if (!core) {
+        return;
+    }
+
+    const projectRoot = await mkdtemp(join(tmpdir(), "iris-codegen-project-"));
+    await mkdir(join(projectRoot, "schemas"), { recursive: true });
+    await mkdir(join(projectRoot, "data"), { recursive: true });
+    await writeFile(join(projectRoot, "schemas", "user.iris"), `${USER_SCHEMA.trim()}\n`, "utf8");
+    await writeFile(
+        join(projectRoot, "iris.config.ts"),
+        `export default {
+  schema: "schemas/user.iris",
+  datasources: {
+    default: { kind: "sqlite", mode: "managed_push", path: "data/app.sqlite" },
+  },
+  generate: { out: ".", target: "typescript" },
+};`,
+        "utf8",
+    );
+
+    const generatedRoot = join(projectRoot, "src", "generated", "iris");
+    const result = core.generate(USER_SCHEMA, "typescript", generatedRoot);
+    assert.equal(result.ok, true);
+
+    const runnerTemplate = fileURLToPath(new URL("./generated-project-e2e-runner.ts", import.meta.url));
+    await copyFile(runnerTemplate, join(generatedRoot, "generated-project-e2e-runner.ts"));
+
+    const bootstrap = pathToFileURL(fileURLToPath(new URL("./generated-e2e-bootstrap.mjs", import.meta.url))).href;
+    const child = spawnSync(
+        process.execPath,
+        ["--experimental-strip-types", `--import`, bootstrap, "src/generated/iris/generated-project-e2e-runner.ts"],
+        {
+            encoding: "utf8",
+            cwd: projectRoot,
+        },
+    );
+    assert.equal(child.status, 0, child.stdout + child.stderr);
+
+    const payload = JSON.parse(child.stdout.trim()) as {
+        ok: boolean;
+        createdUserId: string;
+        createdUserName: string;
+        createdActive: boolean;
+        uniqueUserName: string;
+        updatedUserName: string;
+        afterUpdateCount: number;
+        afterDeleteCount: number;
+    };
+    assert.equal(payload.ok, true);
+    assert.equal(payload.createdUserId, "proj-1");
+    assert.equal(payload.createdUserName, "Ada");
+    assert.equal(payload.createdActive, true);
+    assert.equal(payload.uniqueUserName, "Ada");
+    assert.equal(payload.updatedUserName, "Grace");
+    assert.equal(payload.afterUpdateCount, 1);
+    assert.equal(payload.afterDeleteCount, 0);
+});
+
 test("generated cloudflare Database.create runs findMany through D1 read plans", async (t) => {
     const core = await loadCore(t);
     if (!core) {
