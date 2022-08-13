@@ -32,9 +32,11 @@ export function createD1OperationExecutor(
 
     wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
 
+    valueCarriersByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
+
 ): OperationExecutor {
 
-    return createSqlitePlanOperationExecutor(d1 as IrisSqliteDatabase, plans, wireNamesByEntity);
+    return createSqlitePlanOperationExecutor(d1 as IrisSqliteDatabase, plans, wireNamesByEntity, valueCarriersByEntity);
 
 }
 

@@ -221,8 +221,8 @@ importers:
         specifier: 0.1.12
         version: 0.1.12
       '@yydb/iris':
-        specifier: 0.0.6
-        version: 0.0.6
+        specifier: 0.0.8
+        version: 0.0.8
       shiki:
         specifier: ^3.0.0
         version: 3.23.0
@@ -242,6 +242,9 @@ importers:
       '@vmz/commander':
         specifier: ^0.2.0
         version: 0.2.7
+      '@voml/vos':
+        specifier: ^0.0.1
+        version: 0.0.1
       '@yydb/iris-unknown-wasm32':
         specifier: workspace:*
         version: link:../iris-unknown-wasm32
@@ -3304,6 +3307,9 @@ packages:
   '@volar/typescript@2.4.28':
     resolution: {integrity: sha512-Ja6yvWrbis2QtN4ClAKreeUZPVYMARDYZl9LMEv1iQ1QdepB6wn0jTRxA9MftYmYa4DQ4k/DaSZpFPUfxl8giw==}
 
+  '@voml/vos@0.0.1':
+    resolution: {integrity: sha512-YbXO5CpsqLJw1gF76S+c4cRgwtO/xOV3KaS16uDkfsGCuI4sTqRl826zF8ZCOLclm2aAZehY06748EilN5Ioxg==}
+
   '@vscode/emmet-helper@2.11.0':
     resolution: {integrity: sha512-QLxjQR3imPZPQltfbWRnHU6JecWTF1QSWhx3GAKQpslx7y3Dp6sIIXhKjiUJ/BR9FX8PVthjr9PD6pNwOJfAzw==}
 
@@ -3379,36 +3385,36 @@ packages:
   '@vue/shared@3.5.43':
     resolution: {integrity: sha512-uksS7YGMR5NZyr4JNq0Rp+QyLns0ueaz20KwzIPW9R0LH1Vnt4E+XUM29PNseEbf1www2gOuhuDi5AKOIXag9Q==}
 
-  '@yydb/iris-darwin-arm64@0.0.6':
-    resolution: {integrity: sha512-mYlhMsyYA8Ym23HeYfmXImIwKKuhO4XdKv2iyRHFHfHDif4dOnkaB5eJb90eRz1aSYVTx2f54JqvDhJgWRzQdQ==}
+  '@yydb/iris-darwin-arm64@0.0.8':
+    resolution: {integrity: sha512-Dh5VmLZo2v0nvRFY/npNlGs1S6Oy5OfzVql+uMuKONmKE7WK1f/SbdHMod8LvJoximISLCoPOg4+b/Wr4rmIlQ==}
     cpu: [arm64]
     os: [darwin]
 
-  '@yydb/iris-darwin-x64@0.0.6':
-    resolution: {integrity: sha512-vs0Tvp606oFXdcm+279W6A+/WvG+S8jUJIlVKyiOMNmSImZcJkLpKBUeV3gv4aHgAb9gklKwZUuFHZz9HU/6/w==}
+  '@yydb/iris-darwin-x64@0.0.8':
+    resolution: {integrity: sha512-G2be6WhMQAVG8BtA3i0m9A8KNCXuVVQxDv9AceISCr/+0BEULHzBP5Af5br7kH77F/NhyP9BaCvP1Lo9Xwhr/Q==}
     cpu: [x64]
     os: [darwin]
 
-  '@yydb/iris-linux-arm64@0.0.6':
-    resolution: {integrity: sha512-UNcpWjuW4LL5GHPkdeh2j5+kTwzuW1EG+H6Jv1iXinJDt5N+qsodIoXXA45HtejL1lFG07cGIO1uqY7TFXw80w==}
+  '@yydb/iris-linux-arm64@0.0.8':
+    resolution: {integrity: sha512-5q3QX18s0tm/Os+DFg2SoPrvfe6C+J9lEVU1rETRydzN6tUcGjEcsImjNJsRiyZfnMmThO7OQ/rOltzBB8lRKQ==}
     cpu: [arm64]
     os: [linux]
 
-  '@yydb/iris-linux-x64@0.0.6':
-    resolution: {integrity: sha512-3pIFWDQAcOLWCVfiqek/vqDDK+qPbiqcOvw3/UFI9YA5o7oyE/A55YA0whY8TH3xStqzILnQgNbl0p8TZNsExQ==}
+  '@yydb/iris-linux-x64@0.0.8':
+    resolution: {integrity: sha512-+AXHtaTTbZEbZtoTpZNAYwqsWHlP5SGacy1EPyIVuXyMYggoOsdCIRMs2fFAPWY3IWiXmMS4gOMT7JEWcW8wQg==}
     cpu: [x64]
     os: [linux]
 
-  '@yydb/iris-unknown-wasm32@0.0.6':
-    resolution: {integrity: sha512-MiDnauBagCKr4o42LGWR0YS0wtQHOBPhEdcTZA0+Se0/koSrJsgM44ACAckzf8GtHHhDpQBClYR1iPH7iKi5HA==}
+  '@yydb/iris-unknown-wasm32@0.0.8':
+    resolution: {integrity: sha512-uYqd62B0CBQYO2Z70rA9IJMk2wR7+sx77NeM1XPmssw3p96rc5f2xeuEpUVupL1z/SnCiNygkjtknvJc0c/kAA==}
 
-  '@yydb/iris-win32-x64@0.0.6':
-    resolution: {integrity: sha512-uwaOq0eOm6cncs7U1053rZ4E//uAwoIfqIHtyN07m29qYNSVsuvBgluWNnuYM/VWA8UE5AGXxG0eM3BC3oeWzA==}
+  '@yydb/iris-win32-x64@0.0.8':
+    resolution: {integrity: sha512-lzGucZdaPAyGNiVQwRfyfCKi7bLu3uS8mcOXi+pYLRGNyq8dbnVkyDfrrnwH3fdNjQjg/u9gxy5+pbp05GPiKQ==}
     cpu: [x64]
     os: [win32]
 
-  '@yydb/iris@0.0.6':
-    resolution: {integrity: sha512-YXLvTRCIwF6O4VfsPKYZHDEkqu4b7xcyWOgOROOzfxtUfs2MojlRiF/gyu9mFU0niCbCY3Se96YalqeTCLAHeQ==}
+  '@yydb/iris@0.0.8':
+    resolution: {integrity: sha512-aFtjpLfNn4/qoZFX/ZxU+iuX5bwC3usEEwOA06ADNeyUJV58Up5BxDSfn/I6ibGFDOFUttbpsgbtMjyFwpafWw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -9567,6 +9573,8 @@ snapshots:
       path-browserify: 1.0.1
       vscode-uri: 3.2.0
 
+  '@voml/vos@0.0.1': {}
+
   '@vscode/emmet-helper@2.11.0':
     dependencies:
       emmet: 2.4.11
@@ -9697,34 +9705,34 @@ snapshots:
 
   '@vue/shared@3.5.43': {}
 
-  '@yydb/iris-darwin-arm64@0.0.6':
+  '@yydb/iris-darwin-arm64@0.0.8':
     optional: true
 
-  '@yydb/iris-darwin-x64@0.0.6':
+  '@yydb/iris-darwin-x64@0.0.8':
     optional: true
 
-  '@yydb/iris-linux-arm64@0.0.6':
+  '@yydb/iris-linux-arm64@0.0.8':
     optional: true
 
-  '@yydb/iris-linux-x64@0.0.6':
+  '@yydb/iris-linux-x64@0.0.8':
     optional: true
 
-  '@yydb/iris-unknown-wasm32@0.0.6': {}
+  '@yydb/iris-unknown-wasm32@0.0.8': {}
 
-  '@yydb/iris-win32-x64@0.0.6':
+  '@yydb/iris-win32-x64@0.0.8':
     optional: true
 
-  '@yydb/iris@0.0.6':
+  '@yydb/iris@0.0.8':
     dependencies:
       '@vmz/commander': 0.2.7
-      '@yydb/iris-unknown-wasm32': 0.0.6
+      '@yydb/iris-unknown-wasm32': 0.0.8
       jiti: 2.7.0
     optionalDependencies:
-      '@yydb/iris-darwin-arm64': 0.0.6
-      '@yydb/iris-darwin-x64': 0.0.6
-      '@yydb/iris-linux-arm64': 0.0.6
-      '@yydb/iris-linux-x64': 0.0.6
-      '@yydb/iris-win32-x64': 0.0.6
+      '@yydb/iris-darwin-arm64': 0.0.8
+      '@yydb/iris-darwin-x64': 0.0.8
+      '@yydb/iris-linux-arm64': 0.0.8
+      '@yydb/iris-linux-x64': 0.0.8
+      '@yydb/iris-win32-x64': 0.0.8
 
   abbrev@3.0.1: {}
 

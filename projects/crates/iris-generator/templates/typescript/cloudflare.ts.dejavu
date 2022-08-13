@@ -1,7 +1,7 @@
 import { createIrisOperationExecutor } from "@yydb/iris/cloudflare";
 import type { CreateIrisCloudflareExecutorOptions } from "@yydb/iris/cloudflare";
 import { createClient, type DbClient } from "./operations.js";
-import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT } from "./metadata.js";
+import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
 import { IRIS_D1_PLANS } from "./_internal/d1-plans.js";
 
 /** Cloudflare Worker host: D1-backed operation executor with build-time read plans. */
@@ -12,6 +12,7 @@ export class Database {
                 ...options,
                 plans: IRIS_D1_PLANS,
                 wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
+                valueCarriersByEntity: IRIS_VALUE_CARRIERS,
                 contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
             }),
         );

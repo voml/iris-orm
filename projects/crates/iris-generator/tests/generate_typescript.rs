@@ -151,3 +151,45 @@ fn generate_rejects_unknown_target() {
     let err = iris_generator::generate_from_source(USER_SCHEMA, "kotlin", Path::new(".")).unwrap_err();
     assert!(err.to_string().contains("kotlin"));
 }
+
+const CARRIER_SCHEMA: &str = r#"
+table Metric {
+    @@metric_id: uuid,
+    seq: i64,
+    counter: u64,
+    note: utf16,
+    payload: bytes,
+    seen_at: datetime,
+    scored_on: date,
+}
+"#;
+
+#[test]
+fn typescript_emit_keeps_vos_types_distinct_through_carriers() {
+    let model = GenerationModel::from_vos_schema(CARRIER_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let file = |name: &str| files.iter().find(|(path, _)| path == name).map(|(_, content)| content.as_str()).expect(name);
+
+    let models = file("models.ts");
+    assert!(models.contains("seq: bigint"), "{models}");
+    assert!(models.contains("counter: bigint"), "{models}");
+    assert!(models.contains("payload: Uint8Array"), "{models}");
+    assert!(models.contains("note: string"), "{models}");
+    assert!(models.contains("seenAt: string"), "{models}");
+    assert!(models.contains("scoredOn: string"), "{models}");
+    assert!(!models.contains("seq: number"), "`i64` must not collapse into a JS number: {models}");
+
+    let inputs = file("inputs.ts");
+    assert!(inputs.contains("export type BigIntFilter"), "{inputs}");
+    assert!(inputs.contains("seq?: bigint | BigIntFilter;"), "{inputs}");
+    assert!(inputs.contains("payload?: Uint8Array | BytesFilter;"), "{inputs}");
+    assert!(inputs.contains("readonly eq?: Uint8Array"), "{inputs}");
+
+    let metadata = file("metadata.ts");
+    assert!(metadata.contains("seq: \"i64\""), "{metadata}");
+    assert!(metadata.contains("counter: \"u64\""), "{metadata}");
+    assert!(metadata.contains("note: \"utf16\""), "`utf16` must stay distinct from `utf8`: {metadata}");
+    assert!(metadata.contains("payload: \"bytes\""), "{metadata}");
+    assert!(metadata.contains("seenAt: \"datetimeUtc\""), "{metadata}");
+    assert!(metadata.contains("scoredOn: \"date\""), "`date` must stay distinct from `datetime`: {metadata}");
+}

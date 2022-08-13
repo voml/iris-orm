@@ -1,5 +1,19 @@
-/** Row payload from a successful VOS DML execution (binding wire shape). */
-export type ExecutionRow = Record<string, string | number | boolean | null>;
+/**
+ * JS carrier a generated value table can promise for one field.
+ *
+ * `bigint` and `Uint8Array` are carriers, not conveniences: VOS `i64` must not be
+ * flattened into a lossy JS `number`, and VOS `bytes` stays binary.
+ */
+export type WireCarrierValue = string | number | boolean | bigint | Uint8Array | null;
+
+/**
+ * Row payload from a successful VOS DML execution (binding wire shape).
+ *
+ * Carriers follow the generated `IRIS_VALUE_CARRIERS` table, so an `i64` column
+ * is surfaced as `bigint` and a `bytes` column as `Uint8Array` instead of being
+ * flattened into a JS scalar.
+ */
+export type ExecutionRow = Record<string, WireCarrierValue>;
 
 /**
  * Binding wire result before host value mapping.

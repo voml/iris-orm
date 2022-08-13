@@ -35,6 +35,36 @@ export type { IrisPlaceholder } from "./placeholder.ts";
 export type { CheckSourceResult } from "./check-source.ts";
 export type { SchemaFieldModel, SchemaIntrospection, SchemaMacroModel, SchemaTableModel } from "./schema-introspection.ts";
 export type { ExecuteResult, IrisRow, IrisSession, IrisSessionProfile, OpenSessionOptions } from "./session.ts";
+export { v } from "./vos.ts";
+export type {
+    AnyTypeDescriptor,
+    Attribute,
+    BuiltinKind,
+    ClassDescriptor,
+    FieldAccess,
+    FieldDescriptor,
+    FieldMap,
+    Infer,
+    ItemKind,
+    ItemMetadataKey,
+    NamedFieldMap,
+    NamedItemDescriptor,
+    NamedItemKind,
+    ObjectDescriptor,
+    RefDescriptor,
+    ReferenceKey,
+    ReferenceTarget,
+    RowOf,
+    ScalarKind,
+    StructuralDescriptor,
+    TableDescriptor,
+    TypeDescriptor,
+    VBuiltinName,
+    VItemName,
+    VWrapperName,
+    VosFileRef,
+    WrapperKind,
+} from "./vos.ts";
 export type { ExecutionResult, ExecutionRow, ExecutionWireResult } from "./execution-result.ts";
 export type {
     CreateIrisDbBindingOptions,

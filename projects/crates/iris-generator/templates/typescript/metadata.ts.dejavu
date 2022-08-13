@@ -6,6 +6,11 @@ export const IRIS_FIELD_WIRE_NAMES: Record<string, Readonly<Record<string, strin
 <% wire_map_lines %>
 };
 
+/** TypeScript author field name → VOS value carrier label (per entity). */
+export const IRIS_VALUE_CARRIERS: Record<string, Readonly<Record<string, string>>> = {
+<% value_carrier_lines %>
+};
+
 /** Reference field → target entity (per entity). */
 export const IRIS_REFERENCE_TARGETS: Record<string, Readonly<Record<string, string>>> = {
 <% reference_target_lines %>

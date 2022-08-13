@@ -31,3 +31,30 @@ test("mapRowsToAuthorSurface is a no-op without wire metadata", () => {
     const rows = [{ user_id: "u1" }];
     assert.deepEqual(mapRowsToAuthorSurface(rows, {}), rows);
 });
+
+const carrierWireToTs = { seq: "seq", payload: "payload", note: "note" };
+const valueCarriers = { seq: "i64", payload: "bytes", note: "utf16" };
+
+test("wireRowToAuthorRow keeps i64 on the bigint carrier", () => {
+    const mapped = wireRowToAuthorRow(carrierWireToTs, { seq: 42, payload: null, note: "Ada" }, valueCarriers);
+    assert.equal(mapped.seq, 42n);
+    assert.equal(typeof mapped.seq, "bigint");
+    assert.equal(mapped.note, "Ada");
+});
+
+test("wireRowToAuthorRow decodes bytes onto Uint8Array", () => {
+    const mapped = wireRowToAuthorRow(carrierWireToTs, { seq: 1, payload: "aGk=", note: null }, valueCarriers);
+    assert.deepEqual(mapped.payload, new Uint8Array([0x68, 0x69]));
+});
+
+test("wireRowToAuthorRow refuses an i64 that left the exact number range", () => {
+    assert.throws(
+        () => wireRowToAuthorRow(carrierWireToTs, { seq: 2 ** 53, payload: null, note: null }, valueCarriers),
+        /beyond the 2\^53 exact range/,
+    );
+});
+
+test("wireRowToAuthorRow keeps fields without a carrier scalar", () => {
+    const mapped = wireRowToAuthorRow(carrierWireToTs, { seq: "7", payload: null, note: "Ada" });
+    assert.deepEqual(mapped, { seq: "7", payload: null, note: "Ada" });
+});

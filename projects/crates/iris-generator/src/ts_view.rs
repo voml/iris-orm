@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Error, FieldModel, GenerationModel, MacroModel, Result, TableModel};
+use crate::{Error, FieldModel, GenerationModel, MacroModel, Result, TableModel, carrier};
 
 #[derive(Debug, Clone, Serialize)]
 struct TsFieldView {
@@ -59,6 +59,7 @@ struct TsTemplateContext {
     input_import_names: String,
     ref_type_imports: String,
     wire_map_lines: String,
+    value_carrier_lines: String,
     reference_target_lines: String,
     d1_plan_lines: String,
     tables_view: Vec<TsTableView>,
@@ -122,6 +123,21 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let value_carrier_lines = model
+        .tables
+        .iter()
+        .map(|table| {
+            let fields = table
+                .fields
+                .iter()
+                .map(|field| format!("{}: \"{}\"", field_ts_name(field), carrier::base_vos_type(&field.vos_type)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("    {}: {{ {} }},", table.name, fields)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
     let d1_plan_lines = model
         .tables
         .iter()
@@ -149,8 +165,8 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
             for field in &table.fields {
                 let wire = field.name.as_str();
                 let param_key = format!("p_{wire}");
-                let base = field.vos_type.trim_end_matches('?').trim_start_matches('&');
-                if matches!(base, "bool" | "utf8" | "uuid" | "decimal" | "datetime") {
+                let base = carrier::base_vos_type(&field.vos_type);
+                if matches!(base, "bool" | "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc") {
                     lines.push(format!(
                         "    \"{entity}.findMany@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
                     ));
@@ -220,6 +236,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         input_import_names,
         ref_type_imports,
         wire_map_lines,
+        value_carrier_lines,
         reference_target_lines,
         d1_plan_lines,
         tables_view,
@@ -232,7 +249,7 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
     let pk = primary_key_field(table);
     let pk_name = pk.map(|f| f.name.as_str()).unwrap_or("id");
     let pk_vos = pk.map(|f| f.vos_type.as_str()).unwrap_or("utf8");
-    let pk_ts_scalar = scalar_base_type(pk_vos).to_string();
+    let pk_ts_scalar = carrier::vos_type_to_ts(pk_vos);
 
     let primary_fields: Vec<_> = table.fields.iter().filter(|f| f.primary).collect();
     let unique_where_lines = if primary_fields.is_empty() {
@@ -276,24 +293,16 @@ fn camel_case(name: &str) -> String {
     }
 }
 
-fn scalar_base_type(vos_type: &str) -> &'static str {
-    let base = vos_type.trim_end_matches('?').trim_start_matches('&');
-    match base {
-        "bool" => "boolean",
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "number",
-        _ => "string",
-    }
-}
-
 fn vos_filter_name(vos_type: &str) -> &'static str {
-    let base = vos_type.trim_end_matches('?').trim_start_matches('&');
+    let base = carrier::base_vos_type(vos_type);
     match base {
         "bool" => "BooleanFilter",
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "NumberFilter",
+        "i64" | "u64" => "BigIntFilter",
+        "i8" | "i16" | "i32" | "u8" | "u16" | "u32" | "f32" | "f64" => "NumberFilter",
         "utf8" | "utf16" => "StringFilter",
         "uuid" => "UuidFilter",
         "decimal" => "DecimalFilter",
-        "datetime" => "DateTimeFilter",
+        "date" | "time" | "datetimeUtc" => "DateTimeFilter",
         "bytes" => "BytesFilter",
         _ => "StringFilter",
     }
@@ -307,12 +316,12 @@ fn model_field_type(table: &TableModel, field: &FieldModel) -> String {
     if field.primary {
         return format!("{}Id", table.name);
     }
-    let base = scalar_base_type(&field.vos_type);
-    if field.optional { format!("{base} | null") } else { base.into() }
+    let base = carrier::vos_type_to_ts(&field.vos_type);
+    if field.optional { format!("{base} | null") } else { base }
 }
 
 fn scalar_filter_type(table: &TableModel, field: &FieldModel) -> String {
-    if field.primary { format!("{}Id", table.name) } else { scalar_base_type(&field.vos_type).into() }
+    if field.primary { format!("{}Id", table.name) } else { carrier::vos_type_to_ts(&field.vos_type) }
 }
 
 fn nullable_where_suffix(optional: bool) -> &'static str {
@@ -414,15 +423,7 @@ fn emit_patch_field(table: &TableModel, field: &FieldModel, entity_names: &HashS
 }
 
 fn macro_return_ts(return_type: &str) -> String {
-    let base = return_type.trim_end_matches('?');
-    match base {
-        "utf8" | "uuid" | "decimal" | "datetime" | "bytes" => "string".into(),
-        "bool" => "boolean".into(),
-        "unit" => "void".into(),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "number".into(),
-        other if other.contains("::") || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) => other.into(),
-        _ => "unknown".into(),
-    }
+    carrier::vos_type_to_ts(return_type)
 }
 
 fn field_ts_name(field: &FieldModel) -> String {
@@ -463,12 +464,8 @@ fn push_d1_create_plans(lines: &mut Vec<String>, entity: &str, insert_fields: &[
     }
     let field_count = insert_fields.len();
     for mask in 1..(1usize << field_count) {
-        let subset: Vec<_> = insert_fields
-            .iter()
-            .enumerate()
-            .filter(|(index, _)| mask & (1usize << index) != 0)
-            .map(|(_, field)| *field)
-            .collect();
+        let subset: Vec<_> =
+            insert_fields.iter().enumerate().filter(|(index, _)| mask & (1usize << index) != 0).map(|(_, field)| *field).collect();
         let insert_cols = subset.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
         let placeholders = subset.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
         let data_param_keys = subset.iter().map(|field| format!("data_{}", field.name)).collect::<Vec<_>>();
@@ -510,12 +507,8 @@ fn push_d1_update_plans(lines: &mut Vec<String>, entity: &str, table: &TableMode
         let pk_wire = pk.name.as_str();
         let pk_param = format!("p_{pk_wire}");
         for mask in 1..(1usize << patch_count) {
-            let subset: Vec<_> = patch_fields
-                .iter()
-                .enumerate()
-                .filter(|(index, _)| mask & (1usize << index) != 0)
-                .map(|(_, field)| *field)
-                .collect();
+            let subset: Vec<_> =
+                patch_fields.iter().enumerate().filter(|(index, _)| mask & (1usize << index) != 0).map(|(_, field)| *field).collect();
             let set_clause = subset.iter().map(|field| format!("{} = ?", field.name)).collect::<Vec<_>>().join(", ");
             let patch_param_keys = subset.iter().map(|field| format!("patch_{}", field.name)).collect::<Vec<_>>();
             let mut sorted_keys = patch_param_keys.clone();

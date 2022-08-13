@@ -22,13 +22,16 @@ async function executeReadPlan(
     sqlite: IrisSqliteDatabase,
     plan: D1PhysicalPlan,
     wireToTs: Readonly<Record<string, string>>,
+    valueCarriers: Readonly<Record<string, string>>,
     parameters?: Readonly<Record<string, unknown>>,
 ): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
     try {
         const bindValues = bindD1Parameters(plan, parameters);
         const statement = sqlite.prepare(plan.sql).bind(...bindValues);
         const { results } = await statement.all<Record<string, unknown>>();
-        const rows = (results ?? []).map((row) => wireRowToAuthorRow(wireToTs, row));
+        const rows = (results ?? []).map((row) =>
+            wireRowToAuthorRow(wireToTs, row, valueCarriers),
+        );
         return { ok: true, value: rows };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -40,6 +43,7 @@ async function executeWriteReturningPlan(
     sqlite: IrisSqliteDatabase,
     plan: D1PhysicalPlan,
     wireToTs: Readonly<Record<string, string>>,
+    valueCarriers: Readonly<Record<string, string>>,
     parameters?: Readonly<Record<string, unknown>>,
 ): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
     try {
@@ -47,7 +51,9 @@ async function executeWriteReturningPlan(
         const sql = applyD1ReturningProjection(plan.sql, parameters?.select_cols);
         const statement = sqlite.prepare(sql).bind(...bindValues);
         const { results } = await statement.all<Record<string, unknown>>();
-        const rows = (results ?? []).map((row) => wireRowToAuthorRow(wireToTs, row));
+        const rows = (results ?? []).map((row) =>
+            wireRowToAuthorRow(wireToTs, row, valueCarriers),
+        );
         return { ok: true, value: rows };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -82,6 +88,7 @@ export function createSqlitePlanOperationExecutor(
     sqlite: IrisSqliteDatabase,
     plans: D1PlanRegistry = {},
     wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
+    valueCarriersByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
 ): OperationExecutor {
     return {
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
@@ -94,11 +101,12 @@ export function createSqlitePlanOperationExecutor(
             }
             const entity = entityFromOperationId(request.identity.operationId);
             const wireToTs = entity ? wireNamesByEntity[entity] ?? {} : {};
+            const valueCarriers = entity ? valueCarriersByEntity[entity] ?? {} : {};
             if (plan.mode === "read") {
-                return executeReadPlan(sqlite, plan, wireToTs, request.parameters);
+                return executeReadPlan(sqlite, plan, wireToTs, valueCarriers, request.parameters);
             }
             if (plan.mode === "write-returning") {
-                return executeWriteReturningPlan(sqlite, plan, wireToTs, request.parameters);
+                return executeWriteReturningPlan(sqlite, plan, wireToTs, valueCarriers, request.parameters);
             }
             return notWired(
                 "IRIS-SQLITE-PLAN-INVALID",

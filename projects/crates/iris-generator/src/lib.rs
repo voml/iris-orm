@@ -53,6 +53,7 @@ pub enum Error {
 /// Result alias.
 pub type Result<T> = std::result::Result<T, Error>;
 
+mod carrier;
 mod rust_view;
 mod ts_view;
 mod typescript;
@@ -218,7 +219,11 @@ impl GenerationModel {
                         .iter()
                         .map(|param| {
                             let vos_type = type_label(&param.ty);
-                            MacroParamModel { name: param.name.clone(), vos_type: vos_type.clone(), ts_type: vos_type_to_ts(&vos_type) }
+                            MacroParamModel {
+                                name: param.name.clone(),
+                                vos_type: vos_type.clone(),
+                                ts_type: carrier::vos_type_to_ts(&vos_type),
+                            }
                         })
                         .collect();
                     macros.push(MacroModel {
@@ -367,21 +372,9 @@ struct MappedFieldType {
     reference_target: Option<String>,
 }
 
-fn vos_type_to_ts(vos_type: &str) -> String {
-    let base = vos_type.trim_end_matches('?').trim_start_matches('&');
-    match base {
-        "bool" => "boolean".into(),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => "number".into(),
-        "unit" => "void".into(),
-        "utf8" | "utf16" | "uuid" | "decimal" | "datetime" | "bytes" => "string".into(),
-        other if other.contains("::") || other.chars().next().is_some_and(|c| c.is_ascii_uppercase()) => other.into(),
-        _ => "unknown".into(),
-    }
-}
-
 fn type_label(ty: &TypeExpr) -> String {
     match ty {
-        TypeExpr::Builtin(b) => format!("{b:?}").to_ascii_lowercase(),
+        TypeExpr::Builtin(b) => carrier::builtin_label(*b).map(str::to_owned).unwrap_or_else(|| format!("{b:?}").to_ascii_lowercase()),
         TypeExpr::Named(n) => n.clone(),
         TypeExpr::Optional(inner) => format!("{}?", type_label(inner)),
         TypeExpr::List(inner) => format!("[{}]", type_label(inner)),
@@ -404,13 +397,9 @@ fn map_resolved_field_type(ty: &vos::contract::ResolvedCanonicalType) -> Result<
         }
         ResolvedCanonicalType::Builtin(path) if path.len() == 1 => {
             let name = path[0].as_str();
-            let rust_ty = match name {
-                "bool" | "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => name.to_owned(),
-                "utf8" | "utf16" | "uuid" => "String".to_owned(),
-                "bytes" => "Vec<u8>".to_owned(),
-                other => return Err(Error::UnsupportedType(other.to_owned())),
-            };
-            Ok(MappedFieldType { rust_ty, vos_type: name.to_owned(), optional: false, is_uuid: name == "uuid", reference_target: None })
+            let label = carrier::faithful_label(name).ok_or_else(|| Error::UnsupportedType(name.to_owned()))?;
+            let rust_ty = carrier::rust_carrier_for_label(label).ok_or_else(|| Error::UnsupportedType(name.to_owned()))?.to_owned();
+            Ok(MappedFieldType { rust_ty, vos_type: label.to_owned(), optional: false, is_uuid: label == "uuid", reference_target: None })
         }
         other => Err(Error::UnsupportedType(format!("resolved type {other:?}"))),
     }
@@ -455,31 +444,15 @@ fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
 fn reference_target_name(ty: &TypeExpr) -> Result<String> {
     match ty {
         TypeExpr::Named(name) => Ok(name.clone()),
-        TypeExpr::Builtin(b) => Ok(format!("{b:?}").to_ascii_lowercase()),
+        TypeExpr::Builtin(b) => {
+            carrier::builtin_label(*b).map(str::to_owned).ok_or_else(|| Error::UnsupportedType(format!("reference target `{b:?}`")))
+        }
         other => Err(Error::UnsupportedType(format!("reference target `{other:?}`"))),
     }
 }
 
 fn map_builtin(b: &BuiltinType) -> Result<(&'static str, &'static str)> {
-    match b {
-        BuiltinType::Bool => Ok(("bool", "bool")),
-        BuiltinType::I8 => Ok(("i8", "i8")),
-        BuiltinType::I16 => Ok(("i16", "i16")),
-        BuiltinType::I32 => Ok(("i32", "i32")),
-        BuiltinType::I64 => Ok(("i64", "i64")),
-        BuiltinType::U8 => Ok(("u8", "u8")),
-        BuiltinType::U16 => Ok(("u16", "u16")),
-        BuiltinType::U32 => Ok(("u32", "u32")),
-        BuiltinType::U64 => Ok(("u64", "u64")),
-        BuiltinType::F32 => Ok(("f32", "f32")),
-        BuiltinType::F64 => Ok(("f64", "f64")),
-        BuiltinType::Utf8 | BuiltinType::Utf16 => Ok(("String", "utf8")),
-        BuiltinType::Uuid => Ok(("String", "uuid")),
-        BuiltinType::Decimal => Ok(("String", "decimal")),
-        BuiltinType::Date | BuiltinType::Time | BuiltinType::DateTimeUtc => Ok(("String", "datetime")),
-        BuiltinType::Bytes => Ok(("Vec<u8>", "bytes")),
-        _ => Err(Error::UnsupportedType(format!("{b:?}"))),
-    }
+    carrier::builtin_rust_and_label(*b).ok_or_else(|| Error::UnsupportedType(format!("{b:?}")))
 }
 
 #[allow(dead_code)]

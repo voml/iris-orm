@@ -13,6 +13,8 @@ export interface CreateIrisCloudflareExecutorOptions extends CreateIrisDbBinding
     plans?: D1PlanRegistry;
     /** Wire-name map from generated `metadata.ts` (`IRIS_FIELD_WIRE_NAMES`). */
     wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    /** VOS value-carrier map from generated `metadata.ts` (`IRIS_VALUE_CARRIERS`). */
+    valueCarriersByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** Create the async operation executor for generated Cloudflare clients. */
@@ -22,7 +24,12 @@ export async function createIrisOperationExecutor(
     if (!options.d1) {
         throw new Error("@yydb/iris/cloudflare: d1 binding is required");
     }
-    const executor = createD1OperationExecutor(options.d1, options.plans ?? {}, options.wireNamesByEntity ?? {});
+    const executor = createD1OperationExecutor(
+        options.d1,
+        options.plans ?? {},
+        options.wireNamesByEntity ?? {},
+        options.valueCarriersByEntity ?? {},
+    );
     if (options.contractFingerprint) {
         return guardOperationExecutor(executor, options.contractFingerprint);
     }

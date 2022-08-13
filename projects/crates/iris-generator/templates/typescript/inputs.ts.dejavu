@@ -34,6 +34,16 @@ export type NumberFilter = {
     readonly lte?: number;
 };
 
+/** Scalar filter operators for VOS `i64` / `u64` fields (carrier: `bigint`). */
+export type BigIntFilter = {
+    readonly eq?: bigint;
+    readonly not?: bigint;
+    readonly gt?: bigint;
+    readonly gte?: bigint;
+    readonly lt?: bigint;
+    readonly lte?: bigint;
+};
+
 /** Scalar filter operators for bool fields. */
 export type BooleanFilter = {
     readonly eq?: boolean;
@@ -66,10 +76,10 @@ export type DateTimeFilter = {
     readonly lte?: string;
 };
 
-/** Scalar filter operators for bytes fields. */
+/** Scalar filter operators for bytes fields (carrier: `Uint8Array`). */
 export type BytesFilter = {
-    readonly eq?: string;
-    readonly not?: string;
+    readonly eq?: Uint8Array;
+    readonly not?: Uint8Array;
 };
 
 /** Patch field: write a value. Omitted field means unchanged. */
@@ -100,11 +110,15 @@ type WhereValueForField<V> = V extends { readonly __irisRef: EntityName }
     ? never
     : V extends boolean
       ? boolean | BooleanFilter | { readonly isNull: true } | { readonly isNotNull: true }
-      : V extends number
-        ? number | NumberFilter | { readonly isNull: true } | { readonly isNotNull: true }
-        : V extends string
-          ? string | StringFilter | UuidFilter | DecimalFilter | DateTimeFilter | BytesFilter | { readonly isNull: true } | { readonly isNotNull: true }
-          : never;
+      : V extends bigint
+        ? bigint | BigIntFilter | { readonly isNull: true } | { readonly isNotNull: true }
+        : V extends number
+          ? number | NumberFilter | { readonly isNull: true } | { readonly isNotNull: true }
+          : V extends Uint8Array
+            ? Uint8Array | BytesFilter | { readonly isNull: true } | { readonly isNotNull: true }
+            : V extends string
+              ? string | StringFilter | UuidFilter | DecimalFilter | DateTimeFilter | BytesFilter | { readonly isNull: true } | { readonly isNotNull: true }
+              : never;
 
 /**
  * Resolve a select shape against an entity — nested object on &T becomes

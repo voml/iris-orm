@@ -34,6 +34,7 @@ export async function createIrisOperationExecutor(options: CreateIrisDbBindingOp
     });
     const executor = createOperationExecutorFromSession(session, {
         wireNamesByEntity: options.wireNamesByEntity,
+        valueCarriersByEntity: options.valueCarriersByEntity,
     });
     if (options.contractFingerprint) {
         return guardOperationExecutor(executor, options.contractFingerprint);

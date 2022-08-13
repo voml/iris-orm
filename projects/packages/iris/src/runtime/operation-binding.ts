@@ -7,6 +7,8 @@ import { entityFromOperationId, mapRowsToAuthorSurface } from "./wire-row-map.ts
 
 export type OperationExecutorSessionOptions = {
     wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    /** Generated `IRIS_VALUE_CARRIERS` table (VOS carrier label per author field). */
+    valueCarriersByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 };
 
 function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly ExecutionRow[]> {
@@ -45,13 +47,15 @@ function mapExecuteEnvelope(
     envelope: ResultEnvelope<readonly ExecutionRow[]>,
     operationId: string,
     wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>>,
+    valueCarriersByEntity: Readonly<Record<string, Readonly<Record<string, string>>>>,
 ): ResultEnvelope<readonly ExecutionRow[]> {
     if (!envelope.ok) {
         return envelope;
     }
     const entity = entityFromOperationId(operationId);
     const wireToTs = entity ? wireNamesByEntity[entity] ?? {} : {};
-    return { ok: true, value: mapRowsToAuthorSurface(envelope.value, wireToTs) };
+    const valueCarriers = entity ? valueCarriersByEntity[entity] ?? {} : {};
+    return { ok: true, value: mapRowsToAuthorSurface(envelope.value, wireToTs, valueCarriers) };
 }
 
 function declaredVosWire(
@@ -77,6 +81,7 @@ export function createOperationExecutorFromSession(
     options: OperationExecutorSessionOptions = {},
 ): OperationExecutor {
     const wireNamesByEntity = options.wireNamesByEntity ?? {};
+    const valueCarriersByEntity = options.valueCarriersByEntity ?? {};
     const runOperation = session.executeOperation?.bind(session);
     const runQuery = session.query ?? session.executeVos.bind(session);
     const runExecute = session.execute?.bind(session);
@@ -85,10 +90,20 @@ export function createOperationExecutorFromSession(
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
             if (runOperation) {
                 const raw = runOperation(JSON.stringify(request));
-                return mapExecuteEnvelope(wireToEnvelope(raw), request.identity.operationId, wireNamesByEntity);
+                return mapExecuteEnvelope(
+                    wireToEnvelope(raw),
+                    request.identity.operationId,
+                    wireNamesByEntity,
+                    valueCarriersByEntity,
+                );
             }
             const raw = declaredVosWire(session, request, runQuery, runExecute, "query");
-            return mapExecuteEnvelope(wireToEnvelope(raw), request.identity.operationId, wireNamesByEntity);
+            return mapExecuteEnvelope(
+                wireToEnvelope(raw),
+                request.identity.operationId,
+                wireNamesByEntity,
+                valueCarriersByEntity,
+            );
         },
         async executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>> {
             if (request.operation.kind === "declared-vos" && runExecute) {
