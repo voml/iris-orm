@@ -10,7 +10,8 @@ import { buildOperationRequest, declaredVosOperation } from "../src/runtime/buil
 import { USER_SCHEMA, USER_WIRE_NAMES } from "./fixtures.ts";
 import { srcImport } from "./helpers.ts";
 
-const CONTRACT_VERSION = "1.0.0";
+/** Mirrors `sqlite_provider::CONTRACT_VERSION` in the `yyds` crate the workspace patches to. */
+const CONTRACT_VERSION = "v0";
 const IRIS_ORM_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
 const YYDS_SQLITE_NODE = join(IRIS_ORM_ROOT, "..", "yyds", "projects", "packages", "sqlite", "src", "node.ts");
 const YYDS_SQLITE_CLI = join(IRIS_ORM_ROOT, "..", "yyds", "projects", "packages", "sqlite", "bin", "sqlite3.mjs");
