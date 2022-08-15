@@ -19,7 +19,7 @@ use dejavu::{Dejavu, IrDocument};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use vos::ast::{BuiltinType, Document, Item, TypeExpr};
+use vos::{CanonicalType, CanonicalTypeArgument, ContractDiagnostic, SchemaProjection, TypeContract, TypeContractKind};
 
 /// Generator errors.
 #[derive(Debug, thiserror::Error)]
@@ -146,7 +146,7 @@ impl GenerationModel {
         let contract = vos::ResolvedContract::from_json(artifact).map_err(|error| Error::Vos(format!("{}: {}", error.code, error.message)))?;
         let mut tables = Vec::new();
         for item in &contract.types {
-            if item.kind != vos::contract::TypeContractKind::Table || item.canonical_path.len() != 1 {
+            if item.kind != TypeContractKind::Table || item.canonical_path.len() != 1 {
                 return Err(Error::UnsupportedType(format!("resolved entity {}", item.canonical_path.join("::"))));
             }
             let mut fields = Vec::new();
@@ -154,7 +154,7 @@ impl GenerationModel {
                 let mapped = map_resolved_field_type(&field.canonical_type)?;
                 fields.push(FieldModel {
                     field_id: Some(field.field_id),
-                    virtual_field_index: Some(field.virtual_field_index),
+                    virtual_field_index: field.virtual_field_index,
                     name: field.canonical_name.clone(),
                     rust_ty: mapped.rust_ty,
                     vos_type: mapped.vos_type,
@@ -183,59 +183,60 @@ impl GenerationModel {
 
     /// Build from a VOS schema document string.
     pub fn from_vos_schema(source: &str) -> Result<Self> {
-        vos::validate_schema(source).map_err(Error::Vos)?;
-        let document = vos::parser::parse_document(source)
-            .map_err(|d| Error::Vos(d.errors.first().map(|e| e.message.clone()).unwrap_or_else(|| "parse failed".into())))?;
-        Self::from_document(&document)
+        let input = vos::parse_oak(source).map_err(Error::Vos)?;
+        Self::from_document(&input)
     }
 
-    /// Build from a parsed VOS document.
-    pub fn from_document(document: &Document) -> Result<Self> {
+    /// Build from a parsed VOS contract input.
+    pub fn from_document(input: &vos::ContractInput) -> Result<Self> {
+        let projection = project_schema(input)?;
+        let operations = input.project_operations().map_err(|diagnostics| Error::Vos(format_diagnostics(&diagnostics)))?;
         let mut tables = Vec::new();
-        let mut macros = Vec::new();
-        for item in &document.items {
-            match item {
-                Item::Table(table) => {
-                    let mut fields = Vec::new();
-                    for field in &table.fields {
-                        let mapped = map_field_type(&field.ty)?;
-                        fields.push(FieldModel {
-                            field_id: None,
-                            virtual_field_index: None,
-                            name: field.name.clone(),
-                            rust_ty: mapped.rust_ty,
-                            vos_type: mapped.vos_type,
-                            primary: field.is_primary(),
-                            optional: mapped.optional,
-                            is_uuid: mapped.is_uuid,
-                            reference_target: mapped.reference_target,
-                        });
-                    }
-                    tables.push(TableModel { type_id: None, name: table.name.clone(), rust_type: table.name.clone(), fields });
-                }
-                Item::Macro(macro_def) => {
-                    let params = macro_def
-                        .params
-                        .iter()
-                        .map(|param| {
-                            let vos_type = type_label(&param.ty);
-                            MacroParamModel {
-                                name: param.name.clone(),
-                                vos_type: vos_type.clone(),
-                                ts_type: carrier::vos_type_to_ts(&vos_type),
-                            }
-                        })
-                        .collect();
-                    macros.push(MacroModel {
-                        name: macro_def.name.clone(),
-                        return_type: macro_def.return_ty.as_ref().map(type_label).unwrap_or_else(|| "unit".into()),
-                        params,
-                    });
-                }
-                _ => {}
+        for table in projection.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+            ensure_single_primary(table)?;
+            let mut fields = Vec::new();
+            for field in &table.fields {
+                let mapped = map_field_type(&field.canonical_type)?;
+                fields.push(FieldModel {
+                    field_id: None,
+                    virtual_field_index: None,
+                    name: field.canonical_name.clone(),
+                    rust_ty: mapped.rust_ty,
+                    vos_type: mapped.vos_type,
+                    primary: field.attributes.iter().any(|attribute| attribute.name == "primary"),
+                    optional: mapped.optional,
+                    is_uuid: mapped.is_uuid,
+                    reference_target: mapped.reference_target,
+                });
             }
+            let Some(name) = table.canonical_path.last()
+            else {
+                return Err(Error::UnsupportedType("table declaration without a name".into()));
+            };
+            tables.push(TableModel { type_id: None, name: name.clone(), rust_type: name.clone(), fields });
         }
-        Ok(Self { generator_version: env!("CARGO_PKG_VERSION").into(), schema_fingerprint: fingerprint_document(document), tables, macros })
+        let mut macros = Vec::new();
+        for operation in operations.iter().filter(|operation| operation.kind == vos::OperationKind::Macro) {
+            let params = operation
+                .parameters
+                .iter()
+                .map(|param| {
+                    let vos_type = type_label(&param.type_expr);
+                    MacroParamModel { name: param.name.clone(), vos_type: vos_type.clone(), ts_type: carrier::vos_type_to_ts(&vos_type) }
+                })
+                .collect();
+            macros.push(MacroModel {
+                name: operation.name.clone(),
+                return_type: operation.return_type.as_ref().map(type_label).unwrap_or_else(|| "unit".into()),
+                params,
+            });
+        }
+        Ok(Self {
+            generator_version: env!("CARGO_PKG_VERSION").into(),
+            schema_fingerprint: fingerprint_schema(&projection, &operations),
+            tables,
+            macros,
+        })
     }
 
     /// JSON value for Dejavu contexts.
@@ -372,21 +373,28 @@ struct MappedFieldType {
     reference_target: Option<String>,
 }
 
-fn type_label(ty: &TypeExpr) -> String {
+fn type_label(ty: &CanonicalType) -> String {
     match ty {
-        TypeExpr::Builtin(b) => carrier::builtin_label(*b).map(str::to_owned).unwrap_or_else(|| format!("{b:?}").to_ascii_lowercase()),
-        TypeExpr::Named(n) => n.clone(),
-        TypeExpr::Optional(inner) => format!("{}?", type_label(inner)),
-        TypeExpr::List(inner) => format!("[{}]", type_label(inner)),
-        TypeExpr::Reference(inner) => format!("&{}", type_label(inner)),
-        TypeExpr::Vector { dim } => format!("vector<{dim}>"),
-        TypeExpr::File => "file".into(),
-        other => format!("{other:?}"),
+        CanonicalType::Named(path) => path.join("::"),
+        CanonicalType::Optional(inner) => format!("{}?", type_label(inner)),
+        CanonicalType::List(inner) => format!("[{}]", type_label(inner)),
+        CanonicalType::Reference(inner) => format!("&{}", type_label(inner)),
+        CanonicalType::Generic { path, arguments } => {
+            let arguments = arguments
+                .iter()
+                .map(|argument| match argument {
+                    CanonicalTypeArgument::Type(value) => type_label(value),
+                    CanonicalTypeArgument::Literal(value) => value.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{}<{arguments}>", path.join("::"))
+        }
     }
 }
 
-fn map_resolved_field_type(ty: &vos::contract::ResolvedCanonicalType) -> Result<MappedFieldType> {
-    use vos::contract::ResolvedCanonicalType;
+fn map_resolved_field_type(ty: &vos::ResolvedCanonicalType) -> Result<MappedFieldType> {
+    use vos::ResolvedCanonicalType;
     match ty {
         ResolvedCanonicalType::Optional(inner) => {
             let mut mapped = map_resolved_field_type(inner)?;
@@ -405,16 +413,16 @@ fn map_resolved_field_type(ty: &vos::contract::ResolvedCanonicalType) -> Result<
     }
 }
 
-fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
+fn map_field_type(ty: &CanonicalType) -> Result<MappedFieldType> {
     match ty {
-        TypeExpr::Optional(inner) => {
+        CanonicalType::Optional(inner) => {
             let mut mapped = map_field_type(inner)?;
             mapped.optional = true;
             mapped.vos_type = format!("{}?", mapped.vos_type);
             mapped.rust_ty = format!("Option<{}>", mapped.rust_ty);
             Ok(mapped)
         }
-        TypeExpr::Reference(inner) => {
+        CanonicalType::Reference(inner) => {
             let target = reference_target_name(inner)?;
             Ok(MappedFieldType {
                 rust_ty: format!("{target}Ref"),
@@ -424,46 +432,69 @@ fn map_field_type(ty: &TypeExpr) -> Result<MappedFieldType> {
                 reference_target: Some(target),
             })
         }
-        TypeExpr::Builtin(b) => {
-            let (rust, vos) = map_builtin(b)?;
-            Ok(MappedFieldType {
-                rust_ty: rust.into(),
-                vos_type: vos.into(),
-                optional: false,
-                is_uuid: matches!(b, BuiltinType::Uuid),
-                reference_target: None,
-            })
+        CanonicalType::Named(path) if path.len() == 1 => {
+            let name = path[0].as_str();
+            match carrier::builtin_rust_and_label(name) {
+                Some((rust, vos)) => {
+                    Ok(MappedFieldType { rust_ty: rust.into(), is_uuid: vos == "uuid", vos_type: vos, optional: false, reference_target: None })
+                }
+                None => Ok(MappedFieldType {
+                    rust_ty: name.to_owned(),
+                    vos_type: name.to_owned(),
+                    optional: false,
+                    is_uuid: false,
+                    reference_target: None,
+                }),
+            }
         }
-        TypeExpr::Named(name) => {
-            Ok(MappedFieldType { rust_ty: name.clone(), vos_type: name.clone(), optional: false, is_uuid: false, reference_target: None })
+        CanonicalType::Named(path) => {
+            Ok(MappedFieldType { rust_ty: path.join("::"), vos_type: path.join("::"), optional: false, is_uuid: false, reference_target: None })
         }
         other => Err(Error::UnsupportedType(format!("{other:?}"))),
     }
 }
 
-fn reference_target_name(ty: &TypeExpr) -> Result<String> {
+fn reference_target_name(ty: &CanonicalType) -> Result<String> {
     match ty {
-        TypeExpr::Named(name) => Ok(name.clone()),
-        TypeExpr::Builtin(b) => {
-            carrier::builtin_label(*b).map(str::to_owned).ok_or_else(|| Error::UnsupportedType(format!("reference target `{b:?}`")))
-        }
+        CanonicalType::Named(path) => Ok(path.join("::")),
         other => Err(Error::UnsupportedType(format!("reference target `{other:?}`"))),
     }
 }
 
-fn map_builtin(b: &BuiltinType) -> Result<(&'static str, &'static str)> {
-    carrier::builtin_rust_and_label(*b).ok_or_else(|| Error::UnsupportedType(format!("{b:?}")))
+fn ensure_single_primary(table: &TypeContract) -> Result<()> {
+    let primary_count = table.fields.iter().flat_map(|field| field.attributes.iter()).filter(|attribute| attribute.name == "primary").count();
+    if primary_count != 1 {
+        return Err(Error::Vos(format!("table `{}` requires exactly one primary field", table.canonical_path.join("::"))));
+    }
+    Ok(())
 }
 
-#[allow(dead_code)]
-fn map_rust_type(ty: &TypeExpr) -> Result<(String, String, bool)> {
-    let mapped = map_field_type(ty)?;
-    Ok((mapped.rust_ty, mapped.vos_type, mapped.optional))
+/// Project only schema declarations through the VOS schema contract.
+///
+/// Operation declarations (for example durable macros) stay in the Oak input
+/// and are projected separately, so they never block table/class projection.
+fn project_schema(input: &vos::ContractInput) -> Result<SchemaProjection> {
+    use vos::syntax::VosDeclarationKind;
+    let root = input.clone().into_oak();
+    let declarations = root
+        .declarations
+        .iter()
+        .filter(|declaration| matches!(declaration.kind, VosDeclarationKind::Namespace | VosDeclarationKind::Table | VosDeclarationKind::Class))
+        .cloned()
+        .collect();
+    vos::ContractInput::from_oak(vos::syntax::VosRoot { source: root.source, syntax: root.syntax, declarations })
+        .project_schema()
+        .map_err(|diagnostics| Error::Vos(format_diagnostics(&diagnostics)))
 }
 
-fn fingerprint_document(document: &Document) -> String {
+fn format_diagnostics(diagnostics: &[ContractDiagnostic]) -> String {
+    diagnostics.iter().map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message)).collect::<Vec<_>>().join("\n")
+}
+
+fn fingerprint_schema(projection: &SchemaProjection, operations: &[vos::OperationProjection]) -> String {
     let mut h = DefaultHasher::new();
-    format!("{document:?}").hash(&mut h);
+    format!("{projection:?}").hash(&mut h);
+    format!("{operations:?}").hash(&mut h);
     format!("{:x}", h.finish())
 }
 

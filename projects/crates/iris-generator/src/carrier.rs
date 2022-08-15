@@ -5,8 +5,6 @@
 //! TypeScript carrier is the same JS type. Nothing else in the generator may
 //! restate this mapping.
 
-use vos::ast::BuiltinType;
-
 /// Strips a trailing `?` and a leading `&` to reach the base VOS type label.
 pub(crate) fn base_vos_type(vos_type: &str) -> &str {
     vos_type.trim_end_matches('?').trim_start_matches('&')
@@ -45,32 +43,6 @@ pub(crate) fn rust_carrier_for_label(label: &str) -> Option<&'static str> {
     })
 }
 
-/// Faithful VOS label of a parsed builtin (`None` = builtin this crate cannot map).
-pub(crate) fn builtin_label(builtin: BuiltinType) -> Option<&'static str> {
-    Some(match builtin {
-        BuiltinType::Bool => "bool",
-        BuiltinType::I8 => "i8",
-        BuiltinType::I16 => "i16",
-        BuiltinType::I32 => "i32",
-        BuiltinType::I64 => "i64",
-        BuiltinType::U8 => "u8",
-        BuiltinType::U16 => "u16",
-        BuiltinType::U32 => "u32",
-        BuiltinType::U64 => "u64",
-        BuiltinType::F32 => "f32",
-        BuiltinType::F64 => "f64",
-        BuiltinType::Utf8 => "utf8",
-        BuiltinType::Utf16 => "utf16",
-        BuiltinType::Uuid => "uuid",
-        BuiltinType::Decimal => "decimal",
-        BuiltinType::Date => "date",
-        BuiltinType::Time => "time",
-        BuiltinType::DateTimeUtc => "datetimeUtc",
-        BuiltinType::Bytes => "bytes",
-        _ => return None,
-    })
-}
-
 /// Faithful VOS label of a builtin spelling.
 ///
 /// Accepts the aliases used by the canonical resolved contract, which spells
@@ -100,9 +72,9 @@ pub(crate) fn vos_type_to_ts(vos_type: &str) -> String {
     "unknown".to_owned()
 }
 
-/// Rust carrier and faithful VOS label of a parsed builtin.
-pub(crate) fn builtin_rust_and_label(builtin: BuiltinType) -> Option<(&'static str, &'static str)> {
-    let label = builtin_label(builtin)?;
+/// Rust carrier and faithful VOS label of a builtin spelling.
+pub(crate) fn builtin_rust_and_label(spelling: &str) -> Option<(&'static str, String)> {
+    let label = faithful_label(spelling)?;
     let rust = rust_carrier_for_label(label)?;
-    Some((rust, label))
+    Some((rust, label.to_owned()))
 }

@@ -1,10 +1,7 @@
 //! Phase 8: Dejavu generation golden + determinism.
 
 use iris_generator::{GenerationModel, TEMPLATE_NAMES, emit_rust_domain, prefers_aot};
-use vos::{
-    contract::{FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity},
-    parse_oak, resolve_contract,
-};
+use vos::{FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -41,6 +38,27 @@ fn generation_rejects_schema_without_a_table_primary() {
 }
 
 #[test]
+fn generation_model_keeps_macros_next_to_tables() {
+    let schema = r#"
+table User {
+    @@id: uuid,
+    name: utf8,
+}
+
+macro seed_user(prefix: utf8) -> unit {
+    User::insert({ id: "1", name: prefix })
+}
+"#;
+    let model = GenerationModel::from_vos_schema(schema).unwrap();
+    assert_eq!(model.tables.len(), 1);
+    assert_eq!(model.macros.len(), 1);
+    assert_eq!(model.macros[0].name, "seed_user");
+    assert_eq!(model.macros[0].return_type, "unit");
+    assert_eq!(model.macros[0].params[0].vos_type, "utf8");
+    assert_eq!(model.macros[0].params[0].ts_type, "string");
+}
+
+#[test]
 fn generation_model_consumes_resolved_contract_identity() {
     let projection = parse_oak("table User { @@id: uuid, active: bool }").unwrap().project_schema().unwrap();
     let manifest = IdentityManifest {
@@ -50,8 +68,8 @@ fn generation_model_consumes_resolved_contract_identity() {
             type_id: 7,
             kind: TypeContractKind::Table,
             fields: vec![
-                FieldIdentity { canonical_name: "id".to_owned(), field_id: 8, virtual_field_index: 0 },
-                FieldIdentity { canonical_name: "active".to_owned(), field_id: 9, virtual_field_index: 1 },
+                FieldIdentity { canonical_name: "id".to_owned(), field_id: 8, virtual_field_index: Some(0) },
+                FieldIdentity { canonical_name: "active".to_owned(), field_id: 9, virtual_field_index: Some(1) },
             ],
         }],
     };
