@@ -1,7 +1,7 @@
 //! Plan + capability negotiation.
 
 use iris_ir::{EffectKind, IrEnvelope, IrVersion, PhysicalOp, PhysicalPlan, PlannedNode, RealizationClass, SchemaFingerprint, hash_ops};
-use vos::ast::Span;
+use vos::syntax::VosProgram;
 
 use crate::{
     capability::CapabilitySet,
@@ -25,25 +25,18 @@ impl Planner {
 
     /// Plan a VOS source string.
     pub fn plan_source(&self, source: &str) -> Result<PhysicalPlan> {
-        let program = vos::parse_program(source).map_err(|diags| {
-            let first = diags
-                .errors
-                .first()
-                .map(Diagnostic::from_vos_parse)
-                .unwrap_or_else(|| Diagnostic::plan_rejected("parse failed", Span::empty(0), None));
-            Error::diagnostic(first)
-        })?;
+        let program = vos::parse_program(source).map_err(|message| Error::diagnostic(Diagnostic::from_vos_parse(message)))?;
         self.plan_program(&program)
     }
 
     /// Plan an already-parsed program.
-    pub fn plan_program(&self, program: &vos::ast::expr::Program) -> Result<PhysicalPlan> {
+    pub fn plan_program(&self, program: &VosProgram) -> Result<PhysicalPlan> {
         let (ops, span) = lower::lower_program(program)?;
         self.plan_ops(ops, span)
     }
 
     /// Assign realization classes and stamp the envelope.
-    pub fn plan_ops(&self, ops: Vec<PhysicalOp>, span: Span) -> Result<PhysicalPlan> {
+    pub fn plan_ops(&self, ops: Vec<PhysicalOp>, span: core::range::Range<usize>) -> Result<PhysicalPlan> {
         let mut required = Vec::new();
         let mut nodes = Vec::with_capacity(ops.len());
         for op in &ops {
@@ -69,7 +62,8 @@ impl Planner {
 
         let effect = if ops.iter().any(|op| matches!(op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. })) {
             EffectKind::Write
-        } else {
+        }
+        else {
             EffectKind::Read
         };
 

@@ -1,9 +1,11 @@
 //! Lower VOS expression pipelines into Iris physical ops.
 
+use core::range::Range;
+
 use iris_ir::{CmpOp, LiteralKind, PhysicalOp, Pred, ProjectField, SortKey, WriteField};
-use vos::ast::{
-    Literal, Program, Span,
-    expr::{BinaryOp, Expr, PathSep, ProjItem, Stmt},
+use vos::syntax::{
+    VosBinaryOp as BinaryOp, VosExpr as Expr, VosLiteral as Literal, VosPathSep as PathSep, VosProgram as Program, VosProjItem as ProjItem,
+    VosStmt as Stmt,
 };
 
 use crate::{
@@ -19,7 +21,7 @@ enum ExecBoundary {
 }
 
 /// Lower a VOS program into an ordered physical op list + root span.
-pub fn lower_program(program: &Program) -> Result<(Vec<PhysicalOp>, Span)> {
+pub fn lower_program(program: &Program) -> Result<(Vec<PhysicalOp>, Range<usize>)> {
     let mut bindings: Vec<(String, Expr)> = Vec::new();
     for stmt in &program.statements {
         match stmt {
@@ -27,23 +29,20 @@ pub fn lower_program(program: &Program) -> Result<(Vec<PhysicalOp>, Span)> {
             Stmt::Expr(expr) => {
                 return lower_exec_expr(expr, &bindings);
             }
-            _ => {
-                return Err(Error::diagnostic(Diagnostic::plan_rejected("unsupported statement in Phase 1 program", program.span, None)));
-            }
         }
     }
     let Some(result) = &program.result
     else {
         return Err(Error::diagnostic(Diagnostic::plan_rejected(
             "program has no result expression to execute",
-            program.span,
+            program.span.clone(),
             Some("end with a `.collect()` pipeline or a write operation".into()),
         )));
     };
     lower_exec_expr(result, &bindings)
 }
 
-fn lower_exec_expr(expr: &Expr, bindings: &[(String, Expr)]) -> Result<(Vec<PhysicalOp>, Span)> {
+fn lower_exec_expr(expr: &Expr, bindings: &[(String, Expr)]) -> Result<(Vec<PhysicalOp>, Range<usize>)> {
     let expr = expand_bindings(expr, bindings)?;
     let (expr, projection) = peel_map(&expr)?;
     let boundary_span = expr_span(&expr);
@@ -61,7 +60,7 @@ fn lower_exec_expr(expr: &Expr, bindings: &[(String, Expr)]) -> Result<(Vec<Phys
             if projection.is_some() {
                 return Err(Error::diagnostic(Diagnostic::plan_rejected(
                     "`.delete()` cannot be followed by `.map()`",
-                    boundary_span,
+                    boundary_span.clone(),
                     None,
                 )));
             }
@@ -70,7 +69,7 @@ fn lower_exec_expr(expr: &Expr, bindings: &[(String, Expr)]) -> Result<(Vec<Phys
         }
         ExecBoundary::Patch(pipeline, patch_obj) => {
             let (table, filter) = lower_filter_pipeline(&pipeline)?;
-            let fields = lower_write_fields(&patch_obj, boundary_span)?;
+            let fields = lower_write_fields(&patch_obj, boundary_span.clone())?;
             let mut ops = vec![PhysicalOp::Patch { table, filter, fields }];
             if let Some(proj) = projection {
                 ops.push(PhysicalOp::Project { fields: lower_projection(&proj)? });
@@ -96,7 +95,7 @@ fn peel_map(expr: &Expr) -> Result<(Expr, Option<Expr>)> {
             Expr::Member { object, name, .. } if name == "map" => {
                 let proj = args
                     .first()
-                    .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected("`.map` requires a projection lambda", *span, None)))?;
+                    .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected("`.map` requires a projection lambda", span.clone(), None)))?;
                 Ok((object.as_ref().clone(), Some(proj.clone())))
             }
             _ => Ok((expr.clone(), None)),
@@ -110,28 +109,26 @@ fn detect_boundary(expr: &Expr) -> Result<ExecBoundary> {
         Expr::Call { callee, args, span } => match callee.as_ref() {
             Expr::Member { object, name, .. } if name == "collect" => {
                 if !args.is_empty() {
-                    return Err(Error::diagnostic(Diagnostic::plan_rejected("`.collect()` takes no arguments", *span, None)));
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected("`.collect()` takes no arguments", span.clone(), None)));
                 }
                 Ok(ExecBoundary::Collect(object.as_ref().clone()))
             }
             Expr::Member { object, name, .. } if name == "delete" => {
                 if !args.is_empty() {
-                    return Err(Error::diagnostic(Diagnostic::plan_rejected("`.delete()` takes no arguments", *span, None)));
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected("`.delete()` takes no arguments", span.clone(), None)));
                 }
                 Ok(ExecBoundary::Delete(object.as_ref().clone()))
             }
             Expr::Member { object, name, .. } if name == "patch" => {
                 let patch_obj = args
                     .first()
-                    .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected("`.patch` requires a field object", *span, None)))?;
+                    .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected("`.patch` requires a field object", span.clone(), None)))?;
                 Ok(ExecBoundary::Patch(object.as_ref().clone(), patch_obj.clone()))
             }
-            Expr::Member { name, sep, .. } if name == "insert" && *sep == PathSep::ColonColon => {
-                Ok(ExecBoundary::Insert(expr.clone()))
-            }
+            Expr::Member { name, sep, .. } if name == "insert" && *sep == PathSep::ColonColon => Ok(ExecBoundary::Insert(expr.clone())),
             _ => Err(Error::diagnostic(Diagnostic::plan_rejected(
                 "unsupported execution boundary",
-                *span,
+                span.clone(),
                 Some("end reads with `.collect()`, writes with `::insert`, `.patch`, or `.delete()`".into()),
             ))),
         },
@@ -146,29 +143,29 @@ fn detect_boundary(expr: &Expr) -> Result<ExecBoundary> {
 fn lower_insert_call(expr: &Expr) -> Result<(String, Vec<WriteField>)> {
     let Expr::Call { callee, args, span } = expr
     else {
-        return Err(Error::diagnostic(Diagnostic::plan_rejected("insert must be a static `Entity::insert({ … })` call", expr_span(expr), None)));
+        return Err(Error::diagnostic(Diagnostic::plan_rejected(
+            "insert must be a static `Entity::insert({ … })` call",
+            expr_span(expr),
+            None,
+        )));
     };
     let Expr::Member { object, name, sep, .. } = callee.as_ref()
     else {
-        return Err(Error::diagnostic(Diagnostic::plan_rejected("insert must be a static `Entity::insert({ … })` call", *span, None)));
+        return Err(Error::diagnostic(Diagnostic::plan_rejected("insert must be a static `Entity::insert({ … })` call", span.clone(), None)));
     };
     if name != "insert" || *sep != PathSep::ColonColon {
-        return Err(Error::diagnostic(Diagnostic::plan_rejected("insert must use `Entity::insert({ … })`", *span, None)));
+        return Err(Error::diagnostic(Diagnostic::plan_rejected("insert must use `Entity::insert({ … })`", span.clone(), None)));
     }
     let table = match object.as_ref() {
         Expr::Name { name, .. } => name.clone(),
         other => {
-            return Err(Error::diagnostic(Diagnostic::plan_rejected(
-                "insert table must be a bare entity name",
-                expr_span(other),
-                None,
-            )));
+            return Err(Error::diagnostic(Diagnostic::plan_rejected("insert table must be a bare entity name", expr_span(other), None)));
         }
     };
     let row = args
         .first()
-        .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected("`::insert` requires one row object argument", *span, None)))?;
-    let fields = lower_write_fields(row, *span)?;
+        .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected("`::insert` requires one row object argument", span.clone(), None)))?;
+    let fields = lower_write_fields(row, span.clone())?;
     Ok((table, fields))
 }
 
@@ -177,24 +174,20 @@ fn lower_filter_pipeline(expr: &Expr) -> Result<(String, Option<Pred>)> {
         Expr::Call { callee, args, span } => match callee.as_ref() {
             Expr::Member { object, name, .. } if name == "filter" || name == "where" => {
                 let (table, _) = lower_filter_pipeline(object)?;
-                let pred_expr = args
-                    .first()
-                    .ok_or_else(|| Error::diagnostic(Diagnostic::plan_rejected(format!("`.{name}` requires a predicate"), *span, None)))?;
+                let pred_expr = args.first().ok_or_else(|| {
+                    Error::diagnostic(Diagnostic::plan_rejected(format!("`.{name}` requires a predicate"), span.clone(), None))
+                })?;
                 let predicate = lower_predicate(pred_expr)?;
                 Ok((table, Some(predicate)))
             }
-            _ => Err(Error::diagnostic(Diagnostic::plan_rejected("write pipeline must start from a table filter", *span, None))),
+            _ => Err(Error::diagnostic(Diagnostic::plan_rejected("write pipeline must start from a table filter", span.clone(), None))),
         },
         Expr::Name { name, .. } => Ok((name.clone(), None)),
-        other => Err(Error::diagnostic(Diagnostic::plan_rejected(
-            "write pipeline must start from a table name",
-            expr_span(other),
-            None,
-        ))),
+        other => Err(Error::diagnostic(Diagnostic::plan_rejected("write pipeline must start from a table name", expr_span(other), None))),
     }
 }
 
-fn lower_write_fields(expr: &Expr, span: Span) -> Result<Vec<WriteField>> {
+fn lower_write_fields(expr: &Expr, span: Range<usize>) -> Result<Vec<WriteField>> {
     let fields = match expr {
         Expr::AnonObject { fields, .. } | Expr::TypedObject { fields, .. } => fields,
         other => {
@@ -207,15 +200,15 @@ fn lower_write_fields(expr: &Expr, span: Span) -> Result<Vec<WriteField>> {
     };
     let mut out = Vec::with_capacity(fields.len());
     for init in fields {
-        if init.is_shorthand() {
+        if init.value.is_none() {
             return Err(Error::diagnostic(Diagnostic::plan_rejected(
                 "write field assignments require explicit values",
-                init.span,
+                init.span.clone(),
                 None,
             )));
         }
         let value = init.value.as_ref().expect("checked shorthand");
-        let mut field = lower_write_field(value, init.span)?;
+        let mut field = lower_write_field(value, init.span.clone())?;
         field.name = init.name.clone();
         out.push(field);
     }
@@ -225,43 +218,15 @@ fn lower_write_fields(expr: &Expr, span: Span) -> Result<Vec<WriteField>> {
     Ok(out)
 }
 
-fn lower_write_field(expr: &Expr, span: Span) -> Result<WriteField> {
+fn lower_write_field(expr: &Expr, span: Range<usize>) -> Result<WriteField> {
     match expr {
-        Expr::Literal(Literal::Bool(b)) => Ok(WriteField {
-            name: String::new(),
-            literal: b.to_string(),
-            kind: LiteralKind::Bool,
-        }),
-        Expr::Literal(Literal::Int(t)) => Ok(WriteField {
-            name: String::new(),
-            literal: t.clone(),
-            kind: LiteralKind::Int,
-        }),
-        Expr::Literal(Literal::String(s)) => Ok(WriteField {
-            name: String::new(),
-            literal: s.clone(),
-            kind: LiteralKind::Str,
-        }),
-        Expr::Literal(Literal::Null) => Ok(WriteField {
-            name: String::new(),
-            literal: "null".into(),
-            kind: LiteralKind::Null,
-        }),
-        Expr::Literal(Literal::Float(t)) => Ok(WriteField {
-            name: String::new(),
-            literal: t.clone(),
-            kind: LiteralKind::Str,
-        }),
-        Expr::Literal(Literal::Ident(t)) => Ok(WriteField {
-            name: String::new(),
-            literal: t.clone(),
-            kind: LiteralKind::Str,
-        }),
-        _ => Err(Error::diagnostic(Diagnostic::plan_rejected(
-            "write field values must be literals after parameter binding",
-            span,
-            None,
-        ))),
+        Expr::Literal(Literal::Bool(b)) => Ok(WriteField { name: String::new(), literal: b.to_string(), kind: LiteralKind::Bool }),
+        Expr::Literal(Literal::Int(t)) => Ok(WriteField { name: String::new(), literal: t.clone(), kind: LiteralKind::Int }),
+        Expr::Literal(Literal::String(s)) => Ok(WriteField { name: String::new(), literal: s.clone(), kind: LiteralKind::Str }),
+        Expr::Literal(Literal::Null) => Ok(WriteField { name: String::new(), literal: "null".into(), kind: LiteralKind::Null }),
+        Expr::Literal(Literal::Float(t)) => Ok(WriteField { name: String::new(), literal: t.clone(), kind: LiteralKind::Str }),
+        Expr::Name { name, .. } => Ok(WriteField { name: String::new(), literal: name.clone(), kind: LiteralKind::Str }),
+        _ => Err(Error::diagnostic(Diagnostic::plan_rejected("write field values must be literals after parameter binding", span, None))),
     }
 }
 
@@ -275,34 +240,38 @@ fn expand_bindings(expr: &Expr, bindings: &[(String, Expr)]) -> Result<Expr> {
                 Ok(expr.clone())
             }
         }
-        Expr::Member { object, name, sep, span } => {
-            Ok(Expr::Member { object: Box::new(expand_bindings(object, bindings)?), name: name.clone(), sep: *sep, span: *span })
-        }
+        Expr::Member { object, name, name_span, sep, span } => Ok(Expr::Member {
+            object: Box::new(expand_bindings(object, bindings)?),
+            name: name.clone(),
+            name_span: name_span.clone(),
+            sep: *sep,
+            span: span.clone(),
+        }),
         Expr::Call { callee, args, span } => Ok(Expr::Call {
             callee: Box::new(expand_bindings(callee, bindings)?),
             args: args.iter().map(|a| expand_bindings(a, bindings)).collect::<Result<Vec<_>>>()?,
-            span: *span,
+            span: span.clone(),
         }),
         other => Ok(other.clone()),
     }
 }
 
 fn lower_read_pipeline(expr: &Expr) -> Result<Vec<PhysicalOp>> {
-    let mut methods: Vec<(&str, &[Expr], Span)> = Vec::new();
+    let mut methods: Vec<(&str, &[Expr], Range<usize>)> = Vec::new();
     let mut cur = expr;
     loop {
         match cur {
             Expr::Call { callee, args, span } => match callee.as_ref() {
                 Expr::Member { object, name, .. } => {
-                    methods.push((name.as_str(), args.as_slice(), *span));
+                    methods.push((name.as_str(), args.as_slice(), span.clone()));
                     cur = object.as_ref();
                 }
                 _ => {
-                    return Err(Error::diagnostic(Diagnostic::plan_rejected("unsupported call shape in query pipeline", *span, None)));
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected("unsupported call shape in query pipeline", span.clone(), None)));
                 }
             },
             Expr::Member { object, name, span, .. } if name == "all" => {
-                methods.push(("all", &[], *span));
+                methods.push(("all", &[], span.clone()));
                 cur = object.as_ref();
             }
             Expr::Name { name, span } => {
@@ -324,7 +293,7 @@ fn lower_read_pipeline(expr: &Expr) -> Result<Vec<PhysicalOp>> {
     }
 }
 
-fn push_read_method(ops: &mut Vec<PhysicalOp>, method: &str, args: &[Expr], span: Span) -> Result<()> {
+fn push_read_method(ops: &mut Vec<PhysicalOp>, method: &str, args: &[Expr], span: Range<usize>) -> Result<()> {
     match method {
         "all" => Ok(()),
         "filter" | "where" => {
@@ -399,7 +368,7 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
                 _ => {
                     return Err(Error::diagnostic(Diagnostic::plan_rejected(
                         "Phase 1 filters must compare a field access on the left",
-                        *span,
+                        span.clone(),
                         None,
                     )));
                 }
@@ -410,9 +379,13 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
                 Expr::Literal(Literal::String(s)) => (s.clone(), LiteralKind::Str),
                 Expr::Literal(Literal::Null) => ("null".into(), LiteralKind::Null),
                 Expr::Literal(Literal::Float(t)) => (t.clone(), LiteralKind::Str),
-                Expr::Literal(Literal::Ident(t)) => (t.clone(), LiteralKind::Str),
+                Expr::Name { name, .. } => (name.clone(), LiteralKind::Str),
                 _ => {
-                    return Err(Error::diagnostic(Diagnostic::plan_rejected("Phase 1 filters require a literal right-hand side", *span, None)));
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected(
+                        "Phase 1 filters require a literal right-hand side",
+                        span.clone(),
+                        None,
+                    )));
                 }
             };
             if matches!(op, BinaryOp::Eq) && kind == LiteralKind::Bool {
@@ -427,7 +400,7 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
                 BinaryOp::Gt => CmpOp::Gt,
                 BinaryOp::Ge => CmpOp::Ge,
                 _ => {
-                    return Err(Error::diagnostic(Diagnostic::plan_rejected("unsupported comparison in filter", *span, None)));
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected("unsupported comparison in filter", span.clone(), None)));
                 }
             };
             Ok(Pred::FieldCmp { field, op: cmp, literal, kind })
@@ -464,7 +437,7 @@ fn lower_projection(expr: &Expr) -> Result<Vec<ProjectField>> {
                     ProjItem::Star { .. } => {
                         return Err(Error::diagnostic(Diagnostic::plan_rejected(
                             "Phase 1 projection does not expand `*` yet",
-                            *span,
+                            span.clone(),
                             Some("enumerate fields explicitly".into()),
                         )));
                     }
@@ -489,9 +462,6 @@ fn lower_projection(expr: &Expr) -> Result<Vec<ProjectField>> {
                         };
                         fields.push(ProjectField { name: init.name.clone(), from });
                     }
-                    _ => {
-                        return Err(Error::diagnostic(Diagnostic::plan_rejected("unsupported projection item", *span, None)));
-                    }
                 }
             }
             Ok(fields)
@@ -500,7 +470,7 @@ fn lower_projection(expr: &Expr) -> Result<Vec<ProjectField>> {
     }
 }
 
-fn literal_u64(expr: Option<&Expr>, span: Span, method: &str) -> Result<u64> {
+fn literal_u64(expr: Option<&Expr>, span: Range<usize>, method: &str) -> Result<u64> {
     let Some(expr) = expr
     else {
         return Err(Error::diagnostic(Diagnostic::plan_rejected(format!("`.{method}` requires a count argument"), span, None)));
@@ -513,23 +483,8 @@ fn literal_u64(expr: Option<&Expr>, span: Span, method: &str) -> Result<u64> {
     }
 }
 
-fn expr_span(expr: &Expr) -> Span {
-    match expr {
-        Expr::Literal(_) => Span::empty(0),
-        Expr::Name { span, .. }
-        | Expr::TypedObject { span, .. }
-        | Expr::AnonObject { span, .. }
-        | Expr::List { span, .. }
-        | Expr::Member { span, .. }
-        | Expr::Call { span, .. }
-        | Expr::Unary { span, .. }
-        | Expr::Binary { span, .. }
-        | Expr::StarProj { span, .. }
-        | Expr::StructProj { span, .. }
-        | Expr::Try { span, .. } => *span,
-        Expr::Lambda(l) => l.span,
-        _ => Span::empty(0),
-    }
+fn expr_span(expr: &Expr) -> Range<usize> {
+    expr.span()
 }
 
 #[cfg(test)]
@@ -564,10 +519,9 @@ mod tests {
 
     #[test]
     fn lowers_patch_with_projection() {
-        let program = vos::parse_program(
-            r#"User.filter(x => x.user_id == "u1").patch({ user_name: "bob" }).map(x => x.{ user_id, user_name })"#,
-        )
-        .expect("parse");
+        let program =
+            vos::parse_program(r#"User.filter(x => x.user_id == "u1").patch({ user_name: "bob" }).map(x => x.{ user_id, user_name })"#)
+                .expect("parse");
         let (ops, _) = lower_program(&program).expect("lower");
         assert!(matches!(ops.first(), Some(PhysicalOp::Patch { table, .. }) if table == "User"));
         assert!(ops.iter().any(|op| matches!(op, PhysicalOp::Project { .. })));

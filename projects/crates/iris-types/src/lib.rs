@@ -56,7 +56,9 @@ pub use projection_store::{
 };
 pub use projection_verify::{PROJECTION_VERIFY_FORMAT, ProjectionVerifyCheck, ProjectionVerifyReport, verify_projection};
 pub use reference::{ReferenceStore, row_from_pairs};
-pub use schema::{collect_schema_paths, load_schema_document, read_schema, table_name_class_hints, table_name_class_hints_from_source};
+pub use schema::{
+    collect_schema_paths, load_schema_document, parse_schema, read_schema, table_name_class_hints, table_name_class_hints_from_source,
+};
 pub use session::{Iris, Session};
 pub use topology::{
     CachePolicy, ComponentRole, FallbackPolicy, ObjectPolicy, OutboxPolicy, ProjectionPolicy, RouteRule, TOPOLOGY_DIR, TOPOLOGY_FORMAT,

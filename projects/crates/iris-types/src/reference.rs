@@ -110,8 +110,7 @@ impl ReferenceStore {
 
     /// Interpret a VOS program directly for conformance.
     pub fn interpret_source(&self, source: &str) -> Result<Vec<Row>> {
-        let program = vos::parse_program(source)
-            .map_err(|d| Error::Runtime(format!("parse failed: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
+        let program = vos::parse_program(source).map_err(|message| Error::Runtime(format!("parse failed: {message}")))?;
         self.interpret_program(&program)
     }
 
@@ -119,7 +118,7 @@ impl ReferenceStore {
     ///
     /// Capability rejection is tested on the planner path; this path proves
     /// physical-op semantics independently of capability gating.
-    pub fn interpret_program(&self, program: &vos::ast::expr::Program) -> Result<Vec<Row>> {
+    pub fn interpret_program(&self, program: &vos::syntax::VosProgram) -> Result<Vec<Row>> {
         let (ops, _span) = lower::lower_program(program)?;
         let plan = PhysicalPlan {
             envelope: iris_ir::IrEnvelope {

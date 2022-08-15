@@ -45,7 +45,7 @@ impl Error {
     }
 
     /// Source span when this is a diagnostic error.
-    pub fn span(&self) -> Option<vos::ast::Span> {
+    pub fn span(&self) -> Option<core::range::Range<usize>> {
         match self {
             Self::Diagnostic(d) => Some(d.span),
             _ => None,

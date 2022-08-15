@@ -1,11 +1,11 @@
 //! Multi-file VOS schema loading (`schemas/**/*.iris`).
 
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
-use vos::ast::Document;
+use vos::{
+    ContractDiagnostic, SchemaProjection, TypeContractKind,
+    syntax::{VosDeclarationKind, VosRoot},
+};
 
 use crate::project::resolve_path;
 
@@ -54,19 +54,36 @@ pub fn read_schema(project_dir: &Path, schema_pattern: &str) -> Result<String, S
     Ok(parts.join("\n\n"))
 }
 
-/// Parse, validate, and merge schema files into one logical document.
-pub fn load_schema_document(project_dir: &Path, schema_pattern: &str) -> Result<Document, String> {
+/// Project one schema source into the VOS schema contract.
+///
+/// Oak parses the source and the VOS projection owns canonical paths, fields,
+/// attributes, and types. Operation-like declarations (for example durable
+/// macros) are valid schema-file content but are not schema types, so only
+/// namespaces, tables, and classes are offered to the schema projection.
+pub fn parse_schema(source: &str) -> Result<SchemaProjection, String> {
+    let root = vos::parse_oak(source)?.into_oak();
+    let declarations = root
+        .declarations
+        .iter()
+        .filter(|declaration| matches!(declaration.kind, VosDeclarationKind::Namespace | VosDeclarationKind::Table | VosDeclarationKind::Class))
+        .cloned()
+        .collect();
+    vos::ContractInput::from_oak(VosRoot { source: root.source, syntax: root.syntax, declarations })
+        .project_schema()
+        .map_err(|diagnostics| format_projection_diagnostics(&diagnostics))
+}
+
+/// Parse, validate, and merge schema files into one logical projection.
+pub fn load_schema_document(project_dir: &Path, schema_pattern: &str) -> Result<SchemaProjection, String> {
     let paths = collect_schema_paths(project_dir, schema_pattern)?;
     let mut parts = Vec::with_capacity(paths.len());
     for path in &paths {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        vos::parser::parse_document(&text).map_err(|d| format_schema_diag(path, &d))?;
+        parse_schema(&text).map_err(|e| format!("{}: {e}", path.display()))?;
         parts.push(text);
     }
     let merged = parts.join("\n\n");
-    let document = vos::parser::parse_document(&merged).map_err(|d| format_schema_diag(Path::new(schema_pattern), &d))?;
-    validate_unique_tables(&document)?;
-    Ok(document)
+    parse_schema(&merged).map_err(|e| format!("{}: {e}", Path::new(schema_pattern).display()))
 }
 
 fn collect_schema_dir(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -92,10 +109,13 @@ fn is_schema_file(path: &Path) -> bool {
 /// Iris uses the same identifier for table and generated class/type. PascalCase
 /// (e.g. `User`, `GiftOrder`) is recommended so Rust/TypeScript class names align
 /// with the physical table name — not enforced at load time.
-pub fn table_name_class_hints(doc: &Document) -> Vec<String> {
+pub fn table_name_class_hints(doc: &SchemaProjection) -> Vec<String> {
     let mut hints = Vec::new();
-    for table in doc.tables() {
-        let name = &table.name;
+    for table in doc.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+        let Some(name) = table.canonical_path.last()
+        else {
+            continue;
+        };
         let pascal =
             name.chars().next().is_some_and(|c| c.is_ascii_uppercase()) && name.chars().all(|c| c.is_ascii_alphanumeric()) && !name.is_empty();
         if !pascal {
@@ -108,30 +128,26 @@ pub fn table_name_class_hints(doc: &Document) -> Vec<String> {
 
 /// Parse schema source and return [`table_name_class_hints`].
 pub fn table_name_class_hints_from_source(source: &str) -> Result<Vec<String>, String> {
-    let doc = vos::parser::parse_document(source)
-        .map_err(|d| d.errors.first().map(|e| e.message.clone()).unwrap_or_else(|| "schema parse error".into()))?;
+    let doc = parse_schema(source)?;
     Ok(table_name_class_hints(&doc))
 }
 
-fn validate_unique_tables(doc: &Document) -> Result<(), String> {
-    let mut seen = HashSet::new();
-    for table in doc.tables() {
-        if !seen.insert(table.name.clone()) {
-            return Err(format!("duplicate table `{name}`", name = table.name));
-        }
-    }
-    Ok(())
-}
-
-fn format_schema_diag(path: &Path, d: &vos::ast::Diagnostics) -> String {
-    let msg = d.errors.first().map(|e| e.message.as_str()).unwrap_or("schema parse error");
-    format!("{}: {msg}", path.display())
+fn format_projection_diagnostics(diagnostics: &[ContractDiagnostic]) -> String {
+    diagnostics.iter().map(|d| format!("{}: {}", d.code, d.message)).collect::<Vec<_>>().join("\n")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::fs;
+
+    fn table_names(doc: &SchemaProjection) -> Vec<&str> {
+        doc.types
+            .iter()
+            .filter(|item| item.kind == TypeContractKind::Table)
+            .filter_map(|item| item.canonical_path.last().map(String::as_str))
+            .collect()
+    }
 
     #[test]
     fn glob_merges_schemas_from_multiple_files() {
@@ -142,8 +158,33 @@ mod tests {
         fs::write(schemas.join("a.iris"), "table User { @@id: utf8, name: utf8, }\n").unwrap();
         fs::write(schemas.join("b.iris"), "table GiftOrder { @@id: utf8, total_cents: i64, }\n").unwrap();
         let doc = load_schema_document(&root, "schemas/**/*.iris").unwrap();
-        let names: Vec<_> = doc.tables().map(|t| t.name.as_str()).collect();
-        assert_eq!(names, vec!["User", "GiftOrder"]);
+        assert_eq!(table_names(&doc), vec!["User", "GiftOrder"]);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn operation_declarations_do_not_block_schema_projection() {
+        let root = std::env::temp_dir()
+            .join(format!("iris-schema-macro-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let schemas = root.join("schemas");
+        fs::create_dir_all(&schemas).unwrap();
+        fs::write(schemas.join("a.iris"), "table User { @@id: uuid, }\n").unwrap();
+        fs::write(schemas.join("b.iris"), "macro seed_user() -> unit {\n    User { id: \"1\" }.insert()\n}\n").unwrap();
+        let doc = load_schema_document(&root, "schemas/**/*.iris").unwrap();
+        assert_eq!(table_names(&doc), vec!["User"]);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn duplicate_tables_surface_projection_diagnostics() {
+        let root = std::env::temp_dir()
+            .join(format!("iris-schema-dup-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let schemas = root.join("schemas");
+        fs::create_dir_all(&schemas).unwrap();
+        fs::write(schemas.join("a.iris"), "table User { @@id: utf8, }\n").unwrap();
+        fs::write(schemas.join("b.iris"), "table User { @@id: utf8, }\n").unwrap();
+        let err = load_schema_document(&root, "schemas/**/*.iris").unwrap_err();
+        assert!(err.contains("VOS002"), "{err}");
         let _ = fs::remove_dir_all(root);
     }
 
@@ -154,7 +195,7 @@ mod tests {
         fs::create_dir_all(&root).unwrap();
         fs::write(root.join("bad.iris"), "table user { @@id: utf8, }\n").unwrap();
         let doc = load_schema_document(&root, "bad.iris").unwrap();
-        assert_eq!(doc.tables().count(), 1);
+        assert_eq!(table_names(&doc), vec!["user"]);
         let hints = table_name_class_hints(&doc);
         assert_eq!(hints.len(), 1);
         assert!(hints[0].contains("PascalCase"), "{}", hints[0]);

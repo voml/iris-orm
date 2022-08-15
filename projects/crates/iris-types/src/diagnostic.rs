@@ -1,6 +1,6 @@
 //! Structured diagnostics.
 
-use vos::ast::Span;
+use core::range::Range;
 
 /// Pipeline stage where a diagnostic was produced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,7 +29,7 @@ pub struct Diagnostic {
     /// Human message.
     pub message: String,
     /// Source span.
-    pub span: Span,
+    pub span: Range<usize>,
     /// Pipeline stage.
     pub stage: StageKind,
     /// Datasource / backend id when known.
@@ -40,19 +40,12 @@ pub struct Diagnostic {
 
 impl Diagnostic {
     /// Build a planning rejection diagnostic.
-    pub fn plan_rejected(message: impl Into<String>, span: Span, hint: Option<String>) -> Self {
+    pub fn plan_rejected(message: impl Into<String>, span: Range<usize>, hint: Option<String>) -> Self {
         Self { code: "IRIS-PLAN-REJECTED".into(), message: message.into(), span, stage: StageKind::Plan, backend: None, hint }
     }
 
-    /// Build a parse diagnostic from VOS diagnostics (first error).
-    pub fn from_vos_parse(diag: &vos::ast::Diagnostic) -> Self {
-        Self {
-            code: diag.code.clone().unwrap_or_else(|| "IRIS-PARSE".into()),
-            message: diag.message.clone(),
-            span: diag.span,
-            stage: StageKind::Parse,
-            backend: None,
-            hint: diag.hint.clone(),
-        }
+    /// Build a parse diagnostic from an Oak/VOS parse message.
+    pub fn from_vos_parse(message: impl Into<String>) -> Self {
+        Self { code: "IRIS-PARSE".into(), message: message.into(), span: (0..0).into(), stage: StageKind::Parse, backend: None, hint: None }
     }
 }
