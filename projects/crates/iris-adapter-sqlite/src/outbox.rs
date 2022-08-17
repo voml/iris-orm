@@ -120,10 +120,7 @@ pub fn authority_commit<P: SqliteProvider, R>(provider: &P, f: impl FnOnce(&mut 
             })
             .ok_or_else(|| Error::Policy("missing authority commit row".into()))?;
         let next = (prev_seq as u64).saturating_add(1);
-        provider.execute_one(
-            "UPDATE _iris_commit SET seq = ?1 WHERE shard = ?2",
-            &[integer_param(next as i64), shard_param()],
-        )?;
+        provider.execute_one("UPDATE _iris_commit SET seq = ?1 WHERE shard = ?2", &[integer_param(next as i64), shard_param()])?;
 
         for ev in &appends {
             let effect = match ev.effect {

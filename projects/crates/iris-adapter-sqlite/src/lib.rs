@@ -103,23 +103,20 @@ impl SqliteSource {
     /// Build an adopt mapping against a VOS schema document (does not invent semantics).
     pub fn adopt(&self, vos_schema: &str) -> Result<MappingManifest> {
         let catalog = self.inspect()?;
-        let document = vos::parser::parse_document(vos_schema)
-            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
+        let document = parse_vos(vos_schema)?;
         Ok(catalog::adopt_plan(&document, &catalog))
     }
 
     /// Plan a Managed Push from a VOS schema (reviewable logical plan).
     pub fn plan_managed_push(&self, vos_schema: &str) -> Result<LogicalMigrationPlan> {
-        let document = vos::parser::parse_document(vos_schema)
-            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
+        let document = parse_vos(vos_schema)?;
         let observed = self.inspect()?;
         migrate::plan_push(&document, &observed)
     }
 
     /// Apply a previously reviewed Managed Push plan.
     pub fn apply_managed_push(&self, plan: &LogicalMigrationPlan, vos_schema: &str) -> Result<PushReport> {
-        let document = vos::parser::parse_document(vos_schema)
-            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
+        let document = parse_vos(vos_schema)?;
         let provider = self.provider.lock().expect("sqlite mutex");
         migrate::apply_push(&*provider, plan, &document)
     }
@@ -135,8 +132,7 @@ impl SqliteSource {
 
     /// Drift check: local VOS vs observed catalog.
     pub fn drift(&self, vos_schema: &str) -> Result<DriftReport> {
-        let document = vos::parser::parse_document(vos_schema)
-            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
+        let document = parse_vos(vos_schema)?;
         let catalog = self.inspect()?;
         Ok(catalog::drift_report(&document, &catalog))
     }
@@ -263,6 +259,10 @@ impl From<std::io::Error> for Error {
     fn from(value: std::io::Error) -> Self {
         Self::Io(value)
     }
+}
+
+fn parse_vos(vos_schema: &str) -> Result<vos::SchemaProjection> {
+    iris_types::parse_schema(vos_schema).map_err(|message| Error::Vos(format!("parse schema: {message}")))
 }
 
 /// Result alias.

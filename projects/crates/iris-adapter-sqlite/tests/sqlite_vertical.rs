@@ -3,10 +3,10 @@
 use std::collections::BTreeMap;
 
 use iris_adapter_sqlite::{BACKEND_ID, SqliteSource};
-use sqlite_provider::{CONTRACT_VERSION, SqliteProvider};
-use sqlite_provider_rusqlite::RusqliteProvider;
 use iris_ir::RealizationClass;
 use iris_types::{Planner, RowWrite, Value};
+use sqlite_provider::{CONTRACT_VERSION, SqliteProvider};
+use sqlite_provider_rusqlite::RusqliteProvider;
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -223,22 +223,15 @@ fn adapter_is_not_yydb() {
     assert!(!manifest.contains("yydb"));
     assert!(manifest.contains("sqlite-provider"));
     assert!(
-        !manifest
-            .lines()
-            .any(|line| line.trim_start().starts_with("rusqlite") && line.contains('=')),
+        !manifest.lines().any(|line| line.trim_start().starts_with("rusqlite") && line.contains('=')),
         "adapter must not depend on rusqlite directly"
     );
 }
 
 #[test]
 fn iris_push_file_readable_by_shared_provider_engine() {
-    let path = std::env::temp_dir().join(format!(
-        "iris-sqlite-cross-{}.db",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let path = std::env::temp_dir()
+        .join(format!("iris-sqlite-cross-{}.db", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     {
         let db = SqliteSource::open(&path).unwrap();
         db.managed_push(USER_SCHEMA).unwrap();
@@ -362,16 +355,12 @@ fn planner_executes_insert_patch_and_delete() {
     assert_eq!(created.len(), 1);
     assert_eq!(created[0].get("user_name"), Some(&Value::Str("planner".into())));
 
-    let update_plan = planner
-        .plan_source(r#"User.filter(x => x.user_id == "u9").patch({ user_name: "patched" })"#)
-        .unwrap();
+    let update_plan = planner.plan_source(r#"User.filter(x => x.user_id == "u9").patch({ user_name: "patched" })"#).unwrap();
     let updated = db.execute_plan(&update_plan).unwrap();
     assert_eq!(updated.len(), 1);
     assert_eq!(updated[0].get("user_name"), Some(&Value::Str("patched".into())));
 
-    let delete_plan = planner
-        .plan_source(r#"User.filter(x => x.user_id == "u9").delete()"#)
-        .unwrap();
+    let delete_plan = planner.plan_source(r#"User.filter(x => x.user_id == "u9").delete()"#).unwrap();
     assert!(db.execute_plan(&delete_plan).unwrap().is_empty());
 
     let read_plan = planner.plan_source(r#"User.filter(x => x.user_id == "u9").collect()"#).unwrap();

@@ -10,11 +10,7 @@ use crate::{
 };
 
 pub(crate) fn execute_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
-    if plan
-        .nodes
-        .iter()
-        .any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. }))
-    {
+    if plan.nodes.iter().any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. })) {
         return execute_write_plan(provider, plan);
     }
     execute_read_plan(provider, plan)
@@ -106,11 +102,7 @@ fn execute_write_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Re
         let returning = returning_sql(projection.as_deref());
         let cols: Vec<String> = fields.iter().map(|f| format!("\"{}\"", f.name)).collect();
         let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
-        let sql = format!(
-            "INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}",
-            cols.join(", "),
-            placeholders.join(", ")
-        );
+        let sql = format!("INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}", cols.join(", "), placeholders.join(", "));
         let params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
         let mut rows = query_rows(provider, &sql, &params)?;
         if let Some(fields) = projection.as_ref() {
@@ -123,10 +115,7 @@ fn execute_write_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Re
         let sets: Vec<String> = fields.iter().map(|f| format!("\"{}\" = ?", f.name)).collect();
         let (where_sql, mut where_params) = filter_to_sql(filter.as_ref())?;
         let returning = returning_sql(projection.as_deref());
-        let sql = format!(
-            "UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}",
-            sets.join(", ")
-        );
+        let sql = format!("UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}", sets.join(", "));
         let mut params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
         params.extend(where_params.drain(..));
         let mut rows = query_rows(provider, &sql, &params)?;
@@ -167,9 +156,7 @@ fn project_fields_sql(fields: &[ProjectField]) -> Vec<String> {
 }
 
 fn returning_sql(projection: Option<&[ProjectField]>) -> String {
-    projection
-        .map(|fields| project_fields_sql(fields).join(", "))
-        .unwrap_or_else(|| "*".into())
+    projection.map(|fields| project_fields_sql(fields).join(", ")).unwrap_or_else(|| "*".into())
 }
 
 fn apply_projection(rows: Vec<Row>, fields: &[ProjectField]) -> Vec<Row> {
@@ -214,8 +201,7 @@ pub(crate) fn update_row(provider: &impl SqliteProvider, write: &RowWrite) -> Re
         return Ok(0);
     }
     let sql = format!("UPDATE \"{}\" SET {} WHERE \"{}\" = ?", write.table, sets.join(", "), write.primary_key);
-    let mut params: Vec<SqliteValue> =
-        write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(_, v)| to_sql_value(v)).collect();
+    let mut params: Vec<SqliteValue> = write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(_, v)| to_sql_value(v)).collect();
     params.push(to_sql_value(key));
     let result = provider.execute_one(&sql, &params)?;
     Ok(result.changes as usize)
