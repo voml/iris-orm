@@ -192,9 +192,8 @@ impl PostgresSource {
     }
 }
 
-fn parse_vos(vos_schema: &str) -> Result<vos::ast::Document> {
-    vos::parser::parse_document(vos_schema)
-        .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))
+fn parse_vos(vos_schema: &str) -> Result<vos::SchemaProjection> {
+    iris_types::parse_schema(vos_schema).map_err(|message| Error::Vos(format!("parse schema: {message}")))
 }
 
 /// Adapter errors.

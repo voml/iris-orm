@@ -7,7 +7,7 @@ use std::{
 
 use iris_types::{LogicalChange, LogicalMigrationPlan, ObservedCatalog};
 use postgres::Client;
-use vos::ast::{BuiltinType, Document, Field, Item, TypeExpr};
+use vos::{CanonicalType, FieldContract, SchemaProjection, TypeContract, TypeContractKind};
 
 use crate::{Error, Result};
 
@@ -21,16 +21,13 @@ pub struct PushReport {
 }
 
 /// Build a non-destructive create plan for tables missing physically.
-pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<LogicalMigrationPlan> {
+pub fn plan_push(document: &SchemaProjection, observed: &ObservedCatalog) -> Result<LogicalMigrationPlan> {
     let target = fingerprint_document(document);
     let mut changes = Vec::new();
-    for item in &document.items {
-        let Item::Table(table) = item
-        else {
-            continue;
-        };
-        if observed.table(&table.name).is_none() {
-            changes.push(LogicalChange::CreateTable { vos_table: table.name.clone() });
+    for table in document.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+        let name = table_name(table);
+        if observed.table(name).is_none() {
+            changes.push(LogicalChange::CreateTable { vos_table: name.to_owned() });
         }
     }
     Ok(LogicalMigrationPlan {
@@ -43,7 +40,7 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
 }
 
 /// Apply a reviewed logical plan by emitting private PostgreSQL DDL.
-pub fn apply_push(client: &mut Client, plan: &LogicalMigrationPlan, document: &Document) -> Result<PushReport> {
+pub fn apply_push(client: &mut Client, plan: &LogicalMigrationPlan, document: &SchemaProjection) -> Result<PushReport> {
     if plan.destructive {
         return Err(Error::Policy("refusing to apply destructive plan without explicit policy".into()));
     }
@@ -54,12 +51,9 @@ pub fn apply_push(client: &mut Client, plan: &LogicalMigrationPlan, document: &D
             match change {
                 LogicalChange::CreateTable { vos_table } => {
                     let table = document
-                        .items
+                        .types
                         .iter()
-                        .find_map(|i| match i {
-                            Item::Table(t) if t.name == *vos_table => Some(t),
-                            _ => None,
-                        })
+                        .find(|item| item.kind == TypeContractKind::Table && table_name(item) == vos_table)
                         .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
                     let ddl = create_table_sql(table)?;
                     client.batch_execute(&ddl)?;
@@ -84,50 +78,45 @@ pub fn apply_push(client: &mut Client, plan: &LogicalMigrationPlan, document: &D
     }
 }
 
-fn create_table_sql(table: &vos::ast::Table) -> Result<String> {
+fn create_table_sql(table: &TypeContract) -> Result<String> {
+    let name = table_name(table);
     let mut cols = Vec::new();
     let mut pks = Vec::new();
     for field in &table.fields {
         let (sql_ty, not_null) = map_field_type(field)?;
-        let mut piece = format!("\"{}\" {sql_ty}", field.name);
+        let mut piece = format!("\"{}\" {sql_ty}", field.canonical_name);
         if not_null {
             piece.push_str(" NOT NULL");
         }
-        if field.is_primary() {
-            pks.push(format!("\"{}\"", field.name));
+        if is_primary(field) {
+            pks.push(format!("\"{}\"", field.canonical_name));
         }
         cols.push(piece);
     }
     if pks.is_empty() {
-        return Err(Error::Policy(format!("table `{}` has no primary key --?cannot push", table.name)));
+        return Err(Error::Policy(format!("table `{name}` has no primary key --?cannot push")));
     }
     cols.push(format!("PRIMARY KEY ({})", pks.join(", ")));
-    Ok(format!("CREATE TABLE IF NOT EXISTS \"{}\" ({});", table.name, cols.join(", ")))
+    Ok(format!("CREATE TABLE IF NOT EXISTS \"{name}\" ({});", cols.join(", ")))
 }
 
-fn map_field_type(field: &Field) -> Result<(String, bool)> {
-    let (inner, optional) = strip_optional(&field.ty);
+fn map_field_type(field: &FieldContract) -> Result<(String, bool)> {
+    let (inner, optional) = strip_optional(&field.canonical_type);
     let sql = match inner {
-        TypeExpr::Builtin(BuiltinType::Bool) => "BOOLEAN",
-        TypeExpr::Builtin(BuiltinType::I8)
-        | TypeExpr::Builtin(BuiltinType::I16)
-        | TypeExpr::Builtin(BuiltinType::U8)
-        | TypeExpr::Builtin(BuiltinType::U16) => "SMALLINT",
-        TypeExpr::Builtin(BuiltinType::I32) | TypeExpr::Builtin(BuiltinType::U32) => "INTEGER",
-        TypeExpr::Builtin(BuiltinType::I64) | TypeExpr::Builtin(BuiltinType::U64) => "BIGINT",
-        TypeExpr::Builtin(BuiltinType::F32) => "REAL",
-        TypeExpr::Builtin(BuiltinType::F64) => "DOUBLE PRECISION",
-        TypeExpr::Builtin(BuiltinType::Utf8)
-        | TypeExpr::Builtin(BuiltinType::Utf16)
-        | TypeExpr::Builtin(BuiltinType::Decimal)
-        | TypeExpr::Builtin(BuiltinType::Date)
-        | TypeExpr::Builtin(BuiltinType::Time)
-        | TypeExpr::Builtin(BuiltinType::DateTimeUtc) => "TEXT",
-        TypeExpr::Builtin(BuiltinType::Uuid) => "UUID",
-        TypeExpr::Builtin(BuiltinType::Bytes) => "BYTEA",
-        TypeExpr::Builtin(_) => {
-            return Err(Error::Policy("unsupported builtin VOS type for PostgreSQL push".into()));
-        }
+        CanonicalType::Named(path) => match path.last().map(String::as_str).unwrap_or_default() {
+            "bool" => "BOOLEAN",
+            "i8" | "i16" | "u8" | "u16" => "SMALLINT",
+            "i32" | "u32" => "INTEGER",
+            "i64" | "u64" => "BIGINT",
+            "f32" => "REAL",
+            "f64" => "DOUBLE PRECISION",
+            "utf8" | "utf16" | "decimal" | "d128" | "date" | "time" | "datetime" | "datetimeUtc" => "TEXT",
+            "uuid" => "UUID",
+            "bytes" => "BYTEA",
+            other => {
+                return Err(Error::Policy(format!("unsupported VOS type for PostgreSQL push: {other}")));
+            }
+        },
         other => {
             return Err(Error::Policy(format!("unsupported VOS type for PostgreSQL push: {other:?}")));
         }
@@ -135,14 +124,22 @@ fn map_field_type(field: &Field) -> Result<(String, bool)> {
     Ok((sql.into(), !optional))
 }
 
-fn strip_optional(ty: &TypeExpr) -> (&TypeExpr, bool) {
+fn strip_optional(ty: &CanonicalType) -> (&CanonicalType, bool) {
     match ty {
-        TypeExpr::Optional(inner) => (inner.as_ref(), true),
+        CanonicalType::Optional(inner) => (inner.as_ref(), true),
         other => (other, false),
     }
 }
 
-fn fingerprint_document(document: &Document) -> String {
+fn is_primary(field: &FieldContract) -> bool {
+    field.attributes.iter().any(|attribute| attribute.name == "primary")
+}
+
+fn table_name(table: &TypeContract) -> &str {
+    table.canonical_path.last().map(String::as_str).unwrap_or_default()
+}
+
+fn fingerprint_document(document: &SchemaProjection) -> String {
     let mut h = DefaultHasher::new();
     format!("{document:?}").hash(&mut h);
     format!("{:x}", h.finish())

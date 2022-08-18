@@ -57,7 +57,7 @@ fn adopt_plan_blocks_missing_pk_without_live_db() {
             columns: vec![ObservedColumn { name: "name".into(), type_name: "text".into(), nullable: true, primary_key: false }],
         }],
     };
-    let doc = vos::parser::parse_document(
+    let doc = iris_types::parse_schema(
         r#"
         table Legacy {
             @@id: utf8,

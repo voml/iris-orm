@@ -48,11 +48,7 @@ fn to_owned(value: &Value) -> OwnedSql {
 }
 
 pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Row>> {
-    if plan
-        .nodes
-        .iter()
-        .any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. }))
-    {
+    if plan.nodes.iter().any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. })) {
         return execute_write_plan(client, plan);
     }
     execute_read_plan(client, plan)
@@ -162,11 +158,7 @@ fn execute_write_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Ro
         let returning = returning_sql(projection.as_deref());
         let cols: Vec<String> = fields.iter().map(|f| format!("\"{}\"", f.name)).collect();
         let placeholders: Vec<String> = (1..=cols.len()).map(|i| format!("${i}")).collect();
-        let sql = format!(
-            "INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}",
-            cols.join(", "),
-            placeholders.join(", ")
-        );
+        let sql = format!("INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}", cols.join(", "), placeholders.join(", "));
         let params: Vec<OwnedSql> = fields.iter().map(write_field_to_owned).collect();
         let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
         let mut rows = query_rows(client, &sql, &param_refs)?;
@@ -180,10 +172,7 @@ fn execute_write_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Ro
         let sets: Vec<String> = fields.iter().enumerate().map(|(i, f)| format!("\"{}\" = ${}", f.name, i + 1)).collect();
         let (where_sql, mut where_params, _) = filter_to_sql(filter.as_ref(), fields.len() + 1)?;
         let returning = returning_sql(projection.as_deref());
-        let sql = format!(
-            "UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}",
-            sets.join(", ")
-        );
+        let sql = format!("UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}", sets.join(", "));
         let mut params: Vec<OwnedSql> = fields.iter().map(write_field_to_owned).collect();
         params.extend(where_params.drain(..));
         let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
@@ -221,9 +210,7 @@ fn project_fields_sql(fields: &[ProjectField]) -> Vec<String> {
 }
 
 fn returning_sql(projection: Option<&[ProjectField]>) -> String {
-    projection
-        .map(|fields| project_fields_sql(fields).join(", "))
-        .unwrap_or_else(|| "*".into())
+    projection.map(|fields| project_fields_sql(fields).join(", ")).unwrap_or_else(|| "*".into())
 }
 
 fn apply_projection(rows: Vec<Row>, fields: &[ProjectField]) -> Vec<Row> {
