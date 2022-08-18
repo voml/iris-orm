@@ -7,7 +7,7 @@ use std::{
 
 use iris_types::{LogicalChange, LogicalMigrationPlan, ObservedCatalog};
 use mysql::{PooledConn, prelude::*};
-use vos::ast::{BuiltinType, Document, Field, Item, TypeExpr};
+use vos::{CanonicalType, FieldContract, SchemaProjection, TypeContract, TypeContractKind};
 
 use crate::{Error, Result};
 
@@ -21,22 +21,19 @@ pub struct PushReport {
 }
 
 /// Build a non-destructive plan: create missing tables + add missing fields.
-pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<LogicalMigrationPlan> {
+pub fn plan_push(document: &SchemaProjection, observed: &ObservedCatalog) -> Result<LogicalMigrationPlan> {
     let target = fingerprint_document(document);
     let mut changes = Vec::new();
-    for item in &document.items {
-        let Item::Table(table) = item
-        else {
-            continue;
-        };
-        match observed.table(&table.name) {
+    for table in document.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+        let name = table_name(table);
+        match observed.table(name) {
             None => {
-                changes.push(LogicalChange::CreateTable { vos_table: table.name.clone() });
+                changes.push(LogicalChange::CreateTable { vos_table: name.to_owned() });
             }
             Some(obs) => {
                 for field in &table.fields {
-                    if !obs.columns.iter().any(|c| c.name == field.name) {
-                        changes.push(LogicalChange::AddField { vos_table: table.name.clone(), vos_field: field.name.clone() });
+                    if !obs.columns.iter().any(|c| c.name == field.canonical_name) {
+                        changes.push(LogicalChange::AddField { vos_table: name.to_owned(), vos_field: field.canonical_name.clone() });
                     }
                 }
             }
@@ -52,7 +49,7 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
 }
 
 /// Apply a reviewed logical plan by emitting private MySQL DDL.
-pub fn apply_push(conn: &mut PooledConn, plan: &LogicalMigrationPlan, document: &Document) -> Result<PushReport> {
+pub fn apply_push(conn: &mut PooledConn, plan: &LogicalMigrationPlan, document: &SchemaProjection) -> Result<PushReport> {
     if plan.destructive {
         return Err(Error::Policy("refusing to apply destructive plan without explicit policy".into()));
     }
@@ -62,33 +59,19 @@ pub fn apply_push(conn: &mut PooledConn, plan: &LogicalMigrationPlan, document: 
         for change in &plan.changes {
             match change {
                 LogicalChange::CreateTable { vos_table } => {
-                    let table = document
-                        .items
-                        .iter()
-                        .find_map(|i| match i {
-                            Item::Table(t) if t.name == *vos_table => Some(t),
-                            _ => None,
-                        })
-                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
+                    let table = find_table(document, vos_table)?;
                     let ddl = create_table_sql(table)?;
                     conn.query_drop(ddl)?;
                     created.push(vos_table.clone());
                 }
                 LogicalChange::AddField { vos_table, vos_field } => {
-                    let table = document
-                        .items
-                        .iter()
-                        .find_map(|i| match i {
-                            Item::Table(t) if t.name == *vos_table => Some(t),
-                            _ => None,
-                        })
-                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
+                    let table = find_table(document, vos_table)?;
                     let field = table
                         .fields
                         .iter()
-                        .find(|f| f.name == *vos_field)
+                        .find(|f| f.canonical_name == *vos_field)
                         .ok_or_else(|| Error::Policy(format!("plan references unknown VOS field `{vos_table}.{vos_field}`")))?;
-                    if field.is_primary() {
+                    if is_primary(field) {
                         return Err(Error::Policy(format!("refusing AddField for primary key `{vos_table}.{vos_field}` — recreate table")));
                     }
                     let ddl = add_field_sql(vos_table, field)?;
@@ -110,30 +93,39 @@ pub fn apply_push(conn: &mut PooledConn, plan: &LogicalMigrationPlan, document: 
     }
 }
 
-fn create_table_sql(table: &vos::ast::Table) -> Result<String> {
+fn find_table<'a>(document: &'a SchemaProjection, name: &str) -> Result<&'a TypeContract> {
+    document
+        .types
+        .iter()
+        .find(|item| item.kind == TypeContractKind::Table && table_name(item) == name)
+        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{name}`")))
+}
+
+fn create_table_sql(table: &TypeContract) -> Result<String> {
+    let name = table_name(table);
     let mut cols = Vec::new();
     let mut pks = Vec::new();
     for field in &table.fields {
         let (sql_ty, not_null) = map_field_type(field)?;
-        let mut piece = format!("`{}` {sql_ty}", field.name);
+        let mut piece = format!("`{}` {sql_ty}", field.canonical_name);
         if not_null {
             piece.push_str(" NOT NULL");
         }
-        if field.is_primary() {
-            pks.push(format!("`{}`", field.name));
+        if is_primary(field) {
+            pks.push(format!("`{}`", field.canonical_name));
         }
         cols.push(piece);
     }
     if pks.is_empty() {
-        return Err(Error::Policy(format!("table `{}` has no primary key -- cannot push", table.name)));
+        return Err(Error::Policy(format!("table `{name}` has no primary key -- cannot push")));
     }
     cols.push(format!("PRIMARY KEY ({})", pks.join(", ")));
-    Ok(format!("CREATE TABLE IF NOT EXISTS `{}` ({}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;", table.name, cols.join(", ")))
+    Ok(format!("CREATE TABLE IF NOT EXISTS `{name}` ({}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;", cols.join(", ")))
 }
 
-fn add_field_sql(table: &str, field: &Field) -> Result<String> {
+fn add_field_sql(table: &str, field: &FieldContract) -> Result<String> {
     let (sql_ty, not_null) = map_field_type_for_add(field)?;
-    let mut piece = format!("`{}` {sql_ty}", field.name);
+    let mut piece = format!("`{}` {sql_ty}", field.canonical_name);
     if not_null {
         // Existing rows need a value when adding NOT NULL columns.
         // Prefer VARCHAR over TEXT so DEFAULT is portable across MySQL versions.
@@ -147,17 +139,15 @@ fn add_field_sql(table: &str, field: &Field) -> Result<String> {
 }
 
 /// Same as [`map_field_type`], except non-PK utf8 uses VARCHAR so NOT NULL DEFAULT works.
-fn map_field_type_for_add(field: &Field) -> Result<(String, bool)> {
+fn map_field_type_for_add(field: &FieldContract) -> Result<(String, bool)> {
     let (sql_ty, not_null) = map_field_type(field)?;
-    let (inner, _) = strip_optional(&field.ty);
+    let (inner, _) = strip_optional(&field.canonical_type);
     let sql_ty = match inner {
-        TypeExpr::Builtin(BuiltinType::Utf8)
-        | TypeExpr::Builtin(BuiltinType::Utf16)
-        | TypeExpr::Builtin(BuiltinType::Decimal)
-        | TypeExpr::Builtin(BuiltinType::Date)
-        | TypeExpr::Builtin(BuiltinType::Time)
-        | TypeExpr::Builtin(BuiltinType::DateTimeUtc)
-            if !field.is_primary() =>
+        CanonicalType::Named(path)
+            if matches!(
+                path.last().map(String::as_str).unwrap_or_default(),
+                "utf8" | "utf16" | "decimal" | "d128" | "date" | "time" | "datetime" | "datetimeUtc"
+            ) && !is_primary(field) =>
         {
             "VARCHAR(512)".into()
         }
@@ -166,80 +156,69 @@ fn map_field_type_for_add(field: &Field) -> Result<(String, bool)> {
     Ok((sql_ty, not_null))
 }
 
-fn default_literal(field: &Field) -> Result<String> {
-    let (inner, _) = strip_optional(&field.ty);
+fn default_literal(field: &FieldContract) -> Result<String> {
+    let (inner, _) = strip_optional(&field.canonical_type);
     match inner {
-        TypeExpr::Builtin(BuiltinType::Bool) => Ok("0".into()),
-        TypeExpr::Builtin(BuiltinType::I8)
-        | TypeExpr::Builtin(BuiltinType::U8)
-        | TypeExpr::Builtin(BuiltinType::I16)
-        | TypeExpr::Builtin(BuiltinType::U16)
-        | TypeExpr::Builtin(BuiltinType::I32)
-        | TypeExpr::Builtin(BuiltinType::U32)
-        | TypeExpr::Builtin(BuiltinType::I64)
-        | TypeExpr::Builtin(BuiltinType::U64)
-        | TypeExpr::Builtin(BuiltinType::F32)
-        | TypeExpr::Builtin(BuiltinType::F64) => Ok("0".into()),
-        TypeExpr::Builtin(BuiltinType::Utf8)
-        | TypeExpr::Builtin(BuiltinType::Utf16)
-        | TypeExpr::Builtin(BuiltinType::Decimal)
-        | TypeExpr::Builtin(BuiltinType::Date)
-        | TypeExpr::Builtin(BuiltinType::Time)
-        | TypeExpr::Builtin(BuiltinType::DateTimeUtc) => Ok("''".into()),
-        TypeExpr::Builtin(BuiltinType::Uuid) => Ok("0x00000000000000000000000000000000".into()),
-        TypeExpr::Builtin(BuiltinType::Bytes) => Ok("''".into()),
+        CanonicalType::Named(path) => match path.last().map(String::as_str).unwrap_or_default() {
+            "bool" | "i8" | "u8" | "i16" | "u16" | "i32" | "u32" | "i64" | "u64" | "f32" | "f64" => Ok("0".into()),
+            "utf8" | "utf16" | "decimal" | "d128" | "date" | "time" | "datetime" | "datetimeUtc" | "bytes" => Ok("''".into()),
+            "uuid" => Ok("0x00000000000000000000000000000000".into()),
+            other => Err(Error::Policy(format!("no AddField default for VOS type {other}"))),
+        },
         other => Err(Error::Policy(format!("no AddField default for VOS type {other:?}"))),
     }
 }
 
-fn map_field_type(field: &Field) -> Result<(String, bool)> {
-    let (inner, optional) = strip_optional(&field.ty);
-    let pk = field.is_primary();
+fn map_field_type(field: &FieldContract) -> Result<(String, bool)> {
+    let (inner, optional) = strip_optional(&field.canonical_type);
+    let pk = is_primary(field);
     let sql = match inner {
-        // MySQL BOOLEAN → TINYINT(1) — document as intentional dialect choice.
-        TypeExpr::Builtin(BuiltinType::Bool) => "TINYINT(1)".into(),
-        TypeExpr::Builtin(BuiltinType::I8)
-        | TypeExpr::Builtin(BuiltinType::U8)
-        | TypeExpr::Builtin(BuiltinType::I16)
-        | TypeExpr::Builtin(BuiltinType::U16) => "SMALLINT".into(),
-        TypeExpr::Builtin(BuiltinType::I32) | TypeExpr::Builtin(BuiltinType::U32) => "INT".into(),
-        TypeExpr::Builtin(BuiltinType::I64) | TypeExpr::Builtin(BuiltinType::U64) => "BIGINT".into(),
-        TypeExpr::Builtin(BuiltinType::F32) => "FLOAT".into(),
-        TypeExpr::Builtin(BuiltinType::F64) => "DOUBLE".into(),
-        TypeExpr::Builtin(BuiltinType::Utf8)
-        | TypeExpr::Builtin(BuiltinType::Utf16)
-        | TypeExpr::Builtin(BuiltinType::Decimal)
-        | TypeExpr::Builtin(BuiltinType::Date)
-        | TypeExpr::Builtin(BuiltinType::Time)
-        | TypeExpr::Builtin(BuiltinType::DateTimeUtc) => {
-            if pk {
-                // utf8mb4 indexable PK (InnoDB max index prefix for VARCHAR).
-                "VARCHAR(191)".into()
+        CanonicalType::Named(path) => match path.last().map(String::as_str).unwrap_or_default() {
+            // MySQL BOOLEAN → TINYINT(1) — document as intentional dialect choice.
+            "bool" => "TINYINT(1)",
+            "i8" | "u8" | "i16" | "u16" => "SMALLINT",
+            "i32" | "u32" => "INT",
+            "i64" | "u64" => "BIGINT",
+            "f32" => "FLOAT",
+            "f64" => "DOUBLE",
+            "utf8" | "utf16" | "decimal" | "d128" | "date" | "time" | "datetime" | "datetimeUtc" => {
+                if pk {
+                    // utf8mb4 indexable PK (InnoDB max index prefix for VARCHAR).
+                    "VARCHAR(191)"
+                }
+                else {
+                    "TEXT"
+                }
             }
-            else {
-                "TEXT".into()
+            "uuid" => "BINARY(16)",
+            "bytes" => "BLOB",
+            other => {
+                return Err(Error::Policy(format!("unsupported VOS type for MySQL push: {other}")));
             }
-        }
-        TypeExpr::Builtin(BuiltinType::Uuid) => "BINARY(16)".into(),
-        TypeExpr::Builtin(BuiltinType::Bytes) => "BLOB".into(),
-        TypeExpr::Builtin(_) => {
-            return Err(Error::Policy("unsupported builtin VOS type for MySQL push".into()));
-        }
+        },
         other => {
             return Err(Error::Policy(format!("unsupported VOS type for MySQL push: {other:?}")));
         }
     };
-    Ok((sql, !optional))
+    Ok((sql.into(), !optional))
 }
 
-fn strip_optional(ty: &TypeExpr) -> (&TypeExpr, bool) {
+fn strip_optional(ty: &CanonicalType) -> (&CanonicalType, bool) {
     match ty {
-        TypeExpr::Optional(inner) => (inner.as_ref(), true),
+        CanonicalType::Optional(inner) => (inner.as_ref(), true),
         other => (other, false),
     }
 }
 
-fn fingerprint_document(document: &Document) -> String {
+fn is_primary(field: &FieldContract) -> bool {
+    field.attributes.iter().any(|attribute| attribute.name == "primary")
+}
+
+fn table_name(table: &TypeContract) -> &str {
+    table.canonical_path.last().map(String::as_str).unwrap_or_default()
+}
+
+fn fingerprint_document(document: &SchemaProjection) -> String {
     let mut h = DefaultHasher::new();
     format!("{document:?}").hash(&mut h);
     format!("{:x}", h.finish())

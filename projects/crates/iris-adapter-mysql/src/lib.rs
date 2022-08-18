@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use iris_ir::{IrVersion, PhysicalPlan};
 use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
 use mysql::{Pool, prelude::*};
-use vos::ast::Document;
+use vos::SchemaProjection;
 
 pub use catalog::{adopt_plan, classify_type};
 pub use migrate::{PushReport, apply_push, plan_push};
@@ -81,8 +81,8 @@ impl MysqlSource {
         self
     }
 
-    /// Register uuid columns from a parsed VOS document.
-    pub fn with_schema_document(mut self, document: &Document) -> Self {
+    /// Register uuid columns from a parsed VOS schema projection.
+    pub fn with_schema_document(mut self, document: &SchemaProjection) -> Self {
         self.uuid_fields = collect_uuid_fields(document);
         self
     }
@@ -216,9 +216,8 @@ impl MysqlSource {
     }
 }
 
-fn parse_vos(vos_schema: &str) -> Result<vos::ast::Document> {
-    vos::parser::parse_document(vos_schema)
-        .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))
+fn parse_vos(vos_schema: &str) -> Result<SchemaProjection> {
+    iris_types::parse_schema(vos_schema).map_err(|message| Error::Vos(format!("parse schema: {message}")))
 }
 
 /// Adapter errors.

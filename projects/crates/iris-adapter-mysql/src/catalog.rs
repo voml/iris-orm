@@ -2,7 +2,7 @@
 
 use iris_types::{DriftReport, FieldMapping, MappingManifest, MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, TableMapping};
 use mysql::{PooledConn, prelude::*};
-use vos::ast::{Document, Item, TypeExpr};
+use vos::{CanonicalType, CanonicalTypeArgument, SchemaProjection, TypeContract, TypeContractKind};
 
 use crate::{ADAPTER_VERSION, BACKEND_ID, Result};
 
@@ -41,20 +41,17 @@ fn inspect_table(conn: &mut PooledConn, table: &str) -> Result<Vec<ObservedColum
 }
 
 /// Build a reviewable adopt mapping; never invents VOS business names from SQL.
-pub fn adopt_plan(document: &Document, catalog: &ObservedCatalog) -> MappingManifest {
+pub fn adopt_plan(document: &SchemaProjection, catalog: &ObservedCatalog) -> MappingManifest {
     let mut tables = Vec::new();
-    for item in &document.items {
-        let Item::Table(table) = item
-        else {
-            continue;
-        };
-        let Some(observed) = catalog.table(&table.name)
+    for table in document.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+        let name = table_name(table);
+        let Some(observed) = catalog.table(name)
         else {
             tables.push(TableMapping {
-                vos_table: table.name.clone(),
-                physical_table: table.name.clone(),
+                vos_table: name.to_owned(),
+                physical_table: name.to_owned(),
                 fields: Vec::new(),
-                blockers: vec![format!("physical table `{}` not found in observed catalog", table.name)],
+                blockers: vec![format!("physical table `{name}` not found in observed catalog")],
             });
             continue;
         };
@@ -67,18 +64,18 @@ pub fn adopt_plan(document: &Document, catalog: &ObservedCatalog) -> MappingMani
 
         let mut fields = Vec::new();
         for field in &table.fields {
-            let vos_type = type_label(&field.ty);
-            match observed.columns.iter().find(|c| c.name == field.name) {
+            let vos_type = type_label(&field.canonical_type);
+            match observed.columns.iter().find(|c| c.name == field.canonical_name) {
                 Some(col) => {
                     let (quality, note) = classify_type(&vos_type, &col.type_name);
                     if quality == MappingQuality::LossyBlocked {
                         blockers.push(format!(
                             "field `{}`.`{}`: cannot map VOS `{vos_type}` to physical `{}` without waiver",
-                            table.name, field.name, col.type_name
+                            name, field.canonical_name, col.type_name
                         ));
                     }
                     fields.push(FieldMapping {
-                        vos_field: field.name.clone(),
+                        vos_field: field.canonical_name.clone(),
                         physical_column: col.name.clone(),
                         vos_type,
                         physical_type: col.type_name.clone(),
@@ -87,48 +84,39 @@ pub fn adopt_plan(document: &Document, catalog: &ObservedCatalog) -> MappingMani
                     });
                 }
                 None => {
-                    blockers.push(format!("VOS field `{}`.`{}` has no physical column --?will not auto-invent", table.name, field.name));
+                    blockers.push(format!("VOS field `{}`.`{}` has no physical column --?will not auto-invent", name, field.canonical_name));
                 }
             }
         }
 
-        tables.push(TableMapping { vos_table: table.name.clone(), physical_table: observed.name.clone(), fields, blockers });
+        tables.push(TableMapping { vos_table: name.to_owned(), physical_table: observed.name.clone(), fields, blockers });
     }
 
     MappingManifest { adapter_id: BACKEND_ID.into(), adapter_version: ADAPTER_VERSION.into(), tables }
 }
 
-pub(crate) fn drift_report(document: &Document, catalog: &ObservedCatalog) -> DriftReport {
-    let vos_tables: Vec<String> = document
-        .items
-        .iter()
-        .filter_map(|i| match i {
-            Item::Table(t) => Some(t.name.clone()),
-            _ => None,
-        })
-        .collect();
+pub(crate) fn drift_report(document: &SchemaProjection, catalog: &ObservedCatalog) -> DriftReport {
+    let vos_tables: Vec<String> =
+        document.types.iter().filter(|item| item.kind == TypeContractKind::Table).map(|item| table_name(item).to_owned()).collect();
     let physical: Vec<String> = catalog.tables.iter().map(|t| t.name.clone()).collect();
 
     let missing_physical_tables = vos_tables.iter().filter(|t| !physical.iter().any(|p| p == *t)).cloned().collect();
     let extra_physical_tables = physical.iter().filter(|p| !vos_tables.iter().any(|t| t == *p)).cloned().collect();
 
     let mut field_mismatches = Vec::new();
-    for item in &document.items {
-        let Item::Table(table) = item
-        else {
-            continue;
-        };
-        let Some(obs) = catalog.table(&table.name)
+    for table in document.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+        let name = table_name(table);
+        let Some(obs) = catalog.table(name)
         else {
             continue;
         };
         for field in &table.fields {
-            match obs.columns.iter().find(|c| c.name == field.name) {
-                None => field_mismatches.push(format!("{}.{} missing physically", table.name, field.name)),
+            match obs.columns.iter().find(|c| c.name == field.canonical_name) {
+                None => field_mismatches.push(format!("{name}.{} missing physically", field.canonical_name)),
                 Some(col) => {
-                    let vos_type = type_label(&field.ty);
+                    let vos_type = type_label(&field.canonical_type);
                     if classify_type(&vos_type, &col.type_name).0 == MappingQuality::LossyBlocked {
-                        field_mismatches.push(format!("{}.{} type drift VOS `{vos_type}` vs `{}`", table.name, field.name, col.type_name));
+                        field_mismatches.push(format!("{name}.{} type drift VOS `{vos_type}` vs `{}`", field.canonical_name, col.type_name));
                     }
                 }
             }
@@ -138,16 +126,27 @@ pub(crate) fn drift_report(document: &Document, catalog: &ObservedCatalog) -> Dr
     DriftReport { missing_physical_tables, extra_physical_tables, field_mismatches }
 }
 
-fn type_label(ty: &TypeExpr) -> String {
+fn table_name(table: &TypeContract) -> &str {
+    table.canonical_path.last().map(String::as_str).unwrap_or_default()
+}
+
+fn type_label(ty: &CanonicalType) -> String {
     match ty {
-        TypeExpr::Builtin(b) => format!("{b:?}").to_ascii_lowercase(),
-        TypeExpr::Named(n) => n.clone(),
-        TypeExpr::Optional(inner) => format!("{}?", type_label(inner)),
-        TypeExpr::List(inner) => format!("[{}]", type_label(inner)),
-        TypeExpr::Reference(inner) => format!("&{}", type_label(inner)),
-        TypeExpr::Vector { dim } => format!("vector<{dim}>"),
-        TypeExpr::File => "file".into(),
-        _ => "unknown".into(),
+        CanonicalType::Named(path) => path.last().cloned().unwrap_or_default(),
+        CanonicalType::Optional(inner) => format!("{}?", type_label(inner)),
+        CanonicalType::List(inner) => format!("[{}]", type_label(inner)),
+        CanonicalType::Reference(inner) => format!("&{}", type_label(inner)),
+        CanonicalType::Generic { path, arguments } => {
+            let arguments = arguments
+                .iter()
+                .map(|argument| match argument {
+                    CanonicalTypeArgument::Type(value) => type_label(value),
+                    CanonicalTypeArgument::Literal(value) => value.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("{}<{arguments}>", path.last().cloned().unwrap_or_default())
+        }
     }
 }
 

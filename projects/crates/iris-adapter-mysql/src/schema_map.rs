@@ -2,29 +2,29 @@
 
 use std::collections::HashSet;
 
-use vos::ast::{BuiltinType, Document, Item, TypeExpr};
+use vos::{CanonicalType, SchemaProjection, TypeContractKind};
 
-/// `(table, field)` pairs declared as VOS `uuid` in the schema document.
-pub fn collect_uuid_fields(document: &Document) -> HashSet<(String, String)> {
+/// `(table, field)` pairs declared as VOS `uuid` in the schema projection.
+pub fn collect_uuid_fields(document: &SchemaProjection) -> HashSet<(String, String)> {
     let mut out = HashSet::new();
-    for item in &document.items {
-        let Item::Table(table) = item
+    for table in document.types.iter().filter(|item| item.kind == TypeContractKind::Table) {
+        let Some(name) = table.canonical_path.last()
         else {
             continue;
         };
         for field in &table.fields {
-            if field_is_uuid(&field.ty) {
-                out.insert((table.name.clone(), field.name.clone()));
+            if field_is_uuid(&field.canonical_type) {
+                out.insert((name.clone(), field.canonical_name.clone()));
             }
         }
     }
     out
 }
 
-fn field_is_uuid(ty: &TypeExpr) -> bool {
+fn field_is_uuid(ty: &CanonicalType) -> bool {
     match ty {
-        TypeExpr::Optional(inner) => field_is_uuid(inner),
-        TypeExpr::Builtin(BuiltinType::Uuid) => true,
+        CanonicalType::Optional(inner) => field_is_uuid(inner),
+        CanonicalType::Named(path) => path.last().is_some_and(|name| name == "uuid"),
         _ => false,
     }
 }

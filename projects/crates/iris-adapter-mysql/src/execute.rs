@@ -12,11 +12,7 @@ use crate::{
 };
 
 pub(crate) fn execute_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &HashSet<(String, String)>) -> Result<Vec<Row>> {
-    if plan
-        .nodes
-        .iter()
-        .any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. }))
-    {
+    if plan.nodes.iter().any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. })) {
         return execute_write_plan(conn, plan, uuid_fields);
     }
     execute_read_plan(conn, plan, uuid_fields)
@@ -128,15 +124,8 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let returning = returning_sql(projection.as_deref());
         let cols: Vec<String> = fields.iter().map(|f| format!("`{}`", f.name)).collect();
         let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
-        let sql = format!(
-            "INSERT INTO `{table}` ({}) VALUES ({})",
-            cols.join(", "),
-            placeholders.join(", ")
-        );
-        let params: Vec<MysqlValue> = fields
-            .iter()
-            .map(|field| write_field_to_mysql(field, &table, uuid_fields))
-            .collect();
+        let sql = format!("INSERT INTO `{table}` ({}) VALUES ({})", cols.join(", "), placeholders.join(", "));
+        let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect();
         conn.exec_drop(sql, Params::Positional(params.clone()))?;
         let (where_sql, _) = inserted_fields_to_sql(&fields, &table, uuid_fields)?;
         let select = format!("SELECT {returning} FROM `{table}` WHERE {where_sql} LIMIT 1");
@@ -147,10 +136,7 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let sets: Vec<String> = fields.iter().map(|f| format!("`{}` = ?", f.name)).collect();
         let (where_sql, mut where_params) = filter_to_sql(filter.as_ref(), &table, uuid_fields)?;
         let sql = format!("UPDATE `{table}` SET {} WHERE {where_sql}", sets.join(", "));
-        let mut params: Vec<MysqlValue> = fields
-            .iter()
-            .map(|field| write_field_to_mysql(field, &table, uuid_fields))
-            .collect();
+        let mut params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect();
         params.extend(where_params.drain(..));
         conn.exec_drop(sql, Params::Positional(params))?;
         let returning = returning_sql(projection.as_deref());
@@ -201,9 +187,7 @@ fn project_fields_sql(fields: &[ProjectField]) -> Vec<String> {
 }
 
 fn returning_sql(projection: Option<&[ProjectField]>) -> String {
-    projection
-        .map(|fields| project_fields_sql(fields).join(", "))
-        .unwrap_or_else(|| "*".into())
+    projection.map(|fields| project_fields_sql(fields).join(", ")).unwrap_or_else(|| "*".into())
 }
 
 fn apply_projection(rows: Vec<Row>, fields: &[ProjectField]) -> Vec<Row> {
@@ -221,11 +205,7 @@ fn apply_projection(rows: Vec<Row>, fields: &[ProjectField]) -> Vec<Row> {
         .collect()
 }
 
-fn filter_to_sql(
-    filter: Option<&Pred>,
-    table: &str,
-    uuid_fields: &HashSet<(String, String)>,
-) -> Result<(String, Vec<MysqlValue>)> {
+fn filter_to_sql(filter: Option<&Pred>, table: &str, uuid_fields: &HashSet<(String, String)>) -> Result<(String, Vec<MysqlValue>)> {
     match filter {
         Some(pred) => pred_to_sql(pred, table, uuid_fields),
         None => Ok(("1 = 1".into(), Vec::new())),
@@ -242,16 +222,9 @@ fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(
     to_mysql(&value, table, &field.name, uuid_fields)
 }
 
-fn inserted_fields_to_sql(
-    fields: &[WriteField],
-    table: &str,
-    uuid_fields: &HashSet<(String, String)>,
-) -> Result<(String, Vec<MysqlValue>)> {
+fn inserted_fields_to_sql(fields: &[WriteField], table: &str, uuid_fields: &HashSet<(String, String)>) -> Result<(String, Vec<MysqlValue>)> {
     let parts: Vec<String> = fields.iter().map(|field| format!("`{}` = ?", field.name)).collect();
-    let params: Vec<MysqlValue> = fields
-        .iter()
-        .map(|field| write_field_to_mysql(field, table, uuid_fields))
-        .collect();
+    let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, table, uuid_fields)).collect();
     Ok((parts.join(" AND "), params))
 }
 
