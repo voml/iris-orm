@@ -72,22 +72,22 @@ impl RedisSource {
     /// Candidates use `iris:<table>:` prefixes and exact primary-key fields. Users must
     /// review/edit before runtime connect --?Redis will not invent mappings from the store.
     pub fn draft_keyspace_mapping(vos_schema: &str) -> Result<MappingManifest> {
-        let document = vos::parser::parse_document(vos_schema)
-            .map_err(|d| Error::Policy(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
+        let document = iris_types::parse_schema(vos_schema).map_err(Error::Policy)?;
         let mut tables = Vec::new();
-        for item in &document.items {
-            let vos::ast::Item::Table(table) = item
+        for table in document.types.iter().filter(|item| item.kind == vos::TypeContractKind::Table) {
+            let Some(name) = table.canonical_path.last()
             else {
                 continue;
             };
-            let pk =
-                table.fields.iter().find(|f| f.is_primary()).ok_or_else(|| {
-                    Error::Policy(format!("table `{}` has no primary key --?Redis keyspace mapping requires one", table.name))
-                })?;
+            let pk = table
+                .fields
+                .iter()
+                .find(|f| f.attributes.iter().any(|a| a.name == "primary"))
+                .ok_or_else(|| Error::Policy(format!("table `{name}` has no primary key --?Redis keyspace mapping requires one")))?;
             tables.push(KeyspaceMapping {
-                vos_table: table.name.clone(),
-                key_prefix: format!("iris:{}:", table.name.to_ascii_lowercase()),
-                primary_key_field: pk.name.clone(),
+                vos_table: name.clone(),
+                key_prefix: format!("iris:{}:", name.to_ascii_lowercase()),
+                primary_key_field: pk.canonical_name.clone(),
                 encoding: KeyEncoding::JsonDocument,
                 ttl_secs: None,
             });
@@ -258,9 +258,7 @@ impl RedisSource {
                     return Err(Error::Unsupported("Redis adapter rejects full-table Scan; use get_primary with an explicit key".into()));
                 }
                 PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. } => {
-                    return Err(Error::Unsupported(
-                        "Redis adapter rejects relational write physical plans; use explicit put/delete".into(),
-                    ));
+                    return Err(Error::Unsupported("Redis adapter rejects relational write physical plans; use explicit put/delete".into()));
                 }
                 PhysicalOp::Collect => {}
             }
