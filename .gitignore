@@ -13,6 +13,7 @@ Thumbs.db
 # Rust
 target/
 .cargo/config.toml
+Cargo.lock
 
 # Node
 node_modules/
@@ -20,6 +21,7 @@ node_modules/
 dist/
 *.node
 *.wasm
+pnpm-lock.yaml
 
 # Secrets / local env
 .env

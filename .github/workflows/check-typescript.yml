@@ -39,11 +39,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
-          cache-dependency-path: projects/packages/homepage/pnpm-lock.yaml
 
       - name: Install
-        run: pnpm install --frozen-lockfile --ignore-workspace
+        run: pnpm install --ignore-workspace
 
       - name: vmz check
         run: pnpm check
