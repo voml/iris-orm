@@ -6,6 +6,6 @@ table User {
 }
 `;
 
-export const USER_SCHEMA_FINGERPRINT = "a7ddf821fff48050";
+export const USER_SCHEMA_FINGERPRINT = "60adfe744c724499";
 
 export const INVALID_SCHEMA = "not a schema";
