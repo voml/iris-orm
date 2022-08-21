@@ -49,25 +49,19 @@ impl ReadinessReport {
     /// Probe current readiness against the pinned `yydb` git dependency.
     pub fn probe() -> Self {
         let schema_handshake_ready = Connection::open_in_memory().is_ok();
-        let vos_executor_ready = Connection::open_in_memory()
-            .and_then(|conn| {
-                conn.ensure_schema("table T { @@id: uuid }")?;
-                conn.query("T.filter(x => true).collect()")?;
-                Ok(())
-            })
-            .is_ok();
-        let (code, message) = if vos_executor_ready {
-            ("IRIS-YYDB-VOS-EXECUTOR-READY".to_string(), "YYDB Phase 1 VOS read query is available on Connection::query".to_string())
+        // YYDB withdrew the `Connection` query / execute facade when it aligned
+        // with the new `vos` generation. Iris stays gated until a versioned VOS
+        // executor is published on the public facade again.
+        let vos_executor_ready = false;
+        Self {
+            backend_id: BACKEND_ID.into(),
+            schema_handshake_ready,
+            vos_executor_ready,
+            code: READINESS_CODE.into(),
+            message: "YYDB formal VOS executor (query / sessions / prepared plans) is not exported on the public \
+                      Connection facade; Iris refuses DML/query until then"
+                .into(),
         }
-        else {
-            (
-                READINESS_CODE.into(),
-                "YYDB formal VOS executor (query / sessions / prepared plans) is not yet \
-                 exported on the public Connection facade; Iris refuses DML/query until then"
-                    .into(),
-            )
-        };
-        Self { backend_id: BACKEND_ID.into(), schema_handshake_ready, vos_executor_ready, code, message }
     }
 
     /// True only when every readiness bit is set.
@@ -167,18 +161,20 @@ impl YydbSource {
 
     /// Execute a VOS DML program on the native YYDB executor.
     ///
-    /// Counterpart of `Session::query` / generated `db.$query`.
-    pub fn query(&self, program: &str) -> Result<Vec<iris_types::Row>> {
-        self.require_vos_executor()?;
-        self.conn.query(program).map_err(Error::from).map(|rows| rows.into_iter().map(row_to_iris).collect())
+    /// Counterpart of `Session::query` / generated `db.$query`. The public
+    /// facade currently has no VOS executor, so this always returns
+    /// [`Error::NotReady`].
+    pub fn query(&self, _program: &str) -> Result<Vec<iris_types::Row>> {
+        Err(Error::NotReady(Self::readiness()))
     }
 
     /// Execute unit-valued / DDL-shaped VOS on the native YYDB executor.
     ///
-    /// Counterpart of `Session::execute` / generated `db.$execute`.
-    pub fn execute(&self, program: &str) -> Result<()> {
-        self.require_vos_executor()?;
-        self.conn.execute(program).map_err(Error::from)
+    /// Counterpart of `Session::execute` / generated `db.$execute`. The public
+    /// facade currently has no VOS executor, so this always returns
+    /// [`Error::NotReady`].
+    pub fn execute(&self, _program: &str) -> Result<()> {
+        Err(Error::NotReady(Self::readiness()))
     }
 
     /// Execute a VOS operation program on the native YYDB executor.
@@ -246,22 +242,6 @@ impl YydbSource {
 pub struct PreparedVos {
     program: String,
     ddl_revision: u64,
-}
-
-fn row_to_iris(row: yydb::query::QueryRow) -> iris_types::Row {
-    row.into_iter().map(|(key, value)| (key, value_to_iris(&value))).collect()
-}
-
-fn value_to_iris(value: &yydb::Value) -> iris_types::Value {
-    match value {
-        yydb::Value::Null => iris_types::Value::Null,
-        yydb::Value::Bool(b) => iris_types::Value::Bool(*b),
-        yydb::Value::I64(i) => iris_types::Value::Int(*i),
-        yydb::Value::Text(s) => iris_types::Value::Str(s.clone()),
-        yydb::Value::Uuid(id) => iris_types::Value::Str(id.to_string()),
-        yydb::Value::Row(fields) => iris_types::Value::Object(fields.iter().map(|(key, value)| (key.clone(), value_to_iris(value))).collect()),
-        _ => iris_types::Value::Null,
-    }
 }
 
 impl PreparedVos {
