@@ -52,10 +52,25 @@ fn does_not_vendor_vos_language_sources() {
 #[test]
 fn public_iris_crate_has_no_sql_dependencies() {
     let manifest = fs::read_to_string(crates_root().join("iris/Cargo.toml")).expect("iris Cargo.toml");
-    for banned in
-        ["sqlx", "diesel", "sea-orm", "postgres", "mysql", "rusqlite", "sqlite", "tiberius", "tokio-postgres", "mysql_async", "sqlparser"]
-    {
-        assert!(!manifest.contains(banned), "public iris facade must not depend on `{banned}`");
+    let deps = manifest.split_once("[dependencies]").map(|(_, rest)| rest.split("\n[").next().unwrap_or(rest)).unwrap_or(manifest.as_str());
+    for line in deps.lines() {
+        let Some((key, value)) = line.split_once('=')
+        else {
+            continue;
+        };
+        let key = key.trim();
+        if key.is_empty() {
+            continue;
+        }
+        if key.starts_with("iris-adapter-") {
+            assert!(value.contains("optional = true"), "SQL adapter `{key}` must stay behind an optional feature");
+            continue;
+        }
+        for banned in
+            ["sqlx", "diesel", "sea-orm", "postgres", "mysql", "rusqlite", "sqlite", "tiberius", "tokio-postgres", "mysql_async", "sqlparser"]
+        {
+            assert!(!key.contains(banned), "public iris facade must not depend on `{banned}`");
+        }
     }
 }
 

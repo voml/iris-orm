@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+#[cfg(feature = "migrate")]
 pub mod migrate;
 pub mod project;
 
@@ -52,6 +53,7 @@ pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+#[cfg(feature = "migrate")]
 pub use migrate::{ApplyReport, migrate_apply, migrate_plan, migrate_run, migrate_verify};
 pub use project::{
     RUNTIME_PROJECT_FILE, discover_project_config, expand_endpoint, load_project, load_project_optional, load_project_required,
