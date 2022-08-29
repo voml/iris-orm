@@ -1,27 +1,36 @@
-//! Native YYDB connector (Phase 2 readiness gate).
+//! Native YYDB connector.
 //!
-//! Iris will speak **formal VOS / shared VOS IR** to YYDB only. Until YYDB's
-//! public `Connection` exposes a versioned VOS executor (`query`, sessions,
-//! prepared plans), this crate wires schema handshake only and refuses DML/query.
+//! Iris speaks formal VOS / shared VOS IR to YYDB via the public `yydb::Connection`
+//! facade. YYDB exposes the full VOS executor (prepare, query_prepared, query_vos,
+//! execute_vos_write, transactions, schema handshake, doctor) on its Connection —
+//! this connector wraps each capability with Iris-level policy and row mapping.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 mod error;
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use iris_ir::IrVersion;
 use iris_types::{CapabilitySet, QueryCaps, WriteCaps};
 use serde::{Deserialize, Serialize};
 use yydb::{Connection, SchemaVersion};
+use yydb::query::PreparedStatement;
 
 pub use error::{Error, Result};
+
+use yydb::Value as YydbValue;
+
+// ---------------------------------------------------------------------------
+// Readiness probe
+// ---------------------------------------------------------------------------
 
 /// Connector identifier.
 pub const BACKEND_ID: &str = "yydb";
 
-/// Stable readiness code when the native query executor is unavailable.
+/// Stable diagnostic code when the native executor is unavailable.
 pub const READINESS_CODE: &str = "IRIS-YYDB-VOS-EXECUTOR-NOT-READY";
 
 /// Stable code when a prepared plan was built against an older DDL revision.
@@ -37,7 +46,9 @@ pub struct ReadinessReport {
     pub backend_id: String,
     /// True when schema install / read works on the public facade.
     pub schema_handshake_ready: bool,
-    /// False until YYDB publishes VOS `query` + session APIs on `Connection`.
+    /// True when `Connection` exposes the VOS executor family (`prepare_vos`,
+    /// `query_prepared`, `query_vos`, `execute_vos_write`) — live since the
+    /// aligned `yydb` workspace.
     pub vos_executor_ready: bool,
     /// Stable diagnostic code.
     pub code: String,
@@ -46,21 +57,24 @@ pub struct ReadinessReport {
 }
 
 impl ReadinessReport {
-    /// Probe current readiness against the pinned `yydb` git dependency.
+    /// Probe current readiness against the pinned `yydb` dependency.
     pub fn probe() -> Self {
         let schema_handshake_ready = Connection::open_in_memory().is_ok();
-        // YYDB withdrew the `Connection` query / execute facade when it aligned
-        // with the new `vos` generation. Iris stays gated until a versioned VOS
-        // executor is published on the public facade again.
-        let vos_executor_ready = false;
+        // YYDB Connection now exposes the VOS executor family:
+        //   prepare_vos → query_prepared / query_vos_with_params / query_vos
+        //   execute_vos_write
+        // plus transaction begin/commit/rollback and schema handshake.
+        let vos_executor_ready = schema_handshake_ready;
         Self {
             backend_id: BACKEND_ID.into(),
             schema_handshake_ready,
             vos_executor_ready,
-            code: READINESS_CODE.into(),
-            message: "YYDB formal VOS executor (query / sessions / prepared plans) is not exported on the public \
-                      Connection facade; Iris refuses DML/query until then"
-                .into(),
+            code: if vos_executor_ready { "IRIS-YYDB-VOS-EXECUTOR-READY" } else { READINESS_CODE }.into(),
+            message: if vos_executor_ready {
+                "YYDB native VOS executor is live on the public Connection facade".into()
+            } else {
+                "YYDB native VOS executor not yet available on the Connection facade".into()
+            },
         }
     }
 
@@ -69,6 +83,10 @@ impl ReadinessReport {
         self.schema_handshake_ready && self.vos_executor_ready
     }
 }
+
+// ---------------------------------------------------------------------------
+// Schema handshake types
+// ---------------------------------------------------------------------------
 
 /// Schema handshake snapshot after open / ensure.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,6 +100,10 @@ pub struct SchemaHandshake {
     /// Whether a VOS document is installed.
     pub has_document: bool,
 }
+
+// ---------------------------------------------------------------------------
+// YydbSource — native datasource handle
+// ---------------------------------------------------------------------------
 
 /// Native YYDB datasource handle.
 pub struct YydbSource {
@@ -159,35 +181,29 @@ impl YydbSource {
         })
     }
 
-    /// Execute a VOS DML program on the native YYDB executor.
+    /// Execute a VOS read pipeline and return typed Iris rows.
+    pub fn query(&self, program: &str) -> Result<Vec<iris_types::Row>> {
+        self.require_vos_executor()?;
+        let rows = self.conn.query_vos(program)?;
+        Ok(rows.into_iter().map(row_from_yydb).collect())
+    }
+
+    /// Execute a VOS write program (schema macros / DML).
+    pub fn execute(&self, program: &str) -> Result<()> {
+        self.require_vos_executor()?;
+        self.conn.execute_vos_write(program)?;
+        Ok(())
+    }
+
+    /// Prepare a VOS program into a cached plan.
     ///
-    /// Counterpart of `Session::query` / generated `db.$query`. The public
-    /// facade currently has no VOS executor, so this always returns
-    /// [`Error::NotReady`].
-    pub fn query(&self, _program: &str) -> Result<Vec<iris_types::Row>> {
-        Err(Error::NotReady(Self::readiness()))
-    }
-
-    /// Execute unit-valued / DDL-shaped VOS on the native YYDB executor.
-    ///
-    /// Counterpart of `Session::execute` / generated `db.$execute`. The public
-    /// facade currently has no VOS executor, so this always returns
-    /// [`Error::NotReady`].
-    pub fn execute(&self, _program: &str) -> Result<()> {
-        Err(Error::NotReady(Self::readiness()))
-    }
-
-    /// Execute a VOS operation program on the native YYDB executor.
-    #[deprecated(note = "renamed to YydbSource::query (aligns with Session::query / db.$query)")]
-    pub fn execute_vos(&self, program: &str) -> Result<Vec<iris_types::Row>> {
-        self.query(program)
-    }
-
-    /// Prepare a VOS program against the current DDL revision.
+    /// The plan is bound to the current DDL revision — re-prepare when the
+    /// schema changes.
     pub fn prepare(&self, program: &str) -> Result<PreparedVos> {
         self.require_vos_executor()?;
         let handshake = self.schema_handshake()?;
-        Ok(PreparedVos { program: program.to_owned(), ddl_revision: handshake.ddl_revision })
+        let stmt = self.conn.prepare_vos(program)?;
+        Ok(PreparedVos { program: program.to_owned(), ddl_revision: handshake.ddl_revision, stmt })
     }
 
     /// Begin a data transaction.
@@ -237,11 +253,17 @@ impl YydbSource {
     }
 }
 
+// ---------------------------------------------------------------------------
+// PreparedVos — cached VOS query plan
+// ---------------------------------------------------------------------------
+
 /// Prepared VOS plan pinned to a DDL revision.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PreparedVos {
+    #[allow(dead_code)]
     program: String,
     ddl_revision: u64,
+    stmt: PreparedStatement,
 }
 
 impl PreparedVos {
@@ -250,8 +272,22 @@ impl PreparedVos {
         self.ddl_revision
     }
 
-    /// Execute if the database DDL revision still matches.
+    /// The underlying YYDB prepared statement — escape hatch for advanced use.
+    pub fn statement(&self) -> &PreparedStatement {
+        &self.stmt
+    }
+
+    /// Execute with no named parameters (read-only projection).
     pub fn execute(&self, source: &YydbSource) -> Result<Vec<iris_types::Row>> {
+        self.execute_with_params(source, BTreeMap::new())
+    }
+
+    /// Execute with named parameter bindings.
+    pub fn execute_with_params(
+        &self,
+        source: &YydbSource,
+        named: BTreeMap<String, yydb::Value>,
+    ) -> Result<Vec<iris_types::Row>> {
         source.require_vos_executor()?;
         let handshake = source.schema_handshake()?;
         if handshake.ddl_revision != self.ddl_revision {
@@ -260,6 +296,86 @@ impl PreparedVos {
                 self.ddl_revision, handshake.ddl_revision
             )));
         }
-        source.query(&self.program)
+        let rows = source.connection().query_prepared(&self.stmt, &named)?;
+        Ok(rows.into_iter().map(row_from_yydb).collect())
     }
+}
+
+// ---------------------------------------------------------------------------
+// Row / value conversion — yydb types → iris_types
+// ---------------------------------------------------------------------------
+
+/// Convert a YYDB runtime Value to Iris Value.
+///
+/// The mapping is lossy for variants Iris doesn't model (UUID, Bytes, Vector,
+/// Object, File) — they collapse to Iris `Null`. Callers that need full
+/// fidelity should work directly with the YYDB `yydb::Value` via the
+/// `connection()` escape hatch.
+pub fn value_from_yydb(v: YydbValue) -> iris_types::Value {
+    match v {
+        YydbValue::Null => iris_types::Value::Null,
+        YydbValue::Bool(b) => iris_types::Value::Bool(b),
+        YydbValue::Text(s) => iris_types::Value::Str(s),
+        YydbValue::I64(i) => iris_types::Value::Int(i),
+        YydbValue::U64(u) => iris_types::Value::Int(u as i64),
+        YydbValue::F64(f) => iris_types::Value::Str(f.to_string()),
+        YydbValue::Bytes(_) => iris_types::Value::Null,
+        YydbValue::Uuid(u) => iris_types::Value::Str(u.to_string()),
+        YydbValue::Vector(_) => iris_types::Value::Null,
+        YydbValue::Object(_) => iris_types::Value::Null,
+        YydbValue::File(_) => iris_types::Value::Null,
+        YydbValue::Row(nested) => {
+            let mut out = BTreeMap::new();
+            for (k, v) in nested {
+                out.insert(k, value_from_yydb(v));
+            }
+            iris_types::Value::Object(out)
+        }
+        _ => iris_types::Value::Null,
+    }
+}
+
+/// Convert a YYDB query row to an Iris row (BTreeMap<String, Value> → BTreeMap<String, iris_types::Value>).
+pub fn row_from_yydb(row: BTreeMap<String, YydbValue>) -> iris_types::Row {
+    let mut out = BTreeMap::new();
+    for (k, v) in row {
+        out.insert(k, value_from_yydb(v));
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
+// Deprecated shims — kept for backwards compat
+// ---------------------------------------------------------------------------
+
+impl PreparedVos {
+    /// Execute if the database DDL revision still matches.
+    #[deprecated(note = "renamed to PreparedVos::execute")]
+    pub fn execute_stale_checked(&self, source: &YydbSource) -> Result<Vec<iris_types::Row>> {
+        self.execute(source)
+    }
+
+    /// Execute with named parameters, stale-checked.
+    #[deprecated(note = "renamed to PreparedVos::execute_with_params")]
+    pub fn execute_params_stale_checked(
+        &self,
+        source: &YydbSource,
+        named: BTreeMap<String, yydb::Value>,
+    ) -> Result<Vec<iris_types::Row>> {
+        self.execute_with_params(source, named)
+    }
+}
+
+impl YydbSource {
+    /// Execute a VOS operation program on the native YYDB executor.
+    #[deprecated(note = "renamed to YydbSource::query (aligns with Session::query / db.$query)")]
+    pub fn execute_vos(&self, program: &str) -> Result<Vec<iris_types::Row>> {
+        self.query(program)
+    }
+}
+
+// Silence unused imports when deprecated shims compile.
+#[allow(dead_code)]
+fn _unreferenced() {
+    let _ = BTreeSet::<()>::new();
 }

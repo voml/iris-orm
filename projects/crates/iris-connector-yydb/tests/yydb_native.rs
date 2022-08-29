@@ -1,11 +1,11 @@
-//! Phase 2: native YYDB connector readiness + schema handshake.
+//! Phase 2: native YYDB connector — VOS executor live on the Connection facade.
 
 use std::{
     fs,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use iris_connector_yydb::{BACKEND_ID, READINESS_CODE, YydbSource};
+use iris_connector_yydb::{BACKEND_ID, YydbSource};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -22,14 +22,17 @@ fn temp_db_path(label: &str) -> std::path::PathBuf {
     dir.join("db.yydb")
 }
 
+// ---------------------------------------------------------------------------
+// Readiness probe — VOS executor is LIVE now
+// ---------------------------------------------------------------------------
+
 #[test]
-fn readiness_probe_reports_missing_vos_executor() {
+fn readiness_probe_reports_vos_executor_ready() {
     let report = YydbSource::readiness();
     assert_eq!(report.backend_id, BACKEND_ID);
     assert!(report.schema_handshake_ready);
-    assert!(!report.vos_executor_ready);
-    assert!(!report.is_ready());
-    assert_eq!(report.code, READINESS_CODE);
+    assert!(report.vos_executor_ready);
+    assert!(report.is_ready());
     assert!(report.message.contains("Connection"), "{}", report.message);
 }
 
@@ -46,37 +49,121 @@ fn ensure_schema_and_handshake_work_on_public_facade() {
     assert!(hs.ddl_revision >= 1);
 }
 
+// ---------------------------------------------------------------------------
+// Live VOS executor: query / execute / prepare / transaction
+// ---------------------------------------------------------------------------
+
 #[test]
-fn query_and_execute_are_refused_until_yydb_exposes_executor() {
+fn vos_execute_inserts_a_row_and_query_finds_it() {
     let db = YydbSource::open_in_memory().unwrap();
     db.ensure_schema(USER_SCHEMA).unwrap();
 
-    let query = db.query(r#"User.filter(x => true).collect()"#).expect_err("query refused");
-    assert!(query.to_string().contains(READINESS_CODE), "{query}");
+    // DML via execute
+    db.execute(
+        r#"User {
+            user_id: "550e8400-e29b-41d4-a716-446655440000",
+            user_name: "ada",
+            active: true,
+        }.insert()"#,
+    )
+    .expect("insert");
 
-    let execute = db
-        .execute(
-            r#"User {
-                user_id: "550e8400-e29b-41d4-a716-446655440000",
-                user_name: "ada",
-                active: true,
-            }.insert()"#,
-        )
-        .expect_err("execute refused");
-    assert!(execute.to_string().contains(READINESS_CODE), "{execute}");
+    // Query via query
+    let rows = db.query(r#"User.filter(x => true).collect()"#).expect("query");
+    assert_eq!(rows.len(), 1);
+    let first = &rows[0];
+    assert_eq!(first.get("user_name").and_then(|v| match v { iris_types::Value::Str(s) => Some(s.as_str()), _ => None }), Some("ada"));
+    assert_eq!(first.get("active"), Some(&iris_types::Value::Bool(true)));
 }
 
 #[test]
-fn prepare_and_transactions_are_refused_until_yydb_exposes_executor() {
+fn vos_prepared_statement_executes_and_stale_checked() {
     let db = YydbSource::open_in_memory().unwrap();
     db.ensure_schema(USER_SCHEMA).unwrap();
 
-    let prepare = db.prepare(r#"User.filter(x => true).collect()"#).expect_err("prepare refused");
-    assert!(prepare.to_string().contains(READINESS_CODE), "{prepare}");
+    // Insert two users
+    db.execute(
+        r#"User { user_id: "11111111-1111-1111-1111-111111111111", user_name: "ada", active: true }.insert()"#,
+    )
+    .unwrap();
+    db.execute(
+        r#"User { user_id: "22222222-2222-2222-2222-222222222222", user_name: "bob", active: false }.insert()"#,
+    )
+    .unwrap();
 
-    let begin = db.begin().expect_err("begin refused");
-    assert!(begin.to_string().contains(READINESS_CODE), "{begin}");
-    assert!(!db.in_transaction());
+    // Prepare a read plan
+    let plan = db.prepare(r#"User.filter(x => x.active == true).collect()"#).expect("prepare");
+    assert_eq!(plan.ddl_revision(), 1);
+
+    let rows = plan.execute(&db).expect("execute");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        rows[0].get("user_name").and_then(|v| match v { iris_types::Value::Str(s) => Some(s.as_str()), _ => None }),
+        Some("ada")
+    );
+}
+
+#[test]
+fn vos_prepared_stale_when_schema_drifts() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
+
+    let plan = db.prepare(r#"User.filter(x => true).collect()"#).unwrap();
+    assert_eq!(plan.ddl_revision(), 1);
+
+    // Directly mutate the schema stored in the YydbSource by re-opening and
+    // using YYDB's migrate_schema — same semantics as a DDL revision bump.
+    // We use YydbSource's escape hatch for this connector-local test since
+    // migrate_schema hasn't been wrapped yet.
+    let conn = db.connection();
+    conn.migrate_schema(
+        r#"
+table User {
+    @@user_id: uuid,
+    @user_name: utf8,
+    active: bool,
+    extra: utf8,
+}
+"#,
+        &Default::default(),
+    )
+    .unwrap();
+
+    // ddl_revision now at least 2
+    let hs = db.schema_handshake().unwrap();
+    assert!(hs.ddl_revision > plan.ddl_revision());
+
+    let err = plan.execute(&db).expect_err("stale plan must refuse");
+    let msg = err.to_string();
+    assert!(msg.contains("VOS-PREPARED-STALE"), "{msg}");
+}
+
+#[test]
+fn vos_transaction_begin_commit_rollback() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
+
+    // begin → insert → commit
+    db.begin().unwrap();
+    db.execute(
+        r#"User { user_id: "33333333-3333-3333-3333-333333333333", user_name: "charlie", active: true }.insert()"#,
+    )
+    .unwrap();
+    db.commit().unwrap();
+
+    let rows = db.query(r#"User.filter(x => x.user_name == "charlie").collect()"#).unwrap();
+    assert_eq!(rows.len(), 1);
+
+    // begin → insert → rollback → row disappears
+    db.begin().unwrap();
+    db.execute(
+        r#"User { user_id: "44444444-4444-4444-4444-444444444444", user_name: "dave", active: true }.insert()"#,
+    )
+    .unwrap();
+    db.rollback().unwrap();
+
+    let rows = db.query(r#"User.filter(x => x.user_name == "dave").collect()"#).unwrap();
+    assert_eq!(rows.len(), 0);
 }
 
 #[test]
