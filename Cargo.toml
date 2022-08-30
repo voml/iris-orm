@@ -51,11 +51,6 @@ napi-derive = "3.6"
 napi-build = "2"
 wasm-bindgen = "0.2"
 
-[patch."https://github.com/yy-database/yyds.git"]
-sqlite-provider = { path = "../yyds/projects/crates/sqlite-provider" }
-# sqlite-provider-rusqlite temporarily removed: yyds dev branch no longer publishes it
-# sqlite-provider-rusqlite = { path = "../yyds/projects/crates/sqlite-provider-rusqlite" }
-
 [profile.release]
 lto = true
 opt-level = "s"
