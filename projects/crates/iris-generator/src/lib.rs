@@ -406,13 +406,36 @@ fn map_resolved_field_type(ty: &vos::ResolvedCanonicalType) -> Result<MappedFiel
             mapped.rust_ty = format!("Option<{}>", mapped.rust_ty);
             Ok(mapped)
         }
+        ResolvedCanonicalType::Reference(inner) => {
+            let target = reference_target_from_resolved(inner)?;
+            Ok(MappedFieldType {
+                rust_ty: format!("{target}Ref"),
+                vos_type: format!("&{target}"),
+                optional: false,
+                is_uuid: false,
+                reference_target: Some(target),
+            })
+        }
         ResolvedCanonicalType::Builtin(path) if path.len() == 1 => {
             let name = path[0].as_str();
             let label = carrier::faithful_label(name).ok_or_else(|| Error::UnsupportedType(name.to_owned()))?;
             let rust_ty = carrier::rust_carrier_for_label(label).ok_or_else(|| Error::UnsupportedType(name.to_owned()))?.to_owned();
             Ok(MappedFieldType { rust_ty, vos_type: label.to_owned(), optional: false, is_uuid: label == "uuid", reference_target: None })
         }
+        ResolvedCanonicalType::User { path, .. } => {
+            let name = path.join("::");
+            Ok(MappedFieldType { rust_ty: name.clone(), vos_type: name, optional: false, is_uuid: false, reference_target: None })
+        }
         other => Err(Error::UnsupportedType(format!("resolved type {other:?}"))),
+    }
+}
+
+fn reference_target_from_resolved(ty: &vos::ResolvedCanonicalType) -> Result<String> {
+    use vos::ResolvedCanonicalType;
+    match ty {
+        ResolvedCanonicalType::User { path, .. } => Ok(path.join("::")),
+        ResolvedCanonicalType::Builtin(path) => Ok(path.join("::")),
+        other => Err(Error::UnsupportedType(format!("resolved reference target `{other:?}`"))),
     }
 }
 
