@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use iris_generator::{GenerationModel, write_typescript_client};
+use vos::{FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -193,3 +194,82 @@ fn typescript_emit_keeps_vos_types_distinct_through_carriers() {
     assert!(metadata.contains("seenAt: \"datetimeUtc\""), "{metadata}");
     assert!(metadata.contains("scoredOn: \"date\""), "`date` must stay distinct from `datetime`: {metadata}");
 }
+
+#[test]
+fn resolved_contract_through_generator_to_typescript_emitter() {
+    // Full chain: VOS source → ResolvedContract → GenerationModel → emit_typescript_client.
+    let source = r#"
+table User {
+    @@user_id: uuid,
+    user_name: utf8,
+    active: bool,
+}
+
+table Post {
+    @@post_id: uuid,
+    author: &User,
+    title: utf8,
+}
+"#;
+    let projection = parse_oak(source).unwrap().project_schema().unwrap();
+    let manifest = IdentityManifest {
+        format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
+        types: vec![
+            TypeIdentity {
+                canonical_path: vec!["User".to_owned()],
+                type_id: 10,
+                kind: TypeContractKind::Table,
+                fields: vec![
+                    FieldIdentity { canonical_name: "user_id".to_owned(), field_id: 101, virtual_field_index: Some(0) },
+                    FieldIdentity { canonical_name: "user_name".to_owned(), field_id: 102, virtual_field_index: Some(1) },
+                    FieldIdentity { canonical_name: "active".to_owned(), field_id: 103, virtual_field_index: Some(2) },
+                ],
+            },
+            TypeIdentity {
+                canonical_path: vec!["Post".to_owned()],
+                type_id: 20,
+                kind: TypeContractKind::Table,
+                fields: vec![
+                    FieldIdentity { canonical_name: "post_id".to_owned(), field_id: 201, virtual_field_index: Some(0) },
+                    FieldIdentity { canonical_name: "author".to_owned(), field_id: 202, virtual_field_index: Some(1) },
+                    FieldIdentity { canonical_name: "title".to_owned(), field_id: 203, virtual_field_index: Some(2) },
+                ],
+            },
+        ],
+    };
+    let contract = resolve_contract(&projection, &manifest).expect("resolve");
+    let artifact = contract.to_json().expect("serialize");
+    let model = GenerationModel::from_resolved_artifact(&artifact).expect("from resolved");
+
+    assert_eq!(model.tables.len(), 2);
+    assert_eq!(model.tables[0].type_id, Some(10));
+    assert_eq!(model.tables[1].type_id, Some(20));
+
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let file = |name: &str| files.iter().find(|(path, _)| path == name).map(|(_, content)| content.as_str()).expect(name);
+
+    let models = file("models.ts");
+    assert!(models.contains("export interface User"), "{models}");
+    assert!(models.contains("userName: string"), "{models}");
+    assert!(models.contains("active: boolean"), "{models}");
+    assert!(models.contains("export interface Post"), "{models}");
+    assert!(models.contains("title: string"), "{models}");
+
+    let refs = file("references.ts");
+    assert!(refs.contains("export type UserId = string"), "{refs}");
+    assert!(refs.contains("export type PostId = string"), "{refs}");
+
+    let inputs = file("inputs.ts");
+    assert!(inputs.contains("UserWhere"));
+    assert!(inputs.contains("PostWhere"));
+
+    let metadata = file("metadata.ts");
+    assert!(metadata.contains("userName: \"user_name\""));
+    assert!(metadata.contains("userId: \"user_id\""));
+    assert!(metadata.contains("postId: \"post_id\""));
+
+    let ops = file("operations.ts");
+    assert!(ops.contains("findMany<const A extends UserFindManyArgs>"));
+    assert!(ops.contains("findMany<const A extends PostFindManyArgs>"));
+}
+

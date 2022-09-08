@@ -138,6 +138,58 @@ table Item {
 }
 
 #[test]
+fn resolved_contract_through_generator_to_rust_emitter() {
+    // Full chain: VOS source → ResolvedContract (identity-bound) → GenerationModel → emit_rust_domain.
+    let source = r#"
+table User {
+    @@id: uuid,
+    name: utf8,
+    active: bool,
+}
+"#;
+    let projection = parse_oak(source).unwrap().project_schema().unwrap();
+    let manifest = IdentityManifest {
+        format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
+        types: vec![TypeIdentity {
+            canonical_path: vec!["User".to_owned()],
+            type_id: 42,
+            kind: TypeContractKind::Table,
+            fields: vec![
+                FieldIdentity { canonical_name: "id".to_owned(), field_id: 1, virtual_field_index: Some(0) },
+                FieldIdentity { canonical_name: "name".to_owned(), field_id: 2, virtual_field_index: Some(1) },
+                FieldIdentity { canonical_name: "active".to_owned(), field_id: 3, virtual_field_index: Some(2) },
+            ],
+        }],
+    };
+    let contract = resolve_contract(&projection, &manifest).expect("resolve");
+    let artifact = contract.to_json().expect("serialize");
+    let model = GenerationModel::from_resolved_artifact(&artifact).expect("from resolved");
+
+    assert_eq!(model.tables.len(), 1);
+    assert_eq!(model.tables[0].type_id, Some(42));
+    assert_eq!(model.tables[0].fields[0].field_id, Some(1));
+    assert_eq!(model.tables[0].fields[2].name, "active");
+    assert_eq!(model.tables[0].fields[2].rust_ty, "bool");
+    assert!(model.tables[0].fields[0].primary);
+    // ResolvedContract path does not carry macro/query operations yet.
+    assert!(model.macros.is_empty());
+
+    // Feed the identity-bound model straight into the Rust emitter.
+    let out = emit_rust_domain(&model).expect("emit");
+    assert!(out.contains("pub struct User"));
+    assert!(out.contains("pub id: String"));
+    assert!(out.contains("pub name: String"));
+    assert!(out.contains("pub active: bool"));
+    assert!(out.contains("SCHEMA_FINGERPRINT"));
+    assert!(out.contains("UUID_FIELDS"));
+    assert!(!out.contains("SELECT"));
+
+    // Round-trip determinism: same contract produces same code.
+    let again = emit_rust_domain(&model).unwrap();
+    assert_eq!(out, again);
+}
+
+#[test]
 fn write_rust_domain_atomic() {
     let dir = std::env::temp_dir()
         .join(format!("iris-gen-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
