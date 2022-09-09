@@ -13,11 +13,11 @@ iris-types = { workspace = true }
 iris-ir = { workspace = true }
 iris-adapter-mysql = { workspace = true, optional = true }
 iris-adapter-postgres = { workspace = true, optional = true }
-iris-adapter-sqlite = { workspace = true, optional = true }
+# iris-adapter-sqlite = { workspace = true, optional = true }  # FIXME: sqlite-provider-rusqlite removed upstream
 von = { workspace = true }
 
 [features]
 default = []
-migrate = ["dep:iris-adapter-mysql", "dep:iris-adapter-postgres", "dep:iris-adapter-sqlite"]
+migrate = ["dep:iris-adapter-mysql", "dep:iris-adapter-postgres"]
 
 [dev-dependencies]
