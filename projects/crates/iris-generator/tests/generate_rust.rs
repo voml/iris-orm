@@ -210,3 +210,60 @@ fn write_rust_domain_atomic() {
     assert!(ops.contains("pub struct Db"));
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn from_vos_schema_maps_list_field_to_rust_vec() {
+    let schema = r#"
+table Tag {
+    @@id: uuid,
+    label: utf8,
+}
+
+table Item {
+    @@id: uuid,
+    tags: [utf8],
+    names: [utf8?],
+}
+"#;
+    let model = GenerationModel::from_vos_schema(schema).expect("parse schema");
+    let item = model.tables.iter().find(|t| t.name == "Item").expect("Item table");
+    let tags = item.fields.iter().find(|f| f.name == "tags").expect("tags field");
+    assert_eq!(tags.rust_ty, "Vec<String>");
+    assert_eq!(tags.vos_type, "[utf8]");
+    assert!(!tags.optional);
+    let names = item.fields.iter().find(|f| f.name == "names").expect("names field");
+    assert_eq!(names.rust_ty, "Vec<Option<String>>");
+    assert_eq!(names.vos_type, "[utf8?]");
+    assert!(names.optional);
+}
+
+#[test]
+fn from_resolved_artifact_maps_list_field_to_rust_vec() {
+    let source = r#"
+table Item {
+    @@id: uuid,
+    tags: [utf8],
+}
+"#;
+    let projection = parse_oak(source).unwrap().project_schema().unwrap();
+    let manifest = IdentityManifest {
+        format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
+        types: vec![TypeIdentity {
+            canonical_path: vec!["Item".to_owned()],
+            type_id: 77,
+            kind: TypeContractKind::Table,
+            fields: vec![
+                FieldIdentity { canonical_name: "id".to_owned(), field_id: 1, virtual_field_index: Some(0) },
+                FieldIdentity { canonical_name: "tags".to_owned(), field_id: 2, virtual_field_index: Some(1) },
+            ],
+        }],
+    };
+    let contract = resolve_contract(&projection, &manifest).expect("resolve");
+    let model = GenerationModel::from_resolved_artifact(&contract.to_json().unwrap()).expect("from resolved");
+    let item = &model.tables[0];
+    assert_eq!(item.type_id, Some(77));
+    let tags = item.fields.iter().find(|f| f.name == "tags").expect("tags field");
+    assert_eq!(tags.rust_ty, "Vec<String>");
+    assert_eq!(tags.vos_type, "[utf8]");
+    assert!(!tags.optional);
+}

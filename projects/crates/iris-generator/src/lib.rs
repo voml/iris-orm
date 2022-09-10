@@ -406,6 +406,16 @@ fn map_resolved_field_type(ty: &vos::ResolvedCanonicalType) -> Result<MappedFiel
             mapped.rust_ty = format!("Option<{}>", mapped.rust_ty);
             Ok(mapped)
         }
+        ResolvedCanonicalType::List(inner) => {
+            let mapped = map_resolved_field_type(inner)?;
+            Ok(MappedFieldType {
+                rust_ty: format!("Vec<{}>", mapped.rust_ty),
+                vos_type: format!("[{}]", mapped.vos_type),
+                optional: mapped.optional,
+                is_uuid: false,
+                reference_target: mapped.reference_target,
+            })
+        }
         ResolvedCanonicalType::Reference(inner) => {
             let target = reference_target_from_resolved(inner)?;
             Ok(MappedFieldType {
@@ -447,6 +457,16 @@ fn map_field_type(ty: &CanonicalType) -> Result<MappedFieldType> {
             mapped.vos_type = format!("{}?", mapped.vos_type);
             mapped.rust_ty = format!("Option<{}>", mapped.rust_ty);
             Ok(mapped)
+        }
+        CanonicalType::List(inner) => {
+            let mapped = map_field_type(inner)?;
+            Ok(MappedFieldType {
+                rust_ty: format!("Vec<{}>", mapped.rust_ty),
+                vos_type: format!("[{}]", mapped.vos_type),
+                optional: mapped.optional,
+                is_uuid: false,
+                reference_target: mapped.reference_target,
+            })
         }
         CanonicalType::Reference(inner) => {
             let target = reference_target_name(inner)?;
