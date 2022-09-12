@@ -36,9 +36,20 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
         ("references.ts".into(), render_ts("typescript/references", &ctx)?),
         ("models.ts".into(), render_ts("typescript/models", &ctx)?),
         ("inputs.ts".into(), render_ts("typescript/inputs", &ctx)?),
-        ("operations.ts".into(), render_ts("typescript/operations", &ctx)?),
         ("errors.ts".into(), render_ts("typescript/errors", &ctx)?),
     ];
+
+    // operations.ts: template base + stubs for projected operations
+    let base_ops = render_ts("typescript/operations", &ctx)?;
+    let ops_content = if model.operations.is_empty() {
+        base_ops
+    } else {
+        let stubs = crate::emit_ts_operation_stubs(model);
+        let mut merged = base_ops;
+        merged.push_str(&stubs);
+        normalize_ts_blank_lines(&merged)
+    };
+    files.push(("operations.ts".into(), ops_content));
 
     files.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(files)

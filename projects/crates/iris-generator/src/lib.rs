@@ -45,6 +45,9 @@ pub enum Error {
     /// Two VOS fields map to the same TypeScript author name.
     #[error("TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`")]
     NamingCollision { entity: String, wire_a: String, wire_b: String, ts_name: String },
+    /// Operation projection artifact decode / validation failure.
+    #[error("operation artifact: {0}")]
+    OperationArtifact(#[from] operations_artifact::OperationArtifactError),
     /// I/O while writing generated files.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -113,6 +116,37 @@ pub struct MacroModel {
     pub params: Vec<MacroParamModel>,
 }
 
+/// One operation parameter (shared across Query / Udf / Micro / Macro).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationParamModel {
+    /// Parameter author name.
+    pub name: String,
+    /// VOS type label (surface syntax).
+    pub vos_type: String,
+    /// TypeScript parameter carrier.
+    pub ts_type: String,
+}
+
+/// One projected operation consumed from VOS OperationProjectionArtifact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationModel {
+    /// Opaque stable operation identity (`op_<hex>`).
+    pub operation_id: String,
+    /// Operation declaration kind (`query` | `udf` | `micro` | `macro`).
+    pub kind: String,
+    /// Operation author name.
+    pub name: String,
+    /// Canonical signature key (human-readable stable key).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_key: Option<String>,
+    /// Operation parameters.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub params: Vec<OperationParamModel>,
+    /// Return type label (VOS surface), absent when the operation returns unit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub return_type: Option<String>,
+}
+
 /// One VOS table in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TableModel {
@@ -139,6 +173,11 @@ pub struct GenerationModel {
     /// Schema macros (always emitted in generated TS regardless of backend capability).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub macros: Vec<MacroModel>,
+    /// Projected operations consumed from VOS OperationProjectionArtifact.
+    /// Always sorted by `operation_id` for determinism; order does not matter
+    /// to identity resolution.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub operations: Vec<OperationModel>,
 }
 
 impl GenerationModel {
@@ -179,7 +218,75 @@ impl GenerationModel {
             schema_fingerprint: contract.schema_fingerprint,
             tables,
             macros: Vec::new(),
+            operations: Vec::new(),
         })
+    }
+
+    /// Builds from a resolved contract artifact **and** a separate VOS
+    /// operation projection artifact.
+    ///
+    /// Operations are sorted by `operation_id` for deterministic output. Macro
+    /// operations are also duplicated into `macros` so that existing TS macro
+    /// templates keep working unchanged.
+    pub fn from_artifacts(contract_json: &str, operations_json: &str) -> Result<Self> {
+        let mut model = Self::from_resolved_artifact(contract_json)?;
+        let artifact = operations_artifact::IrisOperationArtifact::from_json(operations_json)?;
+        let mut operations = Vec::with_capacity(artifact.len());
+        let mut macros: Vec<MacroModel> = Vec::new();
+        let mut seen_macro = std::collections::HashSet::new();
+        for op in &artifact.operations {
+            let kind_str = operation_kind_label(op.kind);
+            let params: Vec<OperationParamModel> = op
+                .parameters
+                .iter()
+                .map(|p| {
+                    let vos_ty = type_label(&p.type_expr);
+                    OperationParamModel {
+                        name: p.name.clone(),
+                        ts_type: carrier::vos_type_to_ts(&vos_ty),
+                        vos_type: vos_ty,
+                    }
+                })
+                .collect();
+            let ret = op.return_type.as_ref().map(|rt| type_label(rt));
+            operations.push(OperationModel {
+                operation_id: op.operation_id.clone(),
+                kind: kind_str,
+                name: op.name.clone(),
+                identity_key: Some(op.identity_key.clone()),
+                params: params.clone(),
+                return_type: ret.clone(),
+            });
+            if op.kind == vos::types::OperationKind::Macro {
+                if seen_macro.insert(op.name.clone()) {
+                    macros.push(MacroModel {
+                        name: op.name.clone(),
+                        return_type: ret.unwrap_or_else(|| "unit".into()),
+                        params: params
+                            .iter()
+                            .map(|p| MacroParamModel {
+                                name: p.name.clone(),
+                                vos_type: p.vos_type.clone(),
+                                ts_type: p.ts_type.clone(),
+                            })
+                            .collect(),
+                    });
+                }
+            }
+        }
+        operations.sort_by(|a, b| a.operation_id.cmp(&b.operation_id));
+        macros.sort_by(|a, b| a.name.cmp(&b.name));
+        model.operations = operations;
+        if !macros.is_empty() {
+            model.macros = macros;
+        }
+        // Prefer envelope fingerprint when present; keep contract fingerprint
+        // as fallback so callers that only ever pass one artifact still get a
+        // deterministic value.
+        if let Some(fp) = artifact.schema_fingerprint() {
+            model.schema_fingerprint = fp.to_owned();
+        }
+        Ok(model)
     }
 
     /// Build from a VOS schema document string.
@@ -220,26 +327,51 @@ impl GenerationModel {
             tables.push(TableModel { type_id: None, name: name.clone(), rust_type: name.clone(), fields });
         }
         let mut macros = Vec::new();
-        for operation in operations.iter().filter(|operation| operation.kind == vos::OperationKind::Macro) {
-            let params = operation
+        let mut operation_models = Vec::new();
+        for operation in &operations {
+            let params: Vec<OperationParamModel> = operation
                 .parameters
                 .iter()
                 .map(|param| {
-                    let vos_type = type_label(&param.type_expr);
-                    MacroParamModel { name: param.name.clone(), vos_type: vos_type.clone(), ts_type: carrier::vos_type_to_ts(&vos_type) }
+                    let vos_ty = type_label(&param.type_expr);
+                    OperationParamModel {
+                        name: param.name.clone(),
+                        ts_type: carrier::vos_type_to_ts(&vos_ty),
+                        vos_type: vos_ty,
+                    }
                 })
                 .collect();
-            macros.push(MacroModel {
+            let ret = operation.return_type.as_ref().map(type_label);
+            let kind_str = operation_kind_label(operation.kind);
+            operation_models.push(OperationModel {
+                operation_id: String::new(),
+                kind: kind_str,
                 name: operation.name.clone(),
-                return_type: operation.return_type.as_ref().map(type_label).unwrap_or_else(|| "unit".into()),
-                params,
+                identity_key: None,
+                params: params.clone(),
+                return_type: ret.clone(),
             });
+            if operation.kind == vos::OperationKind::Macro {
+                macros.push(MacroModel {
+                    name: operation.name.clone(),
+                    return_type: ret.unwrap_or_else(|| "unit".into()),
+                    params: params
+                        .iter()
+                        .map(|p| MacroParamModel {
+                            name: p.name.clone(),
+                            vos_type: p.vos_type.clone(),
+                            ts_type: p.ts_type.clone(),
+                        })
+                        .collect(),
+                });
+            }
         }
         Ok(Self {
             generator_version: env!("CARGO_PKG_VERSION").into(),
             schema_fingerprint: fingerprint_schema(&projection, &operations),
             tables,
             macros,
+            operations: operation_models,
         })
     }
 
@@ -309,7 +441,12 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
     let models = format!("{header}\n{structs}\n{helpers}\n{impls}");
     let metadata = format!("{header}\n{}\n", render("rust/metadata", &ctx)?);
     let errors = format!("{header}\n{}\n", render("rust/errors", &ctx)?);
-    let operations = format!("{header}\n{}\n", unescape_rust_template(&render("rust/operations", &ctx)?),);
+    let base_ops = format!("{header}\n{}\n", unescape_rust_template(&render("rust/operations", &ctx)?),);
+    let operations = if model.operations.is_empty() {
+        base_ops
+    } else {
+        format!("{base_ops}\n{}", emit_rust_operation_stubs(model))
+    };
     let index = format!("{header}\n{}\n", render("rust/rust_index", &ctx)?);
 
     Ok(vec![
@@ -572,4 +709,140 @@ fn render_dyn_source(source: &str, ctx: &Value) -> Result<String> {
 /// Marker kept for older Phase 0 callers.
 pub fn is_stub() -> bool {
     false
+}
+
+/// Convert a VOS `OperationKind` enum into the stable lowercase string tag
+/// we store inside `OperationModel.kind`.
+fn operation_kind_label(kind: vos::types::OperationKind) -> String {
+    match kind {
+        vos::types::OperationKind::Query => "query",
+        vos::types::OperationKind::Udf => "udf",
+        vos::types::OperationKind::Micro => "micro",
+        vos::types::OperationKind::Macro => "macro",
+    }
+    .to_owned()
+}
+
+// -----------------------------------------------------------------------------
+// Operation stub emitters (Rust + TypeScript)
+// -----------------------------------------------------------------------------
+
+/// Emit Rust stub function declarations for every projected operation.
+/// Returns an empty string when no operations are present.
+pub(crate) fn emit_rust_operation_stubs(model: &GenerationModel) -> String {
+    if model.operations.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    out.push_str("// --- Projected operation stubs (from VOS OperationProjectionArtifact) ---\n");
+    out.push_str("// These are thin declarations. Implement bodies in your host adapter.\n\n");
+    for op in &model.operations {
+        let ret = op
+            .return_type
+            .as_ref()
+            .map(|t| carrier::rust_carrier_for_label(carrier::base_vos_type(t)).unwrap_or("String"))
+            .unwrap_or("()");
+        let kind_doc = operation_kind_rust_doc(op.kind.as_str());
+        out.push_str(&format!(
+            "/// VOS {kind_doc:?} operation `{name}` (op_id: {op_id}).\n\
+             fn {name}({params}) -> {ret} {{ unimplemented!(\"VOS op {name}\") }}\n\n",
+            kind_doc = kind_doc,
+            name = op.name,
+            op_id = op.operation_id,
+            params = emit_rust_params(op),
+            ret = ret,
+        ));
+    }
+    out
+}
+
+fn emit_rust_params(op: &OperationModel) -> String {
+    op.params
+        .iter()
+        .map(|p| {
+            let rust_ty = carrier::rust_carrier_for_label(carrier::base_vos_type(&p.vos_type)).unwrap_or("String");
+            format!("{}: {}", p.name, rust_ty)
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn operation_kind_rust_doc(kind: &str) -> &'static str {
+    match kind {
+        "query" => "query",
+        "udf" => "udf",
+        "micro" => "micro",
+        "macro" => "macro",
+        _ => "op",
+    }
+}
+
+/// Emit TypeScript stub method declarations for every projected operation.
+/// Returns an empty string when no operations are present.
+pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> String {
+    if model.operations.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    out.push_str("\n/** --- Projected operation stubs (from VOS OperationProjectionArtifact) ---\n");
+    out.push_str(" * These delegate to `this.executor` with the declared operation id.\n");
+    out.push_str(" */\n");
+    out.push_str("export class GeneratedOperations {\n");
+    out.push_str("    private readonly executor: OperationExecutor;\n\n");
+    out.push_str("    constructor(executor: OperationExecutor) {\n");
+    out.push_str("        this.executor = executor;\n");
+    out.push_str("    }\n\n");
+    for op in &model.operations {
+        let ts_ret = op
+            .return_type
+            .as_ref()
+            .map(|t| carrier::vos_type_to_ts(t))
+            .unwrap_or_else(|| "void".into());
+        let param_sig = op
+            .params
+            .iter()
+            .map(|p| format!("{}: {}", p.name, p.ts_type))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let param_obj = op
+            .params
+            .iter()
+            .map(|p| format!("\"{}\"", p.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let use_execute = ts_ret == "void";
+        let kind_label = operation_kind_ts_label(op.kind.as_str());
+        out.push_str(&format!(
+            "    /** VOS {kind} operation `{name}` (op_id: {op_id}). */\n\
+             async {name}({param_sig}): Promise<{ts_ret}> {{\n\
+             {indent}const envelope = await this.executor.{exec_fn}(buildDeclaredOperationRequest(\"{name}\", {{ parameters: [{param_obj}] }}));\n",
+            kind = kind_label,
+            name = op.name,
+            op_id = op.operation_id,
+            param_sig = param_sig,
+            param_obj = param_obj,
+            ts_ret = ts_ret,
+            indent = if use_execute { "        " } else { "        " },
+            exec_fn = if use_execute { "executeUnit" } else { "execute" },
+        ));
+        out.push_str("        if (!envelope.ok) {\n");
+        out.push_str("            throwOperationEnvelopeError(envelope);\n");
+        out.push_str("        }\n");
+        if !use_execute {
+            out.push_str("        return envelope.value as any;\n");
+        }
+        out.push_str("    }\n\n");
+    }
+    out.push_str("}\n");
+    out
+}
+
+fn operation_kind_ts_label(kind: &str) -> &'static str {
+    match kind {
+        "query" => "query",
+        "udf" => "udf",
+        "micro" => "micro",
+        "macro" => "macro",
+        _ => "op",
+    }
 }
