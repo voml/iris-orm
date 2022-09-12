@@ -54,6 +54,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 mod carrier;
+mod operations_artifact;
 mod rust_view;
 mod ts_view;
 mod typescript;
