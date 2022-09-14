@@ -273,3 +273,96 @@ table Post {
     assert!(ops.contains("findMany<const A extends PostFindManyArgs>"));
 }
 
+const OPERATION_ARTIFACT_JSON: &str = r#"{
+    "envelope": {
+        "stage": "operation-syntax-projection",
+        "contractFormatVersion": "vos-operation-contract-v0",
+        "languageVersion": "vos-language-v0",
+        "canonicalizationVersion": "vos-canonical-v0",
+        "schemaFingerprint": null,
+        "sourceUnits": [
+            { "sourceUnitId": 0, "source": "query get_user(id: uuid) -> User?\nudf hash_password(raw: utf8) -> utf8\nmacro seed_user() -> unit" }
+        ]
+    },
+    "operations": [
+        {
+            "kind": "query",
+            "name": "get_user",
+            "identityKey": "query:get_user(id:uuid)->User?",
+            "operationId": "op_a1b2c3d4e5f67890",
+            "parameters": [
+                { "name": "id", "typeExpr": { "named": ["uuid"] }, "span": { "start": 15, "end": 23 } }
+            ],
+            "returnType": { "optional": { "named": ["User"] } },
+            "signature": { "text": "get_user(id: uuid) -> User?", "span": { "start": 6, "end": 32 } },
+            "body": null,
+            "span": { "start": 0, "end": 45 }
+        },
+        {
+            "kind": "udf",
+            "name": "hash_password",
+            "identityKey": "udf:hash_password(raw:utf8)->utf8",
+            "operationId": "op_b2c3d4e5f6a78901",
+            "parameters": [
+                { "name": "raw", "typeExpr": { "named": ["utf8"] }, "span": { "start": 60, "end": 68 } }
+            ],
+            "returnType": { "named": ["utf8"] },
+            "signature": { "text": "hash_password(raw: utf8) -> utf8", "span": { "start": 46, "end": 75 } },
+            "body": null,
+            "span": { "start": 45, "end": 90 }
+        },
+        {
+            "kind": "macro",
+            "name": "seed_user",
+            "identityKey": "macro:seed_user()->unit",
+            "operationId": "op_c3d4e5f6a7b89012",
+            "parameters": [],
+            "returnType": null,
+            "signature": { "text": "seed_user() -> unit", "span": { "start": 92, "end": 112 } },
+            "body": null,
+            "span": { "start": 90, "end": 120 }
+        }
+    ]
+}"#;
+
+#[test]
+fn typescript_emit_includes_operation_stubs_class() {
+    let source = r#"
+table User {
+    @@id: uuid,
+    name: utf8,
+}
+"#;
+    let projection = parse_oak(source).unwrap().project_schema().unwrap();
+    let manifest = IdentityManifest {
+        format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
+        types: vec![TypeIdentity {
+            canonical_path: vec!["User".to_owned()],
+            type_id: 42,
+            kind: TypeContractKind::Table,
+            fields: vec![
+                FieldIdentity { canonical_name: "id".to_owned(), field_id: 1, virtual_field_index: Some(0) },
+                FieldIdentity { canonical_name: "name".to_owned(), field_id: 2, virtual_field_index: Some(1) },
+            ],
+        }],
+    };
+    let contract = resolve_contract(&projection, &manifest).unwrap();
+    let model = GenerationModel::from_artifacts(&contract.to_json().unwrap(), OPERATION_ARTIFACT_JSON).unwrap();
+
+    let files = iris_generator::emit_typescript_client(&model).unwrap();
+    let file = |name: &str| files.iter().find(|(p, _)| p == name).map(|(_, c)| c.as_str()).expect(name);
+
+    let ops = file("operations.ts");
+    assert!(
+        ops.contains("GeneratedOperations"),
+        "operations.ts should contain GeneratedOperations class"
+    );
+    assert!(ops.contains("async get_user(id: string): Promise<"));
+    assert!(ops.contains("async hash_password(raw: string): Promise<string>"));
+    assert!(ops.contains("async seed_user(): Promise<void>"));
+
+    // Macros also still work (operation_kind=macro populates macros).
+    assert!(ops.contains("class GeneratedMacros"));
+    assert!(ops.contains("async seed_user()"));
+}
+
