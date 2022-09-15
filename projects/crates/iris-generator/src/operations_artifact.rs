@@ -184,11 +184,6 @@ impl IrisOperationArtifact {
     pub fn len(&self) -> usize {
         self.operations.len()
     }
-
-    /// Whether the operation collection is empty.
-    pub fn is_empty(&self) -> bool {
-        self.operations.is_empty()
-    }
 }
 
 #[cfg(test)]
