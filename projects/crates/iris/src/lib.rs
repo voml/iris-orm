@@ -4,7 +4,7 @@
 //! workspace-private and must not be re-exported as SQL or foreign-command APIs.
 
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 #[cfg(feature = "migrate")]
 pub mod migrate;

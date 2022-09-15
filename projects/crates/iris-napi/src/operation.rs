@@ -32,6 +32,7 @@ pub struct WhereEq {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct OperationIdentity {
     pub operation_id: String,
     pub contract_fingerprint: String,
@@ -39,6 +40,7 @@ pub struct OperationIdentity {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct OperationRequest {
     pub identity: OperationIdentity,
     pub operation: IrisOperation,
@@ -46,6 +48,7 @@ pub struct OperationRequest {
     pub deadline_ms: Option<u64>,
 }
 
+#[allow(dead_code)]
 pub fn encode_operation_json(json: &str) -> Result<String, String> {
     let op: IrisOperation = serde_json::from_str(json).map_err(|err| err.to_string())?;
     encode_operation(&op)
@@ -81,6 +84,7 @@ fn encode_operation(op: &IrisOperation) -> Result<String, String> {
 }
 
 /// Bind optional request parameters into an operation before planning.
+#[allow(dead_code)]
 pub fn bind_operation_request(operation_json: &str, parameters_json: Option<&str>) -> Result<String, String> {
     let source = encode_operation_json(operation_json)?;
     match parameters_json {

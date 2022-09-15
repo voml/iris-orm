@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::{DatasourceKind, DriftReport, LogicalMigrationPlan, TruthMode, default_migration_plan, resolve_path};
+use crate::{DatasourceKind, DriftReport, LogicalMigrationPlan, TruthMode, default_migration_plan};
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
 

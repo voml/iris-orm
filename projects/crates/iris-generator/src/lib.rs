@@ -7,7 +7,7 @@
 //! own generator against the same template contract.
 
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 use std::{
     collections::{HashMap, hash_map::DefaultHasher},
@@ -44,7 +44,16 @@ pub enum Error {
     UnsupportedTarget(String),
     /// Two VOS fields map to the same TypeScript author name.
     #[error("TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`")]
-    NamingCollision { entity: String, wire_a: String, wire_b: String, ts_name: String },
+    NamingCollision {
+        /// Entity name where the collision was detected.
+        entity: String,
+        /// First colliding VOS wire field name.
+        wire_a: String,
+        /// Second colliding VOS wire field name.
+        wire_b: String,
+        /// Target TypeScript name both fields try to occupy.
+        ts_name: String,
+    },
     /// Operation projection artifact decode / validation failure.
     #[error("operation artifact: {0}")]
     OperationArtifact(#[from] operations_artifact::OperationArtifactError),

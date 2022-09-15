@@ -1,7 +1,7 @@
 //! Iris runtime core: parse -> plan -> capability -> reference execution.
 
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
+#![deny(missing_docs)]
 
 mod adapter;
 mod cache_route;

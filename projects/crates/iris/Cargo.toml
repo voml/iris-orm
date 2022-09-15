@@ -13,7 +13,7 @@ iris-types = { workspace = true }
 iris-ir = { workspace = true }
 iris-adapter-mysql = { workspace = true, optional = true }
 iris-adapter-postgres = { workspace = true, optional = true }
-# iris-adapter-sqlite = { workspace = true, optional = true }  # FIXME: sqlite-provider-rusqlite removed upstream
+# adapter line removed upstream — adapter feature temporarily disabled
 von = { workspace = true }
 
 [features]
