@@ -23,7 +23,7 @@ dejavu = { git = "https://github.com/doki-land/dejavu-engine.git", branch = "dev
 
 once_cell = "1"
 clap = { version = "4", features = ["derive"] }
-sqlite-provider = { git = "https://github.com/yy-database/yyds.git", branch = "dev" }
+# sqlite-provider = { git = "https://github.com/yy-database/yyds.git", branch = "dev" }  # FIXME: no longer consumed (iris-adapter-sqlite excluded from workspace)
 # sqlite-provider-rusqlite = { git = "https://github.com/yy-database/yyds.git", branch = "dev" }  # FIXME: crate no longer exists on yyds dev
 postgres = "0.19"
 r2d2 = "0.8"
