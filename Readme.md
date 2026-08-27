@@ -1,5 +1,23 @@
 # Iris ORM
 
+<p align="center">
+  <a href="https://iris-orm.pages.dev/"><img src=".github/social-preview.jpg" alt="Iris ORM — VOS data access layer. One Rust core, Node N-API, Browser WASM." width="100%"></a>
+</p>
+
+<p align="center">
+  <a href="https://iris-orm.pages.dev/"><strong>Website</strong></a> ·
+  <a href="https://iris-orm.pages.dev/d/en-us/">Docs</a> ·
+  <a href="https://github.com/voml/iris-orm/issues">Issues</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/stars/voml/iris-orm?style=social" alt="GitHub stars">
+  <img src="https://img.shields.io/badge/Rust-core-DEA584?logo=rust&logoColor=white" alt="Rust core">
+  <img src="https://img.shields.io/badge/Node-N--API-339933?logo=nodedotjs&logoColor=white" alt="Node N-API">
+  <img src="https://img.shields.io/badge/Browser-WASM-654FF0?logo=webassembly&logoColor=white" alt="Browser WASM">
+  <img src="https://img.shields.io/badge/schema-.iris-0d7a62" alt=".iris schema">
+</p>
+
 **Site:** [iris-orm.pages.dev](https://iris-orm.pages.dev/) · **Repo:** [github.com/voml/iris-orm](https://github.com/voml/iris-orm)
 
 Iris is the **VOS data-access layer** for backend applications. It is not a

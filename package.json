@@ -1,7 +1,7 @@
 {
     "name": "@yydb/iris-orm-workspace",
     "private": true,
-    "description": "Iris ORM multi-language mono — Rust iris::* + TypeScript @yydb/iris",
+    "description": "Iris ORM — VOS data-access layer. One Rust semantic core; Node via N-API, browsers via WASM.",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {
         "type": "git",
