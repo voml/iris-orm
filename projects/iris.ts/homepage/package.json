@@ -24,13 +24,15 @@
         "verify:hosts": "node ./scripts/verify-host-exports.mjs"
     },
     "dependencies": {
-        "@vmz/core": "0.1.9",
-        "@vmz/ui": "0.1.9",
-        "@vmz/ui-icons": "0.1.9"
+        "@vmz/core": "0.1.12",
+        "@vmz/plugin-shiki": "0.1.12",
+        "@vmz/ui": "0.1.12",
+        "@yydb/iris": "workspace:*",
+        "shiki": "^3.0.0"
     },
     "devDependencies": {
-        "@vmz/plugin-markdown-it": "0.1.9",
-        "@vmz/vmz": "0.1.9",
+        "@vmz/plugin-markdown-it": "0.1.12",
+        "@vmz/vmz": "0.1.12",
         "typescript": "^5.9.2"
     }
 }

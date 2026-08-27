@@ -1,9 +1,9 @@
 import { defineConfig } from "@vmz/vmz";
+import shiki from "@vmz/plugin-shiki";
 
 export default defineConfig({
-    // Documents use `@vmz/plugin-markdown-it` at build time (document integrate);
-    // do not register the client MarkdownIt component — static-cdn SSR cannot
-    // strip types from node_modules/runtime.ts (0.1.9).
+    plugins: [shiki()],
+    engines: { code: "shiki" },
     delivery: {
         default: "static",
         profiles: {
