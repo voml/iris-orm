@@ -63,6 +63,18 @@ export type SemanticCore = SemanticCoreBinding & {
     readSchema(projectRoot: string, schemaGlob: string): string;
     generate(source: string, target: string, outDir: string): GenerateResult;
     migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;
+    migrateRunCmd?(
+        configPath: string,
+        source: string,
+        planOut?: string | null,
+        planOnly?: boolean,
+    ): {
+        ok: boolean;
+        planPath: string;
+        planOnly: boolean;
+        createdTables: string[];
+        error?: string | null;
+    };
 };
 
 let cached: SemanticCore | null = null;
@@ -127,6 +139,24 @@ function loadModule(specifier: string): SemanticCore {
                     source,
                     outDir ?? undefined,
                 ),
+            migrateRunCmd:
+                typeof module.migrateRunCmd === "function"
+                    ? (configPath, source, planOut, planOnly) =>
+                          (
+                              module.migrateRunCmd as (
+                                  c: string,
+                                  s: string,
+                                  p?: string | null,
+                                  o?: boolean,
+                              ) => {
+                                  ok: boolean;
+                                  planPath: string;
+                                  planOnly: boolean;
+                                  createdTables: string[];
+                                  error?: string | null;
+                              }
+                          )(configPath, source, planOut ?? undefined, planOnly ?? false)
+                    : undefined,
         };
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

@@ -11,7 +11,7 @@ mod session;
 use std::path::Path;
 
 use iris_generator::GenerationModel;
-use iris_tools::{migrate_plan, project};
+use iris_tools::{migrate_plan, migrate_run, project};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use session::MemorySession;
@@ -163,6 +163,59 @@ pub fn migrate_plan_cmd(
         Err(err) => Ok(MigratePlanResult {
             ok: false,
             plan_path: String::new(),
+            error: Some(err),
+        }),
+    }
+}
+
+/// Full managed-push run summary (plan → apply → verify).
+#[napi(object)]
+pub struct MigrateRunResult {
+    pub ok: bool,
+    pub plan_path: String,
+    pub plan_only: bool,
+    pub created_tables: Vec<String>,
+    pub error: Option<String>,
+}
+
+/// Plan → apply → verify (same as `iris-tools migrate run` / library `migrate_run`).
+#[napi]
+pub fn migrate_run_cmd(
+    config_path: String,
+    source: String,
+    plan_out: Option<String>,
+    plan_only: bool,
+) -> Result<MigrateRunResult> {
+    let config = Path::new(&config_path);
+    let plan_path = plan_out
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            config
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join("migrations")
+                .join(format!("{source}-plan.von"))
+        });
+    match migrate_run(config, &source, &plan_path, plan_only) {
+        Ok(None) => Ok(MigrateRunResult {
+            ok: true,
+            plan_path: plan_path.display().to_string(),
+            plan_only: true,
+            created_tables: vec![],
+            error: None,
+        }),
+        Ok(Some(report)) => Ok(MigrateRunResult {
+            ok: true,
+            plan_path: plan_path.display().to_string(),
+            plan_only: false,
+            created_tables: report.created_tables,
+            error: None,
+        }),
+        Err(err) => Ok(MigrateRunResult {
+            ok: false,
+            plan_path: plan_path.display().to_string(),
+            plan_only: plan_only,
+            created_tables: vec![],
             error: Some(err),
         }),
     }

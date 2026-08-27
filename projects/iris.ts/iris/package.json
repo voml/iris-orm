@@ -36,7 +36,7 @@
         }
     },
     "bin": {
-        "iris": "./bin/iris.ts"
+        "iris": "./bin/iris.mjs"
     },
     "files": [
         "bin",
@@ -44,7 +44,7 @@
     ],
     "scripts": {
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "iris": "node ./bin/iris.ts",
+        "iris": "node ./bin/iris.mjs",
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "dependencies": {
