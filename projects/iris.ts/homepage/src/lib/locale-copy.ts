@@ -6,6 +6,14 @@ export type LocaleId = "zh-hans" | "en-us" | string;
 
 export function readLocaleId(preferred?: string | null): LocaleId {
     if (preferred === "en-us" || preferred === "zh-hans") return preferred;
+    if (typeof window !== "undefined") {
+        try {
+            const stored = localStorage.getItem("vmz.locale");
+            if (stored === "en-us" || stored === "zh-hans") return stored;
+        } catch {
+            /* ignore */
+        }
+    }
     if (typeof document !== "undefined") {
         const fromAttr = document.documentElement.getAttribute("data-locale");
         if (fromAttr === "en-us" || fromAttr === "zh-hans") return fromAttr;
@@ -15,8 +23,8 @@ export function readLocaleId(preferred?: string | null): LocaleId {
     return "zh-hans";
 }
 
-export function docsPaths(localeId: LocaleId) {
-    const root = docsHomePath(localeId === "en-us" ? "en-us" : "zh-hans");
+export function docsPaths(_localeId?: LocaleId) {
+    const root = docsHomePath();
     return {
         docsRootHref: root,
         guideHref: `${root}guide/getting-started`,
