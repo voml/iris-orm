@@ -1,6 +1,6 @@
 # VMZ issues found on Iris homepage
 
-Findings while building `@yydb/iris-homepage` on **npm `@vmz/*@0.1.9`**. Confirmed defects should migrate to `规划设计/vmz/` when that tree is restored.
+Findings while building `@yydb/iris-homepage` on **npm `@vmz/*@0.1.12`**. Confirmed defects should migrate to `规划设计/vmz/` when that tree is restored.
 
 | ID | Area | Symptom | Expected | Blocks site? |
 |----|------|---------|----------|--------------|
@@ -9,7 +9,7 @@ Findings while building `@yydb/iris-homepage` on **npm `@vmz/*@0.1.9`**. Confirm
 | I-03 | `@vmz/ui` `Dropdown` | Items are `{ id, title, href }` only | Callable items or `onSelect` for `__vmzTransitionLocale` without URL rewrite | No — locale menu uses `Button variant="ghost"` in `<details>` |
 | I-04 | `@vmz/ui` `AppShell` | Nav slot is flat `{ id, title, href }[]` | Extension slot or actions region for locale control + external CTA | No — custom header with `Link`/`Button`/`Icon` |
 | I-05 | `@vmz/ui` `Link` | Underline-primary style only | `variant="nav"` / muted chrome link for header/footer | No — page SCSS targets `.site-nav .vmz-ui-link` |
-| I-06 | Documents | `/d/` uses integrated document build (no client MarkdownIt) | Plugin client component + static-cdn breaks on `runtime.ts` in node_modules | No — plugin kept as devDep only |
+| I-06 | Documents | ~~regex chrome / plugin-shiki `.ts` in node_modules~~ | **0.1.12**: DocumentLayout + `@vmz/plugin-shiki` dist runtime | Resolved on bump |
 | I-07 | static SSR | `onMount` runs with `window` present but `window.location` undefined | Documented host contract or skip mounts without location | No — guard `location` in SiteHeader |
 
 ## How to add an issue

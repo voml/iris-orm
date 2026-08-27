@@ -1,8 +1,3 @@
----
-title: Getting started
-order: 0
----
-
 # Iris ORM docs
 
 Iris is the **VOS data-access layer** — not a database and not a new schema language. Authoritative schemas use **`.iris`** (VOS grammar).

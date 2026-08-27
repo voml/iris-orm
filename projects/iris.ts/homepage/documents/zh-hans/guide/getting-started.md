@@ -1,8 +1,3 @@
----
-title: 快速开始
-order: 1
----
-
 # 快速开始
 
 ## 安装
@@ -31,7 +26,7 @@ import { createIris, initIris } from "@yydb/iris";
 import { createIris } from "@yydb/iris/node";
 ```
 
-**禁止**在共享入口写 `typeof window` 分支动态 import； bundler 会把 N-API 与 WASM 打进同一依赖图。
+**禁止**在共享入口写 `typeof window` 分支动态 import； bundler 会把 N-API 与 WASM 打进同一依赖树。
 
 ## CLI
 
@@ -45,7 +40,7 @@ pnpm exec iris --help
 
 ## Schema
 
-在仓库中维护 `schemas/**/*.iris`，用 `iris.von` 声明 datasource 与 generate 输出。示例见 [circle-farm](https://github.com/yy-database/vmz-circle-farm) 的 `farm-database` crate。
+在仓库中维护 `schemas/**/*.iris`，用 `iris.von` 声明 datasource 与 generate 输出。示例见 [circle-farm](https://github.com/voml/iris-orm) 的 `farm-database` crate。
 
 ## 与 sql-studio-orm 的关系
 
