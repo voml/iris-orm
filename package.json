@@ -2,6 +2,14 @@
     "name": "@yydb/iris-orm-workspace",
     "private": true,
     "description": "Iris ORM multi-language mono — Rust iris::* + TypeScript @yydb/iris",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
     "packageManager": "pnpm@10.0.0",
     "type": "module",
     "scripts": {

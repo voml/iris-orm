@@ -21,4 +21,5 @@ Iris is the **VOS data-access layer** — not a database and not a new schema la
 
 ## Repository
 
-- [iris-orm on GitHub](https://github.com/yy-database/iris-orm)
+- [Official site](https://iris-orm.pages.dev/)
+- [iris-orm on GitHub](https://github.com/voml/iris-orm)
