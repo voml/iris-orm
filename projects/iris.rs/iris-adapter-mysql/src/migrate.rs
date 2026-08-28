@@ -19,7 +19,7 @@ pub struct PushReport {
     pub created_tables: Vec<String>,
 }
 
-/// Build a non-destructive create plan for tables missing physically.
+/// Build a non-destructive plan: create missing tables + add missing fields.
 pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<LogicalMigrationPlan> {
     let target = fingerprint_document(document);
     let mut changes = Vec::new();
@@ -27,10 +27,22 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
         let Item::Table(table) = item else {
             continue;
         };
-        if observed.table(&table.name).is_none() {
-            changes.push(LogicalChange::CreateTable {
-                vos_table: table.name.clone(),
-            });
+        match observed.table(&table.name) {
+            None => {
+                changes.push(LogicalChange::CreateTable {
+                    vos_table: table.name.clone(),
+                });
+            }
+            Some(obs) => {
+                for field in &table.fields {
+                    if !obs.columns.iter().any(|c| c.name == field.name) {
+                        changes.push(LogicalChange::AddField {
+                            vos_table: table.name.clone(),
+                            vos_field: field.name.clone(),
+                        });
+                    }
+                }
+            }
         }
     }
     Ok(LogicalMigrationPlan {
@@ -75,10 +87,38 @@ pub fn apply_push(
                     conn.query_drop(ddl)?;
                     created.push(vos_table.clone());
                 }
-                LogicalChange::AddField { .. } => {
-                    return Err(Error::Policy(
-                        "AddField apply is not implemented in Phase 4 slice".into(),
-                    ));
+                LogicalChange::AddField {
+                    vos_table,
+                    vos_field,
+                } => {
+                    let table = document
+                        .items
+                        .iter()
+                        .find_map(|i| match i {
+                            Item::Table(t) if t.name == *vos_table => Some(t),
+                            _ => None,
+                        })
+                        .ok_or_else(|| {
+                            Error::Policy(format!(
+                                "plan references unknown VOS table `{vos_table}`"
+                            ))
+                        })?;
+                    let field = table
+                        .fields
+                        .iter()
+                        .find(|f| f.name == *vos_field)
+                        .ok_or_else(|| {
+                            Error::Policy(format!(
+                                "plan references unknown VOS field `{vos_table}.{vos_field}`"
+                            ))
+                        })?;
+                    if field.is_primary() {
+                        return Err(Error::Policy(format!(
+                            "refusing AddField for primary key `{vos_table}.{vos_field}` — recreate table"
+                        )));
+                    }
+                    let ddl = add_field_sql(vos_table, field)?;
+                    conn.query_drop(ddl)?;
                 }
             }
         }
@@ -115,7 +155,7 @@ fn create_table_sql(table: &vos::ast::Table) -> Result<String> {
     }
     if pks.is_empty() {
         return Err(Error::Policy(format!(
-            "table `{}` has no primary key --?cannot push",
+            "table `{}` has no primary key -- cannot push",
             table.name
         )));
     }
@@ -125,6 +165,68 @@ fn create_table_sql(table: &vos::ast::Table) -> Result<String> {
         table.name,
         cols.join(", ")
     ))
+}
+
+fn add_field_sql(table: &str, field: &Field) -> Result<String> {
+    let (sql_ty, not_null) = map_field_type_for_add(field)?;
+    let mut piece = format!("`{}` {sql_ty}", field.name);
+    if not_null {
+        // Existing rows need a value when adding NOT NULL columns.
+        // Prefer VARCHAR over TEXT so DEFAULT is portable across MySQL versions.
+        piece.push_str(" NOT NULL");
+        piece.push_str(&format!(" DEFAULT {}", default_literal(field)?));
+    } else {
+        piece.push_str(" NULL");
+    }
+    Ok(format!("ALTER TABLE `{table}` ADD COLUMN {piece};"))
+}
+
+/// Same as [`map_field_type`], except non-PK utf8 uses VARCHAR so NOT NULL DEFAULT works.
+fn map_field_type_for_add(field: &Field) -> Result<(String, bool)> {
+    let (sql_ty, not_null) = map_field_type(field)?;
+    let (inner, _) = strip_optional(&field.ty);
+    let sql_ty = match inner {
+        TypeExpr::Builtin(BuiltinType::Utf8)
+        | TypeExpr::Builtin(BuiltinType::Utf16)
+        | TypeExpr::Builtin(BuiltinType::Decimal)
+        | TypeExpr::Builtin(BuiltinType::Date)
+        | TypeExpr::Builtin(BuiltinType::Time)
+        | TypeExpr::Builtin(BuiltinType::DateTimeUtc)
+            if !field.is_primary() =>
+        {
+            "VARCHAR(512)".into()
+        }
+        _ => sql_ty,
+    };
+    Ok((sql_ty, not_null))
+}
+
+fn default_literal(field: &Field) -> Result<String> {
+    let (inner, _) = strip_optional(&field.ty);
+    match inner {
+        TypeExpr::Builtin(BuiltinType::Bool) => Ok("0".into()),
+        TypeExpr::Builtin(BuiltinType::I8)
+        | TypeExpr::Builtin(BuiltinType::U8)
+        | TypeExpr::Builtin(BuiltinType::I16)
+        | TypeExpr::Builtin(BuiltinType::U16)
+        | TypeExpr::Builtin(BuiltinType::I32)
+        | TypeExpr::Builtin(BuiltinType::U32)
+        | TypeExpr::Builtin(BuiltinType::I64)
+        | TypeExpr::Builtin(BuiltinType::U64)
+        | TypeExpr::Builtin(BuiltinType::F32)
+        | TypeExpr::Builtin(BuiltinType::F64) => Ok("0".into()),
+        TypeExpr::Builtin(BuiltinType::Utf8)
+        | TypeExpr::Builtin(BuiltinType::Utf16)
+        | TypeExpr::Builtin(BuiltinType::Decimal)
+        | TypeExpr::Builtin(BuiltinType::Date)
+        | TypeExpr::Builtin(BuiltinType::Time)
+        | TypeExpr::Builtin(BuiltinType::DateTimeUtc) => Ok("''".into()),
+        TypeExpr::Builtin(BuiltinType::Uuid) => Ok("0x00000000000000000000000000000000".into()),
+        TypeExpr::Builtin(BuiltinType::Bytes) => Ok("''".into()),
+        other => Err(Error::Policy(format!(
+            "no AddField default for VOS type {other:?}"
+        ))),
+    }
 }
 
 fn map_field_type(field: &Field) -> Result<(String, bool)> {
