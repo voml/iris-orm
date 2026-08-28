@@ -42,6 +42,7 @@ fn rust_emit_contains_structs_fingerprint_and_no_sql() {
     assert!(out.contains("pub user_id: String"));
     assert!(out.contains("pub active: bool"));
     assert!(out.contains("SCHEMA_FINGERPRINT"));
+    assert!(out.contains("UUID_FIELDS"));
     assert!(!out.contains("SELECT "));
     assert!(!out.contains("CREATE TABLE"));
     let again = emit_rust_domain(&model).unwrap();
@@ -60,6 +61,29 @@ table Item {
     let out = emit_rust_domain(&model).unwrap();
     assert!(out.contains("Option<String>"));
     assert!(!out.contains("&lt;"));
+}
+
+#[test]
+fn rust_emit_uuid_fields_table() {
+    let schema = r#"
+table Item {
+    @@id: uuid,
+    owner_id: uuid?,
+    name: utf8,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(schema).unwrap();
+    assert!(model.tables[0].fields.iter().any(|f| f.name == "id" && f.is_uuid));
+    assert!(
+        model.tables[0]
+            .fields
+            .iter()
+            .any(|f| f.name == "owner_id" && f.is_uuid && f.optional)
+    );
+    let out = emit_rust_domain(&model).unwrap();
+    assert!(out.contains(r#"("Item", "id")"#));
+    assert!(out.contains(r#"("Item", "owner_id")"#));
+    assert!(!out.contains(r#"("Item", "name")"#));
 }
 
 #[test]
