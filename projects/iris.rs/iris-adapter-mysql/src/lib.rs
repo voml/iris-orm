@@ -26,6 +26,8 @@ use vos::ast::Document;
 pub use catalog::{adopt_plan, classify_type};
 pub use migrate::{PushReport, apply_push, plan_push};
 pub use schema_map::collect_uuid_fields;
+/// Connection handle for generated `DbTxn` / same-connection CRUD.
+pub use mysql::PooledConn;
 
 /// Adapter identifier.
 pub const BACKEND_ID: &str = "mysql";
