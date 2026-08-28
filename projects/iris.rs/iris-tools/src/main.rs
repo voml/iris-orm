@@ -695,13 +695,19 @@ fn cmd_generate_source(
         ));
     }
     let model = GenerationModel::from_vos_schema(source).map_err(|e| e.to_string())?;
-    let path = iris_generator::write_rust_domain(&model, out).map_err(|e| e.to_string())?;
+    let paths = iris_generator::write_rust_domain(&model, out).map_err(|e| e.to_string())?;
     let lock = IrisLock::new(&model.schema_fingerprint, &model.generator_version, target);
     let lock_path = resolve_path(project_dir.unwrap_or(Path::new(".")), DEFAULT_LOCK_PATH);
     write_von_file(&lock_path, &lock.to_von().map_err(|e| e.to_string())?)?;
+    let root = paths
+        .first()
+        .and_then(|p| p.parent())
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| out.display().to_string());
     println!(
-        "generated {} (fingerprint={})",
-        path.display(),
+        "generated {} ({} files, fingerprint={})",
+        root,
+        paths.len(),
         model.schema_fingerprint
     );
     println!("wrote {}", lock_path.display());

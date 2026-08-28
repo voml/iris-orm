@@ -15,7 +15,7 @@ export interface IrisCapabilities {
 /**
  * Binding bring-up / conformance host (not the application ORM surface).
  *
- * Application code should import `./generated/iris` and use `IrisClient` / `iris`.
+ * Application code should import `./generated/iris/typescript` (or host entry) and use `DbClient` / `createDb`.
  * Use generated `db` from `./generated`. Binding bring-up only.
  */
 export interface IrisBindingHost {

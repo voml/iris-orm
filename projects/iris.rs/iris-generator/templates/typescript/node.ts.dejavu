@@ -1,10 +1,10 @@
 import { createIrisDbBinding } from "@yydb/iris/node";
 import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
-import { createClient, type DbClient } from "./db.js";
+import { createClient, type DbClient } from "./operations.js";
 
 /** Node host: construct a generated client with N-API binding. */
 export async function createDb(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
     return createClient(await createIrisDbBinding(options));
 }
 
-export { createClient, DbClient } from "./db.js";
+export { createClient, DbClient } from "./operations.js";

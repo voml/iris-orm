@@ -13,7 +13,7 @@ table User {
 "#;
 
 #[test]
-fn typescript_emit_writes_generated_client_files() {
+fn typescript_emit_writes_ux_layout() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).expect("schema");
     let dir = std::env::temp_dir().join(format!(
         "iris-ts-gen-{}",
@@ -24,12 +24,23 @@ fn typescript_emit_writes_generated_client_files() {
     ));
     let paths = write_typescript_client(&model, &dir).expect("write");
     assert_eq!(paths.len(), 10);
-    assert!(dir.join("generated/db.ts").is_file());
-    assert!(dir.join("generated/synthesize.ts").is_file());
-    let db = std::fs::read_to_string(dir.join("generated/db.ts")).expect("read db.ts");
-    assert!(db.contains("$query<T = unknown>"));
-    assert!(db.contains("synthesizeCreate"));
-    assert!(!db.contains("@yydb/iris/node"));
+    let root = dir.join("generated/iris/typescript");
+    assert!(root.join("index.ts").is_file());
+    assert!(root.join("models.ts").is_file());
+    assert!(root.join("operations.ts").is_file());
+    assert!(root.join("metadata.ts").is_file());
+    assert!(root.join("errors.ts").is_file());
+    assert!(root.join("_internal/synthesize.ts").is_file());
+    assert!(!root.join("synthesize.ts").is_file());
+    assert!(!root.join("db.ts").is_file());
+    let ops = std::fs::read_to_string(root.join("operations.ts")).expect("read operations");
+    assert!(ops.contains("$query<T = unknown>"));
+    assert!(ops.contains("synthesizeCreate"));
+    assert!(ops.contains("./_internal/synthesize.js"));
+    assert!(!ops.contains("@yydb/iris/node"));
+    let index = std::fs::read_to_string(root.join("index.ts")).expect("read index");
+    assert!(index.contains("./operations.js"));
+    assert!(!index.contains("synthesize"));
     let _ = std::fs::remove_dir_all(dir);
 }
 
@@ -45,11 +56,9 @@ fn generate_dispatch_typescript_target() {
     let (_, paths) =
         iris_generator::generate_from_source(USER_SCHEMA, "typescript", &dir).expect("generate");
     assert_eq!(paths.len(), 10);
-    assert!(
-        paths
-            .iter()
-            .all(|path| path.starts_with(dir.join("generated")))
-    );
+    assert!(paths.iter().all(|path| {
+        path.starts_with(dir.join("generated/iris/typescript"))
+    }));
     assert!(
         paths
             .iter()

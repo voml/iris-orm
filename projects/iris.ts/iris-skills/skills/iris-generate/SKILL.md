@@ -14,7 +14,7 @@ Read [../references/workflow.md](../references/workflow.md) and
 ## When to use
 
 - `.iris` / fingerprint changed and typed host client is stale
-- `build.rs` or CI complains missing `generated/iris/mod.rs` (or host equivalent)
+- `build.rs` or CI complains missing `generated/iris/rust/mod.rs` (or `generated/iris/typescript/index.ts`)
 - Adding tables/fields that the generated client must expose
 
 ## Do today (real CLI)
