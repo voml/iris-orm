@@ -15,6 +15,8 @@ iris = { workspace = true }
 iris-generator = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
+# `vos::uuid` / `uuid` pull getrandom; wasm-pack target needs the JS Crypto backend.
+getrandom = { version = "0.4", features = ["wasm_js"] }
 
 [dev-dependencies]
 iris = { workspace = true }
