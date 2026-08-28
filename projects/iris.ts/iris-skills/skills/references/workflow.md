@@ -59,12 +59,14 @@ If the runtime needs schema-derived metadata (e.g. MySQL uuid column map), **`ir
 ## Runtime data access
 
 ```text
-App → generated types / execute_vos("…") / Iris write APIs
+App → generated types / Session::query("…") / db.$query("…") / Iris write APIs
     → Iris planner + adapter
     → DB
 ```
 
 - Prefer generated models + Iris APIs.
+- Pipeline predicates: `.filter(x => …)` or `.where(…)` (alias); both lower to the same `Filter` op.
+- Escape hatch: Rust `query`/`execute` ↔ TS `$query`/`$execute` (legacy `execute_vos` deprecated).
 - **No** SQL / `mysql2` / `sqlx` on Iris-managed tables.
 - New `uuid` PKs: **`iris::uuid()`** (v7 only).
 

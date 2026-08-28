@@ -2,8 +2,8 @@
 name: iris-diagnose
 description: >-
   Diagnose Iris migrate/query/adapter failures and drift. Use when iris push,
-  generate, or execute_vos fails. Fix upstream Iris — never switch to SQL Studio
-  or raw SQL as a workaround.
+  generate, or Session::query / db.$query fails. Fix upstream Iris — never switch
+  to SQL Studio or raw SQL as a workaround.
 ---
 
 # iris-diagnose
