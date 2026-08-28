@@ -1,9 +1,9 @@
 ---
 name: iris-operation
 description: >-
-  Write Iris runtime data access as VOS queries / generated clients
-  (Session::query / db.$query, typed APIs). Use instead of SQL, query builders,
-  or raw drivers for Iris-managed tables.
+  Write Iris runtime data access via generated clients (Rust Db / TS db.user)
+  and escape-hatch query/execute. Prefer generated CRUD over hand-written VOS
+  strings. Use instead of SQL, query builders, or raw drivers.
 ---
 
 # iris-operation
@@ -20,24 +20,43 @@ Read [../references/workflow.md](../references/workflow.md) and
 ## Do today
 
 ```text
-Agent proposes VOS intent (string or generated client)
+Agent proposes intent
+  → generated client (primary) or escape-hatch VOS text
   → Iris planner (capability + IR)
   → Adapter executes
 ```
 
-In Rust apps that wrap Iris:
+### Rust (generated-first)
 
-- Prefer **generated** table types + helpers when present.
-- Or thin host wrappers with **VOS pipeline style**:
-  `query("Goods.filter(x => x.sku_id == \"r50\").collect()")`.
-- Prefer **`.filter(x => …)`**. Do **not** teach SQL-style `.where(…)` in new code
-  (planner may accept `.where` as a compatibility alias of `.filter`, but the
-  canonical surface is `.filter`).
-- Escape hatch names: Rust `Session::query` / `Session::execute` ↔ TS `db.$query` / `db.$execute`
-  (do **not** invent a third name; legacy `execute_vos` is deprecated).
-- New primary keys: **`iris::uuid()`** (v7), never `Uuid::new_v4()`.
+After `iris generate --target rust` (commit `generated/`):
 
-Escape user strings for VOS string literals with the app’s escape helper (e.g. `escape_vos_str`) — do not concatenate raw SQL.
+```rust
+let db = generated::Db::new(&mysql_source);
+// Pool path
+let rows = db.goods().find_many(&GoodsWhere { sku_id: Some("r50".into()), ..Default::default() })?;
+// Shared-DB tests: always ROLLBACK
+db.with_rollback(|txn| {
+    txn.goods().insert(&row)?;
+    let got = txn.goods().find_unique(&GoodsWhere { sku_id: Some(id), ..Default::default() })?;
+    assert!(got.is_some());
+    Ok(())
+})?;
+```
+
+Rules for Rust:
+
+1. **Primary path** = generated `Db` / `DbTxn` delegates (`find_many` / `find_unique` / `insert` / `update` / `delete`).
+2. Escape hatch only: `db.query("…")` / `db.execute("…")` (or `Session::query` on the reference store). **Do not** teach hand-written VOS strings as the normal CRUD API.
+3. Prefer **`.filter(x => …)`** inside any escape-hatch VOS. Do **not** teach SQL-style `.where(…)`.
+4. Inside `transaction` / `with_rollback`, use **`DbTxn`** (or adapter `*_on`) — never pool-level `insert` / `execute_plan` (different connection).
+5. New primary keys: **`iris::uuid()`** (v7), never `Uuid::new_v4()`.
+
+This thin CRUD is a **TS-parity shim** (synthesizes VOS). It is **not** knife-B `GeneratedCall` / identity IR.
+
+### TypeScript
+
+- Prefer `db.user.findMany({ where: { … } })` from generate.
+- Escape hatch: `db.$query` / `db.$execute`.
 
 ## Rules
 
@@ -51,9 +70,10 @@ Escape user strings for VOS string literals with the app’s escape helper (e.g.
 | Wrong | Right |
 |-------|--------|
 | `sqlx::query!("SELECT …")` on Iris tables | VOS / generated Iris API |
+| Hand-written `query("Goods.filter…")` as the app CRUD layer | Generated `db.goods().find_many` |
+| Pool `insert` / `execute_plan` inside `transaction` | `DbTxn` / `insert_on` / `execute_plan_on` |
 | Invent `fromRedis` / dual-write helpers in app | Topology / Iris composite contracts |
-| “Just use mysql2 for this one query” | Fix Iris / express in VOS |
-| New examples using `.where(…)` like SQL | `.filter(x => …)` |
+| New examples using `.where(…)` like SQL | `.filter(x => …)` (or generated where struct) |
 
 ## Planned tools (not live)
 
