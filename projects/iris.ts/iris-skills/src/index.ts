@@ -105,6 +105,11 @@ export const IRIS_LIVE_CLI = [
     "iris generate --config iris.von --target <host>",
 ] as const;
 
+/** One-line contract for agents */
+export const IRIS_WORKFLOW_SUMMARY =
+    "edit .iris → check → generate+commit generated/ → push --plan → push (ops only); deploy = runtime+generated only; never CI migrate/seed/generate";
+
+
 export function listIrisSkills(): readonly IrisSkillMeta[] {
     return IRIS_SKILLS;
 }
