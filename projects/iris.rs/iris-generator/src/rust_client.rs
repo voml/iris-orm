@@ -45,6 +45,8 @@ fn __iris_value_str(row: &Row, key: &str) -> Option<String> {
 fn __iris_value_bool(row: &Row, key: &str) -> Option<bool> {
     match row.get(key)? {
         Value::Bool(b) => Some(*b),
+        // MySQL BOOLEAN is TINYINT(1); adapter surfaces Int.
+        Value::Int(i) => Some(*i != 0),
         _ => None,
     }
 }
