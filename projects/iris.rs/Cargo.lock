@@ -645,7 +645,7 @@ dependencies = [
 [[package]]
 name = "dejavu"
 version = "0.0.1"
-source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#65d39a9eeb37ba27acc1828edd4e8c406f60c602"
+source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#c14ad3f786feb30676d809999199a3c867a90cbf"
 dependencies = [
  "dejavu-engine",
  "dejavu-ir",
@@ -658,7 +658,7 @@ dependencies = [
 [[package]]
 name = "dejavu-engine"
 version = "0.0.1"
-source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#65d39a9eeb37ba27acc1828edd4e8c406f60c602"
+source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#c14ad3f786feb30676d809999199a3c867a90cbf"
 dependencies = [
  "dejavu-ir",
  "dejavu-language",
@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "dejavu-ir"
 version = "0.0.1"
-source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#65d39a9eeb37ba27acc1828edd4e8c406f60c602"
+source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#c14ad3f786feb30676d809999199a3c867a90cbf"
 dependencies = [
  "serde",
  "serde_json",
@@ -681,7 +681,7 @@ dependencies = [
 [[package]]
 name = "dejavu-language"
 version = "0.0.1"
-source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#65d39a9eeb37ba27acc1828edd4e8c406f60c602"
+source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#c14ad3f786feb30676d809999199a3c867a90cbf"
 dependencies = [
  "dejavu-ir",
  "miette",
@@ -692,12 +692,12 @@ dependencies = [
 [[package]]
 name = "dejavu-runtime"
 version = "0.0.1"
-source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#65d39a9eeb37ba27acc1828edd4e8c406f60c602"
+source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#c14ad3f786feb30676d809999199a3c867a90cbf"
 
 [[package]]
 name = "dejavu-types"
 version = "0.0.1"
-source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#65d39a9eeb37ba27acc1828edd4e8c406f60c602"
+source = "git+https://github.com/doki-land/dejavu-engine.git?branch=dev#c14ad3f786feb30676d809999199a3c867a90cbf"
 dependencies = [
  "dejavu-ir",
  "dejavu-language",
@@ -779,7 +779,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2440,7 +2440,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2799,7 +2799,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3138,7 +3138,17 @@ dependencies = [
  "getrandom 0.4.3",
  "js-sys",
  "serde_core",
+ "uuid-rng-internal",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "uuid-rng-internal"
+version = "1.26.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee9ad27c58031a66157ac3b5c93e65068357eeeaceaa658a6163d4e5befb4a06"
+dependencies = [
+ "getrandom 0.4.3",
 ]
 
 [[package]]
@@ -3184,8 +3194,9 @@ dependencies = [
 [[package]]
 name = "vos"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#8b4b3e7d936dc9d8ba438304c361ef066e617f78"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
+ "uuid",
  "vos-ast",
  "vos-generator",
  "vos-inspect",
@@ -3195,7 +3206,7 @@ dependencies = [
 [[package]]
 name = "vos-ast"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#8b4b3e7d936dc9d8ba438304c361ef066e617f78"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "serde",
 ]
@@ -3203,7 +3214,7 @@ dependencies = [
 [[package]]
 name = "vos-generator"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#8b4b3e7d936dc9d8ba438304c361ef066e617f78"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "dejavu",
  "once_cell",
@@ -3215,7 +3226,7 @@ dependencies = [
 [[package]]
 name = "vos-inspect"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#8b4b3e7d936dc9d8ba438304c361ef066e617f78"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "serde",
  "vos-ast",
@@ -3224,7 +3235,7 @@ dependencies = [
 [[package]]
 name = "vos-parser"
 version = "0.1.0"
-source = "git+https://github.com/voml/vos-language.git?branch=dev#8b4b3e7d936dc9d8ba438304c361ef066e617f78"
+source = "git+https://github.com/voml/vos-language.git?branch=dev#cf2b5b0ae95f004daf9003217d09547db8ebd58f"
 dependencies = [
  "miette",
  "thiserror 2.0.20",
@@ -3355,7 +3366,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

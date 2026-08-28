@@ -42,6 +42,18 @@ pub use iris_types::{
     verify_projection, verify_report, watermark_covers, writer_version_ok,
 };
 
+/// VOS builtin `uuid()` — **UUID v7 only** (time-ordered PKs; avoids InnoDB page splits).
+///
+/// See `vos-language/specifications/uuid-v7.md`.
+pub fn uuid() -> String {
+    iris_types::uuid()
+}
+
+/// Returns true when `text` is UUID version 7.
+pub fn uuid_is_v7(text: &str) -> bool {
+    iris_types::is_v7(text)
+}
+
 /// Library version string.
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")

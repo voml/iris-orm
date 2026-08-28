@@ -1,4 +1,8 @@
 //! UUID <-> BINARY(16) helpers for MySQL `uuid` columns.
+//!
+//! Schema `uuid` PKs must be **UUID v7** (`iris::uuid()` / VOS `uuid()`). Random v4 keys
+//! cause clustered-index page splits and insert throughput collapse; v7 keeps inserts
+//! append-mostly on the B-tree right edge. See `vos-language/specifications/uuid-v7.md`.
 
 /// Parse hyphenated or 32-hex UUID text into 16 bytes.
 pub fn try_parse_uuid_bytes(text: &str) -> Option<Vec<u8>> {
