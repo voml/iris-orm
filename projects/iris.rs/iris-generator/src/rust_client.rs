@@ -1,8 +1,8 @@
 //! Emit thin Rust `Db` / typed CRUD (TS-parity shim; not knife-B identity IR).
 //!
 //! Generated code targets `MysqlSource` + `Planner`, synthesizes VOS `.filter`
-//! pipelines with escaped literals, and exposes txn delegates for same-connection
-//! integration tests (`with_rollback`).
+//! pipelines with escaped literals. Pooling stays inside `MysqlSource`; apps see
+//! `Db` and, for a unit of work, `Txn` (same method names).
 
 use crate::{Error, FieldModel, GenerationModel, Result, TableModel};
 
@@ -14,7 +14,8 @@ pub fn emit_rust_mysql_client(model: &GenerationModel) -> Result<String> {
 // --- Thin generated client (TS-parity shim; not knife-B GeneratedCall) ---------
 // Prefer these delegates over hand-written VOS strings / RowWrite. Escape hatch:
 // `Db::query` / `Db::execute` (aligns with Session::query / db.$query).
-// Inside `transaction` / `with_rollback`, use `DbTxn` methods (same connection).
+// `transaction` / `with_rollback` give a `Txn` with the same CRUD surface;
+// the connection is held by Iris — do not call MysqlSource checkout APIs from `f`.
 
 use std::collections::BTreeMap;
 
@@ -65,7 +66,7 @@ fn __iris_value_i64(row: &Row, key: &str) -> Option<i64> {
 
     out.push_str(
         r#"
-/// Generated Iris client bound to a MySQL adapter (pool-level + txn helpers).
+/// Generated Iris client bound to a MySQL adapter.
 pub struct Db<'a> {
     source: &'a MysqlSource,
     planner: Planner,
@@ -95,14 +96,13 @@ impl<'a> Db<'a> {
         Ok(())
     }
 
-    /// Commit-on-success transaction. Use [`DbTxn`] APIs inside `f` — do **not**
-    /// call pool-level [`MysqlSource::insert`] / [`MysqlSource::execute_plan`].
+    /// Commit-on-success transaction. Use [`Txn`] inside `f` (same CRUD names as [`Db`]).
     pub fn transaction<R>(
         &self,
-        f: impl FnOnce(&mut DbTxn<'_>) -> MysqlResult<R>,
+        f: impl FnOnce(&mut Txn<'_>) -> MysqlResult<R>,
     ) -> MysqlResult<R> {
         self.source.transaction(|conn| {
-            let mut txn = DbTxn {
+            let mut txn = Txn {
                 source: self.source,
                 planner: &self.planner,
                 conn,
@@ -114,10 +114,10 @@ impl<'a> Db<'a> {
     /// Always `ROLLBACK` — shared-DB integration tests (fixtures leave no residue).
     pub fn with_rollback<R>(
         &self,
-        f: impl FnOnce(&mut DbTxn<'_>) -> MysqlResult<R>,
+        f: impl FnOnce(&mut Txn<'_>) -> MysqlResult<R>,
     ) -> MysqlResult<R> {
         self.source.with_rollback(|conn| {
-            let mut txn = DbTxn {
+            let mut txn = Txn {
                 source: self.source,
                 planner: &self.planner,
                 conn,
@@ -132,7 +132,7 @@ impl<'a> Db<'a> {
         let method = to_snake(&table.name);
         out.push_str(&format!(
             r#"
-    /// Table delegate for `{name}` (pool connection).
+    /// Table delegate for `{name}`.
     pub fn {method}(&self) -> {name}Delegate<'_> {{
         {name}Delegate {{ db: self }}
     }}
@@ -146,15 +146,15 @@ impl<'a> Db<'a> {
 
     out.push_str(
         r#"
-/// Transaction-scoped client: all CRUD uses the same [`iris_adapter_mysql::PooledConn`].
-pub struct DbTxn<'a> {
+/// Transaction handle: same CRUD names as [`Db`]; Iris holds one connection for the closure.
+pub struct Txn<'a> {
     source: &'a MysqlSource,
     planner: &'a Planner,
     conn: &'a mut iris_adapter_mysql::PooledConn,
 }
 
-impl DbTxn<'_> {
-    /// Escape hatch on the open transaction connection.
+impl Txn<'_> {
+    /// Escape hatch while the transaction connection is held.
     pub fn query(&mut self, source: &str) -> MysqlResult<Vec<Row>> {
         let plan = self
             .planner
@@ -163,7 +163,7 @@ impl DbTxn<'_> {
         self.source.execute_plan_on(self.conn, &plan)
     }
 
-    /// Unit-valued escape hatch on the open transaction connection.
+    /// Unit-valued escape hatch while the transaction connection is held.
     pub fn execute(&mut self, source: &str) -> MysqlResult<()> {
         let _ = self.query(source)?;
         Ok(())
@@ -175,7 +175,7 @@ impl DbTxn<'_> {
         let method = to_snake(&table.name);
         out.push_str(&format!(
             r#"
-    /// Table delegate for `{name}` on this transaction connection.
+    /// Table delegate for `{name}` on this transaction.
     pub fn {method}(&mut self) -> {name}TxnDelegate<'_> {{
         {name}TxnDelegate {{
             source: self.source,
@@ -192,7 +192,7 @@ impl DbTxn<'_> {
     out.push_str("}\n");
 
     for table in &model.tables {
-        out.push_str(&emit_pool_delegate(table)?);
+        out.push_str(&emit_db_delegate(table)?);
         out.push_str(&emit_txn_delegate(table)?);
     }
 
@@ -429,14 +429,14 @@ fn row_write_fn(table: &TableModel, pk: &str) -> String {
     )
 }
 
-fn emit_pool_delegate(table: &TableModel) -> Result<String> {
+fn emit_db_delegate(table: &TableModel) -> Result<String> {
     let name = &table.name;
     let pk = primary_key(table)?;
     let synth = synthesize_fns(table);
     let to_write = row_write_fn(table, pk);
     Ok(format!(
         r#"
-/// Pool-level delegate for `{name}`.
+/// Table delegate for `{name}`.
 pub struct {name}Delegate<'a> {{
     db: &'a Db<'a>,
 }}
@@ -444,31 +444,31 @@ pub struct {name}Delegate<'a> {{
 impl {name}Delegate<'_> {{
 {synth}
 {to_write}
-    /// `find_many` against the pool.
+    /// Find many rows matching a flat where.
     pub fn find_many(&self, where_: &{name}Where) -> MysqlResult<Vec<{name}>> {{
         let source = Self::synthesize_find_many(where_);
         let rows = self.db.query(&source)?;
         Ok(rows.iter().filter_map({name}::from_row).collect())
     }}
 
-    /// `find_unique` — at most one row (adds `.take(1)`).
+    /// Find at most one row (adds `.take(1)`).
     pub fn find_unique(&self, where_: &{name}Where) -> MysqlResult<Option<{name}>> {{
         let source = Self::synthesize_find_unique(where_);
         let rows = self.db.query(&source)?;
         Ok(rows.first().and_then({name}::from_row))
     }}
 
-    /// Insert via [`MysqlSource::insert`].
+    /// Insert a row.
     pub fn insert(&self, row: &{name}) -> MysqlResult<()> {{
         self.db.source.insert(&Self::to_row_write(row))
     }}
 
-    /// Update by primary key via [`MysqlSource::update`].
+    /// Update by primary key.
     pub fn update(&self, row: &{name}) -> MysqlResult<u64> {{
         self.db.source.update(&Self::to_row_write(row))
     }}
 
-    /// Delete by primary key via [`MysqlSource::delete`].
+    /// Delete by primary key.
     pub fn delete(&self, key: &Value) -> MysqlResult<u64> {{
         self.db.source.delete("{name}", "{pk}", key)
     }}
@@ -486,7 +486,7 @@ fn emit_txn_delegate(table: &TableModel) -> Result<String> {
     let pk = primary_key(table)?;
     Ok(format!(
         r#"
-/// Transaction-scoped delegate for `{name}` (same connection).
+/// Table delegate for `{name}` while a [`Txn`] holds the connection.
 pub struct {name}TxnDelegate<'a> {{
     source: &'a MysqlSource,
     planner: &'a Planner,
@@ -494,7 +494,7 @@ pub struct {name}TxnDelegate<'a> {{
 }}
 
 impl {name}TxnDelegate<'_> {{
-    /// `find_many` on the open transaction.
+    /// Find many rows matching a flat where.
     pub fn find_many(&mut self, where_: &{name}Where) -> MysqlResult<Vec<{name}>> {{
         let source = {name}Delegate::synthesize_find_many(where_);
         let plan = self
@@ -505,7 +505,7 @@ impl {name}TxnDelegate<'_> {{
         Ok(rows.iter().filter_map({name}::from_row).collect())
     }}
 
-    /// `find_unique` on the open transaction.
+    /// Find at most one row (adds `.take(1)`).
     pub fn find_unique(&mut self, where_: &{name}Where) -> MysqlResult<Option<{name}>> {{
         let source = {name}Delegate::synthesize_find_unique(where_);
         let plan = self
@@ -516,19 +516,19 @@ impl {name}TxnDelegate<'_> {{
         Ok(rows.first().and_then({name}::from_row))
     }}
 
-    /// Insert on the open transaction ([`MysqlSource::insert_on`]).
+    /// Insert a row.
     pub fn insert(&mut self, row: &{name}) -> MysqlResult<()> {{
         self.source
             .insert_on(self.conn, &{name}Delegate::to_row_write(row))
     }}
 
-    /// Update on the open transaction.
+    /// Update by primary key.
     pub fn update(&mut self, row: &{name}) -> MysqlResult<u64> {{
         self.source
             .update_on(self.conn, &{name}Delegate::to_row_write(row))
     }}
 
-    /// Delete on the open transaction.
+    /// Delete by primary key.
     pub fn delete(&mut self, key: &Value) -> MysqlResult<u64> {{
         self.source.delete_on(self.conn, "{name}", "{pk}", key)
     }}

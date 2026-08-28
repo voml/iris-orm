@@ -44,7 +44,7 @@ fn rust_emit_contains_structs_fingerprint_and_no_sql() {
     assert!(out.contains("SCHEMA_FINGERPRINT"));
     assert!(out.contains("UUID_FIELDS"));
     assert!(out.contains("pub struct Db"));
-    assert!(out.contains("pub struct DbTxn"));
+    assert!(out.contains("pub struct Txn"));
     assert!(out.contains("fn find_many"));
     assert!(out.contains("fn with_rollback"));
     assert!(out.contains("fn query"));
