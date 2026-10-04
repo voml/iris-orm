@@ -263,6 +263,46 @@ export type DeleteArgs = {
     where: Record<string, unknown>;
 };
 
+export type UpdateArgs = {
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+    select?: Record<string, unknown>;
+};
+
+function compilePatchAssignments(
+    entity: string,
+    data: Record<string, unknown>,
+    parameters: VosParameters,
+): string[] {
+    const assignments: string[] = [];
+    for (const [key, value] of Object.entries(data)) {
+        if (value === undefined) {
+            continue;
+        }
+        const wireKey = wireName(entity, key);
+        if (isPlainObject(value) && "set" in value) {
+            const param = nextParam(parameters, `patch_${wireKey}`, flattenRefInput(value.set));
+            assignments.push(`${wireKey}: $${param}`);
+        } else if (isPlainObject(value) && "setNull" in value && value.setNull === true) {
+            assignments.push(`${wireKey}: null`);
+        }
+    }
+    return assignments;
+}
+
+/** Synthesize `Entity.filter(...).patch({ ... })` with bound where and patch parameters. */
+export function synthesizeUpdate(entity: string, args: UpdateArgs): VosSynthesis {
+    const parameters: VosParameters = {};
+    const predicates = compileWherePredicates(entity, args.where, parameters);
+    const assignments = compilePatchAssignments(entity, args.data, parameters);
+    const body = predicates.length === 1 ? predicates[0]! : predicates.join(" && ");
+    let source = `${entity}.filter(x => ${body}).patch({ ${assignments.join(", ")} })`;
+    if (args.select && Object.keys(args.select).length > 0) {
+        source = `(${source}).map(x => ${compileSelectProjection(entity, args.select, "x")})`;
+    }
+    return { source, parameters };
+}
+
 /** Synthesize `Entity.filter(...).delete()` with bound where parameters. */
 export function synthesizeDelete(entity: string, args: DeleteArgs): VosSynthesis {
     const parameters: VosParameters = {};

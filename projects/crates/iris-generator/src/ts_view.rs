@@ -96,6 +96,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 format!("{}FindUniqueArgs", table.name),
                 format!("{}CreateArgs", table.name),
                 format!("{}DeleteArgs", table.name),
+                format!("{}UpdateArgs", table.name),
                 format!("{}GetPayload", table.name),
             ]
         })
@@ -159,6 +160,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 }
             }
             push_d1_create_plans(&mut lines, entity, &insert_fields);
+            push_d1_update_plans(&mut lines, entity, table, &cols, &entity_names);
             lines
         })
         .collect::<Vec<_>>()
@@ -477,6 +479,56 @@ fn push_d1_create_plans(lines: &mut Vec<String>, entity: &str, insert_fields: &[
         lines.push(format!(
             "    \"{entity}.create@{variant_suffix}\": {{ sql: \"INSERT INTO {entity} ({insert_cols}) VALUES ({placeholders}) RETURNING {insert_cols}\", mode: \"write-returning\", paramOrder: [{param_order}] }},"
         ));
+    }
+}
+
+fn d1_patch_field_eligible(field: &FieldModel, entity_names: &HashSet<&str>) -> bool {
+    if field.primary {
+        return false;
+    }
+    match &field.reference_target {
+        Some(target) => entity_names.contains(target.as_str()),
+        None => true,
+    }
+}
+
+fn d1_patch_fields<'a>(table: &'a TableModel, entity_names: &HashSet<&str>) -> Vec<&'a FieldModel> {
+    table.fields.iter().filter(|field| d1_patch_field_eligible(field, entity_names)).collect()
+}
+
+fn push_d1_update_plans(lines: &mut Vec<String>, entity: &str, table: &TableModel, returning_cols: &str, entity_names: &HashSet<&str>) {
+    let patch_fields = d1_patch_fields(table, entity_names);
+    if patch_fields.is_empty() || patch_fields.len() > MAX_D1_CREATE_SUBSET_FIELDS {
+        return;
+    }
+    let primary_fields: Vec<_> = table.fields.iter().filter(|field| field.primary).collect();
+    if primary_fields.is_empty() {
+        return;
+    }
+    let patch_count = patch_fields.len();
+    for pk in primary_fields {
+        let pk_wire = pk.name.as_str();
+        let pk_param = format!("p_{pk_wire}");
+        for mask in 1..(1usize << patch_count) {
+            let subset: Vec<_> = patch_fields
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| mask & (1usize << index) != 0)
+                .map(|(_, field)| *field)
+                .collect();
+            let set_clause = subset.iter().map(|field| format!("{} = ?", field.name)).collect::<Vec<_>>().join(", ");
+            let patch_param_keys = subset.iter().map(|field| format!("patch_{}", field.name)).collect::<Vec<_>>();
+            let mut sorted_keys = patch_param_keys.clone();
+            sorted_keys.push(pk_param.clone());
+            sorted_keys.sort();
+            let variant_suffix = sorted_keys.join(",");
+            let mut param_order = patch_param_keys.iter().map(|key| format!("\"{key}\"")).collect::<Vec<_>>();
+            param_order.push(format!("\"{pk_param}\""));
+            let param_order_json = param_order.join(", ");
+            lines.push(format!(
+                "    \"{entity}.update@{variant_suffix}\": {{ sql: \"UPDATE {entity} SET {set_clause} WHERE {pk_wire} = ? RETURNING {returning_cols}\", mode: \"write-returning\", paramOrder: [{param_order_json}] }},"
+            ));
+        }
     }
 }
 
