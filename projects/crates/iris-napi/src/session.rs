@@ -256,11 +256,11 @@ impl MemorySession {
 
     /// Execute a structured Iris operation JSON payload (generated client ABI).
     #[napi(js_name = executeOperation)]
-    pub fn execute_operation(&self, operation_json: String) -> Result<ExecuteResult> {
+    pub fn execute_operation(&self, request_json: String) -> Result<ExecuteResult> {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let source = operation::encode_operation_json(&operation_json).map_err(|err| Error::from_reason(err))?;
+        let source = operation::encode_request_json(&request_json).map_err(|err| Error::from_reason(err))?;
         if let SessionStore::Yydb(db) = &self.store {
             self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
         }
