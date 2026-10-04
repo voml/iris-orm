@@ -6,7 +6,7 @@ use std::{
 };
 
 use iris_types::{LogicalChange, LogicalMigrationPlan, ObservedCatalog};
-use rusqlite::Connection;
+use sqlite_provider::SqliteProvider;
 use vos::ast::{BuiltinType, Document, Field, Item, TypeExpr};
 
 use crate::{Error, Result};
@@ -43,34 +43,40 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
 }
 
 /// Apply a reviewed logical plan by emitting private SQLite DDL.
-pub fn apply_push(conn: &mut Connection, plan: &LogicalMigrationPlan, document: &Document) -> Result<PushReport> {
+pub fn apply_push(provider: &impl SqliteProvider, plan: &LogicalMigrationPlan, document: &Document) -> Result<PushReport> {
     if plan.destructive {
         return Err(Error::Policy("refusing to apply destructive plan without explicit policy".into()));
     }
     let mut created = Vec::new();
-    let tx = conn.transaction()?;
-    for change in &plan.changes {
-        match change {
-            LogicalChange::CreateTable { vos_table } => {
-                let table = document
-                    .items
-                    .iter()
-                    .find_map(|i| match i {
-                        Item::Table(t) if t.name == *vos_table => Some(t),
-                        _ => None,
-                    })
-                    .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
-                let ddl = create_table_sql(table)?;
-                tx.execute_batch(&ddl)?;
-                created.push(vos_table.clone());
-            }
-            LogicalChange::AddField { .. } => {
-                return Err(Error::Policy("AddField apply is not implemented in Phase 3 slice".into()));
+    provider.begin_immediate()?;
+    let applied = (|| {
+        for change in &plan.changes {
+            match change {
+                LogicalChange::CreateTable { vos_table } => {
+                    let table = document
+                        .items
+                        .iter()
+                        .find_map(|i| match i {
+                            Item::Table(t) if t.name == *vos_table => Some(t),
+                            _ => None,
+                        })
+                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
+                    let ddl = create_table_sql(table)?;
+                    provider.execute_batch(&ddl)?;
+                    created.push(vos_table.clone());
+                }
+                LogicalChange::AddField { .. } => {
+                    return Err(Error::Policy("AddField apply is not implemented in Phase 3 slice".into()));
+                }
             }
         }
+        provider.commit()?;
+        Ok(PushReport { plan_id: plan.id.clone(), created_tables: created })
+    })();
+    if applied.is_err() {
+        let _ = provider.rollback();
     }
-    tx.commit()?;
-    Ok(PushReport { plan_id: plan.id.clone(), created_tables: created })
+    applied
 }
 
 fn create_table_sql(table: &vos::ast::Table) -> Result<String> {

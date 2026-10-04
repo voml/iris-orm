@@ -1,42 +1,31 @@
 //! Catalog inspect, adopt planning, and drift (no SQL in public values).
 
 use iris_types::{DriftReport, FieldMapping, MappingManifest, MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, TableMapping};
-use rusqlite::Connection;
+use sqlite_provider::SqliteProvider;
 use vos::ast::{Document, Item, TypeExpr};
 
 use crate::{ADAPTER_VERSION, BACKEND_ID, Result, outbox};
 
-pub(crate) fn inspect_catalog(conn: &Connection) -> Result<ObservedCatalog> {
+pub(crate) fn inspect_catalog(provider: &impl SqliteProvider) -> Result<ObservedCatalog> {
+    let snapshot = provider.inspect_catalog()?;
     let mut tables = Vec::new();
-    let mut stmt = conn.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")?;
-    let names = stmt.query_map([], |row| row.get::<_, String>(0))?.collect::<std::result::Result<Vec<_>, _>>()?;
-    for name in names {
-        if outbox::is_meta_table(&name) {
+    for table in snapshot.tables {
+        if outbox::is_meta_table(&table.name) {
             continue;
         }
-        let columns = inspect_table(conn, &name)?;
-        tables.push(ObservedTable { name, columns });
+        let columns = table
+            .columns
+            .into_iter()
+            .map(|col| ObservedColumn {
+                name: col.name,
+                type_name: col.type_name,
+                nullable: col.nullable,
+                primary_key: col.primary_key,
+            })
+            .collect();
+        tables.push(ObservedTable { name: table.name, columns });
     }
     Ok(ObservedCatalog { backend_id: BACKEND_ID.into(), tables })
-}
-
-fn inspect_table(conn: &Connection, table: &str) -> Result<Vec<ObservedColumn>> {
-    // PRAGMA table_info is the SQLite catalog API; kept private to this module.
-    // Quote the identifier so names with punctuation never become command text.
-    let escaped = table.replace('"', "\"\"");
-    let pragma = format!("PRAGMA table_info(\"{escaped}\")");
-    let mut stmt = conn.prepare(&pragma)?;
-    let cols = stmt
-        .query_map([], |row| {
-            Ok(ObservedColumn {
-                name: row.get::<_, String>(1)?,
-                type_name: row.get::<_, String>(2)?,
-                nullable: row.get::<_, i64>(3)? == 0,
-                primary_key: row.get::<_, i64>(5)? > 0,
-            })
-        })?
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    Ok(cols)
 }
 
 /// Build a reviewable adopt mapping; never invents VOS business names from SQL.

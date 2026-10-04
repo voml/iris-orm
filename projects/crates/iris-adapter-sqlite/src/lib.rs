@@ -1,7 +1,7 @@
 //! Isolated SQLite foreign-store adapter.
 //!
 //! Backend commands stay **private** to this crate. The public API speaks Iris
-//! physical plans, observed catalogs, and mapping manifests --?never SQL strings.
+//! physical plans, observed catalogs, and mapping manifests -- never SQL strings.
 
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -19,11 +19,13 @@ use std::{
 
 use iris_ir::{CommitToken, IrVersion, OutboxRecord, PhysicalPlan};
 use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
-use rusqlite::Connection;
+use sqlite_provider::{CONTRACT_VERSION, SqliteError, SqliteProvider};
+use sqlite_provider_rusqlite::RusqliteProvider;
 
 pub use catalog::adopt_plan;
 pub use migrate::{PushReport, apply_push, plan_push};
 pub use outbox::AuthorityTxn;
+pub use sqlite_provider::SqliteValue;
 
 /// Adapter identifier.
 pub const BACKEND_ID: &str = "sqlite";
@@ -31,9 +33,9 @@ pub const BACKEND_ID: &str = "sqlite";
 /// Adapter crate version label.
 pub const ADAPTER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// SQLite foreign datasource.
+/// SQLite foreign datasource backed by the versioned provider contract.
 pub struct SqliteSource {
-    conn: Mutex<Connection>,
+    provider: Mutex<RusqliteProvider>,
     path: Option<PathBuf>,
 }
 
@@ -56,9 +58,14 @@ impl SqliteSource {
         }
     }
 
+    /// Frozen SQLite provider contract version used by this adapter.
+    pub fn provider_contract_version() -> &'static str {
+        CONTRACT_VERSION
+    }
+
     /// Open an in-memory SQLite database.
     pub fn open_in_memory() -> Result<Self> {
-        Ok(Self { conn: Mutex::new(Connection::open_in_memory()?), path: None })
+        Ok(Self { provider: Mutex::new(RusqliteProvider::open_in_memory()?), path: None })
     }
 
     /// Open or create a file-backed SQLite database.
@@ -67,7 +74,7 @@ impl SqliteSource {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        Ok(Self { conn: Mutex::new(Connection::open(&path)?), path: Some(path) })
+        Ok(Self { provider: Mutex::new(RusqliteProvider::open(&path)?), path: Some(path) })
     }
 
     /// On-disk path when file-backed.
@@ -75,10 +82,22 @@ impl SqliteSource {
         self.path.as_deref()
     }
 
+    /// Active upstream SQLite engine version string.
+    pub fn sqlite_version(&self) -> Result<String> {
+        let provider = self.provider.lock().expect("sqlite mutex");
+        provider.sqlite_version().map_err(Error::from)
+    }
+
+    /// Active upstream SQLite source id string.
+    pub fn sqlite_source_id(&self) -> Result<String> {
+        let provider = self.provider.lock().expect("sqlite mutex");
+        provider.source_id().map_err(Error::from)
+    }
+
     /// Inspect the foreign catalog (Adopt Existing input).
     pub fn inspect(&self) -> Result<ObservedCatalog> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        catalog::inspect_catalog(&conn)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        catalog::inspect_catalog(&*provider)
     }
 
     /// Build an adopt mapping against a VOS schema document (does not invent semantics).
@@ -101,8 +120,8 @@ impl SqliteSource {
     pub fn apply_managed_push(&self, plan: &LogicalMigrationPlan, vos_schema: &str) -> Result<PushReport> {
         let document = vos::parser::parse_document(vos_schema)
             .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
-        let mut conn = self.conn.lock().expect("sqlite mutex");
-        migrate::apply_push(&mut conn, plan, &document)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        migrate::apply_push(&*provider, plan, &document)
     }
 
     /// Convenience: plan + apply when the database has no conflicting tables.
@@ -127,87 +146,85 @@ impl SqliteSource {
         if plan.is_rejected() {
             return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
-        let conn = self.conn.lock().expect("sqlite mutex");
-        execute::execute_plan(&conn, plan)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        execute::execute_plan(&*provider, plan)
     }
 
     /// Insert a row (typed values; SQL stays private).
     pub fn insert(&self, write: &RowWrite) -> Result<()> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        execute::insert_row(&conn, write)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        execute::insert_row(&*provider, write)
     }
 
     /// Update by primary key.
     pub fn update(&self, write: &RowWrite) -> Result<usize> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        execute::update_row(&conn, write)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        execute::update_row(&*provider, write)
     }
 
     /// Delete by primary key.
     pub fn delete(&self, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<usize> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        execute::delete_row(&conn, table, primary_key, key)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        execute::delete_row(&*provider, table, primary_key, key)
     }
 
     /// Begin a transaction.
     pub fn begin(&self) -> Result<()> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        conn.execute_batch("BEGIN IMMEDIATE")?;
-        Ok(())
+        let provider = self.provider.lock().expect("sqlite mutex");
+        provider.begin_immediate().map_err(Error::from)
     }
 
     /// Commit.
     pub fn commit(&self) -> Result<()> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        conn.execute_batch("COMMIT")?;
-        Ok(())
+        let provider = self.provider.lock().expect("sqlite mutex");
+        provider.commit().map_err(Error::from)
     }
 
     /// Rollback.
     pub fn rollback(&self) -> Result<()> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        conn.execute_batch("ROLLBACK")?;
-        Ok(())
+        let provider = self.provider.lock().expect("sqlite mutex");
+        provider.rollback().map_err(Error::from)
     }
 
     /// Install authority commit counter + outbox tables (idempotent).
     pub fn ensure_authority_outbox(&self) -> Result<()> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        outbox::ensure_schema(&conn)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        outbox::ensure_schema(&*provider)
     }
 
     /// Current authority [`CommitToken`] (last successful composite commit).
     pub fn current_commit_token(&self) -> Result<CommitToken> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        outbox::current_token(&conn)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        outbox::current_token(&*provider)
     }
 
     /// Authority transaction: business mutations + outbox appends commit atomically.
     ///
-    /// Success means authority committed and durable outbox accepted propagation duty --?    /// not that cache/search/vector projections have applied the events.
-    pub fn authority_commit<R>(&self, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
-        let mut conn = self.conn.lock().expect("sqlite mutex");
-        outbox::authority_commit(&mut conn, f)
+    /// Success means authority committed and durable outbox accepted propagation duty --
+    /// not that cache/search/vector projections have applied the events.
+    pub fn authority_commit<R>(&self, f: impl FnOnce(&mut AuthorityTxn<'_, RusqliteProvider>) -> Result<R>) -> Result<(R, CommitToken)> {
+        let provider = self.provider.lock().expect("sqlite mutex");
+        outbox::authority_commit(&*provider, f)
     }
 
     /// Poll durable outbox events after a sequence (projector shape).
     pub fn outbox_after(&self, after_seq: u64, limit: usize) -> Result<Vec<OutboxRecord>> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        outbox::outbox_after(&conn, after_seq, limit)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        outbox::outbox_after(&*provider, after_seq, limit)
     }
 
     /// Outbox backlog size.
     pub fn outbox_backlog(&self) -> Result<u64> {
-        let conn = self.conn.lock().expect("sqlite mutex");
-        outbox::outbox_backlog(&conn)
+        let provider = self.provider.lock().expect("sqlite mutex");
+        outbox::outbox_backlog(&*provider)
     }
 }
 
 /// Adapter errors.
 #[derive(Debug)]
 pub enum Error {
-    /// SQLite / rusqlite failure.
-    Sqlite(rusqlite::Error),
+    /// SQLite provider failure.
+    Sqlite(SqliteError),
     /// I/O (journal files, directories).
     Io(std::io::Error),
     /// VOS schema parse / semantic issues.
@@ -236,8 +253,8 @@ impl std::error::Error for Error {
     }
 }
 
-impl From<rusqlite::Error> for Error {
-    fn from(value: rusqlite::Error) -> Self {
+impl From<SqliteError> for Error {
+    fn from(value: SqliteError) -> Self {
         Self::Sqlite(value)
     }
 }

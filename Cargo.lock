@@ -1298,8 +1298,9 @@ version = "0.1.0"
 dependencies = [
  "iris-ir",
  "iris-types",
- "rusqlite",
  "serde",
+ "sqlite-provider",
+ "sqlite-provider-rusqlite",
  "vos",
 ]
 
@@ -2560,6 +2561,21 @@ checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "sqlite-provider"
+version = "0.1.0"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "sqlite-provider-rusqlite"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "sqlite-provider",
 ]
 
 [[package]]

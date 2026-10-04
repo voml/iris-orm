@@ -3,6 +3,8 @@
 use std::collections::BTreeMap;
 
 use iris_adapter_sqlite::{BACKEND_ID, SqliteSource};
+use sqlite_provider::{CONTRACT_VERSION, SqliteProvider};
+use sqlite_provider_rusqlite::RusqliteProvider;
 use iris_ir::RealizationClass;
 use iris_types::{Planner, RowWrite, Value};
 
@@ -90,7 +92,7 @@ fn adopt_existing_blocks_missing_pk_and_maps_exact_fields() {
     let path = std::env::temp_dir()
         .join(format!("iris-sqlite-adopt-{}.db", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     {
-        let raw = rusqlite::Connection::open(&path).unwrap();
+        let raw = RusqliteProvider::open(&path).unwrap();
         raw.execute_batch("CREATE TABLE Legacy (name TEXT);").unwrap();
     }
     let db2 = SqliteSource::open(&path).unwrap();
@@ -219,7 +221,58 @@ fn adapter_is_not_yydb() {
     assert_ne!(BACKEND_ID, "reference");
     let manifest = include_str!("../Cargo.toml");
     assert!(!manifest.contains("yydb"));
-    assert!(manifest.contains("rusqlite"));
+    assert!(manifest.contains("sqlite-provider"));
+    assert!(
+        !manifest
+            .lines()
+            .any(|line| line.trim_start().starts_with("rusqlite") && line.contains('=')),
+        "adapter must not depend on rusqlite directly"
+    );
+}
+
+#[test]
+fn iris_push_file_readable_by_shared_provider_engine() {
+    let path = std::env::temp_dir().join(format!(
+        "iris-sqlite-cross-{}.db",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    {
+        let db = SqliteSource::open(&path).unwrap();
+        db.managed_push(USER_SCHEMA).unwrap();
+        db.insert(&RowWrite {
+            table: "User".into(),
+            primary_key: "user_id".into(),
+            fields: BTreeMap::from([
+                ("user_id".into(), Value::Str("cross".into())),
+                ("user_name".into(), Value::Str("provider".into())),
+                ("active".into(), Value::Bool(true)),
+            ]),
+        })
+        .unwrap();
+        assert_eq!(db.sqlite_version().unwrap(), RusqliteProvider::open(&path).unwrap().sqlite_version().unwrap());
+    }
+
+    let reader = RusqliteProvider::open(&path).unwrap();
+    let catalog = reader.inspect_catalog().expect("catalog");
+    assert!(catalog.table("User").is_some());
+    let rows = reader
+        .execute_one("SELECT user_name FROM \"User\" WHERE user_id = ?1", &[sqlite_provider::SqliteValue::Text(b"cross".to_vec())])
+        .expect("select");
+    assert_eq!(rows.rows[0][0], sqlite_provider::SqliteValue::Text(b"provider".to_vec()));
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn adapter_uses_versioned_sqlite_provider_contract() {
+    let db = SqliteSource::open_in_memory().unwrap();
+    assert_eq!(SqliteSource::provider_contract_version(), CONTRACT_VERSION);
+    let version = db.sqlite_version().expect("sqlite version");
+    assert!(!version.is_empty());
+    let source_id = db.sqlite_source_id().expect("sqlite source id");
+    assert!(!source_id.is_empty());
 }
 
 #[test]
