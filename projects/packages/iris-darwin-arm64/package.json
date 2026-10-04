@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris-darwin-arm64",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "description": "Prebuilt Iris ORM N-API binary for macOS arm64 (Apple Silicon)",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {

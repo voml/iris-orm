@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API + WASM facades, iris CLI)",
     "homepage": "https://iris-orm.pages.dev/",
     "keywords": [

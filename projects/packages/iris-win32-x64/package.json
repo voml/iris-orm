@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris-win32-x64",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "description": "Prebuilt Iris ORM N-API binary for Windows x64",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {

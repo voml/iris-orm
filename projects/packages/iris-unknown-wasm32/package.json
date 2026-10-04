@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris-unknown-wasm32",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "description": "Browser WebAssembly semantic core for @yydb/iris (wasm-bindgen artifact)",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {
