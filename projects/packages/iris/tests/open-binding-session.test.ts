@@ -27,9 +27,10 @@ function stubCore(): { core: IrisBindings; pushed: string[] } {
     return { core, pushed };
 }
 
-test("resolveBindingProfile infers sqlite and project from options", () => {
+test("resolveBindingProfile infers sqlite, opfs, and project from options", () => {
     assert.equal(resolveBindingProfile({}), "memory");
     assert.equal(resolveBindingProfile({ sqlitePath: ":memory:" }), "sqlite");
+    assert.equal(resolveBindingProfile({ opfsPath: "app" }), "opfs");
     assert.equal(resolveBindingProfile({ config: "/app" }), "project");
 });
 
@@ -44,5 +45,13 @@ test("openBindingSession rejects non-memory profiles on web host", async () => {
     await assert.rejects(
         () => openBindingSession("web", core, { profile: "sqlite", sqlitePath: ":memory:" }),
         /browser host only supports memory profile/,
+    );
+});
+
+test("openBindingSession rejects opfs profile on web host", async () => {
+    const { core } = stubCore();
+    await assert.rejects(
+        () => openBindingSession("web", core, { profile: "opfs", opfsPath: "app" }),
+        /@yydb\/iris\/opfs/,
     );
 });

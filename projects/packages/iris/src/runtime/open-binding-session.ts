@@ -1,6 +1,6 @@
 import type { IrisBindings, MemorySessionBinding } from "../bindings.ts";
 import type { CreateIrisDbBindingOptions } from "../types/executor.ts";
-import type { IrisHost } from "../types/profile.ts";
+import type { IrisBindingProfile, IrisHost } from "../types/profile.ts";
 import { normalizeIrisHost } from "../types/profile.ts";
 
 /** Node-only project wiring for generated `Database.create` (`profile: "project"`). */
@@ -12,9 +12,12 @@ export type BindingSessionHooks = {
 };
 
 /** Resolve the binding profile from generated-client options. */
-export function resolveBindingProfile(options: CreateIrisDbBindingOptions = {}): "memory" | "sqlite" | "project" {
+export function resolveBindingProfile(options: CreateIrisDbBindingOptions = {}): IrisBindingProfile {
     if (options.profile) {
         return options.profile;
+    }
+    if (options.opfsPath) {
+        return "opfs";
     }
     if (options.sqlitePath) {
         return "sqlite";
@@ -34,8 +37,8 @@ function pushSchemaIfPresent(session: MemorySessionBinding, schema?: string): vo
 /**
  * Open a generated-client session symmetrically across Node N-API and browser WASM hosts.
  *
- * Node supports sqlite/project/memory profiles. Browser currently supports memory only and
- * accepts inline `schema` for managed-push when the binding exposes it.
+ * Node supports sqlite/project/memory profiles. Browser supports memory inline schema push;
+ * durable OPFS execution uses `@yydb/iris/opfs` with a host-provided SQLite handle.
  */
 export async function openBindingSession(
     host: IrisHost | "web",
@@ -67,6 +70,11 @@ export async function openBindingSession(
         return session;
     }
 
+    if (profile === "opfs") {
+        throw new Error(
+            `@yydb/iris: browser opfs profile requires @yydb/iris/opfs with an injected SQLite handle (got opfsPath=${options.opfsPath ?? "default"})`,
+        );
+    }
     if (profile !== "memory") {
         throw new Error(
             `@yydb/iris: browser host only supports memory profile (got ${profile}); pass inline schema or use @yydb/iris/node`,
