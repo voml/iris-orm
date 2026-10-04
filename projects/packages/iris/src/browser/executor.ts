@@ -20,7 +20,9 @@ export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = 
 /** Create the async operation executor for generated browser clients (preferred ABI). */
 export async function createIrisOperationExecutor(options: CreateIrisDbBindingOptions = {}): Promise<OperationExecutor> {
     const session = await openBindingSession("browser", getWasmSemanticCore(), options);
-    const executor = createOperationExecutorFromSession(session);
+    const executor = createOperationExecutorFromSession(session, {
+        wireNamesByEntity: options.wireNamesByEntity,
+    });
     if (options.contractFingerprint) {
         return guardOperationExecutor(executor, options.contractFingerprint);
     }

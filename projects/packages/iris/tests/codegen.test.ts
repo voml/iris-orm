@@ -72,6 +72,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
     assert.match(nodeEntry, /createIrisOperationExecutor/);
+    assert.match(nodeEntry, /IRIS_FIELD_WIRE_NAMES/);
+    assert.match(nodeEntry, /wireNamesByEntity: IRIS_FIELD_WIRE_NAMES/);
     assert.match(nodeEntry, /IRIS_SCHEMA_FINGERPRINT/);
     assert.match(nodeEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
     assert.match(nodeEntry, /export class Database/);
@@ -82,6 +84,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris\/wasm/);
     assert.match(browserEntry, /createIrisOperationExecutor/);
+    assert.match(browserEntry, /wireNamesByEntity: IRIS_FIELD_WIRE_NAMES/);
     assert.match(browserEntry, /IRIS_SCHEMA_FINGERPRINT/);
     assert.match(browserEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
     assert.match(browserEntry, /export class Database/);

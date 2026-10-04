@@ -41,6 +41,8 @@ export interface CreateIrisDbBindingOptions {
     schema?: string;
     /** Build-time contract fingerprint from generated metadata (generated clients set this). */
     contractFingerprint?: string;
+    /** Wire-name map from generated `metadata.ts` (`IRIS_FIELD_WIRE_NAMES`). */
+    wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 /** @deprecated Use `IrisDbBinding`. */

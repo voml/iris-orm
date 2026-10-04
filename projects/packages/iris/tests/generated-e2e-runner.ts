@@ -3,16 +3,8 @@ import { Database } from "./node.js";
 import { buildDeclaredOperationRequest, synthesizeFindMany } from "./_internal/synthesize.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT } from "./metadata.js";
 
-function readTsField(row: Record<string, unknown>, entity: string, tsField: string): unknown {
-    const wire = IRIS_FIELD_WIRE_NAMES[entity]?.[tsField];
-    if (wire && wire in row) {
-        return row[wire];
-    }
-    return row[tsField];
-}
-
-function readBoolField(row: Record<string, unknown>, entity: string, tsField: string): boolean {
-    const value = readTsField(row, entity, tsField);
+function readBoolField(row: Record<string, unknown>, field: string): boolean {
+    const value = row[field];
     return value === true || value === 1;
 }
 
@@ -27,6 +19,7 @@ const executor = await createIrisOperationExecutor({
     profile: "sqlite",
     sqlitePath: ":memory:",
     schema,
+    wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
     contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
 });
 
@@ -89,7 +82,6 @@ if (!directEnvelope.ok) {
 }
 
 const createdRow = created as Record<string, unknown>;
-const uniqueRow = (unique ?? {}) as Record<string, unknown>;
 const updatedRow = updated as Record<string, unknown>;
 
 console.log(
@@ -99,12 +91,12 @@ console.log(
         directCount: directEnvelope.value.length,
         clientCount: clientRows.length,
         databaseCount: databaseRows.length,
-        createdUserId: readTsField(createdRow, "User", "userId"),
-        createdUserName: readTsField(createdRow, "User", "userName"),
-        createdActive: readBoolField(createdRow, "User", "active"),
-        uniqueUserName: unique ? readTsField(uniqueRow, "User", "userName") : null,
+        createdUserId: created.userId,
+        createdUserName: created.userName,
+        createdActive: readBoolField(createdRow, "active"),
+        uniqueUserName: unique?.userName,
         afterCreateCount: afterCreate.length,
-        updatedUserName: readTsField(updatedRow, "User", "userName"),
+        updatedUserName: updated.userName,
         afterDeleteCount: afterDelete.length,
     }),
 );
