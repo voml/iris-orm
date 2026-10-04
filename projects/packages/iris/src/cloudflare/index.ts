@@ -8,8 +8,11 @@
 export { createIrisOperationExecutor, type CreateIrisCloudflareExecutorOptions } from "./executor.ts";
 export { createD1OperationExecutor, createD1ReadOperationExecutor } from "./d1-executor.ts";
 export {
+    applyD1ReturningProjection,
     bindD1Parameters,
     coerceD1BindValue,
+    D1_PLAN_META_PARAM_KEYS,
+    planLookupParamKeys,
     resolveD1Plan,
     resolveD1PlanForRequest,
     type D1PhysicalPlan,

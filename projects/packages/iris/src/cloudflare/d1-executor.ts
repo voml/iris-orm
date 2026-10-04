@@ -1,7 +1,13 @@
 import type { OperationRequest, ResultEnvelope } from "../types/contract.ts";
 import type { ExecutionRow } from "../types/execution-result.ts";
 import type { OperationExecutor } from "../types/operation-executor.ts";
-import { bindD1Parameters, resolveD1PlanForRequest, type D1PhysicalPlan, type D1PlanRegistry } from "./d1-plan.ts";
+import {
+    applyD1ReturningProjection,
+    bindD1Parameters,
+    resolveD1PlanForRequest,
+    type D1PhysicalPlan,
+    type D1PlanRegistry,
+} from "./d1-plan.ts";
 import type { IrisD1Database } from "./types.ts";
 
 function notWired(code: string, message: string): ResultEnvelope<never> {
@@ -64,7 +70,8 @@ async function executeWriteReturningPlan(
 ): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
     try {
         const bindValues = bindD1Parameters(plan, parameters);
-        const statement = d1.prepare(plan.sql).bind(...bindValues);
+        const sql = applyD1ReturningProjection(plan.sql, parameters?.select_cols);
+        const statement = d1.prepare(sql).bind(...bindValues);
         const { results } = await statement.all<Record<string, unknown>>();
         const rows = (results ?? []).map((row) => wireRowToAuthorRow(wireToTs, row));
         return { ok: true, value: rows };

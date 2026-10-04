@@ -150,6 +150,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(synthesize, /synthesizeCreate/);
     assert.match(synthesize, /synthesizeUpdate/);
     assert.match(synthesize, /patch_/);
+    assert.match(synthesize, /compileSelectWireColumns/);
+    assert.match(synthesize, /select_cols/);
     assert.match(synthesize, /buildDeclaredOperationRequest/);
     assert.match(synthesize, /IRIS_SCHEMA_FINGERPRINT/);
 
@@ -499,7 +501,7 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
         uniqueUserId: string;
         createdUserId: string;
         createdUserName: string;
-        createdActive: number;
+        createdHasActive: boolean;
         updatedUserName: string;
         filteredTrace: { sql: string; bind: unknown[] };
         limitedTrace: { sql: string; bind: unknown[] };
@@ -517,7 +519,7 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.equal(payload.uniqueUserId, "u1");
     assert.equal(payload.createdUserId, "u1");
     assert.equal(payload.createdUserName, "Ada");
-    assert.equal(payload.createdActive, 1);
+    assert.equal(payload.createdHasActive, false);
     assert.equal(payload.updatedUserName, "Ada");
     assert.match(payload.filteredTrace.sql, /WHERE active = \?/);
     assert.deepEqual(payload.filteredTrace.bind, [1]);
@@ -530,7 +532,7 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.deepEqual(payload.uniqueTrace.bind, ["u1"]);
     assert.match(payload.uniqueTrace.sql, /LIMIT 1/);
     assert.match(payload.createTrace.sql, /INSERT INTO User/);
-    assert.match(payload.createTrace.sql, /RETURNING/);
+    assert.match(payload.createTrace.sql, /RETURNING user_id,user_name/);
     assert.deepEqual(payload.createTrace.bind, ["u2", "Bob", 0]);
     assert.match(payload.updateTrace.sql, /UPDATE User SET user_name = \?/);
     assert.deepEqual(payload.updateTrace.bind, ["Carol", "u2"]);

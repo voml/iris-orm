@@ -173,6 +173,32 @@ export function compileWherePredicates(
  * Compile nested select into a VOS projection expression rooted at `root`.
  * TypeScript author keys are lowered to VOS wire field names per entity.
  */
+/** Flat scalar wire columns selected with `{ field: true }` (sorted for plan metadata). */
+export function compileSelectWireColumns(entity: string, select: Record<string, unknown>): string[] {
+    const wires: string[] = [];
+    for (const [key, value] of Object.entries(select)) {
+        if (value === true) {
+            wires.push(wireName(entity, key));
+        }
+    }
+    wires.sort();
+    return wires;
+}
+
+function appendSelectColsParameter(
+    entity: string,
+    select: Record<string, unknown> | undefined,
+    parameters: VosParameters,
+): void {
+    if (!select || Object.keys(select).length === 0) {
+        return;
+    }
+    const wires = compileSelectWireColumns(entity, select);
+    if (wires.length > 0) {
+        parameters.select_cols = wires.join(",");
+    }
+}
+
 export function compileSelectProjection(
     entity: string,
     select: Record<string, unknown>,
@@ -298,6 +324,7 @@ export function synthesizeUpdate(entity: string, args: UpdateArgs): VosSynthesis
     const body = predicates.length === 1 ? predicates[0]! : predicates.join(" && ");
     let source = `${entity}.filter(x => ${body}).patch({ ${assignments.join(", ")} })`;
     if (args.select && Object.keys(args.select).length > 0) {
+        appendSelectColsParameter(entity, args.select, parameters);
         source = `(${source}).map(x => ${compileSelectProjection(entity, args.select, "x")})`;
     }
     return { source, parameters };
@@ -325,6 +352,7 @@ export function synthesizeCreate(entity: string, args: CreateArgs): VosSynthesis
     }
     let source = `${entity}::insert({ ${fields.join(", ")} })`;
     if (args.select && Object.keys(args.select).length > 0) {
+        appendSelectColsParameter(entity, args.select, parameters);
         source = `(${source}).map(x => ${compileSelectProjection(entity, args.select, "x")})`;
     }
     return { source, parameters };
