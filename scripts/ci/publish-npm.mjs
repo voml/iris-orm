@@ -132,6 +132,8 @@ function isAlreadyPublished(blob) {
 }
 
 function isAuthFailure(blob) {
+    // Do not treat "403 + already published" as auth. Check versionExists first.
+    if (isAlreadyPublished(blob)) return false;
     return /ENEEDAUTH|Unable to authenticate|not authorized|OIDC|trusted publisher|two-factor|need to be logged|login|identity token|do not have permission to access it|Access token expired or revoked/i.test(
         blob,
     );
@@ -158,10 +160,19 @@ function npmPublish(stagingDir, name, version) {
     const blob = `${r.stdout}\n${r.stderr}`;
     if (r.status === 0) return "published";
     if (isAlreadyPublished(blob) || versionExists(name, version)) return "exists";
-    if (isAuthFailure(blob)) return "auth";
+    if (isAuthFailure(blob)) {
+        if (versionExists(name, version)) return "exists";
+        return "auth";
+    }
     if (isMissingPackage(blob)) return "missing";
+    if (versionExists(name, version)) return "exists";
     console.error(blob.slice(0, 1200));
     return "other";
+}
+
+function trustHint(names) {
+    const only = names.length === 1 ? ` --only ${names[0]}` : "";
+    return `Trusted Publisher missing or OIDC auth failed: ${names.join(", ")}. Local fix: pnpm placeholder:trust -- --refresh${only} (see nifty.config.ts trust.npm and scripts/README.md)`;
 }
 
 function stagePackageFiles(abs, stage) {
@@ -194,6 +205,8 @@ function stagePackageFiles(abs, stage) {
 function publishNative(version, artifactsRoot) {
     let published = 0;
     let skipped = 0;
+    const authFailed = [];
+    const otherFailed = [];
     for (const plat of NATIVE_PLATFORMS) {
         const name = `@yydb/iris-${plat.short}`;
         const packageDir = path.join(ROOT, "projects/packages", `iris-${plat.short}`);
@@ -237,18 +250,22 @@ function publishNative(version, artifactsRoot) {
         const outcome = npmPublish(stage, name, version);
         if (outcome === "published") published += 1;
         else if (outcome === "exists") skipped += 1;
-        else if (outcome === "auth") {
-            fail(`OIDC/auth failed for ${name}. Configure Trusted Publisher: file=publish-npm.yml env=NPM_PUBLISH repo=voml/iris-orm`);
-        } else if (outcome === "missing") {
-            fail(`${name} is not on the registry yet. Create the name first via placeholder stubs, then retry real publish.`);
-        } else fail(`publish failed for ${name}`);
+        else if (outcome === "auth") authFailed.push(name);
+        else if (outcome === "missing") {
+            otherFailed.push(name);
+            console.error(
+                `ci-publish-npm: ${name} missing on registry — create 0.0.0 stub via pnpm placeholder:publish, then pnpm placeholder:trust`,
+            );
+        } else otherFailed.push(name);
     }
-    return { published, skipped };
+    return { published, skipped, authFailed, otherFailed };
 }
 
 function publishJs(version, artifactsRoot) {
     let published = 0;
     let skipped = 0;
+    const authFailed = [];
+    const otherFailed = [];
     const optionalNatives = {};
     for (const plat of NATIVE_PLATFORMS) {
         const n = `@yydb/iris-${plat.short}`;
@@ -301,13 +318,15 @@ function publishJs(version, artifactsRoot) {
         const outcome = npmPublish(stage, name, version);
         if (outcome === "published") published += 1;
         else if (outcome === "exists") skipped += 1;
-        else if (outcome === "auth") {
-            fail(`OIDC/auth failed for ${name}. Configure Trusted Publisher: file=publish-npm.yml env=NPM_PUBLISH repo=voml/iris-orm`);
-        } else if (outcome === "missing") {
-            fail(`${name} is not on the registry yet. Create the name first via placeholder stubs, then retry real publish.`);
-        } else fail(`publish failed for ${name}`);
+        else if (outcome === "auth") authFailed.push(name);
+        else if (outcome === "missing") {
+            otherFailed.push(name);
+            console.error(
+                `ci-publish-npm: ${name} missing on registry — create 0.0.0 stub via pnpm placeholder:publish, then pnpm placeholder:trust`,
+            );
+        } else otherFailed.push(name);
     }
-    return { published, skipped };
+    return { published, skipped, authFailed, otherFailed };
 }
 
 const version = resolveVersion();
@@ -321,7 +340,16 @@ delete process.env.NPM_TOKEN;
 const artifactsRoot = process.env.IRIS_NATIVE_ARTIFACTS || path.join(ROOT, "dist", "native-flat");
 const native = publishNative(version, artifactsRoot);
 const js = publishJs(version, artifactsRoot);
+const authFailed = [...native.authFailed, ...js.authFailed];
+const otherFailed = [...native.otherFailed, ...js.otherFailed];
+
+if (authFailed.length || otherFailed.length) {
+    const parts = [];
+    if (authFailed.length) parts.push(trustHint(authFailed));
+    if (otherFailed.length) parts.push(`Other publish failures: ${otherFailed.join(", ")}`);
+    fail(parts.join("\n"));
+}
 
 console.log(
-    `\nci-publish-npm: done (native published=${native.published} skipped=${native.skipped}; js published=${js.published} skipped=${js.skipped})`,
+    `\nci-publish-npm: done (native published=${native.published} skipped=${native.skipped}. js published=${js.published} skipped=${js.skipped})`,
 );

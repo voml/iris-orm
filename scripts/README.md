@@ -14,16 +14,33 @@ scripts/
     publish-npm.mjs          Real release (OIDC via publish-npm.yml)
 ```
 
-## npm placeholder (0.0.0)
+## npm placeholder and Trusted Publisher
 
-Reserve package names before Trusted Publisher real releases (`@doki-land/nifty`):
+Package set: `nifty.config.ts` `publish.packages` (eight `@yydb/iris*` packages).
+
+Trusted Publisher contract (must match npm registry settings per package):
+
+| Field | Value |
+|-------|-------|
+| Repository | `voml/iris-orm` |
+| Workflow file | `publish-npm.yml` |
+| Environment | `NPM_PUBLISH` |
+
+One-time local setup (gitignored `.env.placeholder.local`):
 
 ```bash
-pnpm placeholder          # nifty publish --placeholder --dry-run
-pnpm placeholder:publish  # publish missing packages @0.0.0
-pnpm placeholder:trust    # configure Trusted Publisher (needs NPM_TOTP_SECRET in .env.placeholder.local)
+# NPM_TOKEN=npm_...          # from npm login or access token with publish + 2FA
+# NPM_TOTP_SECRET=...        # base32 secret when the account uses 2FA
+pnpm placeholder:publish     # publish missing @0.0.0 stubs
+pnpm placeholder:trust -- --refresh
+pnpm placeholder:trust -- --only @yydb/iris-linux-arm64   # single package
 ```
 
-Package set: non-`private` workspace packages (`package.json`). Local secrets (gitignored): `.env.placeholder.local`.
+Dry run:
 
-Real versions: push tag `vX.Y.Z` or `workflow_dispatch` on `publish-npm.yml` (environment `NPM_PUBLISH`).
+```bash
+pnpm placeholder             # nifty publish --placeholder --dry-run
+pnpm placeholder:trust -- --dry-run
+```
+
+Real versions: push tag `vX.Y.Z` or `workflow_dispatch` on `publish-npm.yml` (GitHub environment `NPM_PUBLISH`). CI uses OIDC only. Each `@yydb/iris*` package needs its own Trusted Publisher row pointing at the same workflow contract.
