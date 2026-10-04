@@ -1,6 +1,6 @@
 //! Physical plan execution and row writes (private PostgreSQL SQL).
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
 use iris_types::{Row, RowWrite, Value};
 use postgres::{
     Client, GenericClient,
@@ -48,6 +48,17 @@ fn to_owned(value: &Value) -> OwnedSql {
 }
 
 pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+    if plan
+        .nodes
+        .iter()
+        .any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. }))
+    {
+        return execute_write_plan(client, plan);
+    }
+    execute_read_plan(client, plan)
+}
+
+fn execute_read_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Row>> {
     let mut table: Option<String> = None;
     let mut where_sql: Option<String> = None;
     let mut where_params: Vec<OwnedSql> = Vec::new();
@@ -84,6 +95,9 @@ pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<V
             PhysicalOp::Skip { count } => offset = Some(*count),
             PhysicalOp::Take { count } => limit = Some(*count),
             PhysicalOp::Collect => {}
+            PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. } => {
+                return Err(crate::Error::Policy("write op in read plan".into()));
+            }
         }
     }
 
@@ -117,6 +131,125 @@ pub(crate) fn execute_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<V
     }
     let _ = next_param;
     Ok(out)
+}
+
+fn execute_write_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+    let mut insert: Option<(String, Vec<WriteField>)> = None;
+    let mut patch: Option<(String, Option<Pred>, Vec<WriteField>)> = None;
+    let mut delete: Option<(String, Option<Pred>)> = None;
+    let mut projection: Option<Vec<ProjectField>> = None;
+
+    for node in &plan.nodes {
+        match &node.op {
+            PhysicalOp::Insert { table, fields } => insert = Some((table.clone(), fields.clone())),
+            PhysicalOp::Patch { table, filter, fields } => patch = Some((table.clone(), filter.clone(), fields.clone())),
+            PhysicalOp::Delete { table, filter } => delete = Some((table.clone(), filter.clone())),
+            PhysicalOp::Project { fields } => projection = Some(fields.clone()),
+            PhysicalOp::Collect => {}
+            other => return Err(crate::Error::Policy(format!("unexpected op in write plan: {other:?}"))),
+        }
+    }
+
+    if let Some((table, filter)) = delete {
+        let (where_sql, params, _) = filter_to_sql(filter.as_ref(), 1)?;
+        let sql = format!("DELETE FROM \"{table}\" WHERE {where_sql}");
+        let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        client.execute(&sql, &param_refs[..])?;
+        return Ok(Vec::new());
+    }
+
+    if let Some((table, fields)) = insert {
+        let returning = returning_sql(projection.as_deref());
+        let cols: Vec<String> = fields.iter().map(|f| format!("\"{}\"", f.name)).collect();
+        let placeholders: Vec<String> = (1..=cols.len()).map(|i| format!("${i}")).collect();
+        let sql = format!(
+            "INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}",
+            cols.join(", "),
+            placeholders.join(", ")
+        );
+        let params: Vec<OwnedSql> = fields.iter().map(write_field_to_owned).collect();
+        let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        let mut rows = query_rows(client, &sql, &param_refs)?;
+        if let Some(fields) = projection.as_ref() {
+            rows = apply_projection(rows, fields);
+        }
+        return Ok(rows);
+    }
+
+    if let Some((table, filter, fields)) = patch {
+        let sets: Vec<String> = fields.iter().enumerate().map(|(i, f)| format!("\"{}\" = ${}", f.name, i + 1)).collect();
+        let (where_sql, mut where_params, _) = filter_to_sql(filter.as_ref(), fields.len() + 1)?;
+        let returning = returning_sql(projection.as_deref());
+        let sql = format!(
+            "UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}",
+            sets.join(", ")
+        );
+        let mut params: Vec<OwnedSql> = fields.iter().map(write_field_to_owned).collect();
+        params.extend(where_params.drain(..));
+        let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
+        let mut rows = query_rows(client, &sql, &param_refs)?;
+        if let Some(fields) = projection.as_ref() {
+            rows = apply_projection(rows, fields);
+        }
+        return Ok(rows);
+    }
+
+    Ok(Vec::new())
+}
+
+fn query_rows(client: &mut Client, sql: &str, param_refs: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
+    let rows = client.query(sql, param_refs)?;
+    let mut out = Vec::new();
+    for row in rows {
+        let mut r = Row::new();
+        for (idx, col) in row.columns().iter().enumerate() {
+            r.insert(col.name().to_string(), from_pg_row(&row, idx));
+        }
+        out.push(r);
+    }
+    Ok(out)
+}
+
+fn project_fields_sql(fields: &[ProjectField]) -> Vec<String> {
+    fields
+        .iter()
+        .map(|f| {
+            let src = f.from.as_deref().unwrap_or(f.name.as_str());
+            if src == f.name { format!("\"{src}\"") } else { format!("\"{src}\" AS \"{}\"", f.name) }
+        })
+        .collect()
+}
+
+fn returning_sql(projection: Option<&[ProjectField]>) -> String {
+    projection
+        .map(|fields| project_fields_sql(fields).join(", "))
+        .unwrap_or_else(|| "*".into())
+}
+
+fn apply_projection(rows: Vec<Row>, fields: &[ProjectField]) -> Vec<Row> {
+    rows.into_iter()
+        .map(|row| {
+            let mut out = Row::new();
+            for field in fields {
+                let src = field.from.as_deref().unwrap_or(field.name.as_str());
+                if let Some(value) = row.get(src) {
+                    out.insert(field.name.clone(), value.clone());
+                }
+            }
+            out
+        })
+        .collect()
+}
+
+fn filter_to_sql(filter: Option<&Pred>, start: usize) -> Result<(String, Vec<OwnedSql>, usize)> {
+    match filter {
+        Some(pred) => pred_to_sql(pred, start),
+        None => Ok(("TRUE".into(), Vec::new(), start)),
+    }
+}
+
+fn write_field_to_owned(field: &WriteField) -> OwnedSql {
+    literal_to_owned(&field.literal, field.kind)
 }
 
 pub(crate) fn insert_row(client: &mut impl GenericClient, write: &RowWrite) -> Result<()> {
