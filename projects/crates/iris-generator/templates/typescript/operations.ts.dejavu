@@ -15,7 +15,11 @@ import type {
 
 /** Generated macro bindings from schema truth (not backend capability intersection). */
 export class GeneratedMacros {
-    constructor(private readonly executor: OperationExecutor) {}
+    private readonly executor: OperationExecutor;
+
+    constructor(executor: OperationExecutor) {
+        this.executor = executor;
+    }
 <%- loop macro in macros_view %>
 
     async <% macro.name %>(<% macro.param_signature %>): Promise<<% macro.ts_return %>> {
@@ -40,13 +44,21 @@ export class GeneratedMacros {
 
 /** Schema macros (empty for this project). */
 export class GeneratedMacros {
-    constructor(private readonly executor: OperationExecutor) {}
+    private readonly executor: OperationExecutor;
+
+    constructor(executor: OperationExecutor) {
+        this.executor = executor;
+    }
 }
 <%- end if %>
 <%- loop table in tables_view %>
 
 export class <% table.name %>Delegate {
-    constructor(private readonly executor: OperationExecutor) {}
+    private readonly executor: OperationExecutor;
+
+    constructor(executor: OperationExecutor) {
+        this.executor = executor;
+    }
 
     async findMany<const A extends <% table.name %>FindManyArgs>(
         args?: A,
