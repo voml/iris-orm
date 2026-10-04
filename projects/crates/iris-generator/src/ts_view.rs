@@ -131,10 +131,12 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 format!("    \"{entity}.findFirst\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT 1\", mode: \"read\" }},"),
             ];
             for field in &table.fields {
-                if field.vos_type == "bool" {
-                    let wire = field.name.as_str();
+                let wire = field.name.as_str();
+                let ts_name = field_ts_name(field);
+                let base = field.vos_type.trim_end_matches('?').trim_start_matches('&');
+                if matches!(base, "bool" | "utf8" | "uuid" | "decimal" | "datetime") {
                     lines.push(format!(
-                        "    \"{entity}.findMany@p_{wire}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"p_{wire}\"] }},"
+                        "    \"{entity}.findMany@p_{ts_name}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"p_{ts_name}\"] }},"
                     ));
                 }
             }
