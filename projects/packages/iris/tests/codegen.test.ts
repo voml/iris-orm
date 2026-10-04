@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { USER_SCHEMA } from "./fixtures.ts";
 import { srcImport } from "./helpers.ts";
@@ -382,6 +382,43 @@ void run;
             shell: true,
         }).status;
     assert.notEqual(negativeStatus, 0, "invalid filter value types must fail tsc");
+});
+
+test("generated synthesize runs findMany through OperationExecutor on Node", async (t) => {
+    const core = await loadCore(t);
+    if (!core) {
+        return;
+    }
+
+    const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-e2e-"));
+    const generatedRoot = join(outDir, "generated", "iris");
+    const result = core.generate(USER_SCHEMA, "typescript", generatedRoot);
+    assert.equal(result.ok, true);
+
+    const runnerTemplate = fileURLToPath(new URL("./generated-e2e-runner.ts", import.meta.url));
+    const runnerPath = join(generatedRoot, "generated-e2e-runner.ts");
+    await copyFile(runnerTemplate, runnerPath);
+
+    const bootstrap = pathToFileURL(fileURLToPath(new URL("./generated-e2e-bootstrap.mjs", import.meta.url))).href;
+    const child = spawnSync(
+        process.execPath,
+        ["--experimental-strip-types", `--import`, bootstrap, "generated-e2e-runner.ts"],
+        {
+            encoding: "utf8",
+            cwd: generatedRoot,
+            env: { ...process.env, IRIS_TEST_SCHEMA: USER_SCHEMA },
+        },
+    );
+    assert.equal(child.status, 0, child.stdout + child.stderr);
+
+    const payload = JSON.parse(child.stdout.trim()) as {
+        ok: boolean;
+        fingerprint: string;
+        count: number;
+    };
+    assert.equal(payload.ok, true);
+    assert.equal(payload.fingerprint, result.schemaFingerprint);
+    assert.equal(typeof payload.count, "number");
 });
 
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {
