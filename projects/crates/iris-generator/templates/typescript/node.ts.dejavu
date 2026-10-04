@@ -1,6 +1,7 @@
 import { createIrisOperationExecutor } from "@yydb/iris/node";
 import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
 import { createClient, type DbClient } from "./operations.js";
+import { IRIS_SCHEMA_FINGERPRINT } from "./metadata.js";
 
 let openDatabaseClient: DbClient | null = null;
 
@@ -8,8 +9,12 @@ let openDatabaseClient: DbClient | null = null;
 export class Database {
     /** Construct a new client for this call site (no process singleton). */
     static async create(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
-        return createClient(await createIrisOperationExecutor(options));
-    }
+        return createClient(
+            await createIrisOperationExecutor({
+                ...options,
+                contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
+            }),
+        );    }
 
     /** Reuse one client per process. Options apply only on the first call. */
     static async open(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
