@@ -59,7 +59,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const root = join(outDir, "generated", "iris");
     const result = core.generate(USER_SCHEMA, "typescript", root);
     assert.equal(result.ok, true);
-    assert.equal(result.files.length, 10);
+    assert.equal(result.files.length, 12);
 
     assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris$/);
 
@@ -87,6 +87,17 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(browserEntry, /export class Database/);
     assert.match(browserEntry, /static async create/);
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
+
+    const cloudflareEntry = await readFile(join(root, "cloudflare.ts"), "utf8");
+    assert.match(cloudflareEntry, /@yydb\/iris\/cloudflare/);
+    assert.match(cloudflareEntry, /IRIS_D1_PLANS/);
+    assert.match(cloudflareEntry, /IRIS_FIELD_WIRE_NAMES/);
+    assert.match(cloudflareEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
+
+    const d1Plans = await readFile(join(root, "_internal", "d1-plans.ts"), "utf8");
+    assert.match(d1Plans, /IRIS_D1_PLANS/);
+    assert.match(d1Plans, /User\.findMany/);
+    assert.match(d1Plans, /SELECT .* FROM User/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
     assert.match(inputs, /export type StringFilter/);
@@ -249,6 +260,7 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
                     "./src/generated/iris/consumer-negative.ts",
                     "./src/generated/iris/node.ts",
                     "./src/generated/iris/browser.ts",
+                    "./src/generated/iris/cloudflare.ts",
                 ],
             },
             null,
