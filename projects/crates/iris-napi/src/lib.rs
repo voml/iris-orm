@@ -21,6 +21,12 @@ pub fn iris_version() -> String {
     iris::version().to_string()
 }
 
+/// Frozen SQLite provider contract version shared with YYDS `@yyds/sqlite`.
+#[napi]
+pub fn sqlite_provider_contract_version() -> String {
+    iris_adapter_sqlite::SqliteSource::provider_contract_version().to_string()
+}
+
 /// Result of validating a VOS / `.iris` schema source via the Rust core.
 #[napi(object)]
 pub struct CheckSourceResult {

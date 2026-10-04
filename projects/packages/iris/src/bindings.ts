@@ -19,6 +19,9 @@ export type MemorySessionBinding = {
     executeOperation?(operationJson: string): SessionExecuteWire;
     close(): void;
     managedPush?: (schema: string) => void;
+    sqliteEngineVersion?: () => string;
+    sqliteSourceId?: () => string;
+    sqliteProviderContractVersion?: () => string;
 };
 
 /** N-API `openSession` wire shape (camelCase from napi-rs). */
@@ -34,6 +37,7 @@ export type OpenSessionNapiOptions = {
 /** Shared semantic core consumed by `buildRuntime` on every host. */
 export type IrisBindings = {
     irisVersion(): string;
+    sqliteProviderContractVersion?(): string;
     checkSource(source: string): CheckSourceResult;
     introspectSchema(source: string): string;
     openMemorySession(): MemorySessionBinding;

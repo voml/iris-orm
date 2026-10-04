@@ -162,8 +162,20 @@ impl MemorySession {
     }
 
     pub(crate) fn open_sqlite(path: String) -> Result<Self> {
-        let db = SqliteSource::open(path).map_err(|err| Error::from_reason(err.to_string()))?;
+        let db = if path == ":memory:" {
+            SqliteSource::open_in_memory().map_err(|err| Error::from_reason(err.to_string()))?
+        }
+        else {
+            SqliteSource::open(path).map_err(|err| Error::from_reason(err.to_string()))?
+        };
         Ok(Self::new_store(SessionStore::Sqlite(db), None))
+    }
+
+    fn sqlite_source(&self) -> Result<&SqliteSource> {
+        match &self.store {
+            SessionStore::Sqlite(db) => Ok(db),
+            _ => Err(Error::from_reason("sqlite identity requires a sqlite session")),
+        }
     }
 
     pub(crate) fn open_postgres(url: String) -> Result<Self> {
@@ -299,6 +311,34 @@ impl MemorySession {
             }
             _ => Err(Error::from_reason("managed_push is only supported on yydb and sqlite sessions")),
         }
+    }
+
+    /// Upstream SQLite engine version for the active sqlite session.
+    #[napi(js_name = sqliteEngineVersion)]
+    pub fn sqlite_engine_version(&self) -> Result<String> {
+        if self.closed {
+            return Err(Error::from_reason("session closed"));
+        }
+        self.sqlite_source()?.sqlite_version().map_err(|err| Error::from_reason(err.to_string()))
+    }
+
+    /// Upstream SQLite source id for the active sqlite session.
+    #[napi(js_name = sqliteSourceId)]
+    pub fn sqlite_source_id(&self) -> Result<String> {
+        if self.closed {
+            return Err(Error::from_reason("session closed"));
+        }
+        self.sqlite_source()?.sqlite_source_id().map_err(|err| Error::from_reason(err.to_string()))
+    }
+
+    /// Frozen provider contract version used by this sqlite session.
+    #[napi(js_name = sqliteProviderContractVersion)]
+    pub fn sqlite_provider_contract_version(&self) -> Result<String> {
+        if self.closed {
+            return Err(Error::from_reason("session closed"));
+        }
+        self.sqlite_source()?;
+        Ok(SqliteSource::provider_contract_version().to_string())
     }
 
     #[napi]
