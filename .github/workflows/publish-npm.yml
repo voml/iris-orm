@@ -195,6 +195,9 @@ jobs:
           name: wasm-lib
           path: projects/packages/iris-unknown-wasm32/lib
 
+      - name: Build TypeScript dist
+        run: pnpm build:ts
+
       - name: Strip token-style npmrc (OIDC only)
         shell: bash
         run: |
