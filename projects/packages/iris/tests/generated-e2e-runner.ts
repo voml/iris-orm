@@ -1,3 +1,5 @@
+import { createClient } from "./operations.js";
+import { Database } from "./node.js";
 import { buildDeclaredOperationRequest, synthesizeFindMany } from "./_internal/synthesize.js";
 import { IRIS_SCHEMA_FINGERPRINT } from "./metadata.js";
 
@@ -21,17 +23,38 @@ const synthesis = synthesizeFindMany("User", {
     },
 });
 const request = buildDeclaredOperationRequest("User.findMany", synthesis);
-const envelope = await executor.execute(request);
+const directEnvelope = await executor.execute(request);
+
+const client = createClient(executor);
+const clientRows = await client.user.findMany({
+    where: {
+        active: { eq: true },
+    },
+});
 await executor.close();
 
-if (!envelope.ok) {
-    throw new Error(envelope.diagnostics[0]?.message ?? "generated findMany failed");
+const db = await Database.create({
+    profile: "sqlite",
+    sqlitePath: ":memory:",
+    schema,
+});
+const databaseRows = await db.user.findMany({
+    where: {
+        active: { eq: true },
+    },
+});
+await Database.close();
+
+if (!directEnvelope.ok) {
+    throw new Error(directEnvelope.diagnostics[0]?.message ?? "generated findMany failed");
 }
 
 console.log(
     JSON.stringify({
         ok: true,
         fingerprint: IRIS_SCHEMA_FINGERPRINT,
-        count: envelope.value.length,
+        directCount: directEnvelope.value.length,
+        clientCount: clientRows.length,
+        databaseCount: databaseRows.length,
     }),
 );
