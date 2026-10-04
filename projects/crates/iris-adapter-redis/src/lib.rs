@@ -257,6 +257,11 @@ impl RedisSource {
                 PhysicalOp::Scan { .. } => {
                     return Err(Error::Unsupported("Redis adapter rejects full-table Scan; use get_primary with an explicit key".into()));
                 }
+                PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. } => {
+                    return Err(Error::Unsupported(
+                        "Redis adapter rejects relational write physical plans; use explicit put/delete".into(),
+                    ));
+                }
                 PhysicalOp::Collect => {}
             }
         }
