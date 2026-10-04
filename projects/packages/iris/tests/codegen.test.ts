@@ -71,7 +71,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.doesNotMatch(index, /synthesize/);
 
     const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
-    assert.match(nodeEntry, /createIrisDbBinding/);
+    assert.match(nodeEntry, /createIrisOperationExecutor/);
     assert.match(nodeEntry, /export class Database/);
     assert.match(nodeEntry, /static async create/);
     assert.match(nodeEntry, /static async open/);
@@ -79,7 +79,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris\/wasm/);
-    assert.match(browserEntry, /createIrisDbBinding/);
+    assert.match(browserEntry, /createIrisOperationExecutor/);
     assert.match(browserEntry, /export class Database/);
     assert.match(browserEntry, /static async create/);
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
@@ -93,6 +93,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(inputs, /UserGetPayload</);
 
     const operations = await readFile(join(root, "operations.ts"), "utf8");
+    assert.match(operations, /OperationExecutor/);
+    assert.match(operations, /buildDeclaredOperationRequest/);
     assert.match(operations, /\$query<T = unknown>/);
     assert.match(operations, /findMany<const A extends UserFindManyArgs>/);
     assert.match(operations, /ReadonlyArray<UserGetPayload<A>>/);
@@ -106,6 +108,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const synthesize = await readFile(join(root, "_internal", "synthesize.ts"), "utf8");
     assert.match(synthesize, /compileWherePredicates/);
     assert.match(synthesize, /synthesizeCreate/);
+    assert.match(synthesize, /buildDeclaredOperationRequest/);
+    assert.match(synthesize, /IRIS_SCHEMA_FINGERPRINT/);
 
     const errors = await readFile(join(root, "errors.ts"), "utf8");
     assert.match(errors, /IrisGeneratedError/);
@@ -130,7 +134,42 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
     await mkdir(stubDir, { recursive: true });
     await writeFile(
         join(stubDir, "iris-types.ts"),
-        `export type IrisDbBinding = {
+        `export type IrisDiagnostic = {
+  readonly code: string;
+  readonly message: string;
+  readonly severity: "error" | "warning";
+  readonly retryable?: boolean;
+  readonly unknownCommit?: boolean;
+};
+
+export type ResultEnvelope<T = unknown> =
+  | { ok: true; value: T; diagnostics?: readonly IrisDiagnostic[] }
+  | { ok: false; diagnostics: readonly IrisDiagnostic[] };
+
+export type OperationIdentity = {
+  readonly operationId: string;
+  readonly contractFingerprint: string;
+};
+
+export type IrisOperation =
+  | { kind: "find-many"; entity: string; where?: { field: string; value: unknown }; take?: number }
+  | { kind: "find-unique"; entity: string; where: { field: string; value: unknown } }
+  | { kind: "declared-vos"; source: string };
+
+export type OperationRequest = {
+  readonly identity: OperationIdentity;
+  readonly operation: IrisOperation;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  readonly deadlineMs?: number;
+};
+
+export interface OperationExecutor {
+  execute(request: OperationRequest): Promise<ResultEnvelope<readonly unknown[]>>;
+  executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
+  close(): Promise<void>;
+}
+
+export type IrisDbBinding = {
   query(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<unknown>;
   execute(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<void>;
   close(): Promise<void>;
@@ -148,8 +187,11 @@ export type CreateIrisDbBindingOptions = {
     );
     await writeFile(
         join(stubDir, "iris-node.ts"),
-        `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
+        `import type { CreateIrisDbBindingOptions, IrisDbBinding, OperationExecutor } from "./iris-types.js";
 export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
+  throw new Error("stub");
+}
+export async function createIrisOperationExecutor(_options?: CreateIrisDbBindingOptions): Promise<OperationExecutor> {
   throw new Error("stub");
 }
 `,
@@ -157,8 +199,11 @@ export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions)
     );
     await writeFile(
         join(stubDir, "iris-wasm.ts"),
-        `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
+        `import type { CreateIrisDbBindingOptions, IrisDbBinding, OperationExecutor } from "./iris-types.js";
 export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
+  throw new Error("stub");
+}
+export async function createIrisOperationExecutor(_options?: CreateIrisDbBindingOptions): Promise<OperationExecutor> {
   throw new Error("stub");
 }
 `,
@@ -211,11 +256,11 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
     await writeFile(
         join(generatedRoot, "consumer.ts"),
         `import { createClient } from "./index.js";
-import type { IrisDbBinding } from "@yydb/iris/types";
+import type { OperationExecutor } from "@yydb/iris/types";
 import type { PostFindManyArgs } from "./inputs.js";
 
-declare const binding: IrisDbBinding;
-const db = createClient(binding);
+declare const executor: OperationExecutor;
+const db = createClient(executor);
 
 async function run() {
   const args = {
@@ -253,10 +298,10 @@ void run;
     await writeFile(
         join(generatedRoot, "consumer-negative.ts"),
         `import { createClient } from "./index.js";
-import type { IrisDbBinding } from "@yydb/iris/types";
+import type { OperationExecutor } from "@yydb/iris/types";
 
-declare const binding: IrisDbBinding;
-const db = createClient(binding);
+declare const executor: OperationExecutor;
+const db = createClient(executor);
 
 async function run() {
   await db.post.findMany({
