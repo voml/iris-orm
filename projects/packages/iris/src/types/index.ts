@@ -25,7 +25,12 @@ export type {
 } from "./contract.ts";
 export type { OperationExecutor } from "./operation-executor.ts";
 export type { IrisOperation, IrisScalar, IrisWhereEq } from "./operation.ts";
-export { defaultDurability, normalizeIrisHost, resolveStorageProfile } from "./profile.ts";
+export {
+    defaultDurability,
+    normalizeIrisHost,
+    resolveStorageProfile,
+    resolveStorageProfileForHost,
+} from "./profile.ts";
 export type { IrisPlaceholder } from "./placeholder.ts";
 export type { CheckSourceResult } from "./check-source.ts";
 export type { SchemaFieldModel, SchemaIntrospection, SchemaMacroModel, SchemaTableModel } from "./schema-introspection.ts";

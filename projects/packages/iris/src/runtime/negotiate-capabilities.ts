@@ -1,6 +1,6 @@
 import type { IrisCapabilityMatrix } from "../types/capabilities.ts";
 import type { IrisBindingProfile, IrisHost, IrisStorageProfile } from "../types/profile.ts";
-import { defaultDurability, resolveStorageProfile } from "../types/profile.ts";
+import { defaultDurability, resolveStorageProfileForHost } from "../types/profile.ts";
 
 export type NegotiateCapabilitiesInput = {
     host: IrisHost;
@@ -45,7 +45,7 @@ function transactionForProfile(profile: IrisStorageProfile): IrisCapabilityMatri
 
 /** Derive the capability matrix for a host + binding profile pair. */
 export function negotiateCapabilities(input: NegotiateCapabilitiesInput): IrisCapabilityMatrix {
-    const storageProfile = resolveStorageProfile(input.profile);
+    const storageProfile = resolveStorageProfileForHost(input.host, input.profile);
     return {
         host: input.host,
         profile: storageProfile,

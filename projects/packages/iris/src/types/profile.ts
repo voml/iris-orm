@@ -29,6 +29,14 @@ export function resolveStorageProfile(profile: IrisBindingProfile): IrisStorageP
     }
 }
 
+/** Resolve storage profile for a host + binding profile pair. */
+export function resolveStorageProfileForHost(host: IrisHost, profile: IrisBindingProfile): IrisStorageProfile {
+    if (host === "cloudflare-worker") {
+        return "d1";
+    }
+    return resolveStorageProfile(profile);
+}
+
 /** Default durability for a storage profile. */
 export function defaultDurability(profile: IrisStorageProfile): IrisDurability {
     switch (profile) {
