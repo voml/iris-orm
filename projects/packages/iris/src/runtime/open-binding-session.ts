@@ -16,9 +16,6 @@ export function resolveBindingProfile(options: CreateIrisDbBindingOptions = {}):
     if (options.profile) {
         return options.profile;
     }
-    if (options.opfsPath) {
-        return "opfs";
-    }
     if (options.sqlitePath) {
         return "sqlite";
     }
@@ -37,8 +34,8 @@ function pushSchemaIfPresent(session: MemorySessionBinding, schema?: string): vo
 /**
  * Open a generated-client session symmetrically across Node N-API and browser WASM hosts.
  *
- * Node supports sqlite/project/memory profiles. Browser supports memory inline schema push;
- * durable OPFS execution uses `@yydb/iris/opfs` with a host-provided SQLite handle.
+ * Node supports sqlite/project/memory profiles. Browser supports memory only and
+ * accepts inline `schema` for managed-push when the binding exposes it.
  */
 export async function openBindingSession(
     host: IrisHost | "web",
@@ -70,11 +67,6 @@ export async function openBindingSession(
         return session;
     }
 
-    if (profile === "opfs") {
-        throw new Error(
-            `@yydb/iris: browser opfs profile requires @yydb/iris/opfs with an injected SQLite handle (got opfsPath=${options.opfsPath ?? "default"})`,
-        );
-    }
     if (profile !== "memory") {
         throw new Error(
             `@yydb/iris: browser host only supports memory profile (got ${profile}); pass inline schema or use @yydb/iris/node`,

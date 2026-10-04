@@ -1,4 +1,4 @@
-/** Minimal SQLite prepare/bind surface shared by D1 and OPFS browser adapters. */
+/** Minimal SQLite prepare/bind surface shared by D1 and other SQLite-shaped adapters. */
 export interface IrisSqlitePreparedStatement {
     bind(...values: unknown[]): IrisSqliteBoundStatement;
 }

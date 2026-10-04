@@ -36,8 +36,6 @@ function transactionForProfile(profile: IrisStorageProfile): IrisCapabilityMatri
             return { local: true, batch: false, crossRequest: false };
         case "local-fs":
             return { local: true, batch: false, crossRequest: false };
-        case "opfs":
-            return { local: true, batch: false, crossRequest: false };
         case "d1":
             return { local: false, batch: true, crossRequest: false };
     }

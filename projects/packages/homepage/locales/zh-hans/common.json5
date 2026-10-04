@@ -18,7 +18,7 @@
   hostsNode: 'Node / SSR / CLI',
   hostsNodeDesc: 'import { createIris } from "@yydb/iris/node" — 加载 optional @yydb/iris-win32-x64 等平台 N-API 包。',
   hostsWeb: 'Browser / Worker',
-  hostsWebDesc: 'import { createIris } from "@yydb/iris" — WASM 语义核在包内，IndexedDB / OPFS 由 Web 宿主集成层负责。',
+  hostsWebDesc: 'import { createIris } from "@yydb/iris" — WASM 语义核在包内，浏览器持久化由 YYDB 承接。',
   pipelineTitle: '编译与执行路径',
   pipelineSchema: '.iris schema',
   pipelineCore: 'Rust Iris core',

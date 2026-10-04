@@ -2,10 +2,10 @@
 export type IrisHost = "node" | "browser" | "cloudflare-worker";
 
 /** Storage / durability profile (orthogonal to `IrisHost`). */
-export type IrisStorageProfile = "memory" | "local-fs" | "opfs" | "d1";
+export type IrisStorageProfile = "memory" | "local-fs" | "d1";
 
 /** Binding options profile before host negotiation. */
-export type IrisBindingProfile = "memory" | "sqlite" | "project" | "opfs";
+export type IrisBindingProfile = "memory" | "sqlite" | "project";
 
 /** Durability class negotiated for the active profile. */
 export type IrisDurability = "ephemeral" | "local-durable" | "remote-durable";
@@ -23,8 +23,6 @@ export function resolveStorageProfile(profile: IrisBindingProfile): IrisStorageP
     switch (profile) {
         case "memory":
             return "memory";
-        case "opfs":
-            return "opfs";
         case "sqlite":
         case "project":
             return "local-fs";
@@ -45,7 +43,6 @@ export function defaultDurability(profile: IrisStorageProfile): IrisDurability {
         case "memory":
             return "ephemeral";
         case "local-fs":
-        case "opfs":
             return "local-durable";
         case "d1":
             return "remote-durable";
