@@ -32,7 +32,7 @@ export interface IrisSession {
     /** Plan and execute VOS source on the bound adapter. */
     execute(source: string): ExecuteResult;
     /** Structured operation ABI (generated client path). */
-    executeOperation?(operation: import("./operation.ts").IrisOperation): ExecuteResult;
+    executeOperation?(request: import("./contract.ts").OperationRequest): ExecuteResult;
     /** Release session resources. */
     close(): void;
     /**

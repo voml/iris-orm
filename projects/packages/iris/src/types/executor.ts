@@ -39,6 +39,8 @@ export interface CreateIrisDbBindingOptions {
      * the on-disk paths declared by `iris.config.ts#schema`.
      */
     schema?: string;
+    /** Build-time contract fingerprint from generated metadata (generated clients set this). */
+    contractFingerprint?: string;
 }
 
 /** @deprecated Use `IrisDbBinding`. */
