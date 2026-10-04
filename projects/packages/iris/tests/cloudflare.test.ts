@@ -49,20 +49,20 @@ const plans = {
         mode: "read" as const,
         paramOrder: ["p_active"],
     },
-    "User.findMany@p_userName": {
+    "User.findMany@p_user_name": {
         sql: "SELECT user_id, user_name, active FROM User WHERE user_name = ?",
         mode: "read" as const,
-        paramOrder: ["p_userName"],
+        paramOrder: ["p_user_name"],
     },
     "User.findMany@take": {
         sql: "SELECT user_id, user_name, active FROM User LIMIT ?",
         mode: "read" as const,
         paramOrder: ["take"],
     },
-    "User.findUnique@p_userId": {
+    "User.findUnique@p_user_id": {
         sql: "SELECT user_id, user_name, active FROM User WHERE user_id = ? LIMIT 1",
         mode: "read" as const,
-        paramOrder: ["p_userId"],
+        paramOrder: ["p_user_id"],
     },
 };
 
@@ -92,8 +92,8 @@ test("D1 read executor binds findUnique primary-key parameters", async () => {
     const read = await executor.execute(
         buildOperationRequest(
             { operationId: "User.findUnique", contractFingerprint: "fp" },
-            declaredVosOperation("User.filter(x => x.user_id == $p_userId).collect()"),
-            { p_userId: "u1" },
+            declaredVosOperation("User.filter(x => x.user_id == $p_user_id).collect()"),
+            { p_user_id: "u1" },
         ),
     );
     assert.equal(read.ok, true);
@@ -106,8 +106,8 @@ test("D1 read executor binds string eq filter parameters", async () => {
     const read = await executor.execute(
         buildOperationRequest(
             { operationId: "User.findMany", contractFingerprint: "fp" },
-            declaredVosOperation('User.filter(x => x.user_name == $p_userName).collect()'),
-            { p_userName: "Ada" },
+            declaredVosOperation('User.filter(x => x.user_name == $p_user_name).collect()'),
+            { p_user_name: "Ada" },
         ),
     );
     assert.equal(read.ok, true);
