@@ -16,7 +16,7 @@ Deploy the same blog schema on **Cloudflare Workers** with a **D1** binding, whi
 
 ```ts
 // Future: one generated entry, D1 as foreign SQLite session
-const db = await createDatabase({ profile: "d1", binding: env.DB, source: "default" });
+const db = await Database.create({ profile: "d1", binding: env.DB, source: "default" });
 await db.$macros.seed_blog();
 ```
 

@@ -1,6 +1,6 @@
 import { defineConfig } from "@yydb/iris";
 
-/** SvelteKit adapter-node - file-backed YYDB survives dev HMR (`openDatabase` from `@iris/node.ts`). */
+/** SvelteKit adapter-node - file-backed YYDB survives dev HMR (`Database.open` from `@iris/node.ts`). */
 export default defineConfig({
     schema: "schemas/**/*.iris",
     datasources: {

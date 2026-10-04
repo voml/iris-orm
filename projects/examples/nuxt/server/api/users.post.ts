@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { UserId } from "@iris/index.ts";
-import { openDatabase } from "@iris/node.ts";
+import { Database } from "@iris/node.ts";
 
 export default defineEventHandler(async (event) => {
     const body = await readBody<{ user_name?: string; active?: boolean }>(event);
@@ -9,7 +9,7 @@ export default defineEventHandler(async (event) => {
     if (!userName) {
         throw createError({ statusCode: 400, statusMessage: "user_name is required" });
     }
-    const db = await openDatabase({ config: process.cwd(), source: "default" });
+    const db = await Database.open({ config: process.cwd(), source: "default" });
     return await db.user.create({
         data: {
             user_id: randomUUID() as UserId,

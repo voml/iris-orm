@@ -5,11 +5,11 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 import type { PostId, UserId } from "@iris/index.ts";
-import { closeDatabase, openDatabase } from "@iris/node.ts";
+import { Database } from "@iris/node.ts";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = new Hono();
-const db = await openDatabase({ config: projectRoot, source: "default" });
+const db = await Database.open({ config: projectRoot, source: "default" });
 await db.$macros.seed_blog();
 
 const postListSelect = {
@@ -72,7 +72,7 @@ serve({ fetch: app.fetch, port }, (info) => {
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
-        await closeDatabase();
+        await Database.close();
         process.exit(0);
     });
 }

@@ -4,13 +4,13 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 
 import type { PostId, UserId } from "@iris/index.ts";
-import { closeDatabase, openDatabase } from "@iris/node.ts";
+import { Database } from "@iris/node.ts";
 
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = express();
 app.use(express.json());
 
-const db = await openDatabase({ config: projectRoot, source: "default" });
+const db = await Database.open({ config: projectRoot, source: "default" });
 await db.$macros.seed_blog();
 
 const postListSelect = {
@@ -73,7 +73,7 @@ const server = app.listen(port, () => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
         server.close();
-        await closeDatabase();
+        await Database.close();
         process.exit(0);
     });
 }
