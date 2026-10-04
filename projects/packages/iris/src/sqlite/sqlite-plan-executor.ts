@@ -8,6 +8,7 @@ import {
     type D1PhysicalPlan,
     type D1PlanRegistry,
 } from "../cloudflare/d1-plan.ts";
+import { entityFromOperationId, wireRowToAuthorRow } from "../runtime/wire-row-map.ts";
 import type { IrisSqliteDatabase } from "./types.ts";
 
 function notWired(code: string, message: string): ResultEnvelope<never> {
@@ -15,33 +16,6 @@ function notWired(code: string, message: string): ResultEnvelope<never> {
         ok: false,
         diagnostics: [{ code, message, severity: "error" }],
     };
-}
-
-function entityFromOperationId(operationId: string): string | null {
-    const dot = operationId.indexOf(".");
-    if (dot <= 0) {
-        return null;
-    }
-    return operationId.slice(0, dot);
-}
-
-function wireRowToAuthorRow(
-    wireToTs: Readonly<Record<string, string>>,
-    row: Record<string, unknown>,
-): ExecutionRow {
-    const mapped: ExecutionRow = {};
-    for (const [tsName, wireName] of Object.entries(wireToTs)) {
-        if (wireName in row) {
-            const value = row[wireName];
-            mapped[tsName] =
-                typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null
-                    ? value
-                    : value == null
-                      ? null
-                      : String(value);
-        }
-    }
-    return mapped;
 }
 
 async function executeReadPlan(
