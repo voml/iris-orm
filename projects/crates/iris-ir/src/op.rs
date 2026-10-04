@@ -77,6 +77,17 @@ pub struct SortKey {
     pub ascending: bool,
 }
 
+/// One field assignment in an insert or patch physical op.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WriteField {
+    /// Logical column / field name.
+    pub name: String,
+    /// Literal encoded as string (bools use `true`/`false`).
+    pub literal: String,
+    /// Literal kind tag.
+    pub kind: LiteralKind,
+}
+
 /// Closed physical op set for Phase 1 (+ stubs reserved by name in docs).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PhysicalOp {
@@ -112,4 +123,27 @@ pub enum PhysicalOp {
     },
     /// Materialize result set (execution boundary).
     Collect,
+    /// Insert one row (`Entity::insert({ … })`).
+    Insert {
+        /// Logical table name.
+        table: String,
+        /// Column assignments in source order.
+        fields: Vec<WriteField>,
+    },
+    /// Update rows matching a filter (`Entity.filter(…).patch({ … })`).
+    Patch {
+        /// Logical table name.
+        table: String,
+        /// Row filter when present.
+        filter: Option<Pred>,
+        /// Patch assignments in source order.
+        fields: Vec<WriteField>,
+    },
+    /// Delete rows matching a filter (`Entity.filter(…).delete()`).
+    Delete {
+        /// Logical table name.
+        table: String,
+        /// Row filter when present.
+        filter: Option<Pred>,
+    },
 }
