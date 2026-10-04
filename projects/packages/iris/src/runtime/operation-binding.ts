@@ -69,6 +69,11 @@ export function createOperationExecutorFromSession(session: MemorySessionBinding
             return wireToEnvelope(raw);
         },
         async executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>> {
+            if (request.operation.kind === "declared-vos" && runExecute) {
+                const raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
+                const envelope = wireToEnvelope(raw);
+                return envelope.ok ? { ok: true, value: undefined } : { ok: false, diagnostics: envelope.diagnostics };
+            }
             if (runOperation) {
                 const raw = runOperation(JSON.stringify(request));
                 const envelope = wireToEnvelope(raw);
