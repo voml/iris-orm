@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
 use iris_types::{Row, RowWrite, Value};
 use mysql::{Params, PooledConn, Value as MysqlValue, prelude::*};
 
@@ -12,6 +12,17 @@ use crate::{
 };
 
 pub(crate) fn execute_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &HashSet<(String, String)>) -> Result<Vec<Row>> {
+    if plan
+        .nodes
+        .iter()
+        .any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. }))
+    {
+        return execute_write_plan(conn, plan, uuid_fields);
+    }
+    execute_read_plan(conn, plan, uuid_fields)
+}
+
+fn execute_read_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &HashSet<(String, String)>) -> Result<Vec<Row>> {
     let mut table: Option<String> = None;
     let mut where_sql: Option<String> = None;
     let mut where_params: Vec<MysqlValue> = Vec::new();
@@ -47,6 +58,9 @@ pub(crate) fn execute_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fiel
             PhysicalOp::Skip { count } => offset = Some(*count),
             PhysicalOp::Take { count } => limit = Some(*count),
             PhysicalOp::Collect => {}
+            PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. } => {
+                return Err(crate::Error::Policy("write op in read plan".into()));
+            }
         }
     }
 
@@ -83,6 +97,162 @@ pub(crate) fn execute_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fiel
         out.push(r);
     }
     Ok(out)
+}
+
+fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &HashSet<(String, String)>) -> Result<Vec<Row>> {
+    let mut insert: Option<(String, Vec<WriteField>)> = None;
+    let mut patch: Option<(String, Option<Pred>, Vec<WriteField>)> = None;
+    let mut delete: Option<(String, Option<Pred>)> = None;
+    let mut projection: Option<Vec<ProjectField>> = None;
+
+    for node in &plan.nodes {
+        match &node.op {
+            PhysicalOp::Insert { table, fields } => insert = Some((table.clone(), fields.clone())),
+            PhysicalOp::Patch { table, filter, fields } => patch = Some((table.clone(), filter.clone(), fields.clone())),
+            PhysicalOp::Delete { table, filter } => delete = Some((table.clone(), filter.clone())),
+            PhysicalOp::Project { fields } => projection = Some(fields.clone()),
+            PhysicalOp::Collect => {}
+            other => return Err(crate::Error::Policy(format!("unexpected op in write plan: {other:?}"))),
+        }
+    }
+
+    if let Some((table, filter)) = delete {
+        let table_ref = table.as_str();
+        let (where_sql, params) = filter_to_sql(filter.as_ref(), table_ref, uuid_fields)?;
+        let sql = format!("DELETE FROM `{table}` WHERE {where_sql}");
+        conn.exec_drop(sql, Params::Positional(params))?;
+        return Ok(Vec::new());
+    }
+
+    if let Some((table, fields)) = insert {
+        let returning = returning_sql(projection.as_deref());
+        let cols: Vec<String> = fields.iter().map(|f| format!("`{}`", f.name)).collect();
+        let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
+        let sql = format!(
+            "INSERT INTO `{table}` ({}) VALUES ({})",
+            cols.join(", "),
+            placeholders.join(", ")
+        );
+        let params: Vec<MysqlValue> = fields
+            .iter()
+            .map(|field| write_field_to_mysql(field, &table, uuid_fields))
+            .collect();
+        conn.exec_drop(sql, Params::Positional(params.clone()))?;
+        let (where_sql, _) = inserted_fields_to_sql(&fields, &table, uuid_fields)?;
+        let select = format!("SELECT {returning} FROM `{table}` WHERE {where_sql} LIMIT 1");
+        return query_rows(conn, &select, params, &table, uuid_fields, projection.as_deref());
+    }
+
+    if let Some((table, filter, fields)) = patch {
+        let sets: Vec<String> = fields.iter().map(|f| format!("`{}` = ?", f.name)).collect();
+        let (where_sql, mut where_params) = filter_to_sql(filter.as_ref(), &table, uuid_fields)?;
+        let sql = format!("UPDATE `{table}` SET {} WHERE {where_sql}", sets.join(", "));
+        let mut params: Vec<MysqlValue> = fields
+            .iter()
+            .map(|field| write_field_to_mysql(field, &table, uuid_fields))
+            .collect();
+        params.extend(where_params.drain(..));
+        conn.exec_drop(sql, Params::Positional(params))?;
+        let returning = returning_sql(projection.as_deref());
+        let select = format!("SELECT {returning} FROM `{table}` WHERE {where_sql}");
+        let (_, reread_params) = filter_to_sql(filter.as_ref(), &table, uuid_fields)?;
+        return query_rows(conn, &select, reread_params, &table, uuid_fields, projection.as_deref());
+    }
+
+    Ok(Vec::new())
+}
+
+fn query_rows(
+    conn: &mut PooledConn,
+    sql: &str,
+    params: Vec<MysqlValue>,
+    table: &str,
+    uuid_fields: &HashSet<(String, String)>,
+    projection: Option<&[ProjectField]>,
+) -> Result<Vec<Row>> {
+    let result = conn.exec_iter(sql, Params::Positional(params))?;
+    let mut out = Vec::new();
+    for row in result {
+        let row = row?;
+        let columns = row.columns_ref();
+        let mut r = Row::new();
+        for (idx, col) in columns.iter().enumerate() {
+            let raw: MysqlValue = row.get(idx).unwrap_or(MysqlValue::NULL);
+            let col_name = col.name_str();
+            let field = col_name.as_ref();
+            r.insert(field.to_string(), from_mysql(raw, table, field, uuid_fields));
+        }
+        out.push(r);
+    }
+    if let Some(fields) = projection {
+        out = apply_projection(out, fields);
+    }
+    Ok(out)
+}
+
+fn project_fields_sql(fields: &[ProjectField]) -> Vec<String> {
+    fields
+        .iter()
+        .map(|f| {
+            let src = f.from.as_deref().unwrap_or(f.name.as_str());
+            if src == f.name { format!("`{src}`") } else { format!("`{src}` AS `{}`", f.name) }
+        })
+        .collect()
+}
+
+fn returning_sql(projection: Option<&[ProjectField]>) -> String {
+    projection
+        .map(|fields| project_fields_sql(fields).join(", "))
+        .unwrap_or_else(|| "*".into())
+}
+
+fn apply_projection(rows: Vec<Row>, fields: &[ProjectField]) -> Vec<Row> {
+    rows.into_iter()
+        .map(|row| {
+            let mut out = Row::new();
+            for field in fields {
+                let src = field.from.as_deref().unwrap_or(field.name.as_str());
+                if let Some(value) = row.get(src) {
+                    out.insert(field.name.clone(), value.clone());
+                }
+            }
+            out
+        })
+        .collect()
+}
+
+fn filter_to_sql(
+    filter: Option<&Pred>,
+    table: &str,
+    uuid_fields: &HashSet<(String, String)>,
+) -> Result<(String, Vec<MysqlValue>)> {
+    match filter {
+        Some(pred) => pred_to_sql(pred, table, uuid_fields),
+        None => Ok(("1 = 1".into(), Vec::new())),
+    }
+}
+
+fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(String, String)>) -> MysqlValue {
+    let value = match field.kind {
+        LiteralKind::Null => Value::Null,
+        LiteralKind::Bool => Value::Bool(field.literal == "true"),
+        LiteralKind::Int => Value::Int(field.literal.parse().unwrap_or(0)),
+        LiteralKind::Str => Value::Str(field.literal.clone()),
+    };
+    to_mysql(&value, table, &field.name, uuid_fields)
+}
+
+fn inserted_fields_to_sql(
+    fields: &[WriteField],
+    table: &str,
+    uuid_fields: &HashSet<(String, String)>,
+) -> Result<(String, Vec<MysqlValue>)> {
+    let parts: Vec<String> = fields.iter().map(|field| format!("`{}` = ?", field.name)).collect();
+    let params: Vec<MysqlValue> = fields
+        .iter()
+        .map(|field| write_field_to_mysql(field, table, uuid_fields))
+        .collect();
+    Ok((parts.join(" AND "), params))
 }
 
 pub(crate) fn insert_row(conn: &mut PooledConn, write: &RowWrite, uuid_fields: &HashSet<(String, String)>) -> Result<()> {
