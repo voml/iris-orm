@@ -60,6 +60,7 @@ struct TsTemplateContext {
     ref_type_imports: String,
     wire_map_lines: String,
     reference_target_lines: String,
+    d1_plan_lines: String,
     tables_view: Vec<TsTableView>,
     macros_view: Vec<TsMacroView>,
     has_macros: bool,
@@ -119,6 +120,24 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let d1_plan_lines = model
+        .tables
+        .iter()
+        .flat_map(|table| {
+            let cols = table.fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
+            let entity = table.name.as_str();
+            [
+                format!(
+                    "    \"{entity}.findMany\": {{ sql: \"SELECT {cols} FROM {entity}\", mode: \"read\" }},"
+                ),
+                format!(
+                    "    \"{entity}.findFirst\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT 1\", mode: \"read\" }},"
+                ),
+            ]
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
     let reference_target_lines = model
         .tables
         .iter()
@@ -174,6 +193,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         ref_type_imports,
         wire_map_lines,
         reference_target_lines,
+        d1_plan_lines,
         tables_view,
         macros_view,
         has_macros: !model.macros.is_empty(),

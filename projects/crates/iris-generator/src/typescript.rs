@@ -30,6 +30,8 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
         ("index.ts".into(), render_ts("typescript/index", &ctx)?),
         ("node.ts".into(), render_ts("typescript/node", &ctx)?),
         ("browser.ts".into(), render_ts("typescript/browser", &ctx)?),
+        ("cloudflare.ts".into(), render_ts("typescript/cloudflare", &ctx)?),
+        ("_internal/d1-plans.ts".into(), render_ts("typescript/d1-plans", &ctx)?),
         ("_internal/synthesize.ts".into(), render_ts("typescript/synthesize", &ctx)?),
         ("references.ts".into(), render_ts("typescript/references", &ctx)?),
         ("models.ts".into(), render_ts("typescript/models", &ctx)?),

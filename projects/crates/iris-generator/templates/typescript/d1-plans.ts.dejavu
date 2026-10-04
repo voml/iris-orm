@@ -1,0 +1,10 @@
+/** Build-time D1 read plan artifact (operationId → parameterized SQL). */
+export type D1PhysicalPlan = {
+    readonly sql: string;
+    readonly mode: "read";
+};
+
+/** Generated read plans for Cloudflare D1 (unfiltered list reads in Phase 3). */
+export const IRIS_D1_PLANS: Record<string, D1PhysicalPlan> = {
+<% d1_plan_lines %>
+};

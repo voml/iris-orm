@@ -44,7 +44,7 @@ fn typescript_emit_writes_ux_layout() {
         .join(format!("iris-ts-gen-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let paths = write_typescript_client(&model, &root).expect("write");
-    assert_eq!(paths.len(), 10);
+    assert_eq!(paths.len(), 12);
     assert!(root.join("index.ts").is_file());
     assert!(root.join("models.ts").is_file());
     assert!(root.join("operations.ts").is_file());
@@ -70,7 +70,7 @@ fn generate_dispatch_typescript_target() {
         .join(format!("iris-ts-dispatch-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let (_, paths) = iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root).expect("generate");
-    assert_eq!(paths.len(), 10);
+    assert_eq!(paths.len(), 12);
     assert!(paths.iter().all(|path| path.starts_with(&root)));
     assert!(paths.iter().any(|path| path.file_name().is_some_and(|name| name == "metadata.ts")));
     let _ = std::fs::remove_dir_all(dir);
@@ -107,7 +107,7 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
 fn typescript_emit_compact_layout_for_all_files() {
     let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    assert_eq!(files.len(), 10);
+    assert_eq!(files.len(), 12);
     for (name, content) in &files {
         assert_compact_ts_layout(name, content);
     }

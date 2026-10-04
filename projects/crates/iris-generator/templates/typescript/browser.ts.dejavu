@@ -11,7 +11,8 @@ export class Database {
                 ...options,
                 contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
             }),
-        );    }
+        );
+    }
 }
 
 export { createClient, DbClient } from "./operations.js";
