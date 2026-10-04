@@ -1,6 +1,7 @@
 {
     "extends": "astro/tsconfigs/strict",
     "compilerOptions": {
+        "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "skipLibCheck": true,
         "baseUrl": ".",
@@ -8,5 +9,5 @@
             "@iris/*": ["src/generated/iris/*"]
         }
     },
-    "include": ["src/**/*.ts", "src/**/*.astro", "astro.config.mjs"]
+    "include": ["src/**/*.ts", "src/**/*.astro", "astro.config.mjs", "iris.config.ts"]
 }
