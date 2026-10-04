@@ -46,17 +46,15 @@ impl Planner {
     pub fn plan_ops(&self, ops: Vec<PhysicalOp>, span: Span) -> Result<PhysicalPlan> {
         let mut required = Vec::new();
         let mut nodes = Vec::with_capacity(ops.len());
-        for op in ops {
-            for cap in CapabilitySet::required_for(&op) {
+        for op in &ops {
+            for cap in CapabilitySet::required_for(op) {
                 if !required.contains(&cap) {
                     required.push(cap);
                 }
             }
-            let (realization, note) = self.classify(&op);
+            let (realization, note) = self.classify(op);
             if realization == RealizationClass::Rejected {
                 let message = note.clone().unwrap_or_else(|| "operation rejected by capability policy".into());
-                // Still build a rejected plan node, but fail before execute via Result
-                // so callers get a spanned diagnostic immediately.
                 return Err(Error::diagnostic(Diagnostic {
                     code: "IRIS-PLAN-REJECTED".into(),
                     message,
@@ -66,8 +64,14 @@ impl Planner {
                     hint: Some("enable the missing capability or rewrite the VOS operation".into()),
                 }));
             }
-            nodes.push(PlannedNode { op, realization, note });
+            nodes.push(PlannedNode { op: op.clone(), realization, note });
         }
+
+        let effect = if ops.iter().any(|op| matches!(op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. })) {
+            EffectKind::Write
+        } else {
+            EffectKind::Read
+        };
 
         let semantic_hash = hash_ops(&nodes.iter().map(|n| n.op.clone()).collect::<Vec<_>>());
         let envelope = IrEnvelope {
@@ -75,7 +79,7 @@ impl Planner {
             ir_version: IrVersion::PHASE1,
             schema_fingerprint: SchemaFingerprint::unbound(),
             operation_id: format!("op-{:x}", semantic_hash.0),
-            effect: EffectKind::Read,
+            effect,
             required_capabilities: required,
             span_start: span.start,
             span_end: span.end,
@@ -119,6 +123,36 @@ impl Planner {
                 }
                 else {
                     (RealizationClass::Rejected, Some("backend cannot page with skip/take".into()))
+                }
+            }
+            PhysicalOp::Insert { .. } => {
+                if self.capabilities.write.insert {
+                    (RealizationClass::Native, None)
+                }
+                else {
+                    (RealizationClass::Rejected, Some("backend cannot insert rows".into()))
+                }
+            }
+            PhysicalOp::Patch { filter, .. } => {
+                if !self.capabilities.write.update {
+                    return (RealizationClass::Rejected, Some("backend cannot patch rows".into()));
+                }
+                if filter.is_some() && !(self.capabilities.query.filter_bool || self.capabilities.query.filter_cmp) {
+                    (RealizationClass::Rejected, Some("backend cannot filter rows for patch".into()))
+                }
+                else {
+                    (RealizationClass::Native, None)
+                }
+            }
+            PhysicalOp::Delete { filter, .. } => {
+                if !self.capabilities.write.delete {
+                    return (RealizationClass::Rejected, Some("backend cannot delete rows".into()));
+                }
+                if filter.is_some() && !(self.capabilities.query.filter_bool || self.capabilities.query.filter_cmp) {
+                    (RealizationClass::Rejected, Some("backend cannot filter rows for delete".into()))
+                }
+                else {
+                    (RealizationClass::Native, None)
                 }
             }
         }

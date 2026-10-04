@@ -152,6 +152,9 @@ impl CapabilitySet {
             PhysicalOp::Sort { .. } => vec!["sort".into()],
             PhysicalOp::Skip { .. } | PhysicalOp::Take { .. } => vec!["page".into()],
             PhysicalOp::Collect => vec!["collect".into()],
+            PhysicalOp::Insert { .. } => vec!["insert".into()],
+            PhysicalOp::Patch { .. } => vec!["update".into(), "filter".into()],
+            PhysicalOp::Delete { .. } => vec!["delete".into(), "filter".into()],
         }
     }
 }
