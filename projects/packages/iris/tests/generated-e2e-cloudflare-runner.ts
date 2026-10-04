@@ -28,6 +28,7 @@ const db = await Database.create({ d1 });
 const unfiltered = await db.user.findMany();
 const filtered = await db.user.findMany({ where: { active: { eq: true } } });
 const limited = await db.user.findMany({ take: 2 });
+const filteredLimited = await db.user.findMany({ where: { active: { eq: true } }, take: 2 });
 const unique = await db.user.findUnique({ where: { userId: "u1" } });
 await db.$close();
 
@@ -37,9 +38,11 @@ console.log(
         unfilteredCount: unfiltered.length,
         filteredCount: filtered.length,
         limitedCount: limited.length,
+        filteredLimitedCount: filteredLimited.length,
         uniqueUserId: unique?.userId,
         filteredTrace: traces[1],
         limitedTrace: traces[2],
-        uniqueTrace: traces[3],
+        filteredLimitedTrace: traces[3],
+        uniqueTrace: traces[4],
     }),
 );
