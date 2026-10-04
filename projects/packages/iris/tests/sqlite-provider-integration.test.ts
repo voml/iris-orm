@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { test } from "node:test";
 
 import { buildOperationRequest, declaredVosOperation } from "../src/runtime/build-operation-request.ts";
-import { USER_SCHEMA } from "./fixtures.ts";
+import { USER_SCHEMA, USER_WIRE_NAMES } from "./fixtures.ts";
 import { srcImport } from "./helpers.ts";
 
 const CONTRACT_VERSION = "1.0.0";
@@ -95,6 +95,7 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
             profile: "sqlite",
             sqlitePath: dbPath,
             schema: USER_SCHEMA,
+            wireNamesByEntity: USER_WIRE_NAMES,
             contractFingerprint: "unused",
         });
     } catch (error) {
@@ -115,6 +116,10 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
         ),
     );
     assert.equal(create.ok, true);
+    if (create.ok) {
+        assert.equal(create.value[0]?.userId, "e2e-1");
+        assert.equal(create.value[0]?.userName, "Ada");
+    }
 
     const findMany = await executor.execute(
         buildOperationRequest(
@@ -125,6 +130,21 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
     assert.equal(findMany.ok, true);
     if (findMany.ok) {
         assert.equal(findMany.value.length, 1);
+        assert.equal(findMany.value[0]?.userId, "e2e-1");
+    }
+
+    const updated = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.update", contractFingerprint: "unused" },
+            declaredVosOperation(
+                'User.filter(x => x.user_id == $p_user_id).patch({ user_name: $patch_user_name })',
+            ),
+            { p_user_id: "e2e-1", patch_user_name: "Grace" },
+        ),
+    );
+    assert.equal(updated.ok, true);
+    if (updated.ok) {
+        assert.equal(updated.value[0]?.userName, "Grace");
     }
 
     await executor.close();
@@ -133,6 +153,7 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
         profile: "sqlite",
         sqlitePath: dbPath,
         schema: USER_SCHEMA,
+        wireNamesByEntity: USER_WIRE_NAMES,
     });
     const again = await reopened.execute(
         buildOperationRequest(
@@ -144,7 +165,30 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
     assert.equal(again.ok, true);
     if (again.ok) {
         assert.equal(again.value.length, 1);
+        assert.equal(again.value[0]?.userName, "Grace");
     }
+
+    const deleted = await reopened.executeUnit(
+        buildOperationRequest(
+            { operationId: "User.delete", contractFingerprint: "unused" },
+            declaredVosOperation('User.filter(x => x.user_id == $p_user_id).delete()'),
+            { p_user_id: "e2e-1" },
+        ),
+    );
+    assert.equal(deleted.ok, true);
+
+    const afterDelete = await reopened.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "unused" },
+            declaredVosOperation('User.filter(x => x.user_id == $p_user_id).collect()'),
+            { p_user_id: "e2e-1" },
+        ),
+    );
+    assert.equal(afterDelete.ok, true);
+    if (afterDelete.ok) {
+        assert.equal(afterDelete.value.length, 0);
+    }
+
     await reopened.close();
     removeTempDir(dir);
 });
@@ -165,6 +209,7 @@ test("iris sqlite file matches @yyds/sqlite engine version when native is availa
             profile: "sqlite",
             sqlitePath: dbPath,
             schema: USER_SCHEMA,
+            wireNamesByEntity: USER_WIRE_NAMES,
         });
     } catch (error) {
         removeTempDir(dir);
@@ -227,6 +272,7 @@ test("iris sqlite file is readable by @yyds/sqlite CLI", async () => {
             profile: "sqlite",
             sqlitePath: dbPath,
             schema: USER_SCHEMA,
+            wireNamesByEntity: USER_WIRE_NAMES,
         });
     } catch (error) {
         removeTempDir(dir);
