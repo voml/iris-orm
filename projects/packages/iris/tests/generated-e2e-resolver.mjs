@@ -10,6 +10,7 @@ function irisSrc(subpath) {
 const alias = new Map([
     ["@yydb/iris/types", irisSrc("src/types/index.ts")],
     ["@yydb/iris/node", irisSrc("src/node/index.ts")],
+    ["@yydb/iris/cloudflare", irisSrc("src/cloudflare/index.ts")],
 ]);
 
 export async function resolve(specifier, context, nextResolve) {

@@ -437,6 +437,44 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
     assert.equal(typeof payload.databaseCount, "number");
 });
 
+test("generated cloudflare Database.create runs findMany through D1 read plans", async (t) => {
+    const core = await loadCore(t);
+    if (!core) {
+        return;
+    }
+
+    const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-cf-e2e-"));
+    const generatedRoot = join(outDir, "generated", "iris");
+    const result = core.generate(USER_SCHEMA, "typescript", generatedRoot);
+    assert.equal(result.ok, true);
+
+    const runnerTemplate = fileURLToPath(new URL("./generated-e2e-cloudflare-runner.ts", import.meta.url));
+    const runnerPath = join(generatedRoot, "generated-e2e-cloudflare-runner.ts");
+    await copyFile(runnerTemplate, runnerPath);
+
+    const bootstrap = pathToFileURL(fileURLToPath(new URL("./generated-e2e-bootstrap.mjs", import.meta.url))).href;
+    const child = spawnSync(
+        process.execPath,
+        ["--experimental-strip-types", `--import`, bootstrap, "generated-e2e-cloudflare-runner.ts"],
+        {
+            encoding: "utf8",
+            cwd: generatedRoot,
+        },
+    );
+    assert.equal(child.status, 0, child.stdout + child.stderr);
+
+    const payload = JSON.parse(child.stdout.trim()) as {
+        ok: boolean;
+        count: number;
+        userId: string;
+        userName: string;
+    };
+    assert.equal(payload.ok, true);
+    assert.equal(payload.count, 1);
+    assert.equal(payload.userId, "u1");
+    assert.equal(payload.userName, "Ada");
+});
+
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {
     const node = await import(srcImport("src/node/index.ts"));
     const { buildOperationRequest, declaredVosOperation } = await import(
