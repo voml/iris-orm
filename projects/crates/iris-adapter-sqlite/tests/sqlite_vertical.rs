@@ -288,3 +288,39 @@ fn connection_failure_bad_path_parent_is_created_but_corrupt_path_errors() {
     assert!(!format!("{err}").is_empty());
     let _ = std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn planner_executes_insert_patch_and_delete() {
+    let db = SqliteSource::open_in_memory().unwrap();
+    db.managed_push(USER_SCHEMA).unwrap();
+
+    let planner = Planner::new(SqliteSource::capabilities());
+
+    let create_plan = planner
+        .plan_source(
+            r#"User::insert({
+                user_id: "u9",
+                user_name: "planner",
+                active: true,
+            })"#,
+        )
+        .unwrap();
+    let created = db.execute_plan(&create_plan).unwrap();
+    assert_eq!(created.len(), 1);
+    assert_eq!(created[0].get("user_name"), Some(&Value::Str("planner".into())));
+
+    let update_plan = planner
+        .plan_source(r#"User.filter(x => x.user_id == "u9").patch({ user_name: "patched" })"#)
+        .unwrap();
+    let updated = db.execute_plan(&update_plan).unwrap();
+    assert_eq!(updated.len(), 1);
+    assert_eq!(updated[0].get("user_name"), Some(&Value::Str("patched".into())));
+
+    let delete_plan = planner
+        .plan_source(r#"User.filter(x => x.user_id == "u9").delete()"#)
+        .unwrap();
+    assert!(db.execute_plan(&delete_plan).unwrap().is_empty());
+
+    let read_plan = planner.plan_source(r#"User.filter(x => x.user_id == "u9").collect()"#).unwrap();
+    assert!(db.execute_plan(&read_plan).unwrap().is_empty());
+}
