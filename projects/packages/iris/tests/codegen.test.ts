@@ -106,6 +106,11 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(d1Plans, /paramOrder: \["take"\]/);
     assert.match(d1Plans, /WHERE user_name = \?/);
     assert.match(d1Plans, /SELECT .* FROM User/);
+    assert.match(d1Plans, /User\.create@data_active,data_user_id,data_user_name/);
+    assert.match(d1Plans, /INSERT INTO User/);
+    assert.match(d1Plans, /RETURNING user_id, user_name, active/);
+    assert.match(d1Plans, /mode: "write-returning"/);
+    assert.match(d1Plans, /paramOrder: \["data_user_id", "data_user_name", "data_active"\]/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
     assert.match(inputs, /export type StringFilter/);
@@ -478,10 +483,14 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
         limitedCount: number;
         filteredLimitedCount: number;
         uniqueUserId: string;
+        createdUserId: string;
+        createdUserName: string;
+        createdActive: number;
         filteredTrace: { sql: string; bind: unknown[] };
         limitedTrace: { sql: string; bind: unknown[] };
         filteredLimitedTrace: { sql: string; bind: unknown[] };
         uniqueTrace: { sql: string; bind: unknown[] };
+        createTrace: { sql: string; bind: unknown[] };
     };
     assert.equal(payload.ok, true);
     assert.equal(payload.unfilteredCount, 1);
@@ -489,6 +498,9 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.equal(payload.limitedCount, 1);
     assert.equal(payload.filteredLimitedCount, 1);
     assert.equal(payload.uniqueUserId, "u1");
+    assert.equal(payload.createdUserId, "u1");
+    assert.equal(payload.createdUserName, "Ada");
+    assert.equal(payload.createdActive, 1);
     assert.match(payload.filteredTrace.sql, /WHERE active = \?/);
     assert.deepEqual(payload.filteredTrace.bind, [1]);
     assert.match(payload.limitedTrace.sql, /LIMIT \?/);
@@ -499,6 +511,9 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
     assert.match(payload.uniqueTrace.sql, /WHERE user_id = \?/);
     assert.deepEqual(payload.uniqueTrace.bind, ["u1"]);
     assert.match(payload.uniqueTrace.sql, /LIMIT 1/);
+    assert.match(payload.createTrace.sql, /INSERT INTO User/);
+    assert.match(payload.createTrace.sql, /RETURNING/);
+    assert.deepEqual(payload.createTrace.bind, ["u2", "Bob", 0]);
 });
 
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {

@@ -64,6 +64,11 @@ const plans = {
         mode: "read" as const,
         paramOrder: ["p_user_id"],
     },
+    "User.create@data_active,data_user_id,data_user_name": {
+        sql: "INSERT INTO User (user_id, user_name, active) VALUES (?, ?, ?) RETURNING user_id, user_name, active",
+        mode: "write-returning" as const,
+        paramOrder: ["data_user_id", "data_user_name", "data_active"],
+    },
 };
 
 test("resolveD1Plan selects parameter variant keys", () => {
@@ -174,17 +179,39 @@ test("D1 read executor runs build-time plan and maps wire columns", async () => 
     assert.equal(fakeD1.lastSql, plans["User.findMany"].sql);
 });
 
-test("D1 read executor rejects mutation operations", async () => {
+test("D1 executor runs create through write-returning plans", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const created = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.create", contractFingerprint: "fp" },
+            declaredVosOperation(
+                "User::insert({ user_id: $data_user_id, user_name: $data_user_name, active: $data_active })",
+            ),
+            { data_user_id: "u2", data_user_name: "Bob", data_active: false },
+        ),
+    );
+    assert.equal(created.ok, true);
+    assert.match(fakeD1.lastSql, /INSERT INTO User/);
+    assert.match(fakeD1.lastSql, /RETURNING/);
+    assert.deepEqual(fakeD1.lastBind, ["u2", "Bob", 0]);
+    if (created.ok) {
+        assert.equal(created.value[0]?.userId, "u1");
+        assert.equal(created.value[0]?.userName, "Ada");
+    }
+});
+
+test("D1 executor rejects create on executeUnit", async () => {
     const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
     const write = await executor.executeUnit(
         buildOperationRequest(
             { operationId: "User.create", contractFingerprint: "fp" },
             declaredVosOperation("User.insert({})"),
+            { data_user_id: "u2", data_user_name: "Bob", data_active: false },
         ),
     );
     assert.equal(write.ok, false);
     if (!write.ok) {
-        assert.equal(write.diagnostics[0]?.code, "IRIS-D1-WRITE-NOT-WIRED");
+        assert.equal(write.diagnostics[0]?.code, "IRIS-D1-PLAN-INVALID");
     }
 });
 

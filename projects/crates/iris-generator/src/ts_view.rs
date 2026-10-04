@@ -153,6 +153,30 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                     ));
                 }
             }
+            let insert_fields = table
+                .fields
+                .iter()
+                .filter(|field| field.reference_target.is_none())
+                .collect::<Vec<_>>();
+            if !insert_fields.is_empty() {
+                let insert_cols = insert_fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
+                let placeholders = insert_fields.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+                let data_param_keys = insert_fields
+                    .iter()
+                    .map(|field| format!("data_{}", field.name))
+                    .collect::<Vec<_>>();
+                let mut sorted_data_keys = data_param_keys.clone();
+                sorted_data_keys.sort();
+                let variant_suffix = sorted_data_keys.join(",");
+                let param_order = data_param_keys
+                    .iter()
+                    .map(|key| format!("\"{key}\""))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                lines.push(format!(
+                    "    \"{entity}.create@{variant_suffix}\": {{ sql: \"INSERT INTO {entity} ({insert_cols}) VALUES ({placeholders}) RETURNING {insert_cols}\", mode: \"write-returning\", paramOrder: [{param_order}] }},"
+                ));
+            }
             lines
         })
         .collect::<Vec<_>>()
