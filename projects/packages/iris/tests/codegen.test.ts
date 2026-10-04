@@ -59,7 +59,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const root = join(outDir, "generated", "iris");
     const result = core.generate(USER_SCHEMA, "typescript", root);
     assert.equal(result.ok, true);
-    assert.equal(result.files.length, 12);
+    assert.equal(result.files.length, 13);
 
     assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris$/);
 
@@ -93,6 +93,13 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(cloudflareEntry, /IRIS_D1_PLANS/);
     assert.match(cloudflareEntry, /IRIS_FIELD_WIRE_NAMES/);
     assert.match(cloudflareEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
+
+    const opfsEntry = await readFile(join(root, "opfs.ts"), "utf8");
+    assert.match(opfsEntry, /@yydb\/iris\/opfs/);
+    assert.match(opfsEntry, /IRIS_D1_PLANS/);
+    assert.match(opfsEntry, /IRIS_FIELD_WIRE_NAMES/);
+    assert.match(opfsEntry, /profile: "opfs"/);
+    assert.match(opfsEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
 
     const d1Plans = await readFile(join(root, "_internal", "d1-plans.ts"), "utf8");
     assert.match(d1Plans, /IRIS_D1_PLANS/);
@@ -290,6 +297,7 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
                     "./src/generated/iris/node.ts",
                     "./src/generated/iris/browser.ts",
                     "./src/generated/iris/cloudflare.ts",
+                    "./src/generated/iris/opfs.ts",
                 ],
             },
             null,
