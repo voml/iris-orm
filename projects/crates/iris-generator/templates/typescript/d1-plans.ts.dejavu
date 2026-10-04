@@ -2,6 +2,7 @@
 export type D1PhysicalPlan = {
     readonly sql: string;
     readonly mode: "read";
+    readonly paramOrder?: readonly string[];
 };
 
 /** Generated read plans for Cloudflare D1 (unfiltered list reads in Phase 3). */
