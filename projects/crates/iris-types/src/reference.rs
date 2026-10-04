@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, WriteField};
 
 use crate::{
     error::{Error, Result},
@@ -38,28 +38,17 @@ impl ReferenceStore {
             return Err(Error::Runtime(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         let mut rows: Vec<Row> = Vec::new();
+        let mut store = self.clone();
         for node in &plan.nodes {
             match &node.op {
                 PhysicalOp::Scan { table } => {
-                    rows = self.tables.get(table).cloned().ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
+                    rows = store.tables.get(table).cloned().ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
                 }
                 PhysicalOp::Filter { predicate } => {
                     rows.retain(|row| eval_pred(predicate, row));
                 }
                 PhysicalOp::Project { fields } => {
-                    rows = rows
-                        .into_iter()
-                        .map(|row| {
-                            let mut out = Row::new();
-                            for f in fields {
-                                let src = f.from.as_deref().unwrap_or(f.name.as_str());
-                                if let Some(v) = row.get(src) {
-                                    out.insert(f.name.clone(), v.clone());
-                                }
-                            }
-                            out
-                        })
-                        .collect();
+                    rows = apply_projection(rows, fields);
                 }
                 PhysicalOp::Sort { keys } => {
                     rows.sort_by(|a, b| {
@@ -81,6 +70,34 @@ impl ReferenceStore {
                 }
                 PhysicalOp::Take { count } => {
                     rows.truncate(*count as usize);
+                }
+                PhysicalOp::Insert { table, fields } => {
+                    let row = write_fields_to_row(fields);
+                    store.tables.entry(table.clone()).or_default().push(row.clone());
+                    rows = vec![row];
+                }
+                PhysicalOp::Patch { table, filter, fields } => {
+                    let table_rows = store.tables.get_mut(table).ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
+                    let mut updated = Vec::new();
+                    for row in table_rows.iter_mut() {
+                        if filter.as_ref().is_none_or(|pred| eval_pred(pred, row)) {
+                            apply_patch(row, fields);
+                            updated.push(row.clone());
+                        }
+                    }
+                    rows = updated;
+                }
+                PhysicalOp::Delete { table, filter } => {
+                    let table_rows = store.tables.get_mut(table).ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
+                    let before = table_rows.len();
+                    if let Some(pred) = filter {
+                        table_rows.retain(|row| !eval_pred(pred, row));
+                    }
+                    else {
+                        table_rows.clear();
+                    }
+                    let _ = before;
+                    rows.clear();
                 }
                 PhysicalOp::Collect => {}
             }
@@ -156,6 +173,31 @@ fn cmp_values(left: &Value, op: CmpOp, right: &Value) -> bool {
         CmpOp::Le => ord != std::cmp::Ordering::Greater,
         CmpOp::Gt => ord == std::cmp::Ordering::Greater,
         CmpOp::Ge => ord != std::cmp::Ordering::Less,
+    }
+}
+
+fn apply_projection(rows: Vec<Row>, fields: &[iris_ir::ProjectField]) -> Vec<Row> {
+    rows.into_iter()
+        .map(|row| {
+            let mut out = Row::new();
+            for f in fields {
+                let src = f.from.as_deref().unwrap_or(f.name.as_str());
+                if let Some(v) = row.get(src) {
+                    out.insert(f.name.clone(), v.clone());
+                }
+            }
+            out
+        })
+        .collect()
+}
+
+fn write_fields_to_row(fields: &[WriteField]) -> Row {
+    fields.iter().map(|field| (field.name.clone(), decode_literal(&field.literal, field.kind))).collect()
+}
+
+fn apply_patch(row: &mut Row, fields: &[WriteField]) {
+    for field in fields {
+        row.insert(field.name.clone(), decode_literal(&field.literal, field.kind));
     }
 }
 
