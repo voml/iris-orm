@@ -38,7 +38,7 @@ export async function openLocalStore(options: OpenLocalStoreOptions): Promise<Lo
     return {
         backend: "memory",
         name: options.name,
-        openSession: () => buildRuntime("web", getWasmSemanticCore()).openSession(),
+        openSession: () => buildRuntime("browser", getWasmSemanticCore(), "memory").openSession(),
         close: async () => {},
     };
 }

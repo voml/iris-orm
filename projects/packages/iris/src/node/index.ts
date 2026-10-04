@@ -10,7 +10,13 @@ export { loadIrisNode, loadIrisNative, isNodeSemanticCoreInstalled } from "./loa
 
 export { checkSchemaFile } from "./check.ts";
 export { createIris, type CreateIrisNodeOptions } from "./create.ts";
-export { createIrisExecutor, createIrisDbBinding, createIrisBindingHost } from "./executor.ts";
+export {
+    createIrisBindingHost,
+    createIrisDbBinding,
+    createIrisExecutor,
+    createIrisOperationExecutor,
+    resolveNodeBindingProfile,
+} from "./executor.ts";
 export { printDoctorReport } from "./doctor.ts";
 export {
     CONFIG_FILE_NAMES,

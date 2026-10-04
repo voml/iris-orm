@@ -11,5 +11,5 @@ export type CreateIrisBrowserOptions = {
  * @deprecated Use generated `IrisClient` + browser executor wiring. WASM init only.
  */
 export async function createIris(_options: CreateIrisBrowserOptions = {}): Promise<IrisBindingHost> {
-    return buildRuntime("web", getWasmSemanticCore());
+    return buildRuntime("browser", getWasmSemanticCore(), "memory");
 }
