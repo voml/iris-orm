@@ -52,7 +52,7 @@ Do **not** enable SPA fallback — routes are pre-rendered HTML.
 
 | Scenario         | Rule                                                                                                  |
 |------------------|-------------------------------------------------------------------------------------------------------|
-| CI / commits     | **npm registry only** — pin `@vmz/*@0.1.12`, lock resolves registry tarballs                          |
+| CI / commits     | **npm registry only** for `@vmz/*@0.1.12`. Pin `@yydb/iris` with `workspace:0.0.6` (matches npm publish set) |
 | Local VMZ bugfix | Temporary `pnpm link` or `file:` **on your machine only** — never commit linked `package.json` / lock |
 | After local test | Restore npm deps and re-run `check` + `build` before push                                             |
 
