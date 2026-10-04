@@ -16,7 +16,37 @@ export async function writeBindingStubs(stubDir: string): Promise<void> {
     await mkdir(stubDir, { recursive: true });
     await writeFile(
         join(stubDir, "iris-types.ts"),
-        `export type IrisDbBinding = {
+        `import type { IrisOperation } from "./iris-operation.js";
+
+export type IrisDiagnostic = {
+  code: string;
+  message: string;
+  severity: "error" | "warning";
+};
+
+export type OperationIdentity = {
+  operationId: string;
+  contractFingerprint: string;
+};
+
+export type OperationRequest = {
+  identity: OperationIdentity;
+  operation: IrisOperation;
+  parameters?: Readonly<Record<string, unknown>>;
+  deadlineMs?: number;
+};
+
+export type ResultEnvelope<T = unknown> =
+  | { ok: true; value: T; diagnostics?: readonly IrisDiagnostic[] }
+  | { ok: false; diagnostics: readonly IrisDiagnostic[] };
+
+export type OperationExecutor = {
+  execute(request: OperationRequest): Promise<ResultEnvelope<readonly Record<string, unknown>[]>>;
+  executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
+  close(): Promise<void>;
+};
+
+export type IrisDbBinding = {
   query(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<unknown>;
   execute(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<void>;
   close(): Promise<void>;
@@ -29,6 +59,14 @@ export type CreateIrisDbBindingOptions = {
   source?: string;
   schema?: string;
 };
+`,
+        "utf8",
+    );
+    await writeFile(
+        join(stubDir, "iris-operation.ts"),
+        `export type IrisOperation =
+  | { kind: "declared-vos"; source: string }
+  | { kind: "source"; source: string };
 `,
         "utf8",
     );

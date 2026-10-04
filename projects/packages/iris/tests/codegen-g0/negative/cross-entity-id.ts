@@ -1,10 +1,10 @@
 import { createClient } from "../../index.js";
 import { postId, userId } from "../../references.js";
-import type { IrisDbBinding } from "@yydb/iris/types";
+import type { OperationExecutor } from "@yydb/iris/types";
 import type { PostId } from "../../references.js";
 
-declare const binding: IrisDbBinding;
-const db = createClient(binding);
+declare const executor: OperationExecutor;
+const db = createClient(executor);
 
 async function run() {
     const wrong: PostId = userId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");

@@ -1,8 +1,8 @@
 import { createClient } from "../../index.js";
-import type { IrisDbBinding } from "@yydb/iris/types";
+import type { OperationExecutor } from "@yydb/iris/types";
 
-declare const binding: IrisDbBinding;
-const db = createClient(binding);
+declare const executor: OperationExecutor;
+const db = createClient(executor);
 
 async function run() {
     await db.post.findMany({
