@@ -135,21 +135,21 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
             ];
             for field in table.fields.iter().filter(|field| field.primary) {
                 let wire = field.name.as_str();
-                let ts_name = field_ts_name(field);
+                let param_key = format!("p_{wire}");
                 lines.push(format!(
-                    "    \"{entity}.findUnique@p_{ts_name}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT 1\", mode: \"read\", paramOrder: [\"p_{ts_name}\"] }},"
+                    "    \"{entity}.findUnique@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT 1\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
                 ));
             }
             for field in &table.fields {
                 let wire = field.name.as_str();
-                let ts_name = field_ts_name(field);
+                let param_key = format!("p_{wire}");
                 let base = field.vos_type.trim_end_matches('?').trim_start_matches('&');
                 if matches!(base, "bool" | "utf8" | "uuid" | "decimal" | "datetime") {
                     lines.push(format!(
-                        "    \"{entity}.findMany@p_{ts_name}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"p_{ts_name}\"] }},"
+                        "    \"{entity}.findMany@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
                     ));
                     lines.push(format!(
-                        "    \"{entity}.findMany@p_{ts_name},take\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT ?\", mode: \"read\", paramOrder: [\"p_{ts_name}\", \"take\"] }},"
+                        "    \"{entity}.findMany@{param_key},take\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT ?\", mode: \"read\", paramOrder: [\"{param_key}\", \"take\"] }},"
                     ));
                 }
             }
