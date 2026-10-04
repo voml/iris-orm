@@ -221,8 +221,8 @@ importers:
         specifier: 0.1.12
         version: 0.1.12
       '@yydb/iris':
-        specifier: 0.0.6
-        version: 0.0.6
+        specifier: workspace:0.0.7
+        version: link:../iris
       shiki:
         specifier: ^3.0.0
         version: 3.23.0
@@ -3378,39 +3378,6 @@ packages:
 
   '@vue/shared@3.5.43':
     resolution: {integrity: sha512-uksS7YGMR5NZyr4JNq0Rp+QyLns0ueaz20KwzIPW9R0LH1Vnt4E+XUM29PNseEbf1www2gOuhuDi5AKOIXag9Q==}
-
-  '@yydb/iris-darwin-arm64@0.0.6':
-    resolution: {integrity: sha512-mYlhMsyYA8Ym23HeYfmXImIwKKuhO4XdKv2iyRHFHfHDif4dOnkaB5eJb90eRz1aSYVTx2f54JqvDhJgWRzQdQ==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@yydb/iris-darwin-x64@0.0.6':
-    resolution: {integrity: sha512-vs0Tvp606oFXdcm+279W6A+/WvG+S8jUJIlVKyiOMNmSImZcJkLpKBUeV3gv4aHgAb9gklKwZUuFHZz9HU/6/w==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@yydb/iris-linux-arm64@0.0.6':
-    resolution: {integrity: sha512-UNcpWjuW4LL5GHPkdeh2j5+kTwzuW1EG+H6Jv1iXinJDt5N+qsodIoXXA45HtejL1lFG07cGIO1uqY7TFXw80w==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@yydb/iris-linux-x64@0.0.6':
-    resolution: {integrity: sha512-3pIFWDQAcOLWCVfiqek/vqDDK+qPbiqcOvw3/UFI9YA5o7oyE/A55YA0whY8TH3xStqzILnQgNbl0p8TZNsExQ==}
-    cpu: [x64]
-    os: [linux]
-
-  '@yydb/iris-unknown-wasm32@0.0.6':
-    resolution: {integrity: sha512-MiDnauBagCKr4o42LGWR0YS0wtQHOBPhEdcTZA0+Se0/koSrJsgM44ACAckzf8GtHHhDpQBClYR1iPH7iKi5HA==}
-
-  '@yydb/iris-win32-x64@0.0.6':
-    resolution: {integrity: sha512-uwaOq0eOm6cncs7U1053rZ4E//uAwoIfqIHtyN07m29qYNSVsuvBgluWNnuYM/VWA8UE5AGXxG0eM3BC3oeWzA==}
-    cpu: [x64]
-    os: [win32]
-
-  '@yydb/iris@0.0.6':
-    resolution: {integrity: sha512-YXLvTRCIwF6O4VfsPKYZHDEkqu4b7xcyWOgOROOzfxtUfs2MojlRiF/gyu9mFU0niCbCY3Se96YalqeTCLAHeQ==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   abbrev@3.0.1:
     resolution: {integrity: sha512-AO2ac6pjRB3SJmGJo+v5/aK6Omggp6fsLrs6wN9bd35ulu4cCwaAU9+7ZhXjeqHVkaHThLuzH0nZr0YpCDhygg==}
@@ -9696,35 +9663,6 @@ snapshots:
       '@vue/shared': 3.5.43
 
   '@vue/shared@3.5.43': {}
-
-  '@yydb/iris-darwin-arm64@0.0.6':
-    optional: true
-
-  '@yydb/iris-darwin-x64@0.0.6':
-    optional: true
-
-  '@yydb/iris-linux-arm64@0.0.6':
-    optional: true
-
-  '@yydb/iris-linux-x64@0.0.6':
-    optional: true
-
-  '@yydb/iris-unknown-wasm32@0.0.6': {}
-
-  '@yydb/iris-win32-x64@0.0.6':
-    optional: true
-
-  '@yydb/iris@0.0.6':
-    dependencies:
-      '@vmz/commander': 0.2.7
-      '@yydb/iris-unknown-wasm32': 0.0.6
-      jiti: 2.7.0
-    optionalDependencies:
-      '@yydb/iris-darwin-arm64': 0.0.6
-      '@yydb/iris-darwin-x64': 0.0.6
-      '@yydb/iris-linux-arm64': 0.0.6
-      '@yydb/iris-linux-x64': 0.0.6
-      '@yydb/iris-win32-x64': 0.0.6
 
   abbrev@3.0.1: {}
 

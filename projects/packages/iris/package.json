@@ -1,9 +1,17 @@
 {
     "name": "@yydb/iris",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API + WASM facades, iris CLI)",
     "homepage": "https://iris-orm.pages.dev/",
-    "keywords": ["iris", "orm", "vos", "yydb", "wasm", "napi", "typescript"],
+    "keywords": [
+        "iris",
+        "orm",
+        "vos",
+        "yydb",
+        "wasm",
+        "napi",
+        "typescript"
+    ],
     "readme": "README.md",
     "repository": {
         "type": "git",
@@ -19,11 +27,21 @@
     "types": "./src/browser/index.ts",
     "typesVersions": {
         "*": {
-            "types": ["./src/types/index.ts"],
-            "node": ["./src/node/index.ts"],
-            "wasm": ["./src/wasm/index.ts"],
-            "cloudflare": ["./src/cloudflare/index.ts"],
-            "node/tooling": ["./src/node/tooling.ts"]
+            "types": [
+                "./src/types/index.ts"
+            ],
+            "node": [
+                "./src/node/index.ts"
+            ],
+            "wasm": [
+                "./src/wasm/index.ts"
+            ],
+            "cloudflare": [
+                "./src/cloudflare/index.ts"
+            ],
+            "node/tooling": [
+                "./src/node/tooling.ts"
+            ]
         }
     },
     "exports": {

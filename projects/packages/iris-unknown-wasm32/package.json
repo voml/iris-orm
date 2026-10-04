@@ -1,48 +1,55 @@
-{
-    "name": "@yydb/iris-unknown-wasm32",
-    "version": "0.0.6",
-    "description": "Browser WebAssembly semantic core for @yydb/iris (wasm-bindgen artifact)",
-    "homepage": "https://iris-orm.pages.dev/",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/voml/iris-orm.git",
-        "directory": "projects/packages/iris-unknown-wasm32"
-    },
-    "bugs": {
-        "url": "https://github.com/voml/iris-orm/issues"
-    },
-    "keywords": ["iris", "wasm", "webassembly", "vos", "yydb"],
-    "readme": "readme.md",
-    "license": "MPL-2.0",
-    "type": "module",
-    "sideEffects": ["./lib/iris_wasm.js"],
-    "types": "./src/index.ts",
-    "exports": {
-        ".": {
-            "types": "./src/index.ts",
-            "import": "./dist/index.js",
-            "default": "./dist/index.js"
-        },
-        "./wasm": "./lib/iris_wasm_bg.wasm"
-    },
-    "files": [
-        "dist",
-        "src",
-        "lib",
-        "readme.md"
-    ],
-    "scripts": {
-        "prepublishOnly": "node ./scripts/build-dist.mjs",
-        "build": "node ./scripts/build-dist.mjs",
-        "typecheck": "tsc --noEmit -p tsconfig.json",
-        "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
-    },
-    "devDependencies": {
-        "@types/node": "^22.15.0",
-        "typescript": "^5.9.2"
-    },
-    "publishConfig": {
-        "access": "public"
-    }
-}
-
+{
+    "name": "@yydb/iris-unknown-wasm32",
+    "version": "0.0.7",
+    "description": "Browser WebAssembly semantic core for @yydb/iris (wasm-bindgen artifact)",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/packages/iris-unknown-wasm32"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
+    "keywords": [
+        "iris",
+        "wasm",
+        "webassembly",
+        "vos",
+        "yydb"
+    ],
+    "readme": "readme.md",
+    "license": "MPL-2.0",
+    "type": "module",
+    "sideEffects": [
+        "./lib/iris_wasm.js"
+    ],
+    "types": "./src/index.ts",
+    "exports": {
+        ".": {
+            "types": "./src/index.ts",
+            "import": "./dist/index.js",
+            "default": "./dist/index.js"
+        },
+        "./wasm": "./lib/iris_wasm_bg.wasm"
+    },
+    "files": [
+        "dist",
+        "src",
+        "lib",
+        "readme.md"
+    ],
+    "scripts": {
+        "prepublishOnly": "node ./scripts/build-dist.mjs",
+        "build": "node ./scripts/build-dist.mjs",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

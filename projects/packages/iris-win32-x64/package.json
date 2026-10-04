@@ -1,29 +1,42 @@
-{
-    "name": "@yydb/iris-win32-x64",
-    "version": "0.0.6",
-    "description": "Prebuilt Iris ORM N-API binary for Windows x64",
-    "homepage": "https://iris-orm.pages.dev/",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/voml/iris-orm.git",
-        "directory": "projects/packages/iris-win32-x64"
-    },
-    "bugs": {
-        "url": "https://github.com/voml/iris-orm/issues"
-    },
-    "keywords": ["iris", "napi", "native", "windows", "x64"],
-    "readme": "readme.md",
-    "type": "module",
-    "license": "MPL-2.0",
-    "main": "./index.js",
-    "exports": {
-        ".": "./index.js"
-    },
-    "files": ["index.js", "lib", "readme.md"],
-    "os": ["win32"],
-    "cpu": ["x64"],
-    "publishConfig": {
-        "access": "public"
-    }
-}
-
+{
+    "name": "@yydb/iris-win32-x64",
+    "version": "0.0.7",
+    "description": "Prebuilt Iris ORM N-API binary for Windows x64",
+    "homepage": "https://iris-orm.pages.dev/",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/packages/iris-win32-x64"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
+    "keywords": [
+        "iris",
+        "napi",
+        "native",
+        "windows",
+        "x64"
+    ],
+    "readme": "readme.md",
+    "type": "module",
+    "license": "MPL-2.0",
+    "main": "./index.js",
+    "exports": {
+        ".": "./index.js"
+    },
+    "files": [
+        "index.js",
+        "lib",
+        "readme.md"
+    ],
+    "os": [
+        "win32"
+    ],
+    "cpu": [
+        "x64"
+    ],
+    "publishConfig": {
+        "access": "public"
+    }
+}
