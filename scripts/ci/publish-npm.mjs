@@ -151,8 +151,20 @@ function versionExists(name, version) {
     return r.status === 0 && r.stdout === version;
 }
 
+function stripLifecycleScripts(pkg) {
+    if (!pkg.scripts) return pkg;
+    const scripts = { ...pkg.scripts };
+    delete scripts.prepublishOnly;
+    delete scripts.prepublish;
+    delete scripts.prepare;
+    pkg.scripts = Object.keys(scripts).length ? scripts : undefined;
+    if (!pkg.scripts) delete pkg.scripts;
+    return pkg;
+}
+
 function npmPublish(stagingDir, name, version) {
-    const args = ["publish", "--access", "public"];
+    // CI already built dist/native/wasm artifacts. Staged trees omit dev scripts.
+    const args = ["publish", "--access", "public", "--ignore-scripts"];
     console.log(`\n=== ${name}@${version} npm ${args.join(" ")} ===`);
     const r = run("npm", args, { cwd: stagingDir });
     if (r.stdout) process.stdout.write(`${r.stdout}\n`);
@@ -309,6 +321,7 @@ function publishJs(version, artifactsRoot) {
             pkg.optionalDependencies = { ...(pkg.optionalDependencies ?? {}), ...optionalNatives };
         }
         delete pkg.devDependencies;
+        stripLifecycleScripts(pkg);
         writeJson(path.join(stage, "package.json"), pkg);
 
         if (!fs.existsSync(path.join(stage, "README.md")) && !fs.existsSync(path.join(stage, "readme.md"))) {
