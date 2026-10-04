@@ -7,5 +7,12 @@
 
 export { createIrisOperationExecutor, type CreateIrisCloudflareExecutorOptions } from "./executor.ts";
 export { createD1ReadOperationExecutor } from "./d1-executor.ts";
-export type { D1PhysicalPlan, D1PlanRegistry } from "./d1-plan.ts";
+export {
+    bindD1Parameters,
+    coerceD1BindValue,
+    resolveD1Plan,
+    resolveD1PlanForRequest,
+    type D1PhysicalPlan,
+    type D1PlanRegistry,
+} from "./d1-plan.ts";
 export type { IrisD1BoundStatement, IrisD1Database, IrisD1PreparedStatement } from "./types.ts";
