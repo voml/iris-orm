@@ -99,7 +99,11 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(d1Plans, /User\.findMany/);
     assert.match(d1Plans, /User\.findMany@p_active/);
     assert.match(d1Plans, /User\.findMany@p_userName/);
+    assert.match(d1Plans, /User\.findMany@take/);
+    assert.match(d1Plans, /User\.findMany@p_active,take/);
+    assert.match(d1Plans, /User\.findUnique@p_userId/);
     assert.match(d1Plans, /paramOrder: \["p_active"\]/);
+    assert.match(d1Plans, /paramOrder: \["take"\]/);
     assert.match(d1Plans, /WHERE user_name = \?/);
     assert.match(d1Plans, /SELECT .* FROM User/);
 

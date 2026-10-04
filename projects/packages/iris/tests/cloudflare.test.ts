@@ -54,6 +54,16 @@ const plans = {
         mode: "read" as const,
         paramOrder: ["p_userName"],
     },
+    "User.findMany@take": {
+        sql: "SELECT user_id, user_name, active FROM User LIMIT ?",
+        mode: "read" as const,
+        paramOrder: ["take"],
+    },
+    "User.findUnique@p_userId": {
+        sql: "SELECT user_id, user_name, active FROM User WHERE user_id = ? LIMIT 1",
+        mode: "read" as const,
+        paramOrder: ["p_userId"],
+    },
 };
 
 test("resolveD1Plan selects parameter variant keys", () => {
@@ -61,6 +71,34 @@ test("resolveD1Plan selects parameter variant keys", () => {
     assert.equal(plan?.sql, plans["User.findMany@p_active"].sql);
     assert.deepEqual(bindD1Parameters(plan!, { p_active: true }), [1]);
     assert.equal(coerceD1BindValue(false), 0);
+});
+
+test("D1 read executor binds take parameter on findMany", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const read = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "fp" },
+            declaredVosOperation("User.collect().take($take)"),
+            { take: 3 },
+        ),
+    );
+    assert.equal(read.ok, true);
+    assert.match(fakeD1.lastSql, /LIMIT \?/);
+    assert.deepEqual(fakeD1.lastBind, [3]);
+});
+
+test("D1 read executor binds findUnique primary-key parameters", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const read = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.findUnique", contractFingerprint: "fp" },
+            declaredVosOperation("User.filter(x => x.user_id == $p_userId).collect()"),
+            { p_userId: "u1" },
+        ),
+    );
+    assert.equal(read.ok, true);
+    assert.match(fakeD1.lastSql, /WHERE user_id = \?/);
+    assert.deepEqual(fakeD1.lastBind, ["u1"]);
 });
 
 test("D1 read executor binds string eq filter parameters", async () => {
