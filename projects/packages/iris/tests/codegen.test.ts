@@ -97,6 +97,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const d1Plans = await readFile(join(root, "_internal", "d1-plans.ts"), "utf8");
     assert.match(d1Plans, /IRIS_D1_PLANS/);
     assert.match(d1Plans, /User\.findMany/);
+    assert.match(d1Plans, /User\.findMany@p_active/);
+    assert.match(d1Plans, /paramOrder: \["p_active"\]/);
     assert.match(d1Plans, /SELECT .* FROM User/);
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
@@ -465,14 +467,16 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
 
     const payload = JSON.parse(child.stdout.trim()) as {
         ok: boolean;
-        count: number;
-        userId: string;
-        userName: string;
+        unfilteredCount: number;
+        filteredCount: number;
+        filteredSql: string;
+        filteredBind: unknown[];
     };
     assert.equal(payload.ok, true);
-    assert.equal(payload.count, 1);
-    assert.equal(payload.userId, "u1");
-    assert.equal(payload.userName, "Ada");
+    assert.equal(payload.unfilteredCount, 1);
+    assert.equal(payload.filteredCount, 1);
+    assert.match(payload.filteredSql, /WHERE active = \?/);
+    assert.deepEqual(payload.filteredBind, [1]);
 });
 
 test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", async (t) => {

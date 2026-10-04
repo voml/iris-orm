@@ -1,16 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { createD1ReadOperationExecutor, createIrisOperationExecutor } from "../src/cloudflare/index.ts";
+import {
+    bindD1Parameters,
+    coerceD1BindValue,
+    createD1ReadOperationExecutor,
+    createIrisOperationExecutor,
+    resolveD1Plan,
+} from "../src/cloudflare/index.ts";
 import { buildOperationRequest, declaredVosOperation } from "../src/runtime/build-operation-request.ts";
 import { negotiateCapabilities } from "../src/runtime/negotiate-capabilities.ts";
 
 const fakeD1 = {
     lastSql: "",
+    lastBind: [] as unknown[],
     prepare(query: string) {
         this.lastSql = query;
         return {
-            bind() {
+            bind(...values: unknown[]) {
+                fakeD1.lastBind = values;
                 return {
                     async all<T>() {
                         return {
@@ -36,7 +44,33 @@ const wireNames = {
 
 const plans = {
     "User.findMany": { sql: "SELECT user_id, user_name, active FROM User", mode: "read" as const },
+    "User.findMany@p_active": {
+        sql: "SELECT user_id, user_name, active FROM User WHERE active = ?",
+        mode: "read" as const,
+        paramOrder: ["p_active"],
+    },
 };
+
+test("resolveD1Plan selects parameter variant keys", () => {
+    const plan = resolveD1Plan(plans, "User.findMany", { p_active: true });
+    assert.equal(plan?.sql, plans["User.findMany@p_active"].sql);
+    assert.deepEqual(bindD1Parameters(plan!, { p_active: true }), [1]);
+    assert.equal(coerceD1BindValue(false), 0);
+});
+
+test("D1 read executor binds bool filter parameters", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const read = await executor.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "fp" },
+            declaredVosOperation("User.filter(x => x.active == $p_active).collect()"),
+            { p_active: true },
+        ),
+    );
+    assert.equal(read.ok, true);
+    assert.match(fakeD1.lastSql, /WHERE active = \?/);
+    assert.deepEqual(fakeD1.lastBind, [1]);
+});
 
 test("negotiateCapabilities maps cloudflare-worker host to d1 profile", () => {
     const matrix = negotiateCapabilities({ host: "cloudflare-worker", profile: "d1", bindingReady: false });

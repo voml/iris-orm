@@ -1,12 +1,16 @@
 import { Database } from "./cloudflare.js";
 
+let lastSql = "";
+let lastBind: unknown[] = [];
+
 const fakeD1 = {
     prepare(query: string) {
+        lastSql = query;
         return {
-            bind() {
+            bind(...values: unknown[]) {
+                lastBind = values;
                 return {
                     async all<T>() {
-                        void query;
                         return {
                             results: [{ user_id: "u1", user_name: "Ada", active: 1 }] as T[],
                         };
@@ -18,14 +22,16 @@ const fakeD1 = {
 };
 
 const db = await Database.create({ d1: fakeD1 });
-const users = await db.user.findMany();
+const unfiltered = await db.user.findMany();
+const filtered = await db.user.findMany({ where: { active: { eq: true } } });
 await db.$close();
 
 console.log(
     JSON.stringify({
         ok: true,
-        count: users.length,
-        userId: users[0]?.userId,
-        userName: users[0]?.userName,
+        unfilteredCount: unfiltered.length,
+        filteredCount: filtered.length,
+        filteredSql: lastSql,
+        filteredBind: lastBind,
     }),
 );
