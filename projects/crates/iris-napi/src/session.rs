@@ -91,12 +91,24 @@ impl SessionStore {
         }
     }
 
-    fn execute_unit(&self, source: &str) -> std::result::Result<(), String> {
+    fn execute_unit(&self, planner: &Planner, source: &str) -> std::result::Result<(), String> {
         match self {
             Self::Memory(iris) => iris.session().execute(source).map_err(|err| err.to_string()),
             Self::Yydb(db) => db.execute(source).map_err(|err| err.to_string()),
-            Self::Sqlite(_) | Self::Postgres(_) | Self::Mysql(_) => {
-                Err("unit-valued execute is only wired for yydb and reference sessions in Phase 2".into())
+            Self::Sqlite(db) => {
+                let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
+                db.execute_plan(&plan).map_err(|err| err.to_string())?;
+                Ok(())
+            }
+            Self::Postgres(db) => {
+                let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
+                db.execute_plan(&plan).map_err(|err| err.to_string())?;
+                Ok(())
+            }
+            Self::Mysql(db) => {
+                let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
+                db.execute_plan(&plan).map_err(|err| err.to_string())?;
+                Ok(())
             }
         }
     }
@@ -242,7 +254,7 @@ impl MemorySession {
                 Err(err) => Ok(err_result(err.to_string())),
             };
         }
-        match self.store.execute_unit(&source) {
+        match self.store.execute_unit(&self.planner, &source) {
             Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
             Err(err) => Ok(err_result(err)),
         }

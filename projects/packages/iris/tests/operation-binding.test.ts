@@ -42,7 +42,7 @@ test("executeUnit routes declared-vos through session execute instead of execute
     assert.equal(operationCalls, 0);
 });
 
-test("createIrisOperationExecutor executeUnit surfaces sqlite unit-valued wiring gap", async () => {
+test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", async () => {
     const node = await import(new URL("../src/node/index.ts", import.meta.url).href);
     const { USER_SCHEMA } = await import(new URL("./fixtures.ts", import.meta.url).href);
     const { buildOperationRequest, declaredVosOperation } = await import(
@@ -69,9 +69,6 @@ test("createIrisOperationExecutor executeUnit surfaces sqlite unit-valued wiring
             declaredVosOperation("User.filter(x => x.active).collect()"),
         ),
     );
-    assert.equal(result.ok, false);
-    if (!result.ok) {
-        assert.match(result.diagnostics[0]?.message ?? "", /unit-valued execute/i);
-    }
+    assert.equal(result.ok, true);
     await executor.close();
 });
