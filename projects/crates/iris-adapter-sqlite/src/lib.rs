@@ -12,14 +12,13 @@ mod migrate;
 mod outbox;
 mod types;
 
-use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::{
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 use iris_ir::{CommitToken, IrVersion, OutboxRecord, PhysicalPlan};
-use iris_types::{
-    CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps,
-    Row, RowWrite, WriteCaps,
-};
+use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
 use rusqlite::Connection;
 
 pub use catalog::adopt_plan;
@@ -40,10 +39,7 @@ pub struct SqliteSource {
 
 impl std::fmt::Debug for SqliteSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SqliteSource")
-            .field("backend", &BACKEND_ID)
-            .field("path", &self.path)
-            .finish_non_exhaustive()
+        f.debug_struct("SqliteSource").field("backend", &BACKEND_ID).field("path", &self.path).finish_non_exhaustive()
     }
 }
 
@@ -62,10 +58,7 @@ impl SqliteSource {
 
     /// Open an in-memory SQLite database.
     pub fn open_in_memory() -> Result<Self> {
-        Ok(Self {
-            conn: Mutex::new(Connection::open_in_memory()?),
-            path: None,
-        })
+        Ok(Self { conn: Mutex::new(Connection::open_in_memory()?), path: None })
     }
 
     /// Open or create a file-backed SQLite database.
@@ -74,10 +67,7 @@ impl SqliteSource {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        Ok(Self {
-            conn: Mutex::new(Connection::open(&path)?),
-            path: Some(path),
-        })
+        Ok(Self { conn: Mutex::new(Connection::open(&path)?), path: Some(path) })
     }
 
     /// On-disk path when file-backed.
@@ -94,48 +84,23 @@ impl SqliteSource {
     /// Build an adopt mapping against a VOS schema document (does not invent semantics).
     pub fn adopt(&self, vos_schema: &str) -> Result<MappingManifest> {
         let catalog = self.inspect()?;
-        let document = vos::parser::parse_document(vos_schema).map_err(|d| {
-            Error::Vos(format!(
-                "parse schema: {}",
-                d.errors
-                    .first()
-                    .map(|e| e.message.as_str())
-                    .unwrap_or("unknown")
-            ))
-        })?;
+        let document = vos::parser::parse_document(vos_schema)
+            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
         Ok(catalog::adopt_plan(&document, &catalog))
     }
 
     /// Plan a Managed Push from a VOS schema (reviewable logical plan).
     pub fn plan_managed_push(&self, vos_schema: &str) -> Result<LogicalMigrationPlan> {
-        let document = vos::parser::parse_document(vos_schema).map_err(|d| {
-            Error::Vos(format!(
-                "parse schema: {}",
-                d.errors
-                    .first()
-                    .map(|e| e.message.as_str())
-                    .unwrap_or("unknown")
-            ))
-        })?;
+        let document = vos::parser::parse_document(vos_schema)
+            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
         let observed = self.inspect()?;
         migrate::plan_push(&document, &observed)
     }
 
     /// Apply a previously reviewed Managed Push plan.
-    pub fn apply_managed_push(
-        &self,
-        plan: &LogicalMigrationPlan,
-        vos_schema: &str,
-    ) -> Result<PushReport> {
-        let document = vos::parser::parse_document(vos_schema).map_err(|d| {
-            Error::Vos(format!(
-                "parse schema: {}",
-                d.errors
-                    .first()
-                    .map(|e| e.message.as_str())
-                    .unwrap_or("unknown")
-            ))
-        })?;
+    pub fn apply_managed_push(&self, plan: &LogicalMigrationPlan, vos_schema: &str) -> Result<PushReport> {
+        let document = vos::parser::parse_document(vos_schema)
+            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
         let mut conn = self.conn.lock().expect("sqlite mutex");
         migrate::apply_push(&mut conn, plan, &document)
     }
@@ -144,24 +109,15 @@ impl SqliteSource {
     pub fn managed_push(&self, vos_schema: &str) -> Result<PushReport> {
         let plan = self.plan_managed_push(vos_schema)?;
         if plan.destructive {
-            return Err(Error::Policy(
-                "destructive managed push requires explicit review/apply".into(),
-            ));
+            return Err(Error::Policy("destructive managed push requires explicit review/apply".into()));
         }
         self.apply_managed_push(&plan, vos_schema)
     }
 
     /// Drift check: local VOS vs observed catalog.
     pub fn drift(&self, vos_schema: &str) -> Result<DriftReport> {
-        let document = vos::parser::parse_document(vos_schema).map_err(|d| {
-            Error::Vos(format!(
-                "parse schema: {}",
-                d.errors
-                    .first()
-                    .map(|e| e.message.as_str())
-                    .unwrap_or("unknown")
-            ))
-        })?;
+        let document = vos::parser::parse_document(vos_schema)
+            .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
         let catalog = self.inspect()?;
         Ok(catalog::drift_report(&document, &catalog))
     }
@@ -169,9 +125,7 @@ impl SqliteSource {
     /// Execute an Iris physical plan (reads).
     pub fn execute_plan(&self, plan: &PhysicalPlan) -> Result<Vec<Row>> {
         if plan.is_rejected() {
-            return Err(Error::Policy(
-                plan.rejection_note().unwrap_or("plan rejected").to_string(),
-            ));
+            return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         let conn = self.conn.lock().expect("sqlite mutex");
         execute::execute_plan(&conn, plan)
@@ -231,10 +185,7 @@ impl SqliteSource {
     /// Authority transaction: business mutations + outbox appends commit atomically.
     ///
     /// Success means authority committed and durable outbox accepted propagation duty --?    /// not that cache/search/vector projections have applied the events.
-    pub fn authority_commit<R>(
-        &self,
-        f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>,
-    ) -> Result<(R, CommitToken)> {
+    pub fn authority_commit<R>(&self, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
         let mut conn = self.conn.lock().expect("sqlite mutex");
         outbox::authority_commit(&mut conn, f)
     }

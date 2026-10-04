@@ -12,14 +12,8 @@ mod cache;
 mod mapping;
 mod ops;
 
-use iris_ir::{
-    CommitToken, ConsistencyIntent, DEFAULT_COMMIT_SHARD, IrVersion, OutboxRecord, PhysicalOp,
-    PhysicalPlan,
-};
-use iris_types::{
-    AppliedWatermarkState, CacheWatermarkProbe, CapabilitySet, CompensationBudget, QueryCaps,
-    WriteCaps,
-};
+use iris_ir::{CommitToken, ConsistencyIntent, DEFAULT_COMMIT_SHARD, IrVersion, OutboxRecord, PhysicalOp, PhysicalPlan};
+use iris_types::{AppliedWatermarkState, CacheWatermarkProbe, CapabilitySet, CompensationBudget, QueryCaps, WriteCaps};
 use redis::Client;
 
 pub use cache::{CacheEntry, IdentityCacheResult};
@@ -39,10 +33,7 @@ pub struct RedisSource {
 
 impl std::fmt::Debug for RedisSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RedisSource")
-            .field("backend", &BACKEND_ID)
-            .field("tables", &self.mapping.tables.len())
-            .finish_non_exhaustive()
+        f.debug_struct("RedisSource").field("backend", &BACKEND_ID).field("tables", &self.mapping.tables.len()).finish_non_exhaustive()
     }
 }
 
@@ -55,21 +46,14 @@ impl RedisSource {
             ir_version_max: IrVersion::PHASE1,
             query: QueryCaps::scan_only(),
             write: WriteCaps::full(),
-            budget: CompensationBudget {
-                max_rows: 1,
-                max_round_trips: 8,
-                max_assoc_fanout: 1,
-                ..CompensationBudget::default()
-            },
+            budget: CompensationBudget { max_rows: 1, max_round_trips: 8, max_assoc_fanout: 1, ..CompensationBudget::default() },
         }
     }
 
     /// Connect with an explicit mapping manifest (required --?no auto catalog invent).
     pub fn connect(url: &str, mapping: MappingManifest) -> Result<Self> {
         if mapping.tables.is_empty() {
-            return Err(Error::Policy(
-                "Redis adapter requires at least one explicit keyspace mapping".into(),
-            ));
+            return Err(Error::Policy("Redis adapter requires at least one explicit keyspace mapping".into()));
         }
         let client = Client::open(url).map_err(Error::Redis)?;
         Ok(Self { client, mapping })
@@ -80,11 +64,7 @@ impl RedisSource {
         let client = Client::open(url).map_err(Error::Redis)?;
         let mut conn = client.get_connection().map_err(Error::Redis)?;
         let pong: String = redis::cmd("PING").query(&mut conn).map_err(Error::Redis)?;
-        if pong.eq_ignore_ascii_case("PONG") || pong == "OK" {
-            Ok(())
-        } else {
-            Err(Error::Policy(format!("unexpected PING reply: {pong}")))
-        }
+        if pong.eq_ignore_ascii_case("PONG") || pong == "OK" { Ok(()) } else { Err(Error::Policy(format!("unexpected PING reply: {pong}"))) }
     }
 
     /// Draft a reviewable keyspace mapping from a VOS schema (does not SCAN Redis).
@@ -92,29 +72,17 @@ impl RedisSource {
     /// Candidates use `iris:<table>:` prefixes and exact primary-key fields. Users must
     /// review/edit before runtime connect --?Redis will not invent mappings from the store.
     pub fn draft_keyspace_mapping(vos_schema: &str) -> Result<MappingManifest> {
-        let document = vos::parser::parse_document(vos_schema).map_err(|d| {
-            Error::Policy(format!(
-                "parse schema: {}",
-                d.errors
-                    .first()
-                    .map(|e| e.message.as_str())
-                    .unwrap_or("unknown")
-            ))
-        })?;
+        let document = vos::parser::parse_document(vos_schema)
+            .map_err(|d| Error::Policy(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
         let mut tables = Vec::new();
         for item in &document.items {
-            let vos::ast::Item::Table(table) = item else {
+            let vos::ast::Item::Table(table) = item
+            else {
                 continue;
             };
-            let pk = table
-                .fields
-                .iter()
-                .find(|f| f.is_primary())
-                .ok_or_else(|| {
-                    Error::Policy(format!(
-                        "table `{}` has no primary key --?Redis keyspace mapping requires one",
-                        table.name
-                    ))
+            let pk =
+                table.fields.iter().find(|f| f.is_primary()).ok_or_else(|| {
+                    Error::Policy(format!("table `{}` has no primary key --?Redis keyspace mapping requires one", table.name))
                 })?;
             tables.push(KeyspaceMapping {
                 vos_table: table.name.clone(),
@@ -125,9 +93,7 @@ impl RedisSource {
             });
         }
         if tables.is_empty() {
-            return Err(Error::Policy(
-                "VOS schema has no tables to map into Redis keyspace".into(),
-            ));
+            return Err(Error::Policy("VOS schema has no tables to map into Redis keyspace".into()));
         }
         Ok(MappingManifest::with_tables(tables))
     }
@@ -184,10 +150,7 @@ impl RedisSource {
     /// Probe a Cache watermark without a keyspace mapping (Phase 10-D status).
     ///
     /// Does not invent catalog mappings; only reads `iris:wm:<shard>`.
-    pub fn probe_watermark_url(
-        url: &str,
-        shard: Option<&str>,
-    ) -> Result<Option<AppliedWatermarkState>> {
+    pub fn probe_watermark_url(url: &str, shard: Option<&str>) -> Result<Option<AppliedWatermarkState>> {
         let client = Client::open(url).map_err(Error::Redis)?;
         let mut conn = client.get_connection().map_err(Error::Redis)?;
         cache::get_watermark(&mut conn, shard.unwrap_or(DEFAULT_COMMIT_SHARD))
@@ -200,11 +163,7 @@ impl RedisSource {
     }
 
     /// Monotonically advance the cache watermark to at least `token.seq`.
-    pub fn cache_advance_watermark(
-        &self,
-        token: &CommitToken,
-        applied_unix_ms: u64,
-    ) -> Result<AppliedWatermarkState> {
+    pub fn cache_advance_watermark(&self, token: &CommitToken, applied_unix_ms: u64) -> Result<AppliedWatermarkState> {
         let mut conn = self.client.get_connection().map_err(Error::Redis)?;
         cache::advance_watermark(&mut conn, token, applied_unix_ms)
     }
@@ -217,12 +176,7 @@ impl RedisSource {
     }
 
     /// Put a versioned cache entry (may set TTL from mapping).
-    pub fn cache_put_entry(
-        &self,
-        table: &str,
-        primary_key: &str,
-        entry: &CacheEntry,
-    ) -> Result<()> {
+    pub fn cache_put_entry(&self, table: &str, primary_key: &str, entry: &CacheEntry) -> Result<()> {
         let map = self.table(table)?;
         let mut conn = self.client.get_connection().map_err(Error::Redis)?;
         cache::put_entry(&mut conn, &map.key_prefix, primary_key, entry, map.ttl_secs)
@@ -236,22 +190,10 @@ impl RedisSource {
     }
 
     /// Apply one authority outbox record into the cache (idempotent projector step).
-    pub fn cache_apply_outbox(
-        &self,
-        record: &OutboxRecord,
-        payload: Option<&str>,
-        now_unix_ms: u64,
-    ) -> Result<AppliedWatermarkState> {
+    pub fn cache_apply_outbox(&self, record: &OutboxRecord, payload: Option<&str>, now_unix_ms: u64) -> Result<AppliedWatermarkState> {
         let map = self.table(&record.table)?;
         let mut conn = self.client.get_connection().map_err(Error::Redis)?;
-        cache::apply_outbox(
-            &mut conn,
-            &map.key_prefix,
-            map.ttl_secs,
-            record,
-            payload,
-            now_unix_ms,
-        )
+        cache::apply_outbox(&mut conn, &map.key_prefix, map.ttl_secs, record, payload, now_unix_ms)
     }
 
     /// Identity read via cache under a consistency intent (hit / bypass / fail-closed).
@@ -291,23 +233,13 @@ impl RedisSource {
     ) -> Result<AppliedWatermarkState> {
         let map = self.table(table)?;
         let mut conn = self.client.get_connection().map_err(Error::Redis)?;
-        cache::fill_from_authority(
-            &mut conn,
-            &map.key_prefix,
-            primary_key,
-            entry,
-            map.ttl_secs,
-            token,
-            now_unix_ms,
-        )
+        cache::fill_from_authority(&mut conn, &map.key_prefix, primary_key, entry, map.ttl_secs, token, now_unix_ms)
     }
 
     /// Reject relational physical plans that would require keyspace scans.
     pub fn execute_plan(&self, plan: &PhysicalPlan) -> Result<Vec<iris_types::Row>> {
         if plan.is_rejected() {
-            return Err(Error::Unsupported(
-                plan.rejection_note().unwrap_or("plan rejected").to_string(),
-            ));
+            return Err(Error::Unsupported(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         for node in &plan.nodes {
             match &node.op {
@@ -323,17 +255,12 @@ impl RedisSource {
                     ));
                 }
                 PhysicalOp::Scan { .. } => {
-                    return Err(Error::Unsupported(
-                        "Redis adapter rejects full-table Scan; use get_primary with an explicit key"
-                            .into(),
-                    ));
+                    return Err(Error::Unsupported("Redis adapter rejects full-table Scan; use get_primary with an explicit key".into()));
                 }
                 PhysicalOp::Collect => {}
             }
         }
-        Err(Error::Unsupported(
-            "Redis adapter does not execute relational physical plans".into(),
-        ))
+        Err(Error::Unsupported("Redis adapter does not execute relational physical plans".into()))
     }
 
     fn table<'a>(&'a self, name: &str) -> Result<&'a KeyspaceMapping> {
@@ -341,11 +268,7 @@ impl RedisSource {
             .tables
             .iter()
             .find(|t| t.vos_table == name)
-            .ok_or_else(|| {
-                Error::Policy(format!(
-                    "no keyspace mapping for VOS table `{name}` --?Redis will not invent one"
-                ))
-            })
+            .ok_or_else(|| Error::Policy(format!("no keyspace mapping for VOS table `{name}` --?Redis will not invent one")))
     }
 }
 
@@ -382,10 +305,7 @@ impl std::error::Error for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl CacheWatermarkProbe for RedisSource {
-    fn probe_watermark(
-        &self,
-        shard: Option<&str>,
-    ) -> std::result::Result<Option<AppliedWatermarkState>, String> {
+    fn probe_watermark(&self, shard: Option<&str>) -> std::result::Result<Option<AppliedWatermarkState>, String> {
         self.cache_watermark(shard).map_err(|e| e.to_string())
     }
 }
@@ -403,10 +323,7 @@ impl RedisWatermarkProbe {
 }
 
 impl CacheWatermarkProbe for RedisWatermarkProbe {
-    fn probe_watermark(
-        &self,
-        shard: Option<&str>,
-    ) -> std::result::Result<Option<AppliedWatermarkState>, String> {
+    fn probe_watermark(&self, shard: Option<&str>) -> std::result::Result<Option<AppliedWatermarkState>, String> {
         RedisSource::probe_watermark_url(&self.url, shard).map_err(|e| e.to_string())
     }
 }

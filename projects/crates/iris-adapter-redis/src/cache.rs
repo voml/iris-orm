@@ -5,8 +5,7 @@
 
 use iris_ir::{AppliedWatermark, CommitToken, ConsistencyIntent, OutboxEffect, OutboxRecord};
 use iris_types::{AppliedWatermarkState, CacheReadAction, CacheReadContext, decide_cache_read};
-use redis::Commands;
-use redis::Connection;
+use redis::{Commands, Connection};
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result};
@@ -22,23 +21,13 @@ struct WatermarkWire {
 
 impl From<&AppliedWatermarkState> for WatermarkWire {
     fn from(s: &AppliedWatermarkState) -> Self {
-        Self {
-            shard: s.watermark.shard.clone(),
-            seq: s.watermark.seq,
-            applied_unix_ms: s.applied_unix_ms,
-        }
+        Self { shard: s.watermark.shard.clone(), seq: s.watermark.seq, applied_unix_ms: s.applied_unix_ms }
     }
 }
 
 impl From<WatermarkWire> for AppliedWatermarkState {
     fn from(w: WatermarkWire) -> Self {
-        Self {
-            watermark: AppliedWatermark {
-                shard: w.shard,
-                seq: w.seq,
-            },
-            applied_unix_ms: w.applied_unix_ms,
-        }
+        Self { watermark: AppliedWatermark { shard: w.shard, seq: w.seq }, applied_unix_ms: w.applied_unix_ms }
     }
 }
 
@@ -57,17 +46,14 @@ fn wm_key(shard: &str) -> String {
     format!("{WM_KEY_PREFIX}{shard}")
 }
 
-pub(crate) fn get_watermark(
-    conn: &mut Connection,
-    shard: &str,
-) -> Result<Option<AppliedWatermarkState>> {
+pub(crate) fn get_watermark(conn: &mut Connection, shard: &str) -> Result<Option<AppliedWatermarkState>> {
     let key = wm_key(shard);
     let raw: Option<String> = conn.get(&key).map_err(Error::Redis)?;
     match raw {
         None => Ok(None),
         Some(s) => {
-            let wire: WatermarkWire = serde_json::from_str(&s)
-                .map_err(|e| Error::Policy(format!("corrupt cache watermark at `{key}`: {e}")))?;
+            let wire: WatermarkWire =
+                serde_json::from_str(&s).map_err(|e| Error::Policy(format!("corrupt cache watermark at `{key}`: {e}")))?;
             Ok(Some(wire.into()))
         }
     }
@@ -82,18 +68,12 @@ pub(crate) fn set_watermark(conn: &mut Connection, state: &AppliedWatermarkState
 }
 
 /// Advance watermark monotonically (same shard only). Returns the stored state.
-pub(crate) fn advance_watermark(
-    conn: &mut Connection,
-    token: &CommitToken,
-    applied_unix_ms: u64,
-) -> Result<AppliedWatermarkState> {
+pub(crate) fn advance_watermark(conn: &mut Connection, token: &CommitToken, applied_unix_ms: u64) -> Result<AppliedWatermarkState> {
     let current = get_watermark(conn, &token.shard)?;
     let next_seq = match &current {
         Some(c) if c.watermark.shard == token.shard => c.watermark.seq.max(token.seq),
         Some(_) => {
-            return Err(Error::Policy(
-                "cache watermark shard mismatch during advance".into(),
-            ));
+            return Err(Error::Policy("cache watermark shard mismatch during advance".into()));
         }
         None => token.seq,
     };
@@ -101,13 +81,7 @@ pub(crate) fn advance_watermark(
         Some(c) if next_seq == c.watermark.seq => c.applied_unix_ms.max(applied_unix_ms),
         _ => applied_unix_ms,
     };
-    let state = AppliedWatermarkState {
-        watermark: AppliedWatermark {
-            shard: token.shard.clone(),
-            seq: next_seq,
-        },
-        applied_unix_ms,
-    };
+    let state = AppliedWatermarkState { watermark: AppliedWatermark { shard: token.shard.clone(), seq: next_seq }, applied_unix_ms };
     set_watermark(conn, &state)?;
     Ok(state)
 }
@@ -118,30 +92,19 @@ fn entry_key(prefix: &str, primary_key: &str) -> String {
     format!("{prefix}__cache_entry__{primary_key}")
 }
 
-pub(crate) fn get_entry(
-    conn: &mut Connection,
-    key_prefix: &str,
-    primary_key: &str,
-) -> Result<Option<CacheEntry>> {
+pub(crate) fn get_entry(conn: &mut Connection, key_prefix: &str, primary_key: &str) -> Result<Option<CacheEntry>> {
     let key = entry_key(key_prefix, primary_key);
     let raw: Option<String> = conn.get(&key).map_err(Error::Redis)?;
     match raw {
         None => Ok(None),
         Some(s) => {
-            let entry: CacheEntry = serde_json::from_str(&s)
-                .map_err(|e| Error::Policy(format!("corrupt cache entry at `{key}`: {e}")))?;
+            let entry: CacheEntry = serde_json::from_str(&s).map_err(|e| Error::Policy(format!("corrupt cache entry at `{key}`: {e}")))?;
             Ok(Some(entry))
         }
     }
 }
 
-pub(crate) fn put_entry(
-    conn: &mut Connection,
-    key_prefix: &str,
-    primary_key: &str,
-    entry: &CacheEntry,
-    ttl_secs: Option<u64>,
-) -> Result<()> {
+pub(crate) fn put_entry(conn: &mut Connection, key_prefix: &str, primary_key: &str, entry: &CacheEntry, ttl_secs: Option<u64>) -> Result<()> {
     let key = entry_key(key_prefix, primary_key);
     let raw = serde_json::to_string(entry).map_err(|e| Error::Policy(e.to_string()))?;
     match ttl_secs {
@@ -155,11 +118,7 @@ pub(crate) fn put_entry(
     Ok(())
 }
 
-pub(crate) fn invalidate_entry(
-    conn: &mut Connection,
-    key_prefix: &str,
-    primary_key: &str,
-) -> Result<bool> {
+pub(crate) fn invalidate_entry(conn: &mut Connection, key_prefix: &str, primary_key: &str) -> Result<bool> {
     let key = entry_key(key_prefix, primary_key);
     let n: i64 = conn.del(&key).map_err(Error::Redis)?;
     Ok(n > 0)
@@ -176,28 +135,20 @@ pub(crate) fn apply_outbox(
 ) -> Result<AppliedWatermarkState> {
     match record.effect {
         OutboxEffect::Upsert => {
-            let payload = payload.ok_or_else(|| {
-                Error::Policy("cache upsert from outbox requires a payload".into())
-            })?;
-            let skip = get_entry(conn, key_prefix, &record.entity_id)?
-                .is_some_and(|existing| existing.entity_version > record.entity_version);
+            let payload = payload.ok_or_else(|| Error::Policy("cache upsert from outbox requires a payload".into()))?;
+            let skip = get_entry(conn, key_prefix, &record.entity_id)?.is_some_and(|existing| existing.entity_version > record.entity_version);
             if !skip {
                 put_entry(
                     conn,
                     key_prefix,
                     &record.entity_id,
-                    &CacheEntry {
-                        entity_version: record.entity_version,
-                        payload: payload.to_string(),
-                        at_seq: record.commit_token.seq,
-                    },
+                    &CacheEntry { entity_version: record.entity_version, payload: payload.to_string(), at_seq: record.commit_token.seq },
                     ttl_secs,
                 )?;
             }
         }
         OutboxEffect::Delete => {
-            let skip = get_entry(conn, key_prefix, &record.entity_id)?
-                .is_some_and(|existing| existing.entity_version > record.entity_version);
+            let skip = get_entry(conn, key_prefix, &record.entity_id)?.is_some_and(|existing| existing.entity_version > record.entity_version);
             if !skip {
                 let _ = invalidate_entry(conn, key_prefix, &record.entity_id)?;
             }
@@ -218,26 +169,13 @@ pub(crate) fn identity_cache_read(
 ) -> Result<IdentityCacheResult> {
     let wm = get_watermark(conn, shard)?;
     let reachable = true; // connection succeeded
-    let action = decide_cache_read(&CacheReadContext {
-        intent,
-        cache_wm: wm.as_ref(),
-        session_fence,
-        now_unix_ms,
-        cache_reachable: reachable,
-    });
+    let action = decide_cache_read(&CacheReadContext { intent, cache_wm: wm.as_ref(), session_fence, now_unix_ms, cache_reachable: reachable });
     match action {
         CacheReadAction::UseCache { freshness_proven } => {
             let entry = get_entry(conn, key_prefix, primary_key)?;
-            Ok(IdentityCacheResult::Hit {
-                entry,
-                watermark: wm,
-                freshness_proven,
-            })
+            Ok(IdentityCacheResult::Hit { entry, watermark: wm, freshness_proven })
         }
-        CacheReadAction::BypassAuthority { reason } => Ok(IdentityCacheResult::BypassAuthority {
-            reason,
-            watermark: wm,
-        }),
+        CacheReadAction::BypassAuthority { reason } => Ok(IdentityCacheResult::BypassAuthority { reason, watermark: wm }),
         CacheReadAction::FailClosed { reason } => Ok(IdentityCacheResult::FailClosed { reason }),
     }
 }

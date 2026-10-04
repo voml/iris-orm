@@ -25,10 +25,7 @@ fn authority_commit_appends_outbox_atomically_and_bumps_token() {
             txn.insert(&RowWrite {
                 table: "User".into(),
                 primary_key: "user_id".into(),
-                fields: BTreeMap::from([
-                    ("user_id".into(), Value::Str("u1".into())),
-                    ("user_name".into(), Value::Str("alice".into())),
-                ]),
+                fields: BTreeMap::from([("user_id".into(), Value::Str("u1".into())), ("user_name".into(), Value::Str("alice".into()))]),
             })?;
             txn.append_outbox(OutboxAppend {
                 operation_id: "op-1".into(),
@@ -70,10 +67,7 @@ fn rolled_back_authority_write_leaves_no_outbox_or_token_bump() {
         txn.insert(&RowWrite {
             table: "User".into(),
             primary_key: "user_id".into(),
-            fields: BTreeMap::from([
-                ("user_id".into(), Value::Str("u1".into())),
-                ("user_name".into(), Value::Str("alice".into())),
-            ]),
+            fields: BTreeMap::from([("user_id".into(), Value::Str("u1".into())), ("user_name".into(), Value::Str("alice".into()))]),
         })?;
         txn.append_outbox(OutboxAppend {
             operation_id: "op-rollback".into(),

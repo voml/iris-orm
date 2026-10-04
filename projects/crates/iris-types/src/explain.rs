@@ -3,10 +3,7 @@
 //! Public explain output must never include credentials, parameter values, or
 //! foreign-store private command text (SQL / Redis wire commands).
 
-use iris_ir::{
-    AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent,
-    PhysicalPlan, RealizationClass,
-};
+use iris_ir::{AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent, PhysicalPlan, RealizationClass};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -132,11 +129,7 @@ pub fn explain_from_plan(
     physical: Option<PhysicalExplain>,
 ) -> ExplainReport {
     let mut fallbacks = Vec::new();
-    let steps = plan
-        .steps
-        .iter()
-        .map(|s| summarize_step(topo, s, &mut fallbacks))
-        .collect();
+    let steps = plan.steps.iter().map(|s| summarize_step(topo, s, &mut fallbacks)).collect();
 
     let mut report = ExplainReport {
         format: EXPLAIN_FORMAT.into(),
@@ -196,58 +189,35 @@ pub fn physical_explain_from_plan(plan: &PhysicalPlan, backend_sketch: &str) -> 
         note = Some(redact_operator_note(rej));
         rejected = true;
     }
-    PhysicalExplain {
-        rejected,
-        backend_sketch: backend_sketch.into(),
-        nodes,
-        note,
-    }
+    PhysicalExplain { rejected, backend_sketch: backend_sketch.into(), nodes, note }
 }
 
-fn summarize_step(
-    topo: &TopologyContract,
-    step: &CompositeStep,
-    fallbacks: &mut Vec<String>,
-) -> ExplainStep {
+fn summarize_step(topo: &TopologyContract, step: &CompositeStep, fallbacks: &mut Vec<String>) -> ExplainStep {
     match step {
-        CompositeStep::AuthorityStep {
-            component,
-            append_outbox,
-        } => ExplainStep {
+        CompositeStep::AuthorityStep { component, append_outbox } => ExplainStep {
             kind: "authority".into(),
             component: Some(component.clone()),
             role: role_of(topo, component),
             detail: Some(format!("append_outbox={append_outbox}")),
         },
-        CompositeStep::DerivedReadStep {
-            component,
-            required_watermark,
-        } => ExplainStep {
+        CompositeStep::DerivedReadStep { component, required_watermark } => ExplainStep {
             kind: "derived_read".into(),
             component: Some(component.clone()),
             role: role_of(topo, component),
-            detail: required_watermark
-                .as_ref()
-                .map(|w| format!("required_watermark={w}")),
+            detail: required_watermark.as_ref().map(|w| format!("required_watermark={w}")),
         },
-        CompositeStep::HydrateStep { component } => ExplainStep {
-            kind: "hydrate".into(),
-            component: Some(component.clone()),
-            role: role_of(topo, component),
-            detail: None,
-        },
+        CompositeStep::HydrateStep { component } => {
+            ExplainStep { kind: "hydrate".into(), component: Some(component.clone()), role: role_of(topo, component), detail: None }
+        }
         CompositeStep::ObjectStep { component, action } => ExplainStep {
             kind: "object".into(),
             component: Some(component.clone()),
             role: role_of(topo, component),
             detail: Some(format!("action={action}")),
         },
-        CompositeStep::FenceStep { fence } => ExplainStep {
-            kind: "fence".into(),
-            component: None,
-            role: None,
-            detail: Some(format!("fence={fence}")),
-        },
+        CompositeStep::FenceStep { fence } => {
+            ExplainStep { kind: "fence".into(), component: None, role: None, detail: Some(format!("fence={fence}")) }
+        }
         CompositeStep::FallbackStep { reason, steps } => {
             fallbacks.push(reason.clone());
             ExplainStep {
@@ -257,18 +227,12 @@ fn summarize_step(
                 detail: Some(format!("reason={reason}; nested_steps={}", steps.len())),
             }
         }
-        CompositeStep::EffectStep { component } => ExplainStep {
-            kind: "effect".into(),
-            component: Some(component.clone()),
-            role: role_of(topo, component),
-            detail: None,
-        },
-        CompositeStep::CompletenessCheck { policy } => ExplainStep {
-            kind: "completeness_check".into(),
-            component: None,
-            role: None,
-            detail: Some(format!("policy={policy}")),
-        },
+        CompositeStep::EffectStep { component } => {
+            ExplainStep { kind: "effect".into(), component: Some(component.clone()), role: role_of(topo, component), detail: None }
+        }
+        CompositeStep::CompletenessCheck { policy } => {
+            ExplainStep { kind: "completeness_check".into(), component: None, role: None, detail: Some(format!("policy={policy}")) }
+        }
     }
 }
 
@@ -293,10 +257,7 @@ fn role_label(role: ComponentRole) -> String {
 
 fn redact_operator_note(note: &str) -> String {
     // Keep short; strip anything that looks like a bind/literal dump.
-    note.replace(['\'', '"'], "")
-        .chars()
-        .take(160)
-        .collect::<String>()
+    note.replace(['\'', '"'], "").chars().take(160).collect::<String>()
 }
 
 /// Scan text for disallowed explain content.
@@ -306,14 +267,10 @@ pub fn scan_explain_text(text: &str) -> ExplainSafety {
         || lower.contains("passwd=")
         || lower.contains("secret=")
         || lower.contains("://")
-            && (lower.contains("@") && lower.contains("redis://")
-                || lower.contains("postgres://")
-                || lower.contains("mysql://"));
+            && (lower.contains("@") && lower.contains("redis://") || lower.contains("postgres://") || lower.contains("mysql://"));
     // Broader credential patterns without requiring URL schemes in Debug output.
-    let credentials_suspected = credentials_suspected
-        || lower.contains("password:")
-        || lower.contains("api_key")
-        || lower.contains("authorization:");
+    let credentials_suspected =
+        credentials_suspected || lower.contains("password:") || lower.contains("api_key") || lower.contains("authorization:");
 
     let sql_shaped_suspected = lower.contains("select ")
         || lower.contains("create table")
@@ -327,11 +284,7 @@ pub fn scan_explain_text(text: &str) -> ExplainSafety {
         || lower.contains(" scan ")
         || lower.contains("explain analyze");
 
-    ExplainSafety {
-        credentials_suspected,
-        sql_shaped_suspected,
-        private_command_suspected,
-    }
+    ExplainSafety { credentials_suspected, sql_shaped_suspected, private_command_suspected }
 }
 
 /// Refuse to emit if the serialized explain body looks unsafe.
@@ -340,9 +293,7 @@ pub fn assert_explain_safe(text: &str) -> Result<(), String> {
     if safety.is_dirty() {
         return Err(format!(
             "refusing to emit explain: credentials={} sql_shaped={} private_command={}",
-            safety.credentials_suspected,
-            safety.sql_shaped_suspected,
-            safety.private_command_suspected
+            safety.credentials_suspected, safety.sql_shaped_suspected, safety.private_command_suspected
         ));
     }
     Ok(())
@@ -351,10 +302,7 @@ pub fn assert_explain_safe(text: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::topology::{
-        CachePolicy, FallbackPolicy, OutboxPolicy, RouteRule, TOPOLOGY_FORMAT, TableBinding,
-        TopologyComponent,
-    };
+    use crate::topology::{CachePolicy, FallbackPolicy, OutboxPolicy, RouteRule, TOPOLOGY_FORMAT, TableBinding, TopologyComponent};
     use std::collections::BTreeMap;
 
     fn sample() -> TopologyContract {
@@ -370,20 +318,10 @@ mod tests {
         );
         components.insert(
             "redis".into(),
-            TopologyComponent {
-                role: ComponentRole::Cache,
-                adapter: "redis".into(),
-                adapter_version: None,
-                datasource: Some("cache".into()),
-            },
+            TopologyComponent { role: ComponentRole::Cache, adapter: "redis".into(), adapter_version: None, datasource: Some("cache".into()) },
         );
         let mut tables = BTreeMap::new();
-        tables.insert(
-            "User".into(),
-            TableBinding {
-                authority: "pg".into(),
-            },
-        );
+        tables.insert("User".into(), TableBinding { authority: "pg".into() });
         let mut routes = BTreeMap::new();
         routes.insert(
             "identity_read".into(),
@@ -401,11 +339,7 @@ mod tests {
             components,
             tables,
             routes,
-            cache: CachePolicy {
-                ttl_secs: Some(30),
-                negative_ttl_secs: None,
-                stampede_budget: Some(4),
-            },
+            cache: CachePolicy { ttl_secs: Some(30), negative_ttl_secs: None, stampede_budget: Some(4) },
             outbox: OutboxPolicy::default(),
             object: crate::topology::ObjectPolicy::default(),
             projection: crate::topology::ProjectionPolicy::default(),
@@ -414,25 +348,13 @@ mod tests {
 
     #[test]
     fn explain_eventual_includes_cache_fallback_and_budget() {
-        let report = explain_topology(
-            &sample(),
-            AccessKind::IdentityRead,
-            ConsistencyIntent::Eventual,
-            Some("User"),
-            None,
-        )
-        .unwrap();
+        let report = explain_topology(&sample(), AccessKind::IdentityRead, ConsistencyIntent::Eventual, Some("User"), None).unwrap();
         assert_eq!(report.format, EXPLAIN_FORMAT);
         assert!(!report.rejected);
         assert!(report.steps.iter().any(|s| s.kind == "derived_read"));
         assert!(!report.fallbacks.is_empty());
         assert!(report.required_watermarks.contains_key("redis"));
-        assert!(
-            report
-                .budget_notes
-                .iter()
-                .any(|b| b.contains("stampede_budget"))
-        );
+        assert!(report.budget_notes.iter().any(|b| b.contains("stampede_budget")));
         assert!(!report.safety.is_dirty());
     }
 

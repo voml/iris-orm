@@ -2,8 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::envelope::IrEnvelope;
-use crate::op::PhysicalOp;
+use crate::{envelope::IrEnvelope, op::PhysicalOp};
 
 /// How a plan node is realized against a datasource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,19 +40,11 @@ pub struct PhysicalPlan {
 impl PhysicalPlan {
     /// True when any node is rejected (must not execute).
     pub fn is_rejected(&self) -> bool {
-        self.nodes
-            .iter()
-            .any(|n| n.realization == RealizationClass::Rejected)
+        self.nodes.iter().any(|n| n.realization == RealizationClass::Rejected)
     }
 
     /// First rejection note, if any.
     pub fn rejection_note(&self) -> Option<&str> {
-        self.nodes.iter().find_map(|n| {
-            if n.realization == RealizationClass::Rejected {
-                n.note.as_deref()
-            } else {
-                None
-            }
-        })
+        self.nodes.iter().find_map(|n| if n.realization == RealizationClass::Rejected { n.note.as_deref() } else { None })
     }
 }

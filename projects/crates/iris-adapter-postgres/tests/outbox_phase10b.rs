@@ -7,9 +7,7 @@ use iris_ir::{CommitToken, OutboxAppend, OutboxEffect};
 use iris_types::{RowWrite, Value};
 
 fn live_url() -> Option<String> {
-    std::env::var("IRIS_TEST_POSTGRES_URL")
-        .ok()
-        .filter(|s| !s.is_empty())
+    std::env::var("IRIS_TEST_POSTGRES_URL").ok().filter(|s| !s.is_empty())
 }
 
 const SCHEMA: &str = r#"
@@ -21,7 +19,8 @@ table IrisOutboxUser {
 
 #[test]
 fn live_authority_outbox_commit_token() {
-    let Some(url) = live_url() else {
+    let Some(url) = live_url()
+    else {
         eprintln!("skip: set IRIS_TEST_POSTGRES_URL for Phase 10-B Postgres outbox");
         return;
     };
@@ -45,10 +44,7 @@ fn live_authority_outbox_commit_token() {
             txn.insert(&RowWrite {
                 table: "IrisOutboxUser".into(),
                 primary_key: "user_id".into(),
-                fields: BTreeMap::from([
-                    ("user_id".into(), Value::Str("u1".into())),
-                    ("user_name".into(), Value::Str("alice".into())),
-                ]),
+                fields: BTreeMap::from([("user_id".into(), Value::Str("u1".into())), ("user_name".into(), Value::Str("alice".into()))]),
             })?;
             txn.append_outbox(OutboxAppend {
                 operation_id: "pg-op-1".into(),

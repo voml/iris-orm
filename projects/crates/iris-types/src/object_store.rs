@@ -4,14 +4,13 @@
 //! Visible [`ObjectReference`] files are written only on finalize; object-store write
 //! failure never yields a committed reference.
 
-use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
-
-use iris_ir::{
-    ObjectError, ObjectHash, ObjectId, ObjectLifecycleState, ObjectMeta, ObjectReference,
-    ObjectResult, require_transition,
+use std::{
+    fs,
+    io::{Read, Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
 };
+
+use iris_ir::{ObjectError, ObjectHash, ObjectId, ObjectLifecycleState, ObjectMeta, ObjectReference, ObjectResult, require_transition};
 use serde::{Deserialize, Serialize};
 
 use crate::topology::ObjectPolicy;
@@ -52,10 +51,7 @@ impl FsObjectStore {
     /// Begin a pending object (no committed reference yet).
     pub fn begin_pending(&self, object_id: ObjectId, now_unix_ms: u64) -> ObjectResult<ObjectMeta> {
         if self.meta_path(&object_id).exists() {
-            return Err(ObjectError::Policy(format!(
-                "object `{}` already exists",
-                object_id
-            )));
+            return Err(ObjectError::Policy(format!("object `{}` already exists", object_id)));
         }
         let meta = ObjectMeta {
             object_id: object_id.clone(),
@@ -72,18 +68,10 @@ impl FsObjectStore {
     }
 
     /// Overwrite pending bytes (Pending only).
-    pub fn write_pending(
-        &self,
-        object_id: &ObjectId,
-        bytes: &[u8],
-        now_unix_ms: u64,
-    ) -> ObjectResult<ObjectMeta> {
+    pub fn write_pending(&self, object_id: &ObjectId, bytes: &[u8], now_unix_ms: u64) -> ObjectResult<ObjectMeta> {
         let mut meta = self.load_meta(object_id)?;
         if !meta.state.allows_write() {
-            return Err(ObjectError::Policy(format!(
-                "object `{}` state {} does not allow writes",
-                object_id, meta.state
-            )));
+            return Err(ObjectError::Policy(format!("object `{}` state {} does not allow writes", object_id, meta.state)));
         }
         require_transition(meta.state, ObjectLifecycleState::Pending)?;
         fs::write(self.blob_path(object_id), bytes).map_err(io_err)?;
@@ -94,24 +82,12 @@ impl FsObjectStore {
     }
 
     /// Append pending bytes (Pending only).
-    pub fn append_pending(
-        &self,
-        object_id: &ObjectId,
-        bytes: &[u8],
-        now_unix_ms: u64,
-    ) -> ObjectResult<ObjectMeta> {
+    pub fn append_pending(&self, object_id: &ObjectId, bytes: &[u8], now_unix_ms: u64) -> ObjectResult<ObjectMeta> {
         let mut meta = self.load_meta(object_id)?;
         if !meta.state.allows_write() {
-            return Err(ObjectError::Policy(format!(
-                "object `{}` state {} does not allow writes",
-                object_id, meta.state
-            )));
+            return Err(ObjectError::Policy(format!("object `{}` state {} does not allow writes", object_id, meta.state)));
         }
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(self.blob_path(object_id))
-            .map_err(io_err)?;
+        let mut file = fs::OpenOptions::new().create(true).append(true).open(self.blob_path(object_id)).map_err(io_err)?;
         file.write_all(bytes).map_err(io_err)?;
         meta.length = meta.length.saturating_add(bytes.len() as u64);
         meta.updated_unix_ms = now_unix_ms;
@@ -120,12 +96,7 @@ impl FsObjectStore {
     }
 
     /// Verify content hash and transition Pending -> Verified.
-    pub fn verify(
-        &self,
-        object_id: &ObjectId,
-        expected_hash: Option<&ObjectHash>,
-        now_unix_ms: u64,
-    ) -> ObjectResult<ObjectMeta> {
+    pub fn verify(&self, object_id: &ObjectId, expected_hash: Option<&ObjectHash>, now_unix_ms: u64) -> ObjectResult<ObjectMeta> {
         let mut meta = self.load_meta(object_id)?;
         require_transition(meta.state, ObjectLifecycleState::Verified)?;
         let bytes = fs::read(self.blob_path(object_id)).map_err(io_err)?;
@@ -148,16 +119,10 @@ impl FsObjectStore {
     /// Finalize Verified -> Committed and publish authority-visible reference.
     ///
     /// This is the only path that creates a committed reference document.
-    pub fn finalize_commit(
-        &self,
-        object_id: &ObjectId,
-        now_unix_ms: u64,
-    ) -> ObjectResult<ObjectReference> {
+    pub fn finalize_commit(&self, object_id: &ObjectId, now_unix_ms: u64) -> ObjectResult<ObjectReference> {
         let mut meta = self.load_meta(object_id)?;
         require_transition(meta.state, ObjectLifecycleState::Committed)?;
-        let hash = meta.content_hash.clone().ok_or_else(|| {
-            ObjectError::Policy("cannot finalize without verified content hash".into())
-        })?;
+        let hash = meta.content_hash.clone().ok_or_else(|| ObjectError::Policy("cannot finalize without verified content hash".into()))?;
         meta.state = ObjectLifecycleState::Committed;
         meta.updated_unix_ms = now_unix_ms;
         self.write_meta(&meta)?;
@@ -180,11 +145,7 @@ impl FsObjectStore {
     }
 
     /// Mark Committed -> Deleting (soft delete before GC).
-    pub fn mark_deleting(
-        &self,
-        object_id: &ObjectId,
-        now_unix_ms: u64,
-    ) -> ObjectResult<ObjectMeta> {
+    pub fn mark_deleting(&self, object_id: &ObjectId, now_unix_ms: u64) -> ObjectResult<ObjectMeta> {
         let mut meta = self.load_meta(object_id)?;
         require_transition(meta.state, ObjectLifecycleState::Deleting)?;
         meta.state = ObjectLifecycleState::Deleting;
@@ -199,38 +160,24 @@ impl FsObjectStore {
     }
 
     /// Load published committed reference, if any.
-    pub fn committed_reference(
-        &self,
-        object_id: &ObjectId,
-    ) -> ObjectResult<Option<ObjectReference>> {
+    pub fn committed_reference(&self, object_id: &ObjectId) -> ObjectResult<Option<ObjectReference>> {
         let path = self.ref_path(object_id);
         if !path.exists() {
             return Ok(None);
         }
         let text = fs::read_to_string(&path).map_err(io_err)?;
-        let wire: ObjectRefWire = von::from_str(&text)
-            .map_err(|e| ObjectError::Policy(format!("corrupt object reference: {e}")))?;
+        let wire: ObjectRefWire = von::from_str(&text).map_err(|e| ObjectError::Policy(format!("corrupt object reference: {e}")))?;
         if wire.reference.state != ObjectLifecycleState::Committed {
-            return Err(ObjectError::Policy(
-                "reference document is not committed".into(),
-            ));
+            return Err(ObjectError::Policy("reference document is not committed".into()));
         }
         Ok(Some(wire.reference))
     }
 
     /// Range-read payload. Allowed for Verified (pre-publish check) and Committed.
-    pub fn range_read(
-        &self,
-        object_id: &ObjectId,
-        offset: u64,
-        len: usize,
-    ) -> ObjectResult<Vec<u8>> {
+    pub fn range_read(&self, object_id: &ObjectId, offset: u64, len: usize) -> ObjectResult<Vec<u8>> {
         let meta = self.load_meta(object_id)?;
         if !meta.state.allows_range_read() {
-            return Err(ObjectError::Policy(format!(
-                "object `{}` state {} does not allow range_read",
-                object_id, meta.state
-            )));
+            return Err(ObjectError::Policy(format!("object `{}` state {} does not allow range_read", object_id, meta.state)));
         }
         // Public callers should use committed refs; Verified is for finalize/preflight only.
         let mut file = fs::File::open(self.blob_path(object_id)).map_err(io_err)?;
@@ -248,7 +195,8 @@ impl FsObjectStore {
         for entry in fs::read_dir(&dir).map_err(io_err)? {
             let entry = entry.map_err(io_err)?;
             let name = entry.file_name();
-            let Some(stem) = Path::new(&name).file_stem().and_then(|s| s.to_str()) else {
+            let Some(stem) = Path::new(&name).file_stem().and_then(|s| s.to_str())
+            else {
                 continue;
             };
             if let Ok(id) = ObjectId::new(stem) {
@@ -264,12 +212,7 @@ impl FsObjectStore {
     /// Returns removed object ids. Never removes Committed objects that still
     /// have a published reference unless they are Deleting.
     pub fn gc(&self, now_unix_ms: u64) -> ObjectResult<Vec<ObjectId>> {
-        let pending_ttl = self
-            .policy
-            .pending_ttl_secs
-            .or(self.policy.orphan_ttl_secs)
-            .unwrap_or(86_400)
-            .saturating_mul(1000);
+        let pending_ttl = self.policy.pending_ttl_secs.or(self.policy.orphan_ttl_secs).unwrap_or(86_400).saturating_mul(1000);
         let mut removed = Vec::new();
         for id in self.list_ids()? {
             let meta = match self.load_meta(&id) {
@@ -343,10 +286,7 @@ impl FsObjectStore {
     }
 
     fn hash_alg(&self) -> &str {
-        self.policy
-            .hash_alg
-            .as_deref()
-            .unwrap_or(OBJECT_HASH_ALG_BLAKE3)
+        self.policy.hash_alg.as_deref().unwrap_or(OBJECT_HASH_ALG_BLAKE3)
     }
 
     fn meta_path(&self, id: &ObjectId) -> PathBuf {
@@ -371,24 +311,16 @@ impl FsObjectStore {
     }
 
     fn write_meta(&self, meta: &ObjectMeta) -> ObjectResult<()> {
-        let text = von::to_string_indented(meta)
-            .map_err(|e| ObjectError::Policy(format!("serialize object meta: {e}")))?;
+        let text = von::to_string_indented(meta).map_err(|e| ObjectError::Policy(format!("serialize object meta: {e}")))?;
         fs::write(self.meta_path(&meta.object_id), text).map_err(io_err)
     }
 
     fn write_reference(&self, reference: &ObjectReference) -> ObjectResult<()> {
         if reference.state != ObjectLifecycleState::Committed {
-            return Err(ObjectError::Policy(
-                "refusing to publish non-committed object reference".into(),
-            ));
+            return Err(ObjectError::Policy("refusing to publish non-committed object reference".into()));
         }
-        let wire = ObjectRefWire {
-            format: OBJECT_REF_FORMAT.into(),
-            version: 1,
-            reference: reference.clone(),
-        };
-        let text = von::to_string_indented(&wire)
-            .map_err(|e| ObjectError::Policy(format!("serialize object ref: {e}")))?;
+        let wire = ObjectRefWire { format: OBJECT_REF_FORMAT.into(), version: 1, reference: reference.clone() };
+        let text = von::to_string_indented(&wire).map_err(|e| ObjectError::Policy(format!("serialize object ref: {e}")))?;
         fs::write(self.ref_path(&reference.object_id), text).map_err(io_err)
     }
 
@@ -404,7 +336,8 @@ fn hash_bytes(bytes: &[u8], alg: &str) -> ObjectHash {
     if alg == OBJECT_HASH_ALG_BLAKE3 {
         let hash = blake3::hash(bytes);
         ObjectHash::new(hash.to_hex().to_string())
-    } else {
+    }
+    else {
         // Unknown alg: still blake3, but bake alg into digest input for distinctness.
         let mut hasher = blake3::Hasher::new();
         hasher.update(alg.as_bytes());
@@ -485,18 +418,11 @@ mod tests {
     use crate::topology::ObjectPolicy;
 
     fn tmp_store() -> (FsObjectStore, PathBuf) {
-        let stamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let root = std::env::temp_dir().join(format!("iris-obj-{stamp}"));
         let store = FsObjectStore::open(
             &root,
-            ObjectPolicy {
-                hash_alg: Some(OBJECT_HASH_ALG_BLAKE3.into()),
-                orphan_ttl_secs: Some(1),
-                pending_ttl_secs: Some(1),
-            },
+            ObjectPolicy { hash_alg: Some(OBJECT_HASH_ALG_BLAKE3.into()), orphan_ttl_secs: Some(1), pending_ttl_secs: Some(1) },
         )
         .unwrap();
         (store, root)
@@ -534,10 +460,7 @@ mod tests {
         store.write_pending(&id, b"x", 2).unwrap();
         store.abort(&id, 3).unwrap();
         assert!(store.committed_reference(&id).unwrap().is_none());
-        assert_eq!(
-            store.meta(&id).unwrap().state,
-            ObjectLifecycleState::Aborted
-        );
+        assert_eq!(store.meta(&id).unwrap().state, ObjectLifecycleState::Aborted);
         let _ = fs::remove_dir_all(root);
     }
 
@@ -547,13 +470,7 @@ mod tests {
         let id = ObjectId::new("img-bad").unwrap();
         store.begin_pending(id.clone(), 1).unwrap();
         let err = store.finalize_commit(&id, 2).unwrap_err();
-        assert!(matches!(
-            err,
-            ObjectError::IllegalTransition {
-                from: ObjectLifecycleState::Pending,
-                to: ObjectLifecycleState::Committed
-            }
-        ));
+        assert!(matches!(err, ObjectError::IllegalTransition { from: ObjectLifecycleState::Pending, to: ObjectLifecycleState::Committed }));
         let _ = fs::remove_dir_all(root);
     }
 
@@ -588,9 +505,7 @@ mod tests {
         let id = ObjectId::new("bad-hash").unwrap();
         store.begin_pending(id.clone(), 1).unwrap();
         store.write_pending(&id, b"abc", 2).unwrap();
-        let err = store
-            .verify(&id, Some(&ObjectHash::new("deadbeef")), 3)
-            .unwrap_err();
+        let err = store.verify(&id, Some(&ObjectHash::new("deadbeef")), 3).unwrap_err();
         assert_eq!(err, ObjectError::HashMismatch);
         let _ = fs::remove_dir_all(root);
     }

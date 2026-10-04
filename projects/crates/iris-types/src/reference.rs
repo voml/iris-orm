@@ -4,9 +4,11 @@ use std::collections::BTreeMap;
 
 use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred};
 
-use crate::error::{Error, Result};
-use crate::lower;
-use crate::value::{Row, Value};
+use crate::{
+    error::{Error, Result},
+    lower,
+    value::{Row, Value},
+};
 
 /// In-memory multi-table store used as the Phase 1 reference adapter.
 #[derive(Debug, Clone, Default)]
@@ -31,25 +33,15 @@ impl ReferenceStore {
     }
 
     /// Execute a physical plan, optionally enforcing a compensation row budget.
-    pub fn execute_plan_with_budget(
-        &self,
-        plan: &PhysicalPlan,
-        budget: Option<&crate::CompensationBudget>,
-    ) -> Result<Vec<Row>> {
+    pub fn execute_plan_with_budget(&self, plan: &PhysicalPlan, budget: Option<&crate::CompensationBudget>) -> Result<Vec<Row>> {
         if plan.is_rejected() {
-            return Err(Error::Runtime(
-                plan.rejection_note().unwrap_or("plan rejected").to_string(),
-            ));
+            return Err(Error::Runtime(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         let mut rows: Vec<Row> = Vec::new();
         for node in &plan.nodes {
             match &node.op {
                 PhysicalOp::Scan { table } => {
-                    rows = self
-                        .tables
-                        .get(table)
-                        .cloned()
-                        .ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
+                    rows = self.tables.get(table).cloned().ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
                 }
                 PhysicalOp::Filter { predicate } => {
                     rows.retain(|row| eval_pred(predicate, row));
@@ -94,24 +86,15 @@ impl ReferenceStore {
             }
         }
         if let Some(budget) = budget {
-            budget
-                .enforce_rows(rows.len() as u64)
-                .map_err(Error::Runtime)?;
+            budget.enforce_rows(rows.len() as u64).map_err(Error::Runtime)?;
         }
         Ok(rows)
     }
 
     /// Interpret a VOS program directly for conformance.
     pub fn interpret_source(&self, source: &str) -> Result<Vec<Row>> {
-        let program = vos::parse_program(source).map_err(|d| {
-            Error::Runtime(format!(
-                "parse failed: {}",
-                d.errors
-                    .first()
-                    .map(|e| e.message.as_str())
-                    .unwrap_or("unknown")
-            ))
-        })?;
+        let program = vos::parse_program(source)
+            .map_err(|d| Error::Runtime(format!("parse failed: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))?;
         self.interpret_program(&program)
     }
 
@@ -133,14 +116,7 @@ impl ReferenceStore {
                 span_end: 0,
                 semantic_hash: iris_ir::SemanticHash(0),
             },
-            nodes: ops
-                .into_iter()
-                .map(|op| iris_ir::PlannedNode {
-                    op,
-                    realization: iris_ir::RealizationClass::Native,
-                    note: None,
-                })
-                .collect(),
+            nodes: ops.into_iter().map(|op| iris_ir::PlannedNode { op, realization: iris_ir::RealizationClass::Native, note: None }).collect(),
         };
         self.execute_plan(&plan)
     }
@@ -152,12 +128,7 @@ fn eval_pred(pred: &Pred, row: &Row) -> bool {
             Some(Value::Bool(b)) => b == value,
             _ => false,
         },
-        Pred::FieldCmp {
-            field,
-            op,
-            literal,
-            kind,
-        } => {
+        Pred::FieldCmp { field, op, literal, kind } => {
             let left = row.get(field).cloned().unwrap_or(Value::Null);
             let right = decode_literal(literal, *kind);
             cmp_values(&left, *op, &right)
@@ -190,8 +161,5 @@ fn cmp_values(left: &Value, op: CmpOp, right: &Value) -> bool {
 
 /// Build a row from field pairs.
 pub fn row_from_pairs(pairs: &[(&str, Value)]) -> Row {
-    pairs
-        .iter()
-        .map(|(k, v)| ((*k).to_string(), v.clone()))
-        .collect()
+    pairs.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect()
 }

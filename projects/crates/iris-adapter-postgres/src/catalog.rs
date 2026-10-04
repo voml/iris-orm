@@ -1,14 +1,10 @@
 //! PostgreSQL catalog inspect, adopt, and drift.
 
-use iris_types::{
-    DriftReport, FieldMapping, MappingManifest, MappingQuality, ObservedCatalog, ObservedColumn,
-    ObservedTable, TableMapping,
-};
+use iris_types::{DriftReport, FieldMapping, MappingManifest, MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, TableMapping};
 use postgres::Client;
 use vos::ast::{Document, Item, TypeExpr};
 
-use crate::outbox;
-use crate::{ADAPTER_VERSION, BACKEND_ID, Result};
+use crate::{ADAPTER_VERSION, BACKEND_ID, Result, outbox};
 
 pub(crate) fn inspect_catalog(client: &mut Client) -> Result<ObservedCatalog> {
     let rows = client.query(
@@ -27,10 +23,7 @@ pub(crate) fn inspect_catalog(client: &mut Client) -> Result<ObservedCatalog> {
         let columns = inspect_table(client, &name)?;
         tables.push(ObservedTable { name, columns });
     }
-    Ok(ObservedCatalog {
-        backend_id: BACKEND_ID.into(),
-        tables,
-    })
+    Ok(ObservedCatalog { backend_id: BACKEND_ID.into(), tables })
 }
 
 fn inspect_table(client: &mut Client, table: &str) -> Result<Vec<ObservedColumn>> {
@@ -59,12 +52,7 @@ fn inspect_table(client: &mut Client, table: &str) -> Result<Vec<ObservedColumn>
         .into_iter()
         .map(|row| {
             let nullable: String = row.get(2);
-            ObservedColumn {
-                name: row.get(0),
-                type_name: row.get(1),
-                nullable: nullable.eq_ignore_ascii_case("YES"),
-                primary_key: row.get(3),
-            }
+            ObservedColumn { name: row.get(0), type_name: row.get(1), nullable: nullable.eq_ignore_ascii_case("YES"), primary_key: row.get(3) }
         })
         .collect())
 }
@@ -73,18 +61,17 @@ fn inspect_table(client: &mut Client, table: &str) -> Result<Vec<ObservedColumn>
 pub fn adopt_plan(document: &Document, catalog: &ObservedCatalog) -> MappingManifest {
     let mut tables = Vec::new();
     for item in &document.items {
-        let Item::Table(table) = item else {
+        let Item::Table(table) = item
+        else {
             continue;
         };
-        let Some(observed) = catalog.table(&table.name) else {
+        let Some(observed) = catalog.table(&table.name)
+        else {
             tables.push(TableMapping {
                 vos_table: table.name.clone(),
                 physical_table: table.name.clone(),
                 fields: Vec::new(),
-                blockers: vec![format!(
-                    "physical table `{}` not found in observed catalog",
-                    table.name
-                )],
+                blockers: vec![format!("physical table `{}` not found in observed catalog", table.name)],
             });
             continue;
         };
@@ -92,10 +79,7 @@ pub fn adopt_plan(document: &Document, catalog: &ObservedCatalog) -> MappingMani
         let mut blockers = Vec::new();
         let pk_count = observed.columns.iter().filter(|c| c.primary_key).count();
         if pk_count == 0 {
-            blockers.push(format!(
-                "table `{}` has no primary key --?adopt blocked",
-                observed.name
-            ));
+            blockers.push(format!("table `{}` has no primary key --?adopt blocked", observed.name));
         }
 
         let mut fields = Vec::new();
@@ -120,27 +104,15 @@ pub fn adopt_plan(document: &Document, catalog: &ObservedCatalog) -> MappingMani
                     });
                 }
                 None => {
-                    blockers.push(format!(
-                        "VOS field `{}`.`{}` has no physical column --?will not auto-invent",
-                        table.name, field.name
-                    ));
+                    blockers.push(format!("VOS field `{}`.`{}` has no physical column --?will not auto-invent", table.name, field.name));
                 }
             }
         }
 
-        tables.push(TableMapping {
-            vos_table: table.name.clone(),
-            physical_table: observed.name.clone(),
-            fields,
-            blockers,
-        });
+        tables.push(TableMapping { vos_table: table.name.clone(), physical_table: observed.name.clone(), fields, blockers });
     }
 
-    MappingManifest {
-        adapter_id: BACKEND_ID.into(),
-        adapter_version: ADAPTER_VERSION.into(),
-        tables,
-    }
+    MappingManifest { adapter_id: BACKEND_ID.into(), adapter_version: ADAPTER_VERSION.into(), tables }
 }
 
 pub(crate) fn drift_report(document: &Document, catalog: &ObservedCatalog) -> DriftReport {
@@ -154,47 +126,33 @@ pub(crate) fn drift_report(document: &Document, catalog: &ObservedCatalog) -> Dr
         .collect();
     let physical: Vec<String> = catalog.tables.iter().map(|t| t.name.clone()).collect();
 
-    let missing_physical_tables = vos_tables
-        .iter()
-        .filter(|t| !physical.iter().any(|p| p == *t))
-        .cloned()
-        .collect();
-    let extra_physical_tables = physical
-        .iter()
-        .filter(|p| !vos_tables.iter().any(|t| t == *p))
-        .cloned()
-        .collect();
+    let missing_physical_tables = vos_tables.iter().filter(|t| !physical.iter().any(|p| p == *t)).cloned().collect();
+    let extra_physical_tables = physical.iter().filter(|p| !vos_tables.iter().any(|t| t == *p)).cloned().collect();
 
     let mut field_mismatches = Vec::new();
     for item in &document.items {
-        let Item::Table(table) = item else {
+        let Item::Table(table) = item
+        else {
             continue;
         };
-        let Some(obs) = catalog.table(&table.name) else {
+        let Some(obs) = catalog.table(&table.name)
+        else {
             continue;
         };
         for field in &table.fields {
             match obs.columns.iter().find(|c| c.name == field.name) {
-                None => field_mismatches
-                    .push(format!("{}.{} missing physically", table.name, field.name)),
+                None => field_mismatches.push(format!("{}.{} missing physically", table.name, field.name)),
                 Some(col) => {
                     let vos_type = type_label(&field.ty);
                     if classify_type(&vos_type, &col.type_name).0 == MappingQuality::LossyBlocked {
-                        field_mismatches.push(format!(
-                            "{}.{} type drift VOS `{vos_type}` vs `{}`",
-                            table.name, field.name, col.type_name
-                        ));
+                        field_mismatches.push(format!("{}.{} type drift VOS `{vos_type}` vs `{}`", table.name, field.name, col.type_name));
                     }
                 }
             }
         }
     }
 
-    DriftReport {
-        missing_physical_tables,
-        extra_physical_tables,
-        field_mismatches,
-    }
+    DriftReport { missing_physical_tables, extra_physical_tables, field_mismatches }
 }
 
 fn type_label(ty: &TypeExpr) -> String {
@@ -214,9 +172,7 @@ fn type_label(ty: &TypeExpr) -> String {
 pub fn classify_type(vos_type: &str, physical: &str) -> (MappingQuality, Option<String>) {
     let p = physical.to_ascii_lowercase();
     let v = vos_type.to_ascii_lowercase();
-    if (v.contains("utf8") || v.contains("string"))
-        && (p == "text" || p == "varchar" || p == "bpchar" || p == "name" || p == "citext")
-    {
+    if (v.contains("utf8") || v.contains("string")) && (p == "text" || p == "varchar" || p == "bpchar" || p == "name" || p == "citext") {
         return (MappingQuality::Exact, None);
     }
     if v.contains("bool") && (p == "bool" || p == "boolean") {
@@ -230,24 +186,14 @@ pub fn classify_type(vos_type: &str, physical: &str) -> (MappingQuality, Option<
     if v.contains("uuid") && p == "uuid" {
         return (MappingQuality::Exact, None);
     }
-    if (v.contains("f64") || v.contains("f32"))
-        && (p == "float8" || p == "float4" || p == "double precision" || p == "real")
-    {
+    if (v.contains("f64") || v.contains("f32")) && (p == "float8" || p == "float4" || p == "double precision" || p == "real") {
         return (MappingQuality::Exact, None);
     }
     if v.contains("bytes") && (p == "bytea") {
         return (MappingQuality::Exact, None);
     }
     if v.contains("vector") || v.contains("bytes") {
-        return (
-            MappingQuality::LossyBlocked,
-            Some("complex payload types need an explicit waiver".into()),
-        );
+        return (MappingQuality::LossyBlocked, Some("complex payload types need an explicit waiver".into()));
     }
-    (
-        MappingQuality::LossyBlocked,
-        Some(format!(
-            "no safe default map for `{vos_type}` ???`{physical}`"
-        )),
-    )
+    (MappingQuality::LossyBlocked, Some(format!("no safe default map for `{vos_type}` ???`{physical}`")))
 }

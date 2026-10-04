@@ -2,11 +2,7 @@
 
 use iris_ir::PhysicalPlan;
 
-use crate::capability::CapabilitySet;
-use crate::error::Result;
-use crate::planner::Planner;
-use crate::reference::ReferenceStore;
-use crate::value::Row;
+use crate::{capability::CapabilitySet, error::Result, planner::Planner, reference::ReferenceStore, value::Row};
 
 /// Process-level Iris handle bound to one reference datasource (Phase 1).
 #[derive(Debug)]
@@ -18,18 +14,12 @@ pub struct Iris {
 impl Iris {
     /// Construct from capabilities + store.
     pub fn new(capabilities: CapabilitySet, store: ReferenceStore) -> Self {
-        Self {
-            capabilities,
-            store,
-        }
+        Self { capabilities, store }
     }
 
     /// Open a session on the reference datasource.
     pub fn session(&self) -> Session<'_> {
-        Session {
-            planner: Planner::new(self.capabilities.clone()),
-            store: &self.store,
-        }
+        Session { planner: Planner::new(self.capabilities.clone()), store: &self.store }
     }
 
     /// Shared store (tests / seeding).
@@ -65,8 +55,7 @@ impl Session<'_> {
     /// Counterpart of generated `db.$query(vosText, parameters?)`.
     pub fn query(&self, source: &str) -> Result<Vec<Row>> {
         let plan = self.plan(source)?;
-        self.store
-            .execute_plan_with_budget(&plan, Some(&self.planner.capabilities.budget))
+        self.store.execute_plan_with_budget(&plan, Some(&self.planner.capabilities.budget))
     }
 
     /// Execute unit-valued / DDL-shaped VOS and map success to `()`.

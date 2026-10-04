@@ -19,10 +19,7 @@ pub struct CommitToken {
 impl CommitToken {
     /// Build a token for the default shard.
     pub fn new(seq: u64) -> Self {
-        Self {
-            shard: DEFAULT_COMMIT_SHARD.into(),
-            seq,
-        }
+        Self { shard: DEFAULT_COMMIT_SHARD.into(), seq }
     }
 
     /// True when `other` is the same shard and at least as new.
@@ -43,10 +40,7 @@ pub struct AppliedWatermark {
 impl AppliedWatermark {
     /// Watermark for the default shard.
     pub fn new(seq: u64) -> Self {
-        Self {
-            shard: DEFAULT_COMMIT_SHARD.into(),
-            seq,
-        }
+        Self { shard: DEFAULT_COMMIT_SHARD.into(), seq }
     }
 }
 

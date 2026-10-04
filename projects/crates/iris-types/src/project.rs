@@ -1,7 +1,9 @@
 //! `iris.von` project configuration (VON document, no secrets).
 
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -92,16 +94,10 @@ pub struct DatasourceConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GenerateConfig {
     /// Output directory (default [`DEFAULT_GENERATE_DIR`], workspace-local).
-    #[serde(
-        default = "default_generate_out",
-        skip_serializing_if = "is_default_generate_out"
-    )]
+    #[serde(default = "default_generate_out", skip_serializing_if = "is_default_generate_out")]
     pub out: String,
     /// Target language.
-    #[serde(
-        default = "default_generate_target",
-        skip_serializing_if = "is_default_generate_target"
-    )]
+    #[serde(default = "default_generate_target", skip_serializing_if = "is_default_generate_target")]
     pub target: String,
 }
 
@@ -130,10 +126,7 @@ impl GenerateConfig {
 
 impl Default for GenerateConfig {
     fn default() -> Self {
-        Self {
-            out: default_generate_out(),
-            target: default_generate_target(),
-        }
+        Self { out: default_generate_out(), target: default_generate_target() }
     }
 }
 
@@ -193,20 +186,14 @@ impl IrisProject {
             return Err(ProjectError::UnsupportedVersion(self.version));
         }
         if self.schema.trim().is_empty() {
-            return Err(ProjectError::Invalid(
-                "schema path must not be empty".into(),
-            ));
+            return Err(ProjectError::Invalid("schema path must not be empty".into()));
         }
         for (name, ds) in &self.datasources {
             if name.trim().is_empty() {
-                return Err(ProjectError::Invalid(
-                    "datasource name must not be empty".into(),
-                ));
+                return Err(ProjectError::Invalid("datasource name must not be empty".into()));
             }
             if ds.path.is_none() && ds.url.is_none() && ds.kind != DatasourceKind::Reference {
-                return Err(ProjectError::Invalid(format!(
-                    "datasource `{name}` needs path or url (except reference)"
-                )));
+                return Err(ProjectError::Invalid(format!("datasource `{name}` needs path or url (except reference)")));
             }
             if let Some(p) = &ds.path {
                 reject_inline_secret(p)?;
@@ -255,17 +242,12 @@ impl IrisProject {
 
     /// Resolve a datasource by name.
     pub fn datasource(&self, name: &str) -> Result<&DatasourceConfig, ProjectError> {
-        self.datasources
-            .get(name)
-            .ok_or_else(|| ProjectError::UnknownDatasource(name.into()))
+        self.datasources.get(name).ok_or_else(|| ProjectError::UnknownDatasource(name.into()))
     }
 
     /// Resolve a topology path by name (relative path stored in `topologies`).
     pub fn topology_path(&self, name: &str) -> Result<&str, ProjectError> {
-        self.topologies
-            .get(name)
-            .map(String::as_str)
-            .ok_or_else(|| ProjectError::Invalid(format!("unknown topology `{name}`")))
+        self.topologies.get(name).map(String::as_str).ok_or_else(|| ProjectError::Invalid(format!("unknown topology `{name}`")))
     }
 }
 
@@ -286,11 +268,7 @@ pub struct IrisLock {
 
 impl IrisLock {
     /// Build a lock record.
-    pub fn new(
-        schema_fingerprint: impl Into<String>,
-        generator_version: impl Into<String>,
-        target: impl Into<String>,
-    ) -> Self {
+    pub fn new(schema_fingerprint: impl Into<String>, generator_version: impl Into<String>, target: impl Into<String>) -> Self {
         Self {
             format: LOCK_FORMAT.into(),
             version: 1,
@@ -323,12 +301,10 @@ pub fn expand_env(template: &str) -> Result<String, ProjectError> {
     while i < chars.len() {
         if chars[i] == '$' {
             if i + 1 < chars.len() && chars[i + 1] == '{' {
-                let end = chars[i + 2..]
-                    .iter()
-                    .position(|c| *c == '}')
-                    .ok_or_else(|| ProjectError::Invalid("unclosed ${} in path/url".into()))?
-                    + i
-                    + 2;
+                let end =
+                    chars[i + 2..].iter().position(|c| *c == '}').ok_or_else(|| ProjectError::Invalid("unclosed ${} in path/url".into()))?
+                        + i
+                        + 2;
                 let key: String = chars[i + 2..end].iter().collect();
                 let val = std::env::var(&key).map_err(|_| ProjectError::MissingEnv(key.clone()))?;
                 out.push_str(&val);
@@ -404,10 +380,7 @@ pub fn resolve_path(project_dir: &Path, relative: &str) -> PathBuf {
 
 /// Default migration plan path for a datasource (`{source}-plan.von`).
 pub fn default_migration_plan(project_dir: &Path, source: &str) -> PathBuf {
-    resolve_path(
-        project_dir,
-        &format!("{DEFAULT_MIGRATIONS_DIR}/{source}-plan.von"),
-    )
+    resolve_path(project_dir, &format!("{DEFAULT_MIGRATIONS_DIR}/{source}-plan.von"))
 }
 
 fn reject_inline_secret(value: &str) -> Result<(), ProjectError> {
@@ -418,9 +391,7 @@ fn reject_inline_secret(value: &str) -> Result<(), ProjectError> {
             continue;
         }
         if lower.contains(banned) && !value.contains('$') {
-            return Err(ProjectError::SecretInConfig(format!(
-                "refusing inline credential material matching `{banned}`; use $ENV expansion"
-            )));
+            return Err(ProjectError::SecretInConfig(format!("refusing inline credential material matching `{banned}`; use $ENV expansion")));
         }
     }
     // user:pass@host pattern without env vars
@@ -431,9 +402,7 @@ fn reject_inline_secret(value: &str) -> Result<(), ProjectError> {
     {
         let rest = &value[scheme_end + 3..];
         if rest.contains('@') && rest.split('@').next().is_some_and(|u| u.contains(':')) {
-            return Err(ProjectError::SecretInConfig(
-                "refusing user:password@url in iris.von; use $ENV for secrets".into(),
-            ));
+            return Err(ProjectError::SecretInConfig("refusing user:password@url in iris.von; use $ENV for secrets".into()));
         }
     }
     Ok(())

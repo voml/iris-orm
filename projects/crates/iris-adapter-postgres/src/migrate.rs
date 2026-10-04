@@ -1,7 +1,9 @@
 //! Managed Push for PostgreSQL (private DDL).
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 use iris_types::{LogicalChange, LogicalMigrationPlan, ObservedCatalog};
 use postgres::Client;
@@ -23,13 +25,12 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
     let target = fingerprint_document(document);
     let mut changes = Vec::new();
     for item in &document.items {
-        let Item::Table(table) = item else {
+        let Item::Table(table) = item
+        else {
             continue;
         };
         if observed.table(&table.name).is_none() {
-            changes.push(LogicalChange::CreateTable {
-                vos_table: table.name.clone(),
-            });
+            changes.push(LogicalChange::CreateTable { vos_table: table.name.clone() });
         }
     }
     Ok(LogicalMigrationPlan {
@@ -42,15 +43,9 @@ pub fn plan_push(document: &Document, observed: &ObservedCatalog) -> Result<Logi
 }
 
 /// Apply a reviewed logical plan by emitting private PostgreSQL DDL.
-pub fn apply_push(
-    client: &mut Client,
-    plan: &LogicalMigrationPlan,
-    document: &Document,
-) -> Result<PushReport> {
+pub fn apply_push(client: &mut Client, plan: &LogicalMigrationPlan, document: &Document) -> Result<PushReport> {
     if plan.destructive {
-        return Err(Error::Policy(
-            "refusing to apply destructive plan without explicit policy".into(),
-        ));
+        return Err(Error::Policy("refusing to apply destructive plan without explicit policy".into()));
     }
     let mut created = Vec::new();
     client.batch_execute("BEGIN")?;
@@ -65,19 +60,13 @@ pub fn apply_push(
                             Item::Table(t) if t.name == *vos_table => Some(t),
                             _ => None,
                         })
-                        .ok_or_else(|| {
-                            Error::Policy(format!(
-                                "plan references unknown VOS table `{vos_table}`"
-                            ))
-                        })?;
+                        .ok_or_else(|| Error::Policy(format!("plan references unknown VOS table `{vos_table}`")))?;
                     let ddl = create_table_sql(table)?;
                     client.batch_execute(&ddl)?;
                     created.push(vos_table.clone());
                 }
                 LogicalChange::AddField { .. } => {
-                    return Err(Error::Policy(
-                        "AddField apply is not implemented in Phase 4 slice".into(),
-                    ));
+                    return Err(Error::Policy("AddField apply is not implemented in Phase 4 slice".into()));
                 }
             }
         }
@@ -86,10 +75,7 @@ pub fn apply_push(
     match apply {
         Ok(()) => {
             client.batch_execute("COMMIT")?;
-            Ok(PushReport {
-                plan_id: plan.id.clone(),
-                created_tables: created,
-            })
+            Ok(PushReport { plan_id: plan.id.clone(), created_tables: created })
         }
         Err(e) => {
             let _ = client.batch_execute("ROLLBACK");
@@ -113,17 +99,10 @@ fn create_table_sql(table: &vos::ast::Table) -> Result<String> {
         cols.push(piece);
     }
     if pks.is_empty() {
-        return Err(Error::Policy(format!(
-            "table `{}` has no primary key --?cannot push",
-            table.name
-        )));
+        return Err(Error::Policy(format!("table `{}` has no primary key --?cannot push", table.name)));
     }
     cols.push(format!("PRIMARY KEY ({})", pks.join(", ")));
-    Ok(format!(
-        "CREATE TABLE IF NOT EXISTS \"{}\" ({});",
-        table.name,
-        cols.join(", ")
-    ))
+    Ok(format!("CREATE TABLE IF NOT EXISTS \"{}\" ({});", table.name, cols.join(", ")))
 }
 
 fn map_field_type(field: &Field) -> Result<(String, bool)> {
@@ -147,14 +126,10 @@ fn map_field_type(field: &Field) -> Result<(String, bool)> {
         TypeExpr::Builtin(BuiltinType::Uuid) => "UUID",
         TypeExpr::Builtin(BuiltinType::Bytes) => "BYTEA",
         TypeExpr::Builtin(_) => {
-            return Err(Error::Policy(
-                "unsupported builtin VOS type for PostgreSQL push".into(),
-            ));
+            return Err(Error::Policy("unsupported builtin VOS type for PostgreSQL push".into()));
         }
         other => {
-            return Err(Error::Policy(format!(
-                "unsupported VOS type for PostgreSQL push: {other:?}"
-            )));
+            return Err(Error::Policy(format!("unsupported VOS type for PostgreSQL push: {other:?}")));
         }
     };
     Ok((sql.into(), !optional))

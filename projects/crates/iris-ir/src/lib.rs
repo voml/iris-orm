@@ -14,22 +14,14 @@ mod op;
 mod plan;
 mod projection;
 
-pub use commit::{
-    AppliedWatermark, CommitToken, DEFAULT_COMMIT_SHARD, OutboxAppend, OutboxEffect, OutboxRecord,
-};
-pub use composite::{
-    AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent, RouteProof,
-};
+pub use commit::{AppliedWatermark, CommitToken, DEFAULT_COMMIT_SHARD, OutboxAppend, OutboxEffect, OutboxRecord};
+pub use composite::{AccessKind, COMPOSITE_PLAN_FORMAT, CompositePlan, CompositeStep, ConsistencyIntent, RouteProof};
 pub use envelope::{EffectKind, IrEnvelope, IrVersion, SchemaFingerprint, hash_ops};
-pub use object::{
-    ObjectError, ObjectHash, ObjectId, ObjectLifecycleState, ObjectMeta, ObjectReference,
-    ObjectResult, require_transition,
-};
+pub use object::{ObjectError, ObjectHash, ObjectId, ObjectLifecycleState, ObjectMeta, ObjectReference, ObjectResult, require_transition};
 pub use op::{CmpOp, LiteralKind, PhysicalOp, Pred, ProjectField, SortKey};
 pub use plan::{PhysicalPlan, PlannedNode, RealizationClass};
 pub use projection::{
-    HydrateCompleteness, HydrateDropReason, HydrateResult, HydratedEntity, ProjectionCandidate,
-    ProjectionDocument, ProjectionGeneration,
+    HydrateCompleteness, HydrateDropReason, HydrateResult, HydratedEntity, ProjectionCandidate, ProjectionDocument, ProjectionGeneration,
 };
 
 use serde::{Deserialize, Serialize};

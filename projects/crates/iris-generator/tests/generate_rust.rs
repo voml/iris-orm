@@ -1,8 +1,10 @@
 //! Phase 8: Dejavu generation golden + determinism.
 
 use iris_generator::{GenerationModel, TEMPLATE_NAMES, emit_rust_domain, prefers_aot};
-use vos::{parse_oak, resolve_contract};
-use vos::contract::{FieldIdentity, IdentityManifest, TypeContractKind, TypeIdentity, IDENTITY_MANIFEST_VERSION};
+use vos::{
+    contract::{FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity},
+    parse_oak, resolve_contract,
+};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -30,12 +32,7 @@ fn generation_model_from_vos_is_deterministic() {
     assert_eq!(a.tables.len(), 1);
     assert_eq!(a.tables[0].name, "User");
     assert!(a.tables[0].fields.iter().any(|f| f.primary));
-    assert!(
-        a.tables[0]
-            .fields
-            .iter()
-            .any(|f| f.name == "active" && f.rust_ty == "bool")
-    );
+    assert!(a.tables[0].fields.iter().any(|f| f.name == "active" && f.rust_ty == "bool"));
 }
 
 #[test]
@@ -45,10 +42,7 @@ fn generation_rejects_schema_without_a_table_primary() {
 
 #[test]
 fn generation_model_consumes_resolved_contract_identity() {
-    let projection = parse_oak("table User { @@id: uuid, active: bool }")
-        .unwrap()
-        .project_schema()
-        .unwrap();
+    let projection = parse_oak("table User { @@id: uuid, active: bool }").unwrap().project_schema().unwrap();
     let manifest = IdentityManifest {
         format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
         types: vec![TypeIdentity {
@@ -117,18 +111,8 @@ table Item {
 }
 "#;
     let model = GenerationModel::from_vos_schema(schema).unwrap();
-    assert!(
-        model.tables[0]
-            .fields
-            .iter()
-            .any(|f| f.name == "id" && f.is_uuid)
-    );
-    assert!(
-        model.tables[0]
-            .fields
-            .iter()
-            .any(|f| f.name == "owner_id" && f.is_uuid && f.optional)
-    );
+    assert!(model.tables[0].fields.iter().any(|f| f.name == "id" && f.is_uuid));
+    assert!(model.tables[0].fields.iter().any(|f| f.name == "owner_id" && f.is_uuid && f.optional));
     let out = emit_rust_domain(&model).unwrap();
     assert!(out.contains(r#"("Item", "id")"#));
     assert!(out.contains(r#"("Item", "owner_id")"#));
@@ -137,13 +121,8 @@ table Item {
 
 #[test]
 fn write_rust_domain_atomic() {
-    let dir = std::env::temp_dir().join(format!(
-        "iris-gen-{}",
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let dir = std::env::temp_dir()
+        .join(format!("iris-gen-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
     let generate_root = dir.join("generated/iris");
     let paths = iris_generator::write_rust_domain(&model, &generate_root).unwrap();

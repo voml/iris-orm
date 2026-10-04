@@ -47,11 +47,7 @@ impl GenerationModel {
 }
 
 pub(crate) fn build_rust_table_views(model: &GenerationModel) -> Result<Vec<RustTableView>> {
-    model
-        .tables
-        .iter()
-        .map(build_rust_table_view)
-        .collect()
+    model.tables.iter().map(build_rust_table_view).collect()
 }
 
 fn build_rust_context(model: &GenerationModel) -> Result<RustTemplateContext> {
@@ -60,10 +56,7 @@ fn build_rust_context(model: &GenerationModel) -> Result<RustTemplateContext> {
         .tables
         .iter()
         .flat_map(|table| {
-            table.fields.iter().filter(|f| f.is_uuid).map(|field| RustUuidField {
-                table: table.name.clone(),
-                field: field.name.clone(),
-            })
+            table.fields.iter().filter(|f| f.is_uuid).map(|field| RustUuidField { table: table.name.clone(), field: field.name.clone() })
         })
         .collect();
 
@@ -84,11 +77,7 @@ fn build_rust_table_view(table: &TableModel) -> Result<RustTableView> {
         .filter(|f| f.reference_target.is_none())
         .map(|field| {
             let extract = value_extract_expr(field);
-            let from_row_expr = if field.optional {
-                extract
-            } else {
-                format!("{extract}?")
-            };
+            let from_row_expr = if field.optional { extract } else { format!("{extract}?") };
             RustFieldView {
                 name: field.name.clone(),
                 rust_ty: field.rust_ty.clone(),
@@ -101,10 +90,7 @@ fn build_rust_table_view(table: &TableModel) -> Result<RustTableView> {
 
     for field in &table.fields {
         if field.reference_target.is_some() {
-            return Err(Error::UnsupportedType(format!(
-                "rust client from_row does not support reference field `{}`",
-                field.name
-            )));
+            return Err(Error::UnsupportedType(format!("rust client from_row does not support reference field `{}`", field.name)));
         }
     }
 
@@ -124,12 +110,7 @@ fn primary_key(table: &TableModel) -> Result<&str> {
         .iter()
         .find(|f| f.primary)
         .map(|f| f.name.as_str())
-        .ok_or_else(|| {
-            Error::Vos(format!(
-                "table `{}` has no primary key for Rust CRUD",
-                table.name
-            ))
-        })
+        .ok_or_else(|| Error::Vos(format!("table `{}` has no primary key for Rust CRUD", table.name)))
 }
 
 fn scalar_base(rust_ty: &str) -> &str {
@@ -140,10 +121,9 @@ fn value_extract_expr(field: &FieldModel) -> String {
     let base = scalar_base(&field.rust_ty);
     match base {
         "bool" => format!("__iris_value_bool(row, \"{}\")", field.name),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => format!(
-            "__iris_value_i64(row, \"{}\").map(|v| v as {base})",
-            field.name
-        ),
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+            format!("__iris_value_i64(row, \"{}\").map(|v| v as {base})", field.name)
+        }
         _ => format!("__iris_value_str(row, \"{}\")", field.name),
     }
 }
@@ -260,20 +240,14 @@ fn row_write_fn(table: &TableModel, pk: &str) -> String {
                     fname = field.name,
                 ),
             }
-        } else {
+        }
+        else {
             match base {
-                "bool" => format!(
-                    r#"            ("{fname}".into(), Value::Bool(row.{fname})),"#,
-                    fname = field.name,
-                ),
-                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => format!(
-                    r#"            ("{fname}".into(), Value::Int(row.{fname} as i64)),"#,
-                    fname = field.name,
-                ),
-                _ => format!(
-                    r#"            ("{fname}".into(), Value::Str(row.{fname}.clone())),"#,
-                    fname = field.name,
-                ),
+                "bool" => format!(r#"            ("{fname}".into(), Value::Bool(row.{fname})),"#, fname = field.name,),
+                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+                    format!(r#"            ("{fname}".into(), Value::Int(row.{fname} as i64)),"#, fname = field.name,)
+                }
+                _ => format!(r#"            ("{fname}".into(), Value::Str(row.{fname}.clone())),"#, fname = field.name,),
             }
         };
         fields.push_str(&value_expr);
@@ -303,7 +277,8 @@ fn to_snake(name: &str) -> String {
                 out.push('_');
             }
             out.extend(c.to_lowercase());
-        } else {
+        }
+        else {
             out.push(c);
         }
     }

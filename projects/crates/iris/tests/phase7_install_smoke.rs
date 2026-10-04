@@ -28,12 +28,7 @@ fn workspace_crate_dirs_exist_for_clean_checkout() {
         let path = workspace.join(rel);
         assert!(path.exists(), "missing workspace path {}", path.display());
     }
-    for rel in [
-        "Cargo.toml",
-        "Readme.md",
-        "projects/packages",
-        "projects/packages/iris/package.json",
-    ] {
+    for rel in ["Cargo.toml", "Readme.md", "projects/packages", "projects/packages/iris/package.json"] {
         let path = product.join(rel);
         assert!(path.exists(), "missing product path {}", path.display());
     }
@@ -42,8 +37,5 @@ fn workspace_crate_dirs_exist_for_clean_checkout() {
 #[test]
 fn node_cli_package_declares_iris_bin() {
     let manifest = include_str!("../../../packages/iris/package.json");
-    assert!(
-        manifest.contains("\"bin\"") && manifest.contains("\"iris\""),
-        "@yydb/iris should ship the sole iris CLI entry"
-    );
+    assert!(manifest.contains("\"bin\"") && manifest.contains("\"iris\""), "@yydb/iris should ship the sole iris CLI entry");
 }

@@ -12,10 +12,7 @@ mod migrate;
 mod outbox;
 
 use iris_ir::{CommitToken, IrVersion, OutboxRecord, PhysicalPlan};
-use iris_types::{
-    CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps,
-    Row, RowWrite, WriteCaps,
-};
+use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
 use r2d2::Pool;
 use r2d2_postgres::{PostgresConnectionManager, postgres::NoTls};
 
@@ -36,10 +33,7 @@ pub struct PostgresSource {
 
 impl std::fmt::Debug for PostgresSource {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PostgresSource")
-            .field("backend", &BACKEND_ID)
-            .field("pool_state", &self.pool.state())
-            .finish_non_exhaustive()
+        f.debug_struct("PostgresSource").field("backend", &BACKEND_ID).field("pool_state", &self.pool.state()).finish_non_exhaustive()
     }
 }
 
@@ -64,19 +58,10 @@ impl PostgresSource {
     }
 
     /// Connect with an explicit pool establish timeout (tests / tight SLAs).
-    pub fn connect_with_pool_timeout(
-        conninfo: &str,
-        pool_timeout: std::time::Duration,
-    ) -> Result<Self> {
-        let config = conninfo
-            .parse()
-            .map_err(|e| Error::Config(format!("{e}")))?;
+    pub fn connect_with_pool_timeout(conninfo: &str, pool_timeout: std::time::Duration) -> Result<Self> {
+        let config = conninfo.parse().map_err(|e| Error::Config(format!("{e}")))?;
         let manager = PostgresConnectionManager::new(config, NoTls);
-        let pool = Pool::builder()
-            .max_size(8)
-            .connection_timeout(pool_timeout)
-            .build(manager)
-            .map_err(|e| Error::Pool(e.to_string()))?;
+        let pool = Pool::builder().max_size(8).connection_timeout(pool_timeout).build(manager).map_err(|e| Error::Pool(e.to_string()))?;
         Ok(Self { pool })
     }
 
@@ -106,11 +91,7 @@ impl PostgresSource {
     }
 
     /// Apply a previously reviewed Managed Push plan.
-    pub fn apply_managed_push(
-        &self,
-        plan: &LogicalMigrationPlan,
-        vos_schema: &str,
-    ) -> Result<PushReport> {
+    pub fn apply_managed_push(&self, plan: &LogicalMigrationPlan, vos_schema: &str) -> Result<PushReport> {
         let document = parse_vos(vos_schema)?;
         let mut client = self.pool.get().map_err(|e| Error::Pool(e.to_string()))?;
         migrate::apply_push(&mut client, plan, &document)
@@ -120,9 +101,7 @@ impl PostgresSource {
     pub fn managed_push(&self, vos_schema: &str) -> Result<PushReport> {
         let plan = self.plan_managed_push(vos_schema)?;
         if plan.destructive {
-            return Err(Error::Policy(
-                "destructive managed push requires explicit review/apply".into(),
-            ));
+            return Err(Error::Policy("destructive managed push requires explicit review/apply".into()));
         }
         self.apply_managed_push(&plan, vos_schema)
     }
@@ -137,9 +116,7 @@ impl PostgresSource {
     /// Execute an Iris physical plan (reads).
     pub fn execute_plan(&self, plan: &PhysicalPlan) -> Result<Vec<Row>> {
         if plan.is_rejected() {
-            return Err(Error::Policy(
-                plan.rejection_note().unwrap_or("plan rejected").to_string(),
-            ));
+            return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         let mut client = self.pool.get().map_err(|e| Error::Pool(e.to_string()))?;
         execute::execute_plan(&mut client, plan)
@@ -167,10 +144,7 @@ impl PostgresSource {
     ///
     /// Phase 4 slice: commit/rollback use explicit SQL on a checked-out connection
     /// via [`with_connection`]. Prefer that for multi-statement transactions.
-    pub fn with_connection<R>(
-        &self,
-        f: impl FnOnce(&mut postgres::Client) -> Result<R>,
-    ) -> Result<R> {
+    pub fn with_connection<R>(&self, f: impl FnOnce(&mut postgres::Client) -> Result<R>) -> Result<R> {
         let mut client = self.pool.get().map_err(|e| Error::Pool(e.to_string()))?;
         f(&mut client)
     }
@@ -203,10 +177,7 @@ impl PostgresSource {
     }
 
     /// Authority transaction with durable outbox append (atomic with mutations).
-    pub fn authority_commit<R>(
-        &self,
-        f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>,
-    ) -> Result<(R, CommitToken)> {
+    pub fn authority_commit<R>(&self, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
         self.with_connection(|client| outbox::authority_commit(client, f))
     }
 
@@ -222,15 +193,8 @@ impl PostgresSource {
 }
 
 fn parse_vos(vos_schema: &str) -> Result<vos::ast::Document> {
-    vos::parser::parse_document(vos_schema).map_err(|d| {
-        Error::Vos(format!(
-            "parse schema: {}",
-            d.errors
-                .first()
-                .map(|e| e.message.as_str())
-                .unwrap_or("unknown")
-        ))
-    })
+    vos::parser::parse_document(vos_schema)
+        .map_err(|d| Error::Vos(format!("parse schema: {}", d.errors.first().map(|e| e.message.as_str()).unwrap_or("unknown"))))
 }
 
 /// Adapter errors.

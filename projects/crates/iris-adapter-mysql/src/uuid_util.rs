@@ -26,14 +26,7 @@ pub fn uuid_bytes_to_str(bytes: &[u8]) -> Option<String> {
         return None;
     }
     let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-    Some(format!(
-        "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..32]
-    ))
+    Some(format!("{}-{}-{}-{}-{}", &hex[0..8], &hex[8..12], &hex[12..16], &hex[16..20], &hex[20..32]))
 }
 
 fn hex_nibble(b: u8) -> Option<u8> {
@@ -61,9 +54,6 @@ mod tests {
     fn roundtrip_compact() {
         let s = "550e8400e29b41d4a716446655440000";
         let b = try_parse_uuid_bytes(s).unwrap();
-        assert_eq!(
-            uuid_bytes_to_str(&b).as_deref(),
-            Some("550e8400-e29b-41d4-a716-446655440000")
-        );
+        assert_eq!(uuid_bytes_to_str(&b).as_deref(), Some("550e8400-e29b-41d4-a716-446655440000"));
     }
 }
