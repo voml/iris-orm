@@ -69,6 +69,11 @@ const plans = {
         mode: "write-returning" as const,
         paramOrder: ["data_user_id", "data_user_name", "data_active"],
     },
+    "User.delete@p_user_id": {
+        sql: "DELETE FROM User WHERE user_id = ?",
+        mode: "write" as const,
+        paramOrder: ["p_user_id"],
+    },
 };
 
 test("resolveD1Plan selects parameter variant keys", () => {
@@ -198,6 +203,20 @@ test("D1 executor runs create through write-returning plans", async () => {
         assert.equal(created.value[0]?.userId, "u1");
         assert.equal(created.value[0]?.userName, "Ada");
     }
+});
+
+test("D1 executor runs delete through write plans on executeUnit", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const deleted = await executor.executeUnit(
+        buildOperationRequest(
+            { operationId: "User.delete", contractFingerprint: "fp" },
+            declaredVosOperation("User.filter(x => x.user_id == $p_user_id).delete()"),
+            { p_user_id: "u1" },
+        ),
+    );
+    assert.equal(deleted.ok, true);
+    assert.match(fakeD1.lastSql, /DELETE FROM User/);
+    assert.deepEqual(fakeD1.lastBind, ["u1"]);
 });
 
 test("D1 executor rejects create on executeUnit", async () => {

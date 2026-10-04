@@ -95,6 +95,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 format!("{}FindFirstArgs", table.name),
                 format!("{}FindUniqueArgs", table.name),
                 format!("{}CreateArgs", table.name),
+                format!("{}DeleteArgs", table.name),
                 format!("{}GetPayload", table.name),
             ]
         })
@@ -126,6 +127,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .flat_map(|table| {
             let cols = table.fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
             let entity = table.name.as_str();
+            let insert_fields = d1_insert_fields(table, &entity_names);
             let mut lines = vec![
                 format!("    \"{entity}.findMany\": {{ sql: \"SELECT {cols} FROM {entity}\", mode: \"read\" }},"),
                 format!(
@@ -138,6 +140,9 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 let param_key = format!("p_{wire}");
                 lines.push(format!(
                     "    \"{entity}.findUnique@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT 1\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
+                ));
+                lines.push(format!(
+                    "    \"{entity}.delete@{param_key}\": {{ sql: \"DELETE FROM {entity} WHERE {wire} = ?\", mode: \"write\", paramOrder: [\"{param_key}\"] }},"
                 ));
             }
             for field in &table.fields {
@@ -153,30 +158,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                     ));
                 }
             }
-            let insert_fields = table
-                .fields
-                .iter()
-                .filter(|field| field.reference_target.is_none())
-                .collect::<Vec<_>>();
-            if !insert_fields.is_empty() {
-                let insert_cols = insert_fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
-                let placeholders = insert_fields.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-                let data_param_keys = insert_fields
-                    .iter()
-                    .map(|field| format!("data_{}", field.name))
-                    .collect::<Vec<_>>();
-                let mut sorted_data_keys = data_param_keys.clone();
-                sorted_data_keys.sort();
-                let variant_suffix = sorted_data_keys.join(",");
-                let param_order = data_param_keys
-                    .iter()
-                    .map(|key| format!("\"{key}\""))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                lines.push(format!(
-                    "    \"{entity}.create@{variant_suffix}\": {{ sql: \"INSERT INTO {entity} ({insert_cols}) VALUES ({placeholders}) RETURNING {insert_cols}\", mode: \"write-returning\", paramOrder: [{param_order}] }},"
-                ));
-            }
+            push_d1_create_plans(&mut lines, entity, &insert_fields);
             lines
         })
         .collect::<Vec<_>>()
@@ -458,6 +440,44 @@ fn snake_to_camel(name: &str) -> String {
         }
     }
     out
+}
+
+const MAX_D1_CREATE_SUBSET_FIELDS: usize = 8;
+
+fn d1_insert_field_in_schema(field: &FieldModel, entity_names: &HashSet<&str>) -> bool {
+    match &field.reference_target {
+        Some(target) => entity_names.contains(target.as_str()),
+        None => true,
+    }
+}
+
+fn d1_insert_fields<'a>(table: &'a TableModel, entity_names: &HashSet<&str>) -> Vec<&'a FieldModel> {
+    table.fields.iter().filter(|field| d1_insert_field_in_schema(field, entity_names)).collect()
+}
+
+fn push_d1_create_plans(lines: &mut Vec<String>, entity: &str, insert_fields: &[&FieldModel]) {
+    if insert_fields.is_empty() || insert_fields.len() > MAX_D1_CREATE_SUBSET_FIELDS {
+        return;
+    }
+    let field_count = insert_fields.len();
+    for mask in 1..(1usize << field_count) {
+        let subset: Vec<_> = insert_fields
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| mask & (1usize << index) != 0)
+            .map(|(_, field)| *field)
+            .collect();
+        let insert_cols = subset.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
+        let placeholders = subset.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+        let data_param_keys = subset.iter().map(|field| format!("data_{}", field.name)).collect::<Vec<_>>();
+        let mut sorted_data_keys = data_param_keys.clone();
+        sorted_data_keys.sort();
+        let variant_suffix = sorted_data_keys.join(",");
+        let param_order = data_param_keys.iter().map(|key| format!("\"{key}\"")).collect::<Vec<_>>().join(", ");
+        lines.push(format!(
+            "    \"{entity}.create@{variant_suffix}\": {{ sql: \"INSERT INTO {entity} ({insert_cols}) VALUES ({placeholders}) RETURNING {insert_cols}\", mode: \"write-returning\", paramOrder: [{param_order}] }},"
+        ));
+    }
 }
 
 fn validate_ts_naming(model: &GenerationModel) -> Result<()> {
