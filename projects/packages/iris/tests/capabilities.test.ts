@@ -37,7 +37,7 @@ test("negotiateCapabilities separates host and storage profile", () => {
     const browserMemory = negotiateCapabilities({ host: "browser", profile: "memory", bindingReady: true });
     assert.equal(browserMemory.host, "browser");
     assert.equal(browserMemory.execution.wasm, true);
-    assert.equal(browserMemory.storage.opfs, true);
+    assert.equal(browserMemory.storage.opfs, false);
 
     const workerProject = negotiateCapabilities({ host: "cloudflare-worker", profile: "project", bindingReady: false });
     assert.equal(workerProject.host, "cloudflare-worker");
