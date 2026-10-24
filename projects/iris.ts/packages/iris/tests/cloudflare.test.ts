@@ -145,7 +145,7 @@ test("D1 read executor binds bool filter parameters", async () => {
 });
 
 test("negotiateCapabilities maps cloudflare-worker host to d1 profile", () => {
-    const matrix = negotiateCapabilities({ host: "cloudflare-worker", profile: "d1", bindingReady: false });
+    const matrix = negotiateCapabilities({ host: "cloudflare-worker", profile: "memory", bindingReady: false });
     assert.equal(matrix.host, "cloudflare-worker");
     assert.equal(matrix.profile, "d1");
     assert.equal(matrix.storage.d1, true);

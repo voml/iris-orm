@@ -111,11 +111,11 @@ export async function copyFixtureDir(sourceDir: string, targetDir: string): Prom
 }
 
 function tscBin(): string {
-    return fileURLToPath(new URL("../../../../../node_modules/typescript/bin/tsc", import.meta.url));
+    return fileURLToPath(new URL("../../../../../../node_modules/typescript/bin/tsc", import.meta.url));
 }
 
 function workspaceRoot(): string {
-    return fileURLToPath(new URL("../../../../../", import.meta.url));
+    return fileURLToPath(new URL("../../../../../../", import.meta.url));
 }
 
 export function runTsc(configPath: string): { status: number | null; stdout: string; stderr: string } {
