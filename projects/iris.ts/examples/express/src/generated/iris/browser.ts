@@ -1,4 +1,4 @@
-import { createIrisDbBinding } from "@yydb/iris/wasm";
+import { createIrisDbBinding } from "@yydb/iris-language";
 import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
 import { createClient, type DbClient } from "./operations.js";
 /** Browser / Worker host: WASM binding (call `initIris()` or `loadIrisWeb()` before `createDatabase`). */

@@ -80,7 +80,7 @@ export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions)
         "utf8",
     );
     await writeFile(
-        join(stubDir, "iris-wasm.ts"),
+        join(stubDir, "iris-language.ts"),
         `import type { CreateIrisDbBindingOptions, IrisDbBinding } from "./iris-types.js";
 export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
   throw new Error("stub");
@@ -154,7 +154,7 @@ export async function writeTscConfig(
                     paths: {
                         "@yydb/iris/types": [join(stubDir, "iris-types.ts").replace(/\\/g, "/")],
                         "@yydb/iris/node": [join(stubDir, "iris-node.ts").replace(/\\/g, "/")],
-                        "@yydb/iris/wasm": [join(stubDir, "iris-wasm.ts").replace(/\\/g, "/")],
+                        "@yydb/iris-language": [join(stubDir, "iris-language.ts").replace(/\\/g, "/")],
                         "@yydb/iris": [join(stubDir, "iris-browser.ts").replace(/\\/g, "/")],
                     },
                     baseUrl: ".",

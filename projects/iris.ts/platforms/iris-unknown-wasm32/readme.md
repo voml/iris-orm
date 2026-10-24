@@ -23,4 +23,4 @@ import { initWasm } from "@yydb/iris-unknown-wasm32";
 await initWasm();
 ```
 
-Application code should use `@yydb/iris` or `@yydb/iris/wasm` unless you own the loader. **Not WASI** — browser-safe WASM only.
+Application code should use `@yydb/iris-language` unless you own the loader. **Not WASI** — browser-safe WASM only.

@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@yydb/iris": "workspace:*",
+        "@yydb/iris-language": "workspace:*",
         "fastify": "^5.4.0"
     },
     "devDependencies": {

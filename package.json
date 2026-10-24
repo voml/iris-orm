@@ -22,12 +22,12 @@
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
         "iris": "pnpm --filter @yydb/iris run build && node ./projects/iris.ts/packages/iris/bin/iris.mjs",
-        "build:ts": "pnpm --filter @yydb/iris-unknown-wasm32 build && pnpm --filter @yydb/iris build",
+        "build:ts": "pnpm --filter @yydb/iris-unknown-wasm32 build && pnpm --filter @yydb/iris build && pnpm --filter @yydb/iris-language build",
         "build:napi": "node scripts/build-napi.mjs",
         "build:wasm": "node scripts/build-wasm.mjs",
         "napi:build": "node scripts/build-napi.mjs",
         "wasm:build": "node scripts/build-wasm.mjs",
-        "test:ts": "pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 run test",
+        "test:ts": "pnpm build:ts && pnpm -r --filter @yydb/iris --filter @yydb/iris-unknown-wasm32 --filter @yydb/iris-language run test",
         "homepage": "pnpm --filter @yydb/iris-homepage build",
         "homepage:dev": "pnpm --filter @yydb/iris-homepage dev",
         "homepage:build": "pnpm homepage",
@@ -40,7 +40,7 @@
         "placeholder:trust": "nifty trust"
     },
     "devDependencies": {
-        "@doki-land/nifty": "^0.0.12",
+        "@doki-land/nifty": "^0.1.9",
         "@napi-rs/cli": "^3.10.6",
         "typescript": "^5.9.2",
         "@types/node": "^22.15.0"

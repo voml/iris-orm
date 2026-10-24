@@ -13,6 +13,7 @@
     "dependencies": {
         "@astrojs/node": "^9.4.4",
         "@yydb/iris": "workspace:*",
+        "@yydb/iris-language": "workspace:*",
         "astro": "^5.13.7"
     },
     "devDependencies": {

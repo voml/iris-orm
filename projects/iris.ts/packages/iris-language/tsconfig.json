@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "types": ["node"],
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "declaration": true,
+        "isolatedModules": true,
+        "allowImportingTsExtensions": true,
+        "allowJs": true,
+        "baseUrl": ".",
+        "paths": {
+            "@yydb/iris/runtime": ["../iris/src/runtime/index.ts"],
+            "@yydb/iris/types": ["../iris/src/types/index.ts"]
+        }
+    },
+    "include": ["src/**/*.ts", "tests/**/*.ts"]
+}

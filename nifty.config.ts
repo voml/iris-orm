@@ -28,16 +28,5 @@ export default defineConfig({
             "**/*.md",
         ],
     },
-    publish: {
-        packages: [
-            "@yydb/iris",
-            "@yydb/iris-skills",
-            "@yydb/iris-unknown-wasm32",
-            "@yydb/iris-win32-x64",
-            "@yydb/iris-linux-x64",
-            "@yydb/iris-linux-arm64",
-            "@yydb/iris-darwin-x64",
-            "@yydb/iris-darwin-arm64",
-        ],
-    },
+    publish: {},
 });

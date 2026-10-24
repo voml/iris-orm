@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const repoRoot = join(pkgRoot, "..", "..", "..");
+const repoRoot = join(pkgRoot, "..", "..", "..", "..");
 const transpile = join(repoRoot, "scripts", "transpile-src-to-dist.mjs");
 const distRoot = join(pkgRoot, "dist");
 

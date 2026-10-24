@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@yydb/iris": "workspace:*",
+        "@yydb/iris-language": "workspace:*",
         "express": "^5.1.0"
     },
     "devDependencies": {

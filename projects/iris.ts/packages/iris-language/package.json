@@ -1,0 +1,58 @@
+{
+    "name": "@yydb/iris-language",
+    "version": "0.0.12",
+    "description": "Iris ORM browser / Worker language layer on the WASM semantic core",
+    "homepage": "https://iris-orm.pages.dev/",
+    "keywords": [
+        "iris",
+        "orm",
+        "vos",
+        "yydb",
+        "wasm",
+        "browser",
+        "typescript"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/iris.ts/packages/iris-language"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
+    "type": "module",
+    "license": "MPL-2.0",
+    "sideEffects": false,
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "browser": "./dist/index.js",
+            "default": "./dist/index.js"
+        }
+    },
+    "files": [
+        "dist",
+        "src"
+    ],
+    "scripts": {
+        "prepublishOnly": "node ./scripts/build-dist.mjs",
+        "build": "node ./scripts/build-dist.mjs",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*",
+        "@yydb/iris-unknown-wasm32": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2"
+    },
+    "engines": {
+        "node": ">=24.12.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

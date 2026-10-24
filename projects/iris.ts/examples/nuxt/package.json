@@ -12,6 +12,7 @@
     },
     "dependencies": {
         "@yydb/iris": "workspace:*",
+        "@yydb/iris-language": "workspace:*",
         "nuxt": "^3.19.2"
     },
     "devDependencies": {

@@ -1,4 +1,4 @@
-import { loadIrisWeb } from "@yydb/iris/wasm";
+import { loadIrisWeb } from "@yydb/iris-language";
 
 import { Database, type DbClient } from "@iris/browser.ts";
 

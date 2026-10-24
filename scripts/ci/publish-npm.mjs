@@ -51,6 +51,7 @@ const JS_PACKAGES = [
     { dir: "projects/iris.ts/platforms/iris-unknown-wasm32" },
     { dir: "projects/iris.ts/packages/iris-skills" },
     { dir: "projects/iris.ts/packages/iris", publishName: "@yydb/iris" },
+    { dir: "projects/iris.ts/packages/iris-language" },
 ];
 
 function fail(msg) {

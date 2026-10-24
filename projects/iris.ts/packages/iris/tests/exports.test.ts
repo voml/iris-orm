@@ -62,7 +62,6 @@ test("@yydb/iris/wasm exposes symmetric binding loader", async () => {
     const wasm = await import(srcImport("src/wasm/index.ts"));
     assert.equal("loadIrisWasm" in wasm, true);
     assert.equal("loadIrisWeb" in wasm, true);
-    assert.equal("createIrisDbBinding" in wasm, true);
     assert.equal("getWasmSemanticCore" in wasm, true);
 });
 

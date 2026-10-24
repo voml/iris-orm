@@ -39,6 +39,9 @@
             "cloudflare": [
                 "./dist/cloudflare/index.d.ts"
             ],
+            "runtime": [
+                "./dist/runtime/index.d.ts"
+            ],
             "node/tooling": [
                 "./dist/node/tooling.d.ts"
             ]
@@ -63,6 +66,10 @@
         "./types": {
             "types": "./dist/types/index.d.ts",
             "default": "./dist/types/index.js"
+        },
+        "./runtime": {
+            "types": "./dist/runtime/index.d.ts",
+            "default": "./dist/runtime/index.js"
         },
         "./cloudflare": {
             "types": "./dist/cloudflare/index.d.ts",

@@ -19,49 +19,6 @@ function ensureNativeOverride(): void {
     }
 }
 
-test("createIris throws wasm-not-initialized before initIris", async () => {
-    const browser = await import(srcImport("src/browser/index.ts"));
-    const wasm = await import(srcImport("src/wasm/index.ts"));
-    wasm.resetInitStateForTests();
-
-    await assert.rejects(
-        () => browser.createIris(),
-        (error: unknown) => error instanceof Error && "code" in error && error.code === "wasm-not-initialized",
-    );
-});
-
-test("browser createIris exposes symmetric runtime methods", async (t) => {
-    const browser = await import(srcImport("src/browser/index.ts"));
-    const wasm = await import(srcImport("src/wasm/index.ts"));
-    wasm.resetInitStateForTests();
-
-    try {
-        await wasm.initIris();
-    } catch (error) {
-        if (error instanceof Error && "code" in error && error.code === "wasm-package-missing") {
-            t.skip("browser semantic core not built");
-            return;
-        }
-        throw error;
-    }
-
-    const runtime = await browser.createIris();
-    assert.equal(runtime.host, "web");
-    assert.ok(runtime.version());
-
-    const ok = runtime.checkSource(USER_SCHEMA);
-    assert.equal(ok.ok, true);
-    assert.equal(ok.schemaFingerprint, USER_SCHEMA_FINGERPRINT);
-
-    const intro = runtime.introspectSchema(USER_SCHEMA);
-    assert.equal(intro.ok, true);
-    assert.equal(intro.schemaFingerprint, USER_SCHEMA_FINGERPRINT);
-    assert.equal(intro.tables.length, 1);
-
-    const session = runtime.openSession();
-    session.close();
-});
-
 test("node createIris exposes symmetric runtime methods", async (t) => {
     ensureNativeOverride();
     const node = await import(srcImport("src/node/index.ts"));
@@ -165,11 +122,4 @@ test("@yydb/iris/node exposes host facade only", async () => {
     assert.equal("loadIrisNative" in node, true);
     assert.equal("loadIrisNode" in node, true);
     assert.equal("loadSemanticCore" in node, false);
-});
-
-test("@yydb/iris/wasm load.ts stays browser-safe (no node:module import)", async () => {
-    const source = await import("node:fs/promises").then((fs) =>
-        fs.readFile(new URL("../src/wasm/load.ts", import.meta.url), "utf8"),
-    );
-    assert.doesNotMatch(source, /node:module/);
 });
