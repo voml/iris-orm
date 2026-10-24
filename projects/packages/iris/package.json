@@ -95,8 +95,7 @@
     "dependencies": {
         "@vmz/commander": "^0.2.0",
         "@voml/vos": "^0.0.5",
-        "@yydb/iris-unknown-wasm32": "workspace:*",
-        "jiti": "^2.4.2"
+        "@yydb/iris-unknown-wasm32": "workspace:*"
     },
     "optionalDependencies": {
         "@yydb/iris-darwin-arm64": "workspace:*",
