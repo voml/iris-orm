@@ -42,7 +42,7 @@ fn to_owned(value: &Value) -> OwnedSql {
         Value::Null => OwnedSql::Null,
         Value::Bool(b) => OwnedSql::Bool(*b),
         Value::Int(i) => OwnedSql::Int(*i),
-        Value::Str(s) => OwnedSql::Text(s.clone()),
+        Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => OwnedSql::Text(s.clone()),
         Value::Object(_) => OwnedSql::Null,
     }
 }
@@ -304,7 +304,9 @@ fn literal_to_owned(text: &str, kind: LiteralKind) -> OwnedSql {
         LiteralKind::Null => OwnedSql::Null,
         LiteralKind::Bool => OwnedSql::Bool(text == "true"),
         LiteralKind::Int => OwnedSql::Int(text.parse().unwrap_or(0)),
-        LiteralKind::Str => OwnedSql::Text(text.to_string()),
+        LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
+            OwnedSql::Text(text.to_string())
+        }
     }
 }
 

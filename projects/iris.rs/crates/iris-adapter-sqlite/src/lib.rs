@@ -19,7 +19,9 @@ use std::{
 };
 
 use iris_ir::{CommitToken, IrVersion, OutboxRecord, PhysicalPlan};
-use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
+use iris_types::{
+    CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, TypedLogicalPlan, WriteCaps,
+};
 use provider::SqliteError;
 
 pub use catalog::adopt_plan;
@@ -139,6 +141,16 @@ impl SqliteSource {
         }
         let provider = self.provider.lock().expect("sqlite mutex");
         execute::execute_plan(&provider, plan)
+    }
+
+    /// Execute a typed logical plan and validate every result cell against the
+    /// contract's canonical result types.
+    pub fn execute_typed_plan(&self, plan: &TypedLogicalPlan) -> Result<Vec<Row>> {
+        if plan.physical.is_rejected() {
+            return Err(Error::Policy(plan.physical.rejection_note().unwrap_or("plan rejected").to_string()));
+        }
+        let provider = self.provider.lock().expect("sqlite mutex");
+        execute::execute_typed_plan(&provider, plan)
     }
 
     /// Insert a row (typed values; SQL stays private).

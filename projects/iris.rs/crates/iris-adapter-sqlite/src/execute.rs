@@ -1,12 +1,12 @@
 //! Physical plan execution and row writes (private SQL only).
 
 use iris_ir::{CmpOp, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
-use iris_types::{Row, RowWrite, Value};
+use iris_types::{Row, RowWrite, TypedColumn, TypedLogicalPlan, Value};
 
 use crate::{
     Result,
     provider::{RusqliteProvider, SqliteValue, StatementResult},
-    types::{from_sql_value, literal_to_sql_value, to_sql_value},
+    types::{from_sql_value, from_sql_value_typed, literal_to_sql_value, to_sql_value},
 };
 
 pub(crate) fn execute_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
@@ -16,7 +16,23 @@ pub(crate) fn execute_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> 
     execute_read_plan(provider, plan)
 }
 
+pub(crate) fn execute_typed_plan(provider: &RusqliteProvider, plan: &TypedLogicalPlan) -> Result<Vec<Row>> {
+    if plan
+        .physical
+        .nodes
+        .iter()
+        .any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. }))
+    {
+        return Err(crate::Error::Policy("typed logical plan must be a read plan".into()));
+    }
+    execute_read_plan_with(provider, &plan.physical, Some(&plan.result_columns))
+}
+
 fn execute_read_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+    execute_read_plan_with(provider, plan, None)
+}
+
+fn execute_read_plan_with(provider: &RusqliteProvider, plan: &PhysicalPlan, expected: Option<&[TypedColumn]>) -> Result<Vec<Row>> {
     let mut table: Option<String> = None;
     let mut where_sql: Option<String> = None;
     let mut where_params: Vec<SqliteValue> = Vec::new();
@@ -69,7 +85,7 @@ fn execute_read_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result
         sql.push_str(&format!(" OFFSET {o}"));
     }
 
-    query_rows(provider, &sql, &where_params)
+    query_rows(provider, &sql, &where_params, expected)
 }
 
 fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
@@ -104,7 +120,7 @@ fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Resul
         let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
         let sql = format!("INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}", cols.join(", "), placeholders.join(", "));
         let params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
-        let mut rows = query_rows(provider, &sql, &params)?;
+        let mut rows = query_rows(provider, &sql, &params, None)?;
         if let Some(fields) = projection.as_ref() {
             rows = apply_projection(rows, fields);
         }
@@ -118,7 +134,7 @@ fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Resul
         let sql = format!("UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}", sets.join(", "));
         let mut params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
         params.append(&mut where_params);
-        let mut rows = query_rows(provider, &sql, &params)?;
+        let mut rows = query_rows(provider, &sql, &params, None)?;
         if let Some(fields) = projection.as_ref() {
             rows = apply_projection(rows, fields);
         }
@@ -128,17 +144,30 @@ fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Resul
     Ok(Vec::new())
 }
 
-fn query_rows(provider: &RusqliteProvider, sql: &str, params: &[SqliteValue]) -> Result<Vec<Row>> {
+fn query_rows(provider: &RusqliteProvider, sql: &str, params: &[SqliteValue], expected: Option<&[TypedColumn]>) -> Result<Vec<Row>> {
     let result = provider.execute_one(sql, params)?;
-    statement_to_rows(&result)
+    statement_to_rows(&result, expected)
 }
 
-fn statement_to_rows(result: &StatementResult) -> Result<Vec<Row>> {
+fn statement_to_rows(result: &StatementResult, expected: Option<&[TypedColumn]>) -> Result<Vec<Row>> {
+    if let Some(expected) = expected {
+        if result.columns.len() != expected.len() || result.columns.iter().zip(expected).any(|(actual, expected)| actual != &expected.name) {
+            return Err(crate::Error::Policy(format!(
+                "typed result columns {:?} do not match plan columns {}",
+                result.columns,
+                expected.iter().map(|column| column.name.as_str()).collect::<Vec<_>>().join(", ")
+            )));
+        }
+    }
     let mut rows = Vec::new();
     for row_values in &result.rows {
         let mut out = Row::new();
         for (idx, name) in result.columns.iter().enumerate() {
-            out.insert(name.clone(), from_sql_value(row_values[idx].clone()));
+            let value = match expected {
+                Some(expected) => from_sql_value_typed(row_values[idx].clone(), &expected[idx].canonical_type)?,
+                None => from_sql_value(row_values[idx].clone()),
+            };
+            out.insert(name.clone(), value);
         }
         rows.push(out);
     }

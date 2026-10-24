@@ -15,6 +15,14 @@ pub enum Value {
     Int(i64),
     /// UTF-8 string.
     Str(String),
+    /// Exact decimal value in canonical text form.
+    Decimal(String),
+    /// Calendar date in canonical text form.
+    Date(String),
+    /// Wall-clock time in canonical text form.
+    Time(String),
+    /// UTC datetime in canonical text form.
+    DateTime(String),
     /// Nested object row (query projection).
     Object(BTreeMap<String, Value>),
 }
@@ -27,6 +35,10 @@ impl Value {
             Self::Bool(b) => (b.to_string(), iris_ir::LiteralKind::Bool),
             Self::Int(i) => (i.to_string(), iris_ir::LiteralKind::Int),
             Self::Str(s) => (s.clone(), iris_ir::LiteralKind::Str),
+            Self::Decimal(s) => (s.clone(), iris_ir::LiteralKind::Decimal),
+            Self::Date(s) => (s.clone(), iris_ir::LiteralKind::Date),
+            Self::Time(s) => (s.clone(), iris_ir::LiteralKind::Time),
+            Self::DateTime(s) => (s.clone(), iris_ir::LiteralKind::DateTime),
             Self::Object(_) => ("null".into(), iris_ir::LiteralKind::Null),
         }
     }

@@ -218,6 +218,10 @@ fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(
         LiteralKind::Bool => Value::Bool(field.literal == "true"),
         LiteralKind::Int => Value::Int(field.literal.parse().unwrap_or(0)),
         LiteralKind::Str => Value::Str(field.literal.clone()),
+        LiteralKind::Decimal => Value::Decimal(field.literal.clone()),
+        LiteralKind::Date => Value::Date(field.literal.clone()),
+        LiteralKind::Time => Value::Time(field.literal.clone()),
+        LiteralKind::DateTime => Value::DateTime(field.literal.clone()),
     };
     to_mysql(&value, table, &field.name, uuid_fields)
 }
@@ -297,7 +301,9 @@ fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uui
         LiteralKind::Null => MysqlValue::NULL,
         LiteralKind::Bool => MysqlValue::Int(i64::from(text == "true")),
         LiteralKind::Int => MysqlValue::Int(text.parse().unwrap_or(0)),
-        LiteralKind::Str => encode_str(text, table, field, uuid_fields),
+        LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
+            encode_str(text, table, field, uuid_fields)
+        }
     }
 }
 
@@ -306,7 +312,7 @@ fn to_mysql(value: &Value, table: &str, field: &str, uuid_fields: &HashSet<(Stri
         Value::Null => MysqlValue::NULL,
         Value::Bool(b) => MysqlValue::Int(i64::from(*b)),
         Value::Int(i) => MysqlValue::Int(*i),
-        Value::Str(s) => encode_str(s, table, field, uuid_fields),
+        Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => encode_str(s, table, field, uuid_fields),
         Value::Object(_) => MysqlValue::NULL,
     }
 }

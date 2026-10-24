@@ -37,7 +37,7 @@ pub fn value_to_json(value: &Value) -> JsonValue {
                 JsonValue::String(i.to_string())
             }
         }
-        Value::Str(s) => json!(s),
+        Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => json!(s),
         Value::Object(fields) => {
             let mut obj = Map::new();
             for (key, value) in fields {

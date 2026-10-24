@@ -160,6 +160,10 @@ fn decode_literal(text: &str, kind: LiteralKind) -> Value {
         LiteralKind::Bool => Value::Bool(text == "true"),
         LiteralKind::Int => Value::Int(text.parse().unwrap_or(0)),
         LiteralKind::Str => Value::Str(text.to_string()),
+        LiteralKind::Decimal => Value::Decimal(text.to_string()),
+        LiteralKind::Date => Value::Date(text.to_string()),
+        LiteralKind::Time => Value::Time(text.to_string()),
+        LiteralKind::DateTime => Value::DateTime(text.to_string()),
     }
 }
 

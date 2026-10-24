@@ -55,6 +55,14 @@ pub enum LiteralKind {
     Int,
     /// UTF-8 string.
     Str,
+    /// Exact decimal text.
+    Decimal,
+    /// Calendar date text (`YYYY-MM-DD`).
+    Date,
+    /// Wall-clock time text (`HH:MM:SS[.fff]`).
+    Time,
+    /// UTC datetime text.
+    DateTime,
     /// Null.
     Null,
 }
