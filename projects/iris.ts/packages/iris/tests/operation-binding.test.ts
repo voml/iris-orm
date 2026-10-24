@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { createOperationExecutorFromSession } from "../src/runtime/operation-binding.ts";
 import { buildOperationRequest, declaredVosOperation } from "../src/runtime/build-operation-request.ts";
 import type { MemorySessionBinding, SessionExecuteWire } from "../src/bindings.ts";
+import { requireNativeSqliteFrom } from "./helpers.ts";
 
 function wire(ok: boolean, rowsJson = "[]", error?: string): SessionExecuteWire {
     return { ok, rowsJson, error: error ?? null };
@@ -42,12 +43,15 @@ test("executeUnit routes declared-vos through session execute instead of execute
     assert.equal(operationCalls, 0);
 });
 
-test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", async () => {
+test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", async (t) => {
     const node = await import(new URL("../src/node/index.ts", import.meta.url).href);
     const { USER_SCHEMA } = await import(new URL("./fixtures.ts", import.meta.url).href);
     const { buildOperationRequest, declaredVosOperation } = await import(
         new URL("../src/runtime/build-operation-request.ts", import.meta.url).href
     );
+    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
+        return;
+    }
 
     let executor;
     try {
@@ -76,12 +80,15 @@ test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", asyn
     await executor.close();
 });
 
-test("createIrisOperationExecutor runs generated delete on sqlite", async () => {
+test("createIrisOperationExecutor runs generated delete on sqlite", async (t) => {
     const node = await import(new URL("../src/node/index.ts", import.meta.url).href);
     const { USER_SCHEMA } = await import(new URL("./fixtures.ts", import.meta.url).href);
     const { buildOperationRequest, declaredVosOperation } = await import(
         new URL("../src/runtime/build-operation-request.ts", import.meta.url).href
     );
+    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
+        return;
+    }
 
     let executor;
     try {

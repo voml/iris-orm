@@ -8,7 +8,7 @@ import { test } from "node:test";
 
 import { buildOperationRequest, declaredVosOperation } from "../src/runtime/build-operation-request.ts";
 import { USER_SCHEMA, USER_WIRE_NAMES } from "./fixtures.ts";
-import { srcImport } from "./helpers.ts";
+import { requireNativeSqlite, requireNativeSqliteFrom, srcImport } from "./helpers.ts";
 
 /** Mirrors `sqlite_provider::CONTRACT_VERSION` in the `yyds` crate the workspace patches to. */
 const CONTRACT_VERSION = "v0";
@@ -62,7 +62,7 @@ async function tryLoadYydsSqlite() {
     }
 }
 
-test("openSqliteSession exposes shared sqlite provider contract identity", async () => {
+test("openSqliteSession exposes shared sqlite provider contract identity", async (t) => {
     const node = await loadNode();
     let bindings;
     try {
@@ -72,6 +72,10 @@ test("openSqliteSession exposes shared sqlite provider contract identity", async
             return;
         }
         throw error;
+    }
+
+    if (!requireNativeSqlite(t, bindings)) {
+        return;
     }
 
     assert.equal(bindings.sqliteProviderContractVersion?.(), CONTRACT_VERSION);
@@ -85,8 +89,11 @@ test("openSqliteSession exposes shared sqlite provider contract identity", async
     session!.close();
 });
 
-test("generated sqlite flow covers managed push create findMany and reopen", async () => {
+test("generated sqlite flow covers managed push create findMany and reopen", async (t) => {
     const node = await loadNode();
+    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
+        return;
+    }
     const dir = mkdtempSync(join(tmpdir(), "iris-sqlite-e2e-"));
     const dbPath = join(dir, "app.sqlite");
 

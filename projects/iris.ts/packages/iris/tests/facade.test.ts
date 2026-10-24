@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 import { INVALID_SCHEMA, USER_SCHEMA, USER_SCHEMA_FINGERPRINT } from "./fixtures.ts";
-import { srcImport } from "./helpers.ts";
+import { requireNativeSqlite, srcImport } from "./helpers.ts";
 
 function ensureNativeOverride(): void {
     if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
@@ -64,6 +64,10 @@ test("node createIris opens sqlite session via sqlitePath", async (t) => {
         throw error;
     }
 
+    if (!requireNativeSqlite(t, node.loadIrisNative())) {
+        return;
+    }
+
     const session = runtime.openSession({ sqlitePath: ":memory:" });
     const result = session.execute("User.filter(x => x.active).collect()");
     assert.equal(typeof result.ok, "boolean");
@@ -88,6 +92,10 @@ test("node createIris opens sqlite session via openSession", async (t) => {
             return;
         }
         throw error;
+    }
+
+    if (!requireNativeSqlite(t, node.loadIrisNative())) {
+        return;
     }
 
     const session = runtime.openSession({ profile: "sqlite", sqlitePath: ":memory:" });
