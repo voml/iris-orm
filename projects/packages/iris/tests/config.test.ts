@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { defineConfig, toProjectDocument } from "../src/types/config.ts";
+import { IrisConfigError } from "../src/types/errors.ts";
 import { findAuthoringConfig, loadAuthoringConfig, resolveProjectRoot } from "../src/node/config.ts";
 
 test("defineConfig requires schema data pointer", () => {
@@ -42,4 +43,49 @@ test("loadAuthoringConfig reads iris.config.ts", async () => {
     assert.equal(loaded.schema, "schemas/app.iris");
     assert.equal(resolveProjectRoot(dir), dir);
     assert.equal(findAuthoringConfig(dir), configPath);
+});
+
+test("loadAuthoringConfig reads erasable TypeScript from iris.config.mts", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "iris-config-mts-"));
+    const configPath = join(dir, "iris.config.mts");
+    await writeFile(
+        configPath,
+        [
+            `interface LocalConfig { schema: string }`,
+            `const config: LocalConfig = { schema: "schemas/app.iris" };`,
+            `export default config;`,
+        ].join("\n"),
+        "utf8",
+    );
+    const loaded = await loadAuthoringConfig(configPath);
+    assert.equal(loaded.schema, "schemas/app.iris");
+});
+
+test("config execution failure keeps code, path, and cause", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "iris-config-throw-"));
+    const configPath = join(dir, "iris.config.mts");
+    await writeFile(configPath, `throw new Error("config boom");`, "utf8");
+
+    await assert.rejects(loadAuthoringConfig(configPath), (error: unknown) => {
+        assert.ok(error instanceof IrisConfigError);
+        assert.equal(error.code, "config-load-failed");
+        assert.equal(error.configPath, configPath);
+        assert.equal(error.args.reason, "failed to execute project config");
+        assert.ok(error.cause instanceof Error);
+        assert.match(error.cause.message, /config boom/);
+        return true;
+    });
+});
+
+test("config without schema reports config-invalid", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "iris-config-invalid-"));
+    const configPath = join(dir, "iris.config.mts");
+    await writeFile(configPath, `export default {};`, "utf8");
+
+    await assert.rejects(loadAuthoringConfig(configPath), (error: unknown) => {
+        assert.ok(error instanceof IrisConfigError);
+        assert.equal(error.code, "config-invalid");
+        assert.equal(error.configPath, configPath);
+        return true;
+    });
 });

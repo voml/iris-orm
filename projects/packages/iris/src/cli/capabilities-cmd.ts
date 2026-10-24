@@ -2,7 +2,7 @@ import type { Cli, ParsedOptions } from "@vmz/commander";
 
 import { negotiateCapabilities } from "../runtime/negotiate-capabilities.ts";
 import type { IrisBindingProfile, IrisHost } from "../types/profile.ts";
-import { str } from "./options.ts";
+import { markAction, str } from "./options.ts";
 
 export function registerCapabilitiesCommand(cli: Cli): void {
     cli.command("capabilities", "iris.cmd.capabilities")
@@ -31,6 +31,7 @@ function parseProfile(value?: string): IrisBindingProfile {
 }
 
 export function cmdCapabilities(options: ParsedOptions): number {
+    markAction();
     const matrix = negotiateCapabilities({
         host: parseHost(str(options, "host")),
         profile: parseProfile(str(options, "profile")),

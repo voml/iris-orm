@@ -1,4 +1,4 @@
-import { IrisFacadeError } from "../types/errors.ts";
+import { IrisConfigError, IrisFacadeError } from "../types/errors.ts";
 import type { IrisProjectDocument, IrisUserConfig } from "../types/config.ts";
 import { loadIrisNative } from "./load.ts";
 import { findAuthoringConfig, loadAuthoringConfig, resolveNativeProjectConfig, resolveProjectRoot } from "./config.ts";
@@ -37,6 +37,9 @@ export async function loadProject(projectPath: string): Promise<LoadedIrisProjec
             document: resolved.document,
         };
     } catch (error) {
+        if (error instanceof IrisConfigError) {
+            throw error;
+        }
         const message = error instanceof Error ? error.message : String(error);
         throw new IrisFacadeError("project-load-failed", `@yydb/iris/node: ${message}`);
     }
@@ -47,7 +50,7 @@ export async function loadIrisConfig(projectPath: string): Promise<IrisUserConfi
     const root = resolveProjectRoot(projectPath);
     const configPath = findAuthoringConfig(root);
     if (!configPath) {
-        throw new IrisFacadeError("project-missing", `@yydb/iris/node: iris.config.ts not found under ${root}`);
+        throw new IrisConfigError("config-not-found", root, { reason: "iris.config.ts not found" });
     }
     return loadAuthoringConfig(configPath);
 }
