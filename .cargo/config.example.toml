@@ -6,6 +6,3 @@ vos = { path = "<your-path>/vos-language/projects/crates/vos" }
 
 [patch."https://github.com/yy-database/yydb.rs.git"]
 yydb = { path = "<your-path>/yydb/projects/crates/yydb" }
-
-[patch."https://github.com/yy-database/yyds.git"]
-sqlite-provider = { path = "<your-path>/yyds/projects/crates/sqlite-provider" }

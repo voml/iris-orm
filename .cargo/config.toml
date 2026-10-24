@@ -1,9 +1,0 @@
-# Local monorepo override (gitignored). CI resolves git `dev` only.
-[patch."https://github.com/voml/vos-language.git"]
-vos = { path = "E:/vmz 全栈开发/vos-language/projects/crates/vos" }
-
-[patch."https://github.com/yy-database/yydb.rs.git"]
-yydb = { path = "E:/vmz 全栈开发/yydb/projects/crates/yydb" }
-
-# [patch."https://github.com/yy-database/yyds.git"]
-# sqlite-provider = { path = "E:/vmz 全栈开发/yyds/projects/crates/sqlite-provider" }  # FIXME: no longer consumed (iris-adapter-sqlite excluded)
