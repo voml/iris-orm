@@ -1,4 +1,4 @@
-export { IrisFacadeError } from "./errors.ts";
+export { IrisConfigError, IrisFacadeError } from "./errors.ts";
 export type {
     IrisBindingHost,
     IrisBindingProfile,
