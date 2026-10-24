@@ -6,6 +6,7 @@
 mod adapter;
 mod cache_route;
 mod capability;
+mod contract;
 mod diagnostic;
 mod error;
 mod explain;
@@ -22,6 +23,7 @@ mod schema;
 mod session;
 mod topology;
 mod topology_activate;
+mod typed_plan;
 mod uuid_v7;
 mod value;
 
@@ -32,6 +34,7 @@ pub use adapter::{
 
 pub use cache_route::{AppliedWatermarkState, CacheReadAction, CacheReadContext, StampedeBudget, StampedePermit, decide_cache_read};
 pub use capability::{CapabilitySet, CompensationBudget, QueryCaps, WriteCaps};
+pub use contract::{ACCEPTED_CONTRACT_FORMAT, CODE_ENVELOPE, CODE_FINGERPRINT, CODE_PRODUCER, ContractError, IrisContract};
 pub use diagnostic::{Diagnostic, StageKind};
 pub use error::{Error, Result};
 pub use explain::{
@@ -67,6 +70,11 @@ pub use topology::{
 pub use topology_activate::{
     TOPOLOGY_ACTIVATION_FORMAT, TopologyActivateReport, TopologyActivation, TopologyHandshake, activate_topology, load_activation,
     reader_version_accepted, writer_version_ok,
+};
+pub use typed_plan::{
+    CODE_ARGUMENT, CODE_ARGUMENT_TYPE, CODE_CANONICAL_VALUE, CODE_FILTER, CODE_PARAMETER_TYPE, CODE_RESULT_TYPE, CODE_RESULT_UNSUPPORTED,
+    FilterBinding, OperationBinding, TypedArgument, TypedColumn, TypedLogicalPlan, TypedParameter, TypedPlanError, is_date, is_decimal,
+    is_time, is_utc_datetime,
 };
 pub use uuid_v7::{is_v7, uuid};
 pub use value::{Row, Value};
