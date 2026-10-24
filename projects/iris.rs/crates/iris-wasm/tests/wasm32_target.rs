@@ -3,7 +3,7 @@
 use std::{path::PathBuf, process::Command};
 
 fn workspace_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..")
 }
 
 fn wasm_artifact() -> PathBuf {

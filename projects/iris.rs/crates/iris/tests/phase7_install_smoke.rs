@@ -12,7 +12,7 @@ fn public_facade_version_and_modules_resolve() {
 fn workspace_crate_dirs_exist_for_clean_checkout() {
     use std::path::PathBuf;
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..");
-    let product = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let product = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..");
     for rel in [
         "iris",
         "iris-types",

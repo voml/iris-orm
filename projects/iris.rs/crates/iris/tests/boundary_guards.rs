@@ -12,7 +12,7 @@ fn crates_root() -> PathBuf {
 
 /// Cargo workspace / repo root (`iris-orm/`).
 fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..").canonicalize().expect("repo root")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../..").canonicalize().expect("repo root")
 }
 
 /// Product repo root (`iris-orm/`).
@@ -174,7 +174,6 @@ fn typescript_tree_has_no_iris_adapter_packages() {
                 entry.path().display()
             );
         }
-    }
     }
 }
 
