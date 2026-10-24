@@ -9,7 +9,7 @@ use iris_connector_yydb::{BACKEND_ID, YydbSource};
 
 const USER_SCHEMA: &str = r#"
 table User {
-    @@user_id: uuid,
+    @@user_id: utf8,
     @user_name: utf8,
     active: bool,
 }
@@ -122,7 +122,7 @@ fn vos_prepared_stale_when_schema_drifts() {
     conn.migrate_schema(
         r#"
 table User {
-    @@user_id: uuid,
+    @@user_id: utf8,
     @user_name: utf8,
     active: bool,
     extra: utf8,
