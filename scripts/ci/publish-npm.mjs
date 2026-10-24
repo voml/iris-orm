@@ -8,7 +8,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const REPO_URL = "git+https://github.com/voml/iris-orm.git";
@@ -188,14 +188,19 @@ function trustHint(names) {
     return `Trusted Publisher missing or OIDC auth failed: ${names.join(", ")}. Local fix: pnpm placeholder:trust -- --refresh${only} (see nifty.config.ts trust.npm and scripts/README.md)`;
 }
 
-function stagePackageFiles(abs, stage) {
+export function stagePackageFiles(abs, stage) {
     const raw = readJson(path.join(abs, "package.json"));
+    const name = typeof raw.name === "string" ? raw.name : abs;
     const files = Array.isArray(raw.files) && raw.files.length ? raw.files : null;
     fs.mkdirSync(stage, { recursive: true });
     if (files) {
         for (const f of files) {
             const from = path.join(abs, f);
-            if (!fs.existsSync(from)) continue;
+            if (!fs.existsSync(from)) {
+                throw new Error(
+                    `${name}: declared publish path "${f}" is missing under ${abs}. Build dist before publishing.`,
+                );
+            }
             const to = path.join(stage, f);
             if (fs.statSync(from).isDirectory()) copyTree(from, to);
             else {
@@ -304,7 +309,11 @@ function publishJs(version, artifactsRoot) {
 
         const stage = path.join(os.tmpdir(), `iris-pub-js-${name.replace(/[/@]/g, "-")}-${version}`);
         fs.rmSync(stage, { recursive: true, force: true });
-        stagePackageFiles(abs, stage);
+        try {
+            stagePackageFiles(abs, stage);
+        } catch (error) {
+            fail(error instanceof Error ? error.message : String(error));
+        }
 
         const pkg = rewriteDepsField({ ...raw }, version);
         pkg.name = name;
@@ -343,27 +352,33 @@ function publishJs(version, artifactsRoot) {
     return { published, skipped, authFailed, otherFailed };
 }
 
-const version = resolveVersion();
-console.log(`ci-publish-npm: version=${version}`);
-console.log(` GITHUB_REF=${process.env.GITHUB_REF ?? "(none)"}`);
-console.log(" Trusted Publisher contract: publish-npm.yml + env NPM_PUBLISH\n");
+function main() {
+    const version = resolveVersion();
+    console.log(`ci-publish-npm: version=${version}`);
+    console.log(` GITHUB_REF=${process.env.GITHUB_REF ?? "(none)"}`);
+    console.log(" Trusted Publisher contract: publish-npm.yml + env NPM_PUBLISH\n");
 
-delete process.env.NODE_AUTH_TOKEN;
-delete process.env.NPM_TOKEN;
+    delete process.env.NODE_AUTH_TOKEN;
+    delete process.env.NPM_TOKEN;
 
-const artifactsRoot = process.env.IRIS_NATIVE_ARTIFACTS || path.join(ROOT, "dist", "native-flat");
-const native = publishNative(version, artifactsRoot);
-const js = publishJs(version, artifactsRoot);
-const authFailed = [...native.authFailed, ...js.authFailed];
-const otherFailed = [...native.otherFailed, ...js.otherFailed];
+    const artifactsRoot = process.env.IRIS_NATIVE_ARTIFACTS || path.join(ROOT, "dist", "native-flat");
+    const native = publishNative(version, artifactsRoot);
+    const js = publishJs(version, artifactsRoot);
+    const authFailed = [...native.authFailed, ...js.authFailed];
+    const otherFailed = [...native.otherFailed, ...js.otherFailed];
 
-if (authFailed.length || otherFailed.length) {
-    const parts = [];
-    if (authFailed.length) parts.push(trustHint(authFailed));
-    if (otherFailed.length) parts.push(`Other publish failures: ${otherFailed.join(", ")}`);
-    fail(parts.join("\n"));
+    if (authFailed.length || otherFailed.length) {
+        const parts = [];
+        if (authFailed.length) parts.push(trustHint(authFailed));
+        if (otherFailed.length) parts.push(`Other publish failures: ${otherFailed.join(", ")}`);
+        fail(parts.join("\n"));
+    }
+
+    console.log(
+        `\nci-publish-npm: done (native published=${native.published} skipped=${native.skipped}. js published=${js.published} skipped=${js.skipped})`,
+    );
 }
 
-console.log(
-    `\nci-publish-npm: done (native published=${native.published} skipped=${native.skipped}. js published=${js.published} skipped=${js.skipped})`,
-);
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+    main();
+}

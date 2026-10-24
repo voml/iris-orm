@@ -21,6 +21,7 @@
         "check:rs": "node scripts/check-rs.mjs",
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
+        "test:ci": "node --test \"scripts/ci/*.test.mjs\"",
         "iris": "pnpm --filter @yydb/iris run build && node ./projects/iris.ts/packages/iris/bin/iris.mjs",
         "build:ts": "pnpm --filter @yydb/iris-unknown-wasm32 build && pnpm --filter @yydb/iris build && pnpm --filter @yydb/iris-language build",
         "build:napi": "node scripts/build-napi.mjs",
