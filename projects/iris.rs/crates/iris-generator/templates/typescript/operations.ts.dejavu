@@ -22,12 +22,12 @@ export class GeneratedMacros {
     constructor(executor: OperationExecutor) {
         this.executor = executor;
     }
-<% loop macro in macros_view %>
+<% loop macro_view in macros_view %>
 
-    async <% macro.name %>(<% macro.param_signature %>): Promise<<% macro.ts_return %>> {
-        const synthesis = synthesizeMacroCall("<% macro.name %>", [<% macro.param_names %>]);
-        const request = buildDeclaredOperationRequest("<% macro.name %>", synthesis);
-<% if macro.uses_execute %>
+    async <% macro_view.name %>(<% macro_view.param_signature %>): Promise<<% macro_view.ts_return %>> {
+        const synthesis = synthesizeMacroCall("<% macro_view.name %>", [<% macro_view.param_names %>]);
+        const request = buildDeclaredOperationRequest("<% macro_view.name %>", synthesis);
+<% if macro_view.uses_execute %>
         const envelope = await this.executor.executeUnit(request);
         if (!envelope.ok) {
             throwOperationEnvelopeError(envelope);
@@ -37,7 +37,7 @@ export class GeneratedMacros {
         if (!envelope.ok) {
             throwOperationEnvelopeError(envelope);
         }
-        return envelope.value as <% macro.ts_return %>;
+        return envelope.value as <% macro_view.ts_return %>;
 <% end if %>
     }
 <% end loop %>
