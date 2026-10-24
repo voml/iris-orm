@@ -11,7 +11,7 @@ export interface CheckSourceResult {
 export type WasmInitInput = URL | Request | Response | ArrayBuffer | Uint8Array | WebAssembly.Module;
 
 export type InitWasmOptions = {
-    /** When omitted, loads the bundled `lib/iris_wasm_bg.wasm` asset. */
+    /** When omitted, loads the bundled `src/lib/iris_wasm_bg.wasm` asset. */
     module?: WasmInitInput;
 };
 
@@ -70,13 +70,13 @@ async function loadGlueModule(): Promise<GlueModule> {
     if (glue) {
         return glue;
     }
-    const mod = (await import("../lib/iris_wasm.js")) as GlueModule;
+    const mod = (await import("./lib/iris_wasm.js")) as unknown as GlueModule;
     glue = mod;
     return mod;
 }
 
 async function resolveDefaultWasmBytes(): Promise<ArrayBuffer | Uint8Array | URL> {
-    const wasmUrl = new URL("../lib/iris_wasm_bg.wasm", import.meta.url);
+    const wasmUrl = new URL("./lib/iris_wasm_bg.wasm", import.meta.url);
     if (typeof process !== "undefined" && process.versions?.node) {
         const { readFileSync } = await import("node:fs");
         const { fileURLToPath } = await import("node:url");

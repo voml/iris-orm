@@ -15,7 +15,7 @@
     "readme": "readme.md",
     "license": "MPL-2.0",
     "type": "module",
-    "sideEffects": ["./lib/iris_wasm.js"],
+    "sideEffects": ["./dist/lib/iris_wasm.js", "./src/lib/iris_wasm.js"],
     "types": "./src/index.ts",
     "exports": {
         ".": {
@@ -23,12 +23,11 @@
             "import": "./dist/index.js",
             "default": "./dist/index.js"
         },
-        "./wasm": "./lib/iris_wasm_bg.wasm"
+        "./wasm": "./dist/lib/iris_wasm_bg.wasm"
     },
     "files": [
         "dist",
         "src",
-        "lib",
         "readme.md"
     ],
     "scripts": {

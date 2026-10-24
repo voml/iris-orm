@@ -125,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wasm-lib
-          path: projects/iris.ts/platforms/iris-unknown-wasm32/lib
+          path: projects/iris.ts/platforms/iris-unknown-wasm32/src/lib
           if-no-files-found: error
 
   publish:
@@ -198,7 +198,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wasm-lib
-          path: projects/iris.ts/platforms/iris-unknown-wasm32/lib
+          path: projects/iris.ts/platforms/iris-unknown-wasm32/src/lib
 
       - name: Build TypeScript dist
         run: pnpm build:ts

@@ -1,2 +1,2 @@
-lib/*
-!lib/*.d.ts
+src/lib/*
+!src/lib/*.d.ts
