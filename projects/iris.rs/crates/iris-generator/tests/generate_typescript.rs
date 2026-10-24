@@ -193,6 +193,11 @@ fn typescript_emit_keeps_vos_types_distinct_through_carriers() {
     assert!(metadata.contains("payload: \"bytes\""), "{metadata}");
     assert!(metadata.contains("seenAt: \"datetimeUtc\""), "{metadata}");
     assert!(metadata.contains("scoredOn: \"date\""), "`date` must stay distinct from `datetime`: {metadata}");
+
+    let plans = file("_internal/d1-plans.ts");
+    assert!(plans.contains("\"Metric.findMany@p_seq\""), "`i64` filters need a D1 plan: {plans}");
+    assert!(plans.contains("\"Metric.findMany@p_counter\""), "`u64` filters need a D1 plan: {plans}");
+    assert!(plans.contains("\"Metric.findMany@p_payload\""), "`bytes` filters need a D1 plan: {plans}");
 }
 
 #[test]

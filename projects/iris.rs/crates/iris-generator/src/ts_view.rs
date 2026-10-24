@@ -166,7 +166,20 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
                 let wire = field.name.as_str();
                 let param_key = format!("p_{wire}");
                 let base = carrier::base_vos_type(&field.vos_type);
-                if matches!(base, "bool" | "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc") {
+                if matches!(
+                    base,
+                    "bool"
+                        | "utf8"
+                        | "utf16"
+                        | "uuid"
+                        | "decimal"
+                        | "date"
+                        | "time"
+                        | "datetimeUtc"
+                        | "i64"
+                        | "u64"
+                        | "bytes"
+                ) {
                     lines.push(format!(
                         "    \"{entity}.findMany@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
                     ));

@@ -36,8 +36,13 @@ const FILTER_OPS = new Set([
     "isNotNull",
 ]);
 
+/** A record literal only: `Uint8Array` / `ArrayBuffer` carriers and class instances must not look like `{ pk }`. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null && !Array.isArray(value);
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        return false;
+    }
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
 }
 
 function isFilterOperatorObject(value: Record<string, unknown>): boolean {
