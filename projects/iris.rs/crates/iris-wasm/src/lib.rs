@@ -7,6 +7,7 @@
 pub mod bind;
 mod core;
 mod session;
+pub mod wire;
 
 pub use bind::bind_parameters;
 

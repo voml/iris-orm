@@ -41,7 +41,14 @@ fn encode_literal(value: &JsonValue) -> Result<String, String> {
     match value {
         JsonValue::Null => Ok("null".into()),
         JsonValue::Bool(b) => Ok(if *b { "true".into() } else { "false".into() }),
-        JsonValue::Number(n) => Ok(n.to_string()),
+        JsonValue::Number(n) => {
+            let text = n.to_string();
+            let is_integer_token = !text.contains('.') && !text.contains('e') && !text.contains('E');
+            if is_integer_token && n.as_i64().is_none() {
+                return Err(format!("integer parameter `{text}` is outside the exact VOS `i64` range"));
+            }
+            Ok(text)
+        }
         JsonValue::String(s) => Ok(format!("\"{}\"", escape_vos_string(s))),
         JsonValue::Array(_) | JsonValue::Object(_) => {
             Err("parameter values must be scalar (null|bool|number|string); nested objects are not VOS literals".into())

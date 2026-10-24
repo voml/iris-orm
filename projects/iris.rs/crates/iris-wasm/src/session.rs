@@ -1,37 +1,9 @@
 //! Stateful in-memory reference session for browser WASM hosts.
 
-use crate::bind;
-use iris_types::{CapabilitySet, Iris, ReferenceStore, Row, Value};
-use serde_json::{Map, Value as JsonValue, json};
+use crate::{bind, wire::rows_to_json};
+use iris_types::{CapabilitySet, Iris, ReferenceStore};
+use serde_json::{Value as JsonValue, json};
 use wasm_bindgen::prelude::*;
-
-fn rows_to_json(rows: Vec<Row>) -> Vec<JsonValue> {
-    rows.into_iter()
-        .map(|row| {
-            let mut obj = Map::new();
-            for (key, value) in row {
-                obj.insert(key, value_to_json(&value));
-            }
-            JsonValue::Object(obj)
-        })
-        .collect()
-}
-
-fn value_to_json(value: &Value) -> JsonValue {
-    match value {
-        Value::Null => JsonValue::Null,
-        Value::Bool(b) => json!(b),
-        Value::Int(i) => json!(i),
-        Value::Str(s) => json!(s),
-        Value::Object(fields) => {
-            let mut obj = serde_json::Map::new();
-            for (key, value) in fields {
-                obj.insert(key.clone(), value_to_json(value));
-            }
-            JsonValue::Object(obj)
-        }
-    }
-}
 
 fn bind_source(source: &str, parameters_json: Option<String>) -> Result<String, JsValue> {
     match parameters_json {

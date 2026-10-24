@@ -13,38 +13,10 @@ use iris_adapter_postgres::PostgresSource;
 #[cfg(feature = "sqlite")]
 use iris_adapter_sqlite::SqliteSource;
 use iris_connector_yydb::YydbSource;
-use iris_wasm::bind;
+use iris_wasm::{bind, wire::rows_to_json};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
-use serde_json::{Map, Value as JsonValue, json};
-
-fn rows_to_json(rows: Vec<Row>) -> Vec<JsonValue> {
-    rows.into_iter()
-        .map(|row| {
-            let mut obj = Map::new();
-            for (key, value) in row {
-                obj.insert(key, value_to_json(&value));
-            }
-            JsonValue::Object(obj)
-        })
-        .collect()
-}
-
-fn value_to_json(value: &iris::Value) -> JsonValue {
-    match value {
-        iris::Value::Null => JsonValue::Null,
-        iris::Value::Bool(b) => json!(b),
-        iris::Value::Int(i) => json!(i),
-        iris::Value::Str(s) => json!(s),
-        iris::Value::Object(fields) => {
-            let mut obj = Map::new();
-            for (key, value) in fields {
-                obj.insert(key.clone(), value_to_json(value));
-            }
-            JsonValue::Object(obj)
-        }
-    }
-}
+use serde_json::Value as JsonValue;
 
 fn ok_result(rows: Vec<Row>) -> ExecuteResult {
     ExecuteResult { ok: true, rows_json: JsonValue::Array(rows_to_json(rows)).to_string(), error: None }
