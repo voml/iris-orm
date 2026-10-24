@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::{DatasourceKind, DriftReport, LogicalMigrationPlan, TruthMode, default_migration_plan};
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
+use iris_adapter_sqlite::SqliteSource;
 
 use crate::project::{expand_endpoint, load_project, read_schema, write_file};
 
@@ -54,7 +55,9 @@ pub fn migrate_plan(config: &Path, source: &str, out: Option<&Path>) -> Result<P
     let schema = read_schema(&project_dir, &project)?;
     let plan = match ds.kind {
         DatasourceKind::Sqlite => {
-            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into());
+            let path = expand_endpoint(ds, source)?;
+            let db = SqliteSource::open(&path).map_err(|e| e.to_string())?;
+            db.plan_managed_push(&schema).map_err(|e| e.to_string())?
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;
@@ -67,7 +70,7 @@ pub fn migrate_plan(config: &Path, source: &str, out: Option<&Path>) -> Result<P
             db.plan_managed_push(&schema).map_err(|e| e.to_string())?
         }
         other => {
-            return Err(format!("migrate plan does not support {:?} (relational: postgres/mysql)", other));
+            return Err(format!("migrate plan does not support {:?} (relational: postgres/mysql/sqlite)", other));
         }
     };
     let out_path = out.map(Path::to_path_buf).unwrap_or_else(|| default_migration_plan(&project_dir, source));
@@ -86,7 +89,10 @@ pub fn migrate_apply(config: &Path, source: &str, plan_path: &Path) -> Result<Ap
     let plan: LogicalMigrationPlan = von::from_str(&plan_text).map_err(|e| e.to_string())?;
     let (plan_id, created) = match ds.kind {
         DatasourceKind::Sqlite => {
-            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into());
+            let path = expand_endpoint(ds, source)?;
+            let db = SqliteSource::open(&path).map_err(|e| e.to_string())?;
+            let report = db.apply_managed_push(&plan, &schema).map_err(|e| e.to_string())?;
+            (report.plan_id, report.created_tables)
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;
@@ -115,7 +121,9 @@ pub fn migrate_verify(config: &Path, source: &str) -> Result<(), String> {
     let schema = read_schema(&project_dir, &project)?;
     let drift = match ds.kind {
         DatasourceKind::Sqlite => {
-            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into());
+            let path = expand_endpoint(ds, source)?;
+            let db = SqliteSource::open(&path).map_err(|e| e.to_string())?;
+            db.drift(&schema).map_err(|e| e.to_string())?
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;
