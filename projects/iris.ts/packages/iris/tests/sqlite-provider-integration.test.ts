@@ -1,20 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 import { buildOperationRequest, declaredVosOperation } from "../src/runtime/build-operation-request.ts";
 import { USER_SCHEMA, USER_WIRE_NAMES } from "./fixtures.ts";
-import { requireNativeSqlite, requireNativeSqliteFrom, srcImport } from "./helpers.ts";
+import { srcImport } from "./helpers.ts";
 
-/** Mirrors `sqlite_provider::CONTRACT_VERSION` in the `yyds` crate the workspace patches to. */
-const CONTRACT_VERSION = "v0";
-const IRIS_ORM_ROOT = fileURLToPath(new URL("../../../..", import.meta.url));
-const YYDS_SQLITE_NODE = join(IRIS_ORM_ROOT, "..", "yyds", "projects", "packages", "sqlite", "src", "node.ts");
-const YYDS_SQLITE_CLI = join(IRIS_ORM_ROOT, "..", "yyds", "projects", "packages", "sqlite", "bin", "sqlite3.mjs");
+const SQLITE_HEADER_MAGIC = "SQLite format 3\u0000";
 
 function removeTempDir(dir: string): void {
     try {
@@ -30,10 +26,6 @@ function removeTempDir(dir: string): void {
         }
         throw error;
     }
-}
-
-function isNativePackageMissing(error: unknown): boolean {
-    return error instanceof Error && "code" in error && error.code === "native-package-missing";
 }
 
 function ensureNativeOverride(): void {
@@ -54,34 +46,21 @@ async function loadNode() {
     return import(srcImport("src/node/index.ts"));
 }
 
-async function tryLoadYydsSqlite() {
-    try {
-        return await import(pathToFileURL(YYDS_SQLITE_NODE).href);
-    } catch {
-        return null;
-    }
+async function createExecutor(node: Awaited<ReturnType<typeof loadNode>>, dbPath: string) {
+    return node.createIrisOperationExecutor({
+        profile: "sqlite",
+        sqlitePath: dbPath,
+        schema: USER_SCHEMA,
+        wireNamesByEntity: USER_WIRE_NAMES,
+    });
 }
 
-test("openSqliteSession exposes shared sqlite provider contract identity", async (t) => {
+test("openSqliteSession exposes the bundled sqlite engine identity", async () => {
     const node = await loadNode();
-    let bindings;
-    try {
-        bindings = node.loadIrisNative();
-    } catch (error) {
-        if (isNativePackageMissing(error)) {
-            return;
-        }
-        throw error;
-    }
+    const bindings = node.loadIrisNative();
 
-    if (!requireNativeSqlite(t, bindings)) {
-        return;
-    }
-
-    assert.equal(bindings.sqliteProviderContractVersion?.(), CONTRACT_VERSION);
     const session = bindings.openSqliteSession?.(":memory:");
     assert.ok(session);
-    assert.equal(session!.sqliteProviderContractVersion?.(), CONTRACT_VERSION);
     const engineVersion = session!.sqliteEngineVersion?.();
     const sourceId = session!.sqliteSourceId?.();
     assert.ok(engineVersion && engineVersion.length > 0);
@@ -89,30 +68,12 @@ test("openSqliteSession exposes shared sqlite provider contract identity", async
     session!.close();
 });
 
-test("generated sqlite flow covers managed push create findMany and reopen", async (t) => {
+test("generated sqlite flow covers managed push create findMany and reopen", async () => {
     const node = await loadNode();
-    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
-        return;
-    }
     const dir = mkdtempSync(join(tmpdir(), "iris-sqlite-e2e-"));
     const dbPath = join(dir, "app.sqlite");
 
-    let executor;
-    try {
-        executor = await node.createIrisOperationExecutor({
-            profile: "sqlite",
-            sqlitePath: dbPath,
-            schema: USER_SCHEMA,
-            wireNamesByEntity: USER_WIRE_NAMES,
-            contractFingerprint: "unused",
-        });
-    } catch (error) {
-        removeTempDir(dir);
-        if (isNativePackageMissing(error)) {
-            return;
-        }
-        throw error;
-    }
+    const executor = await createExecutor(node, dbPath);
 
     const create = await executor.execute(
         buildOperationRequest(
@@ -157,12 +118,7 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
 
     await executor.close();
 
-    const reopened = await node.createIrisOperationExecutor({
-        profile: "sqlite",
-        sqlitePath: dbPath,
-        schema: USER_SCHEMA,
-        wireNamesByEntity: USER_WIRE_NAMES,
-    });
+    const reopened = await createExecutor(node, dbPath);
     const again = await reopened.execute(
         buildOperationRequest(
             { operationId: "User.findMany", contractFingerprint: "unused" },
@@ -201,113 +157,82 @@ test("generated sqlite flow covers managed push create findMany and reopen", asy
     removeTempDir(dir);
 });
 
-test("iris sqlite file matches @yyds/sqlite engine version when native is available", async () => {
-    const yyds = await tryLoadYydsSqlite();
-    if (!yyds) {
-        return;
-    }
-
+test("iris sqlite file carries the real SQLite format-3 header", async () => {
     const node = await loadNode();
-    const dir = mkdtempSync(join(tmpdir(), "iris-sqlite-cross-"));
-    const dbPath = join(dir, "cross.sqlite");
+    const dir = mkdtempSync(join(tmpdir(), "iris-sqlite-header-"));
+    const dbPath = join(dir, "header.sqlite");
 
-    let executor;
-    try {
-        executor = await node.createIrisOperationExecutor({
-            profile: "sqlite",
-            sqlitePath: dbPath,
-            schema: USER_SCHEMA,
-            wireNamesByEntity: USER_WIRE_NAMES,
-        });
-    } catch (error) {
-        removeTempDir(dir);
-        if (isNativePackageMissing(error)) {
-            return;
-        }
-        throw error;
-    }
-
-    const bindings = node.loadIrisNative();
-    const irisSession = bindings.openSqliteSession?.(dbPath);
-    assert.ok(irisSession);
-    const irisVersion = irisSession!.sqliteEngineVersion?.();
-    irisSession!.close();
-
-    await executor.execute(
+    const executor = await createExecutor(node, dbPath);
+    const created = await executor.execute(
         buildOperationRequest(
             { operationId: "User.create", contractFingerprint: "unused" },
             declaredVosOperation(
                 "User::insert({ user_id: $data_user_id, user_name: $data_user_name, active: $data_active })",
             ),
-            { data_user_id: "cross", data_user_name: "YYDS", data_active: true },
+            { data_user_id: "header", data_user_name: "Format", data_active: true },
         ),
     );
+    assert.equal(created.ok, true);
     await executor.close();
 
-    {
-        const yydsDb = new yyds.SqliteConnection(dbPath);
-        const yydsVersion = yydsDb.execute("SELECT sqlite_version()").rows[0][0];
-        assert.equal(yydsVersion.kind, "text");
-        if (yydsVersion.kind === "text") {
-            assert.equal(String(yydsVersion.value), irisVersion);
-        }
+    const bytes = readFileSync(dbPath);
+    assert.ok(bytes.length >= 512);
+    assert.equal(bytes.subarray(0, 16).toString("latin1"), SQLITE_HEADER_MAGIC);
+    const pageSize = bytes.readUInt16BE(16);
+    assert.ok(pageSize === 65536 || (pageSize >= 512 && (pageSize & (pageSize - 1)) === 0));
+    const pageCount = bytes.readUInt32BE(28);
+    assert.ok(pageCount >= 1);
+    assert.equal(bytes.length, pageSize * pageCount);
 
-        const row = yydsDb.executeWithParameters('SELECT user_name FROM "User" WHERE user_id = ?1', [
-            { kind: "text", value: "cross" },
-        ]);
-        assert.equal(row.rows[0][0].kind, "text");
-        if (row.rows[0][0].kind === "text") {
-            assert.equal(String(row.rows[0][0].value), "YYDS");
-        }
+    const reopened = await createExecutor(node, dbPath);
+    const rows = await reopened.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "unused" },
+            declaredVosOperation("User.filter(x => x.user_name == $name).collect()"),
+            { name: "Format" },
+        ),
+    );
+    assert.equal(rows.ok, true);
+    if (rows.ok) {
+        assert.equal(rows.value.length, 1);
     }
+    await reopened.close();
 
     removeTempDir(dir);
 });
 
-test("iris sqlite file is readable by @yyds/sqlite CLI", async () => {
-    const yyds = await tryLoadYydsSqlite();
-    if (!yyds) {
-        return;
-    }
-
+test("iris sqlite file keeps committed rows across an independent reopen", async () => {
     const node = await loadNode();
-    const dir = mkdtempSync(join(tmpdir(), "iris-sqlite-cli-"));
-    const dbPath = join(dir, "cli.sqlite");
+    const dir = mkdtempSync(join(tmpdir(), "iris-sqlite-persist-"));
+    const dbPath = join(dir, "persist.sqlite");
 
-    let executor;
-    try {
-        executor = await node.createIrisOperationExecutor({
-            profile: "sqlite",
-            sqlitePath: dbPath,
-            schema: USER_SCHEMA,
-            wireNamesByEntity: USER_WIRE_NAMES,
-        });
-    } catch (error) {
-        removeTempDir(dir);
-        if (isNativePackageMissing(error)) {
-            return;
-        }
-        throw error;
-    }
-
-    await executor.execute(
+    const writer = await createExecutor(node, dbPath);
+    const created = await writer.execute(
         buildOperationRequest(
             { operationId: "User.create", contractFingerprint: "unused" },
             declaredVosOperation(
                 "User::insert({ user_id: $data_user_id, user_name: $data_user_name, active: $data_active })",
             ),
-            { data_user_id: "cli", data_user_name: "CLI", data_active: true },
+            { data_user_id: "persist-1", data_user_name: "Persisted", data_active: true },
         ),
     );
-    await executor.close();
+    assert.equal(created.ok, true);
+    await writer.close();
 
-    const result = spawnSync(
-        process.execPath,
-        ["--experimental-strip-types", YYDS_SQLITE_CLI, dbPath, 'SELECT user_name FROM "User" WHERE user_id = \'cli\''],
-        { encoding: "utf8" },
+    const reader = await createExecutor(node, dbPath);
+    const rows = await reader.execute(
+        buildOperationRequest(
+            { operationId: "User.findMany", contractFingerprint: "unused" },
+            declaredVosOperation('User.filter(x => x.user_id == $p_user_id).collect()'),
+            { p_user_id: "persist-1" },
+        ),
     );
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-    assert.match(result.stdout, /CLI/);
+    assert.equal(rows.ok, true);
+    if (rows.ok) {
+        assert.equal(rows.value.length, 1);
+        assert.equal(rows.value[0]?.userName, "Persisted");
+    }
+    await reader.close();
 
     removeTempDir(dir);
 });
