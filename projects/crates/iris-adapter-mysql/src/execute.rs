@@ -137,7 +137,7 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let (where_sql, mut where_params) = filter_to_sql(filter.as_ref(), &table, uuid_fields)?;
         let sql = format!("UPDATE `{table}` SET {} WHERE {where_sql}", sets.join(", "));
         let mut params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect();
-        params.extend(where_params.drain(..));
+        params.append(&mut where_params);
         conn.exec_drop(sql, Params::Positional(params))?;
         let returning = returning_sql(projection.as_deref());
         let select = format!("SELECT {returning} FROM `{table}` WHERE {where_sql}");

@@ -117,7 +117,7 @@ fn execute_write_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Re
         let returning = returning_sql(projection.as_deref());
         let sql = format!("UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}", sets.join(", "));
         let mut params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
-        params.extend(where_params.drain(..));
+        params.append(&mut where_params);
         let mut rows = query_rows(provider, &sql, &params)?;
         if let Some(fields) = projection.as_ref() {
             rows = apply_projection(rows, fields);

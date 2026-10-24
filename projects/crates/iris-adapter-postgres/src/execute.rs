@@ -174,7 +174,7 @@ fn execute_write_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Ro
         let returning = returning_sql(projection.as_deref());
         let sql = format!("UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}", sets.join(", "));
         let mut params: Vec<OwnedSql> = fields.iter().map(write_field_to_owned).collect();
-        params.extend(where_params.drain(..));
+        params.append(&mut where_params);
         let param_refs: Vec<&(dyn ToSql + Sync)> = params.iter().map(|p| p as &(dyn ToSql + Sync)).collect();
         let mut rows = query_rows(client, &sql, &param_refs)?;
         if let Some(fields) = projection.as_ref() {
