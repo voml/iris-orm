@@ -7,21 +7,23 @@ Rust Iris core
   ├─ iris-generator (Rust codegen)
   ├─ iris-connector-* / iris-adapter-* (Rust workspace lowering)
   ├─ Node N-API → @yydb/iris/node + `iris` CLI
-  └─ browser WASM → @yydb/iris (default entry)
+  └─ browser WASM → @yydb/iris-language
 ```
 
 TypeScript must **not** re-implement parser, planner, optimizer, or diagnostics in parallel.
 
 ## npm surface
 
-| Package                   | Role                                 |
-|---------------------------|--------------------------------------|
-| `@yydb/iris`              | Default Web facade (WASM inside)     |
-| `@yydb/iris/node`         | Node N-API facade + `iris` CLI       |
-| `@yydb/iris/types`        | Protocol / binding DTOs (no loaders) |
-| `@yydb/iris-win32-x64`, … | Optional platform binaries           |
+| Package                   | Role                                      |
+|---------------------------|-------------------------------------------|
+| `@yydb/iris`              | Default entry: project config helpers     |
+| `@yydb/iris/node`         | Node N-API facade + `iris` CLI            |
+| `@yydb/iris-language`     | Browser / Worker host + WASM loader       |
+| `@yydb/iris/runtime`      | Host-agnostic binding helpers (no WASM)   |
+| `@yydb/iris/types`        | Protocol / binding DTOs (no loaders)      |
+| `@yydb/iris-win32-x64`, … | Optional platform binaries                |
 
-There is no `@yydb/iris/web`, `@yydb/iris/wasm`, or standalone `@yydb/iris-core` npm package.
+There is no `@yydb/iris/web` or `@yydb/iris/wasm` subpath, and no standalone `@yydb/iris-core` npm package.
 
 ## Retired TS product surface
 
@@ -48,11 +50,11 @@ Expected when `iris.win32-x64-msvc.node` is built on Windows:
 
 | Check                                                             | Result                                                               |
 |-------------------------------------------------------------------|----------------------------------------------------------------------|
-| `import "@yydb/iris"` (browser or node resolve conditions)        | always → `src/browser/` (no `@yydb/iris/web` subpath)                |
+| `import "@yydb/iris"` (browser or node resolve conditions)        | always → `src/browser/` (config helpers only)                        |
 | `import "@yydb/iris/node"` under **browser** conditions (bundler) | → `unsupported.ts`                                                   |
 | `import "@yydb/iris/node"` under **node** conditions              | → `src/node/index.ts`                                                |
 | `loadNativeBinding()`                                             | loads optional `.node`; `irisVersion()` → `0.1.0`                    |
-| `initIris()` (web)                                                | `wasm-not-implemented` until WASM artifact is copied                 |
+| `initIris()` (`@yydb/iris-language`)                              | loads the WASM core from `@yydb/iris-unknown-wasm32`                  |
 | `iris` CLI                                                        | requires `pnpm install --filter @yydb/iris`; then `doctor` / `check` |
 
 On Node, `import "@yydb/iris/node"` correctly resolves to the N-API facade. Bundlers using browser conditions get

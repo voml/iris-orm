@@ -2,7 +2,7 @@
  * `@yydb/iris/node` — Node N-API facade, project helpers, and CLI builder.
  *
  * Import this entry from servers, SSR, tests, and Node tooling only.
- * Browser code must use the default `@yydb/iris` entry or `@yydb/iris/wasm`.
+ * Browser code must use `@yydb/iris-language` for the WASM host and the default `@yydb/iris` entry for config helpers.
  */
 
 export type { IrisBindings, IrisNodeBindings } from "../bindings.ts";

@@ -1,21 +1,24 @@
 # `@yydb/iris`
 
-Primary npm entry: browser facade, Node N-API facade, `iris` CLI, and project config helpers. Product overview:
+Primary npm entry: Node N-API facade, `iris` CLI, and project config helpers. The browser WASM host lives in
+[`@yydb/iris-language`](https://www.npmjs.com/package/@yydb/iris-language). Product overview:
 [repository README](https://github.com/voml/iris-orm/blob/dev/README.md) · [docs](https://iris-orm.pages.dev/d/en-us/).
 
 ## Exports
 
 | Subpath | Host | Role |
 |---------|------|------|
-| `@yydb/iris` | Browser / Worker (default) | `initIris`, `createIris`, `defineConfig`, `openLocalStore` |
+| `@yydb/iris` | Browser / Worker (default) | `defineConfig`, `toProjectDocument` |
 | `@yydb/iris/node` | Node.js | N-API facade + CLI wiring |
-| `@yydb/iris/wasm` | Browser (advanced) | Low-level WASM loader |
+| `@yydb/iris/runtime` | Any host | Host-agnostic binding helpers (no WASM) |
 | `@yydb/iris/types` | Any | Protocol DTOs (no loaders) |
 | `@yydb/iris/node/tooling` | Node tooling | Config / codegen helpers |
 
-There is no `@yydb/iris/web`. Under bundler **browser** conditions, `@yydb/iris/node` resolves to `unsupported.js`.
+There is no `@yydb/iris/web` or `@yydb/iris/wasm` subpath. Under bundler **browser** conditions, `@yydb/iris/node`
+resolves to `unsupported.js`.
 
-Platform N-API packages and `@yydb/iris-unknown-wasm32` install as optional / bundled dependencies — see [Related packages](#related-packages).
+Platform N-API packages install as optional dependencies — see [Related packages](#related-packages). Browser WASM is
+loaded by `@yydb/iris-language` from `@yydb/iris-unknown-wasm32`.
 
 ## Runtime
 
@@ -40,7 +43,7 @@ export default defineConfig({
 **Browser — check schema source**
 
 ```ts
-import { initIris, createIris } from "@yydb/iris";
+import { createIris, initIris } from "@yydb/iris-language";
 
 await initIris();
 const runtime = await createIris();
@@ -69,5 +72,6 @@ Do not branch on `typeof window` in a shared entry — bundlers may pull both N-
 
 | Package | Role |
 |---------|------|
-| [`@yydb/iris-unknown-wasm32`](https://www.npmjs.com/package/@yydb/iris-unknown-wasm32) | Browser WASM artifact (via default facade) |
+| [`@yydb/iris-language`](https://www.npmjs.com/package/@yydb/iris-language) | Browser language layer (WASM loader, executors) |
+| [`@yydb/iris-unknown-wasm32`](https://www.npmjs.com/package/@yydb/iris-unknown-wasm32) | WebAssembly artifact consumed by the language layer |
 | `@yydb/iris-{platform}` | N-API binaries (`win32-x64`, `linux-x64`, `linux-arm64`, `darwin-x64`, `darwin-arm64`) — auto-selected |

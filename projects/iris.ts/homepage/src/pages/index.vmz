@@ -122,7 +122,7 @@ export default class IndexPage {
   guideHref = boot.guideHref;
   githubUrl = githubUrl;
   codeSample =
-    'import type { IrisRuntime } from "@yydb/iris/types";\n\n// browser default\nimport { createIris } from "@yydb/iris";\n\n// node / SSR / CLI\nimport { createIris } from "@yydb/iris/node";';
+    'import type { IrisRuntime } from "@yydb/iris/types";\n\n// browser / Worker\nimport { createIris } from "@yydb/iris-language";\n\n// node / SSR / CLI\nimport { createIris } from "@yydb/iris/node";';
   _unwatchLocale = null;
 
   onMount() {

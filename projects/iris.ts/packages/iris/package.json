@@ -1,7 +1,7 @@
 {
     "name": "@yydb/iris",
     "version": "0.0.12",
-    "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API + WASM facades, iris CLI)",
+    "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API facade, project config helpers, iris CLI)",
     "homepage": "https://iris-orm.pages.dev/",
     "keywords": [
         "iris",
@@ -33,9 +33,6 @@
             "node": [
                 "./dist/node/index.d.ts"
             ],
-            "wasm": [
-                "./dist/wasm/index.d.ts"
-            ],
             "cloudflare": [
                 "./dist/cloudflare/index.d.ts"
             ],
@@ -57,11 +54,6 @@
             "types": "./dist/node/index.d.ts",
             "node": "./dist/node/index.js",
             "default": "./dist/node/unsupported.js"
-        },
-        "./wasm": {
-            "types": "./dist/wasm/index.d.ts",
-            "browser": "./dist/wasm/index.js",
-            "default": "./dist/wasm/index.js"
         },
         "./types": {
             "types": "./dist/types/index.d.ts",
@@ -101,8 +93,7 @@
     },
     "dependencies": {
         "@vmz/commander": "^0.2.0",
-        "@voml/vos": "^0.0.5",
-        "@yydb/iris-unknown-wasm32": "workspace:*"
+        "@voml/vos": "^0.0.5"
     },
     "optionalDependencies": {
         "@yydb/iris-darwin-arm64": "workspace:*",

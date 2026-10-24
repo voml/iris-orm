@@ -6,12 +6,18 @@
 pnpm add @yydb/iris
 ```
 
+Browser / Worker hosts also add the language layer, which loads the WASM core:
+
+```bash
+pnpm add @yydb/iris-language
+```
+
 Node apps also need the matching optional N-API platform package (resolved by the `@yydb/iris/node` loader):
 
 ```text
 @yydb/iris-win32-x64
 @yydb/iris-linux-x64
-@yydb/iris-unknown-wasm32   # browser WASM asset
+@yydb/iris-unknown-wasm32   # browser WASM asset, loaded by @yydb/iris-language
 ```
 
 ## Import paths
@@ -19,8 +25,11 @@ Node apps also need the matching optional N-API platform package (resolved by th
 ```ts
 import type { IrisRuntime } from "@yydb/iris/types";
 
-// browser / worker — default entry
-import { createIris, initIris } from "@yydb/iris";
+// browser / worker — WASM host
+import { createIris, initIris } from "@yydb/iris-language";
+
+// project config helpers — every host
+import { defineConfig } from "@yydb/iris";
 
 // node / SSR / CLI — explicit subpath required
 import { createIris } from "@yydb/iris/node";

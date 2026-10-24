@@ -43,7 +43,7 @@ test("iris doctor hides platform package names", () => {
     const doctor = runCli(["doctor"]);
     assert.equal(doctor.status, 0);
     assert.match(doctor.stdout, /@yydb\/iris\/node/);
-    assert.match(doctor.stdout, /Semantic cores/);
+    assert.match(doctor.stdout, /Semantic core/);
     assert.doesNotMatch(doctor.stdout, /@yydb\/iris-win32-x64/);
     assert.doesNotMatch(doctor.stdout, /@yydb\/iris-linux-x64/);
     assert.doesNotMatch(doctor.stdout, /@yydb\/iris-unknown-wasm32/);

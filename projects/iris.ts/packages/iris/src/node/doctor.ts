@@ -1,5 +1,4 @@
 import { isNodeSemanticCoreInstalled } from "./load.ts";
-import { isBrowserSemanticCoreInstalled } from "../wasm/install-check.ts";
 import { IrisFacadeError } from "../types/errors.ts";
 import { irisCoreVersion, packageVersion } from "./versions.ts";
 
@@ -14,9 +13,8 @@ export async function printDoctorReport(): Promise<void> {
         "  @yydb/iris/node     Node + iris CLI",
         "  @yydb/iris/types    protocol types only",
         "",
-        "Semantic cores (optional, installed with @yydb/iris):",
+        "Semantic core (optional, installed with @yydb/iris):",
         `  Node host:     ${isNodeSemanticCoreInstalled() ? "installed" : "missing"}`,
-        `  Browser host:  ${isBrowserSemanticCoreInstalled() ? "installed" : "missing"}`,
     ];
 
     try {

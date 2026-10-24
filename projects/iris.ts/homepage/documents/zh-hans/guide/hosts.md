@@ -7,7 +7,7 @@ Rust Iris core
   ├─ iris-generator（Rust codegen）
   ├─ iris-connector-* / iris-adapter-*（Rust 工作区 lowering）
   ├─ Node N-API → @yydb/iris/node + `iris` CLI
-  └─ browser WASM → @yydb/iris（默认入口）
+  └─ browser WASM → @yydb/iris-language
 ```
 
 TypeScript **不再**平行重写 parser、planner、optimizer 或 diagnostic 体系。
@@ -16,12 +16,14 @@ TypeScript **不再**平行重写 parser、planner、optimizer 或 diagnostic �
 
 | 包                        | 用途                            |
 |---------------------------|---------------------------------|
-| `@yydb/iris`              | 默认 Web facade（WASM 在包内）  |
+| `@yydb/iris`              | 默认入口：项目配置助手          |
 | `@yydb/iris/node`         | Node N-API facade + `iris` CLI  |
+| `@yydb/iris-language`     | 浏览器 / Worker 宿主 + WASM 加载 |
+| `@yydb/iris/runtime`      | 宿主无关的 binding 助手（无 WASM） |
 | `@yydb/iris/types`        | 协议 / binding DTO（无 loader） |
 | `@yydb/iris-win32-x64` 等 | optional 平台 binary            |
 
-不存在 `@yydb/iris/web`、`@yydb/iris/wasm` 或独立 `@yydb/iris-core` npm 包。
+不存在 `@yydb/iris/web`、`@yydb/iris/wasm` 子路径，也不存在独立 `@yydb/iris-core` npm 包。
 
 ## 已退役的 TS 产品面
 
@@ -46,11 +48,11 @@ pnpm run verify:iris-exports     # 仅 @yydb/iris 包
 
 | 检查                                                         | 结果                                                             |
 |--------------------------------------------------------------|------------------------------------------------------------------|
-| `import "@yydb/iris"`（browser / node 条件）                 | 始终 → `src/browser/`（**无** `@yydb/iris/web` 子路径）          |
+| `import "@yydb/iris"`（browser / node 条件）                 | 始终 → `src/browser/`（仅配置助手）                              |
 | `import "@yydb/iris/node"`（**browser** 条件，bundler 模拟） | → `unsupported.ts`                                               |
 | `import "@yydb/iris/node"`（**node** 条件）                  | → `src/node/index.ts`                                            |
 | `loadNativeBinding()`                                        | 加载 optional 平台 `.node`，`irisVersion()` → `0.1.0`            |
-| `initIris()`（web）                                          | `wasm-not-implemented`（WASM 未 copy 前正常）                    |
+| `initIris()`（`@yydb/iris-language`）                        | 从 `@yydb/iris-unknown-wasm32` 加载 WASM 语义核                  |
 | `iris` CLI                                                   | 需 `pnpm install --filter @yydb/iris` 后 `doctor` / `check` 可用 |
 
 **注意**：在 Node 进程里 `import "@yydb/iris/node"` 会正确解析到 N-API facade；这与 bundler 在 browser 条件下走

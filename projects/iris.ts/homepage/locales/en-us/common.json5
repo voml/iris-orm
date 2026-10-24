@@ -18,7 +18,7 @@
   hostsNode: 'Node / SSR / CLI',
   hostsNodeDesc: 'import { createIris } from "@yydb/iris/node" — loads optional @yydb/iris-win32-x64 (and peers) N-API binaries.',
   hostsWeb: 'Browser / Worker',
-  hostsWebDesc: 'import { createIris } from "@yydb/iris" — WASM core ships inside the default facade; storage APIs stay in the Web host layer.',
+  hostsWebDesc: 'import { createIris } from "@yydb/iris-language" — loads the WASM core from @yydb/iris-unknown-wasm32; storage APIs stay in the Web host layer.',
   pipelineTitle: 'From schema to execution',
   pipelineSchema: '.iris schema',
   pipelineCore: 'Rust Iris core',

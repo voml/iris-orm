@@ -6,7 +6,8 @@ Iris 是 **VOS 数据访问层**：不是数据库，也不是新的 schema 语�
 
 - **Rust Iris core** 是唯一运行时语义实现（parser / planner / capability / consistency 等只实现一次）。
 - **Node.js** 经 **N-API** 暴露为 `@yydb/iris/node` + optional 平台包（如 `@yydb/iris-win32-x64`）。
-- **浏览器** 默认入口 `@yydb/iris` 内嵌 **WASM** 语义核；浏览器持久化（含 OPFS）由 **YYDB** 承接，不在 Iris 内接线。
+- **浏览器**使用 `@yydb/iris-language`，由它从 `@yydb/iris-unknown-wasm32` 加载 **WASM** 语义核；浏览器持久化（含 OPFS）由 **YYDB** 承接，不在 Iris 内接线。
+- **`@yydb/iris`** 本体只暴露项目配置助手（`defineConfig`、`toProjectDocument`）。
 - **不再** 提供 TypeScript `@yydb/iris-adapter-*` npm 包；foreign-store lowering 在 Rust 工作区的 `iris-adapter-*` /
   `iris-connector-*` 完成，经 N-API / WASM 暴露。
 

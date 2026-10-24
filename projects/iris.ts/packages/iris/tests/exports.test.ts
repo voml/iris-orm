@@ -48,9 +48,9 @@ test("/types export resolves to protocol-only surface", () => {
     assert.match(path.replace(/\\/g, "/"), /\/(src|dist)\/types\//);
 });
 
-test("/wasm export resolves to wasm facade", () => {
-    const path = resolveExportMap("./wasm", ["browser", "import"]);
-    assert.match(path.replace(/\\/g, "/"), facadePath("wasm"));
+test("/runtime export resolves to runtime helpers", () => {
+    const path = resolveExportMap("./runtime", ["browser", "import"]);
+    assert.match(path.replace(/\\/g, "/"), facadePath("runtime"));
 });
 
 test("/cloudflare export resolves to cloudflare facade", () => {
@@ -58,11 +58,18 @@ test("/cloudflare export resolves to cloudflare facade", () => {
     assert.match(path.replace(/\\/g, "/"), facadePath("cloudflare"));
 });
 
-test("@yydb/iris/wasm exposes symmetric binding loader", async () => {
-    const wasm = await import(srcImport("src/wasm/index.ts"));
-    assert.equal("loadIrisWasm" in wasm, true);
-    assert.equal("loadIrisWeb" in wasm, true);
-    assert.equal("getWasmSemanticCore" in wasm, true);
+test("@yydb/iris exposes runtime helpers and no WASM entry", async () => {
+    const runtime = await import(srcImport("src/runtime/index.ts"));
+    assert.equal("buildRuntime" in runtime, true);
+    assert.equal("openBindingSession" in runtime, true);
+    assert.equal("createIrisDbBindingFromSession" in runtime, true);
+    assert.equal("createOperationExecutorFromSession" in runtime, true);
+    assert.equal("guardOperationExecutor" in runtime, true);
+
+    assert.equal(pkg.exports["./wasm"], undefined);
+    assert.equal(pkg.typesVersions["*"].wasm, undefined);
+    assert.equal(pkg.dependencies["@yydb/iris-unknown-wasm32"], undefined);
+    assert.equal(pkg.dependencies["@yydb/iris-language"], undefined);
 });
 
 test("unsupported /node stub throws node-host-required", async () => {

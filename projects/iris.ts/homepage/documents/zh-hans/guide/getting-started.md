@@ -6,12 +6,18 @@
 pnpm add @yydb/iris
 ```
 
+浏览器 / Worker 宿主还需语言层包，由它加载 WASM 语义核：
+
+```bash
+pnpm add @yydb/iris-language
+```
+
 Node 应用还需要匹配平台的 optional N-API 包（由 `@yydb/iris/node` loader 解析）：
 
 ```text
 @yydb/iris-win32-x64
 @yydb/iris-linux-x64
-@yydb/iris-unknown-wasm32   # browser WASM asset
+@yydb/iris-unknown-wasm32   # browser WASM asset，由 @yydb/iris-language 加载
 ```
 
 ## Import 路径
@@ -19,8 +25,11 @@ Node 应用还需要匹配平台的 optional N-API 包（由 `@yydb/iris/node` l
 ```ts
 import type { IrisRuntime } from "@yydb/iris/types";
 
-// 浏览器 / Worker — 默认入口
-import { createIris, initIris } from "@yydb/iris";
+// 浏览器 / Worker — WASM 宿主
+import { createIris, initIris } from "@yydb/iris-language";
+
+// 项目配置助手 — 各宿主通用
+import { defineConfig } from "@yydb/iris";
 
 // Node / SSR / CLI — 必须显式子路径
 import { createIris } from "@yydb/iris/node";

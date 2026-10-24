@@ -1,6 +1,6 @@
 # `@yydb/iris-unknown-wasm32`
 
-Browser WebAssembly semantic core for [`@yydb/iris`](https://www.npmjs.com/package/@yydb/iris). **Not a typical import target** — installed as a dependency of the main package.
+Browser WebAssembly semantic core for [`@yydb/iris-language`](https://www.npmjs.com/package/@yydb/iris-language). **Not a typical import target** — installed as a dependency of the language layer.
 
 The wasm-bindgen glue (`iris_wasm.js`) and the `iris_wasm_bg.wasm` asset are generated into `src/lib` by `pnpm build:wasm` and copied to `dist/lib` by the package build.
 
@@ -9,7 +9,7 @@ The wasm-bindgen glue (`iris_wasm.js`) and the `iris_wasm_bg.wasm` asset are gen
 **Preferred** (loads this package internally):
 
 ```ts
-import { initIris, createIris } from "@yydb/iris";
+import { initIris, createIris } from "@yydb/iris-language";
 
 await initIris();
 const runtime = await createIris();
