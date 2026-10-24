@@ -10,7 +10,7 @@
 
 import type { WireCarrierValue } from "../types/execution-result.ts";
 
-const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+import { decodeBase64 } from "./base64.ts";
 
 function carrierError(field: string, carrier: string, detail: string): Error {
     return new Error(`IRIS-VALUE-CARRIER: \`${field}\` promised VOS \`${carrier}\`: ${detail}`);
@@ -24,29 +24,12 @@ function normalizeWireScalar(value: unknown): WireCarrierValue {
     return value == null ? null : String(value);
 }
 
-function decodeBase64(text: string, field: string): Uint8Array {
-    const clean = text.replace(/[\s=]/g, "");
-    if (clean.length % 4 === 1) {
+function decodeBase64OrThrow(text: string, field: string): Uint8Array {
+    const bytes = decodeBase64(text);
+    if (bytes === null) {
         throw carrierError(field, "bytes", "received malformed base64 text");
     }
-    const bytes = new Uint8Array((clean.length * 3) >> 2);
-    let buffer = 0;
-    let bits = 0;
-    let written = 0;
-    for (const char of clean) {
-        const value = BASE64_ALPHABET.indexOf(char);
-        if (value < 0) {
-            throw carrierError(field, "bytes", "received malformed base64 text");
-        }
-        buffer = (buffer << 6) | value;
-        bits += 6;
-        if (bits >= 8) {
-            bits -= 8;
-            bytes[written] = (buffer >> bits) & 0xff;
-            written += 1;
-        }
-    }
-    return bytes.slice(0, written);
+    return bytes;
 }
 
 function toExactBigInt(value: unknown, field: string, carrier: string): bigint {
@@ -82,7 +65,7 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
         return copy;
     }
     if (typeof value === "string") {
-        return decodeBase64(value, field);
+        return decodeBase64OrThrow(value, field);
     }
     throw carrierError(field, "bytes", `cannot convert ${typeof value} value to Uint8Array`);
 }
@@ -91,9 +74,10 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
  * Convert one wire value to the carrier the generated type promises.
  *
  * `carrier` is the VOS base label from `IRIS_VALUE_CARRIERS` (`i64`, `u64`,
- * `bytes`, …). Labels without a distinct JS carrier pass through; note that no
- * fixture covers `bytes` yet (the SQLite/JSON wire paths both hand back text
- * for that column until a binary provider fixture exists).
+ * `bytes`, …). Labels without a distinct JS carrier pass through. `i64` accepts
+ * exact decimal strings (the wire shape for values past 2^53) or safe numbers.
+ * `bytes` accepts base64 text, `ArrayBuffer` and views; a binary provider that
+ * hands back `BLOB`/`ArrayBuffer` binds straight into the same carrier.
  */
 export function decodeWireValueByCarrier(carrier: string | undefined, value: unknown, field = "value"): WireCarrierValue {
     if (value === null || value === undefined) {

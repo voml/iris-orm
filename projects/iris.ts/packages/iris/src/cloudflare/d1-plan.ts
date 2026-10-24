@@ -1,5 +1,7 @@
 import type { OperationRequest } from "../types/contract.ts";
 
+import { exactI64Text } from "../runtime/operation-parameters.ts";
+
 /** Build-time D1 physical plan entry (generated into client `_internal/d1-plans.ts`). */
 export interface D1PhysicalPlan {
     readonly sql: string;
@@ -52,10 +54,26 @@ export function resolveD1Plan(
     return plans[operationId];
 }
 
-/** Coerce parameter values for D1/SQLite wire shapes. */
-export function coerceD1BindValue(value: unknown): unknown {
+/**
+ * Coerce parameter values for D1/SQLite wire shapes.
+ *
+ * The generated carriers hand over `bigint` (`i64`/`u64`) and `Uint8Array`
+ * (`bytes`). D1 only binds numbers, strings, `ArrayBuffer` and `null`, so an
+ * exact integer leaves as decimal text (SQLite integer affinity restores the
+ * `INTEGER` value) and bytes leave as an `ArrayBuffer` copy (`BLOB`).
+ */
+export function coerceD1BindValue(value: unknown, parameterKey = "parameter"): unknown {
     if (typeof value === "boolean") {
         return value ? 1 : 0;
+    }
+    if (typeof value === "bigint") {
+        return exactI64Text(value, `parameter \`${parameterKey}\``);
+    }
+    if (value instanceof ArrayBuffer) {
+        return value.slice(0);
+    }
+    if (ArrayBuffer.isView(value)) {
+        return value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
     }
     return value;
 }
@@ -68,7 +86,7 @@ export function bindD1Parameters(
     if (!plan.paramOrder?.length) {
         return [];
     }
-    return plan.paramOrder.map((key) => coerceD1BindValue(parameters?.[key]));
+    return plan.paramOrder.map((key) => coerceD1BindValue(parameters?.[key], key));
 }
 
 /** @internal Test helper for plan resolution from a full request. */

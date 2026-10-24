@@ -3,6 +3,11 @@ import type { OperationRequest, ResultEnvelope } from "../types/contract.ts";
 import type { ExecutionRow } from "../types/execution-result.ts";
 import type { OperationExecutor } from "../types/operation-executor.ts";
 import { parseExecuteJson, parseRowsJson } from "./parse.ts";
+import {
+    IrisParameterEncodingError,
+    stringifyOperationParameters,
+    stringifyOperationRequest,
+} from "./operation-parameters.ts";
 import { entityFromOperationId, mapRowsToAuthorSurface } from "./wire-row-map.ts";
 
 export type OperationExecutorSessionOptions = {
@@ -58,6 +63,20 @@ function mapExecuteEnvelope(
     return { ok: true, value: mapRowsToAuthorSurface(envelope.value, wireToTs, valueCarriers) };
 }
 
+function encodingFailure(error: unknown): Extract<ResultEnvelope<never>, { ok: false }> {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+        ok: false,
+        diagnostics: [
+            {
+                code: error instanceof IrisParameterEncodingError ? error.code : "IRIS-PARAM-ENCODING",
+                message,
+                severity: "error",
+            },
+        ],
+    };
+}
+
 function declaredVosWire(
     session: MemorySessionBinding,
     request: OperationRequest,
@@ -68,7 +87,8 @@ function declaredVosWire(
     if (request.operation.kind !== "declared-vos") {
         return { ok: false, rowsJson: "[]", error: "session fallback requires declared-vos operations" };
     }
-    const parametersJson = request.parameters === undefined ? null : JSON.stringify(request.parameters);
+    const parametersJson =
+        request.parameters === undefined ? null : stringifyOperationParameters(request.parameters);
     if (mode === "execute" && runExecute) {
         return runExecute(request.operation.source, parametersJson);
     }
@@ -89,7 +109,13 @@ export function createOperationExecutorFromSession(
     return {
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
             if (runOperation) {
-                const raw = runOperation(JSON.stringify(request));
+                let requestJson: string;
+                try {
+                    requestJson = stringifyOperationRequest(request);
+                } catch (error) {
+                    return encodingFailure(error);
+                }
+                const raw = runOperation(requestJson);
                 return mapExecuteEnvelope(
                     wireToEnvelope(raw),
                     request.identity.operationId,
@@ -97,7 +123,12 @@ export function createOperationExecutorFromSession(
                     valueCarriersByEntity,
                 );
             }
-            const raw = declaredVosWire(session, request, runQuery, runExecute, "query");
+            let raw: SessionExecuteWire;
+            try {
+                raw = declaredVosWire(session, request, runQuery, runExecute, "query");
+            } catch (error) {
+                return encodingFailure(error);
+            }
             return mapExecuteEnvelope(
                 wireToEnvelope(raw),
                 request.identity.operationId,
@@ -106,17 +137,19 @@ export function createOperationExecutorFromSession(
             );
         },
         async executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>> {
-            if (request.operation.kind === "declared-vos" && runExecute) {
-                const raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
-                const envelope = wireToEnvelope(raw);
-                return envelope.ok ? { ok: true, value: undefined } : { ok: false, diagnostics: envelope.diagnostics };
+            let raw: SessionExecuteWire;
+            try {
+                if (request.operation.kind === "declared-vos" && runExecute) {
+                    raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
+                } else if (runOperation) {
+                    raw = runOperation(stringifyOperationRequest(request));
+                } else {
+                    raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
+                }
+            } catch (error) {
+                const failure = encodingFailure(error);
+                return { ok: false, diagnostics: failure.diagnostics };
             }
-            if (runOperation) {
-                const raw = runOperation(JSON.stringify(request));
-                const envelope = wireToEnvelope(raw);
-                return envelope.ok ? { ok: true, value: undefined } : { ok: false, diagnostics: envelope.diagnostics };
-            }
-            const raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
             const envelope = wireToEnvelope(raw);
             return envelope.ok ? { ok: true, value: undefined } : { ok: false, diagnostics: envelope.diagnostics };
         },

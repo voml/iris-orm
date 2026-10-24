@@ -2,13 +2,14 @@ import type { MemorySessionBinding, SessionExecuteWire } from "../bindings.ts";
 import type { ExecutionWireResult } from "../types/execution-result.ts";
 import type { IrisDbBinding, VosParameters } from "../types/executor.ts";
 import { mapWireToQueryValue } from "../types/executor.ts";
-import { parseExecuteJson, parseRowsJson } from "./parse.ts";
-
-/** Session surface consumed by generated `db` bindings (Node N-API + browser WASM). */
-export type DbBindingSession = MemorySessionBinding;
-
-function parametersJson(parameters?: VosParameters): string | null {
-    return parameters === undefined ? null : JSON.stringify(parameters);
+import { parseExecuteJson, parseRowsJson } from "./parse.ts";
+import { stringifyOperationParameters } from "./operation-parameters.ts";
+
+/** Session surface consumed by generated `db` bindings (Node N-API + browser WASM). */
+export type DbBindingSession = MemorySessionBinding;
+
+function parametersJson(parameters?: VosParameters): string | null {
+    return parameters === undefined ? null : stringifyOperationParameters(parameters);
 }
 
 function wireToRows(raw: SessionExecuteWire): ExecutionWireResult {
