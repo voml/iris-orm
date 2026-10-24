@@ -17,6 +17,9 @@ serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
 # `vos::uuid` / `uuid` pull getrandom; wasm-pack target needs the JS Crypto backend.
 getrandom = { version = "0.4", features = ["wasm_js"] }
+# `rand 0.9` (via oak's `twox-hash`) pulls getrandom 0.3, which needs its own
+# JS Crypto backend to compile for `wasm32-unknown-unknown`.
+getrandom-03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 iris = { workspace = true }
