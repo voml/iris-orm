@@ -23,7 +23,7 @@ const distLib = join(pkgRoot, "dist", "lib");
 if (existsSync(srcLib)) {
     mkdirSync(distLib, { recursive: true });
     for (const name of readdirSync(srcLib)) {
-        if (!/\.(js|mjs|wasm|d\.ts)$/.test(name)) {
+        if (! /\.(js|mjs|wasm|d\.ts)$/.test(name)) {
             continue;
         }
         copyFileSync(join(srcLib, name), join(distLib, name));

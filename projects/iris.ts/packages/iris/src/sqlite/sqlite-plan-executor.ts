@@ -87,8 +87,8 @@ async function executeWritePlan(
 export function createSqlitePlanOperationExecutor(
     sqlite: IrisSqliteDatabase,
     plans: D1PlanRegistry = {},
-    wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
-    valueCarriersByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
+    wireNamesByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
+    valueCarriersByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
 ): OperationExecutor {
     return {
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {

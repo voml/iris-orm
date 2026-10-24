@@ -8,15 +8,15 @@ export type SessionExecuteWire =
 /** Wire session surface shared by Node N-API and browser WASM hosts. */
 export type MemorySessionBinding = {
     /** DML entry (preferred). Aligns with generated `db.$query`. */
-    query?(source: string, parametersJson?: string | null): SessionExecuteWire;
+    query ? (source: string, parametersJson?: string | null) : SessionExecuteWire;
     /** DDL / unit entry (preferred). Aligns with generated `db.$execute`. */
-    execute?(source: string, parametersJson?: string | null): SessionExecuteWire;
+    execute ? (source: string, parametersJson?: string | null) : SessionExecuteWire;
     /** Legacy DML alias kept for older native builds. */
     executeVos(
         source: string,
         parametersJson?: string | null,
     ): SessionExecuteWire;
-    executeOperation?(operationJson: string): SessionExecuteWire;
+    executeOperation ? (operationJson: string) : SessionExecuteWire;
     close(): void;
     managedPush?: (schema: string) => void;
     sqliteEngineVersion?: () => string;
@@ -39,11 +39,11 @@ export type IrisBindings = {
     checkSource(source: string): CheckSourceResult;
     introspectSchema(source: string): string;
     openMemorySession(): MemorySessionBinding;
-    openSession?(options?: OpenSessionNapiOptions): MemorySessionBinding;
-    openSqliteSession?(path: string): MemorySessionBinding;
-    openPostgresSession?(url: string): MemorySessionBinding;
-    openMysqlSession?(url: string): MemorySessionBinding;
-    openProjectSession?(configPath: string, source: string): MemorySessionBinding;
+    openSession ? (options?: OpenSessionNapiOptions) : MemorySessionBinding;
+    openSqliteSession ? (path: string) : MemorySessionBinding;
+    openPostgresSession ? (url: string) : MemorySessionBinding;
+    openMysqlSession ? (url: string) : MemorySessionBinding;
+    openProjectSession ? (configPath: string, source: string) : MemorySessionBinding;
 };
 
 export type LoadProjectResult = {
@@ -75,12 +75,12 @@ export type IrisNodeBindings = IrisBindings & {
     readSchema(projectRoot: string, schemaGlob: string): string;
     generate(source: string, target: string, outDir: string): GenerateResult;
     migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;
-    migrateRunCmd?(
+    migrateRunCmd ? (
         configPath: string,
         source: string,
         planOut?: string | null,
         planOnly?: boolean,
-    ): {
+    ) : {
         ok: boolean;
         planPath: string;
         planOnly: boolean;

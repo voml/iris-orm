@@ -25,8 +25,8 @@ type WasmPackage = {
 };
 
 type WasmMemorySession = {
-    query?(source: string, parametersJson?: string | null): string;
-    execute?(source: string, parametersJson?: string | null): string;
+    query ? (source: string, parametersJson?: string | null) : string;
+    execute ? (source: string, parametersJson?: string | null) : string;
     executeVos(source: string, parametersJson?: string | null): string;
     close(): void;
 };

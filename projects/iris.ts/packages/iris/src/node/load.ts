@@ -15,10 +15,10 @@ const require = createRequire(import.meta.url);
 type NativeExecuteResult = { ok: boolean; rowsJson: string; error?: string | null };
 
 type NativeMemorySession = {
-    query?(source: string, parametersJson?: string | null): NativeExecuteResult;
-    execute?(source: string, parametersJson?: string | null): NativeExecuteResult;
+    query ? (source: string, parametersJson?: string | null) : NativeExecuteResult;
+    execute ? (source: string, parametersJson?: string | null) : NativeExecuteResult;
     executeVos(source: string, parametersJson?: string | null): NativeExecuteResult;
-    executeOperation?(operationJson: string): NativeExecuteResult;
+    executeOperation ? (operationJson: string) : NativeExecuteResult;
     close(): void;
     managedPush?: (schema: string) => void;
     sqliteEngineVersion?: () => string;

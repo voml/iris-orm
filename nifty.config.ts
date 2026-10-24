@@ -1,4 +1,4 @@
-﻿// Nifty project configuration for iris-orm (hybrid cargo + pnpm).
+// Nifty project configuration for iris-orm (hybrid cargo + pnpm).
 // Trusted Publisher contract: repo voml/iris-orm, workflow publish-npm.yml, environment NPM_PUBLISH (see scripts/README.md).
 import { defineConfig } from "@doki-land/nifty";
 
@@ -9,7 +9,7 @@ export default defineConfig({
             indentStyle: "space",
             indentWidth: 4,
             lineWidth: 144,
-            quoteStyle: "double",
+            quoteStyle: "single",
         },
         includes: [
             "package.json",

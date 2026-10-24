@@ -168,11 +168,7 @@ fn typescript_tree_has_no_iris_adapter_packages() {
         for entry in fs::read_dir(&ts_root).expect("read iris.ts dir") {
             let entry = entry.expect("iris.ts dir entry");
             let name = entry.file_name().to_string_lossy().into_owned();
-            assert!(
-                !name.starts_with("iris-adapter-"),
-                "TypeScript iris-adapter packages are retired; remove `{}`",
-                entry.path().display()
-            );
+            assert!(!name.starts_with("iris-adapter-"), "TypeScript iris-adapter packages are retired; remove `{}`", entry.path().display());
         }
     }
 }

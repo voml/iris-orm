@@ -11,9 +11,9 @@ import {
 import { entityFromOperationId, mapRowsToAuthorSurface } from "./wire-row-map.ts";
 
 export type OperationExecutorSessionOptions = {
-    wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    wireNamesByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
     /** Generated `IRIS_VALUE_CARRIERS` table (VOS carrier label per author field). */
-    valueCarriersByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    valueCarriersByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
 };
 
 function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly ExecutionRow[]> {
@@ -51,8 +51,8 @@ function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly Execut
 function mapExecuteEnvelope(
     envelope: ResultEnvelope<readonly ExecutionRow[]>,
     operationId: string,
-    wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>>,
-    valueCarriersByEntity: Readonly<Record<string, Readonly<Record<string, string>>>>,
+    wireNamesByEntity: Readonly<Record < string, Readonly < Record < string, string >>> >,
+    valueCarriersByEntity: Readonly<Record < string, Readonly < Record < string, string >>> >,
 ): ResultEnvelope<readonly ExecutionRow[]> {
     if (!envelope.ok) {
         return envelope;

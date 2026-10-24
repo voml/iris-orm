@@ -12,9 +12,9 @@ export interface CreateIrisCloudflareExecutorOptions extends CreateIrisDbBinding
     /** Build-time physical plan artifact from generated `_internal/d1-plans.ts`. */
     plans?: D1PlanRegistry;
     /** Wire-name map from generated `metadata.ts` (`IRIS_FIELD_WIRE_NAMES`). */
-    wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    wireNamesByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
     /** VOS value-carrier map from generated `metadata.ts` (`IRIS_VALUE_CARRIERS`). */
-    valueCarriersByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    valueCarriersByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
 }
 
 /** Create the async operation executor for generated Cloudflare clients. */

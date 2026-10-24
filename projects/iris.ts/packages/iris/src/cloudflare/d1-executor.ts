@@ -30,9 +30,9 @@ export function createD1OperationExecutor(
 
     plans: D1PlanRegistry = {},
 
-    wireNamesByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
+    wireNamesByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
 
-    valueCarriersByEntity: Readonly<Record<string, Readonly<Record<string, string>>>> = {},
+    valueCarriersByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
 
 ): OperationExecutor {
 

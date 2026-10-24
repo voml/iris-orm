@@ -42,12 +42,12 @@ export interface CreateIrisDbBindingOptions {
     /** Build-time contract fingerprint from generated metadata (generated clients set this). */
     contractFingerprint?: string;
     /** Wire-name map from generated `metadata.ts` (`IRIS_FIELD_WIRE_NAMES`). */
-    wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    wireNamesByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
     /**
      * VOS value-carrier map from generated `metadata.ts` (`IRIS_VALUE_CARRIERS`).
      * Values are delivered on the carrier the generated types declare.
      */
-    valueCarriersByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+    valueCarriersByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
 }
 
 /** @deprecated Use `IrisDbBinding`. */

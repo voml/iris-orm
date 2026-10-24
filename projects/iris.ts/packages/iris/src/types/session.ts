@@ -32,12 +32,12 @@ export interface IrisSession {
     /** Plan and execute VOS source on the bound adapter. */
     execute(source: string): ExecuteResult;
     /** Structured operation ABI (generated client path). */
-    executeOperation?(request: import("./contract.ts").OperationRequest): ExecuteResult;
+    executeOperation ? (request: import("./contract.ts").OperationRequest) : ExecuteResult;
     /** Release session resources. */
     close(): void;
     /**
      * Debug / SQLite bootstrap only.
      * @deprecated Application schema changes use `iris push`, not session helpers.
      */
-    managedPush?(schema: string): void;
+    managedPush ? (schema: string) : void;
 }
