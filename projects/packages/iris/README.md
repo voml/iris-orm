@@ -17,6 +17,12 @@ There is no `@yydb/iris/web`. Under bundler **browser** conditions, `@yydb/iris/
 
 Platform N-API packages and `@yydb/iris-unknown-wasm32` install as optional / bundled dependencies — see [Related packages](#related-packages).
 
+## Runtime
+
+Node.js **>=24.12.0**. Project config (`iris.config.ts` / `.mts` / `.mjs` / `.js`) is executed by Node itself
+(`await import(pathToFileURL(configPath).href)`) — Iris ships no runtime TypeScript compiler. Use erasable TypeScript
+syntax in config (type annotations and `interface` are fine; `enum` / `namespace` are not).
+
 ## Example
 
 **Project config**

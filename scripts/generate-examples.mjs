@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const examplesRoot = join(root, "projects/examples");
-const irisCli = join(root, "projects/packages/iris/bin/iris.ts");
+const irisCli = join(root, "projects/packages/iris/bin/iris.mjs");
+const irisBuild = join(root, "projects/packages/iris/scripts/build-dist.mjs");
 
 const EXAMPLES = ["hono", "express", "fastify", "next", "nuxt", "sveltekit", "astro", "cloudflare"];
 
@@ -37,11 +38,16 @@ function ensureNativeArtifact() {
 }
 
 ensureNativeArtifact();
+execSync(`node "${irisBuild}"`, {
+    cwd: root,
+    stdio: "inherit",
+    shell: true,
+});
 
 for (const name of EXAMPLES) {
     const exampleDir = join(examplesRoot, name);
     console.log(`\n==> ${name}`);
-    execSync(`node --experimental-strip-types "${irisCli}" generate --config "${exampleDir}"`, {
+    execSync(`node "${irisCli}" generate --config "${exampleDir}"`, {
         cwd: root,
         stdio: "inherit",
         shell: true,

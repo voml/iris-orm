@@ -83,6 +83,8 @@ deploy:        runtime + generated only              # no CLI on the server
 
 ### 2. Manual install
 
+Requires **Node.js >=24.12.0** — project config is executed by Node itself (native TypeScript type stripping), not by a bundled runtime compiler.
+
 **Install Iris:**
 
 ```bash
