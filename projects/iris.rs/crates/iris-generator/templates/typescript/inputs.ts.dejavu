@@ -138,20 +138,20 @@ export type SelectResultFor<E extends EntityName, S> = [S] extends [undefined]
                 : never;
       };
 
-<%- loop table in tables_view %>
+<% loop table in tables_view %>
 
 export type <% table.name %>Select = {
-<%- loop field in table.fields %>
+<% loop field in table.fields %>
 <% if field.select_line %><% field.select_line %>
 <% end if %>
-<%- end loop %>
+<% end loop %>
 };
 
 export type <% table.name %>WhereInput = {
-<%- loop field in table.fields %>
+<% loop field in table.fields %>
 <% if field.where_line %><% field.where_line %>
 <% end if %>
-<%- end loop %>
+<% end loop %>
 };
 
 export type <% table.name %>WhereUniqueInput = {
@@ -159,17 +159,17 @@ export type <% table.name %>WhereUniqueInput = {
 };
 
 export type <% table.name %>CreateInput = {
-<%- loop field in table.fields %>
+<% loop field in table.fields %>
 <% if field.create_line %><% field.create_line %>
 <% end if %>
-<%- end loop %>
+<% end loop %>
 };
 
 export type <% table.name %>PatchInput = {
-<%- loop field in table.fields %>
+<% loop field in table.fields %>
 <% if field.patch_line %><% field.patch_line %>
 <% end if %>
-<%- end loop %>
+<% end loop %>
 };
 
 export type <% table.name %>FindManyArgs = {
@@ -202,4 +202,4 @@ export type <% table.name %>UpdateArgs = {
 
 export type <% table.name %>GetPayload<A extends <% table.name %>FindManyArgs | <% table.name %>FindUniqueArgs | <% table.name %>CreateArgs | <% table.name %>UpdateArgs> =
     SelectResultFor<"<% table.name %>", A["select"]>;
-<%- end loop %>
+<% end loop %>

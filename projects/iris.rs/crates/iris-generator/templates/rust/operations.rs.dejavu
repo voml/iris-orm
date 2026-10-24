@@ -71,13 +71,11 @@ impl<'a> Db<'a> {
         })
     }
 
-<%- loop table in tables_view %>
-    /// Table delegate for `<% table.name %>`.
+<% loop table in tables_view %>    /// Table delegate for `<% table.name %>`.
     pub fn <% table.snake_name %>(&self) -> <% table.name %>Delegate<'_> {
         <% table.name %>Delegate { db: self }
     }
-<%- end loop %>
-}
+<% end loop %>}
 
 /// Transaction handle: same CRUD names as [`Db`]; Iris holds one connection for the closure.
 pub struct Txn<'a> {
@@ -102,8 +100,7 @@ impl Txn<'_> {
         Ok(())
     }
 
-<%- loop table in tables_view %>
-    /// Table delegate for `<% table.name %>` on this transaction.
+<% loop table in tables_view %>    /// Table delegate for `<% table.name %>` on this transaction.
     pub fn <% table.snake_name %>(&mut self) -> <% table.name %>TxnDelegate<'_> {
         <% table.name %>TxnDelegate {
             source: self.source,
@@ -111,11 +108,9 @@ impl Txn<'_> {
             conn: self.conn,
         }
     }
-<%- end loop %>
-}
+<% end loop %>}
 
-<%- loop table in tables_view %>
-/// Table delegate for `<% table.name %>`.
+<% loop table in tables_view %>/// Table delegate for `<% table.name %>`.
 pub struct <% table.name %>Delegate<'a> {
     db: &'a Db<'a>,
 }
@@ -200,5 +195,4 @@ impl <% table.name %>TxnDelegate<'_> {
         self.source.delete_on(self.conn, "<% table.name %>", "<% table.primary_key %>", key)
     }
 }
-
-<%- end loop %>
+<% end loop %>

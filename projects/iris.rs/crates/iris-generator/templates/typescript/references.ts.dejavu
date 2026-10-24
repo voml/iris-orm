@@ -1,4 +1,4 @@
-<%- loop table in tables_view %>
+<% loop table in tables_view %>
 declare const __iris<% table.name %>IdBrand: unique symbol;
 
 /** Branded primary key for <% table.name %>. */
@@ -23,4 +23,4 @@ export type <% table.name %>RefInput =
     | { <% table.pk_ts_name %>: <% table.name %>Id }
     | <% table.name %>Reference;
 
-<%- end loop %>
+<% end loop %>

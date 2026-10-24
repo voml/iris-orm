@@ -1,9 +1,5 @@
-<%- loop table in tables %>
-#[derive(Clone, Debug, PartialEq)]
+<% loop table in tables %>#[derive(Clone, Debug, PartialEq)]
 pub struct <% table.rust_type %> {
-<%- loop field in table.fields %>
-    pub <% field.name %>: <% field.rust_ty %>,
-<%- end loop %>
-}
-
-<%- end loop %>
+<% loop field in table.fields %>    pub <% field.name %>: <% field.rust_ty %>,
+<% end loop %>}
+<% end loop %>

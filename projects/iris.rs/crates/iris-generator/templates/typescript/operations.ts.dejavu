@@ -13,7 +13,7 @@ import {
 import type {
     <% input_import_names %>
 } from "./inputs.js";
-<%- if has_macros %>
+<% if has_macros %>
 
 /** Generated macro bindings from schema truth (not backend capability intersection). */
 export class GeneratedMacros {
@@ -22,27 +22,27 @@ export class GeneratedMacros {
     constructor(executor: OperationExecutor) {
         this.executor = executor;
     }
-<%- loop macro in macros_view %>
+<% loop macro in macros_view %>
 
     async <% macro.name %>(<% macro.param_signature %>): Promise<<% macro.ts_return %>> {
         const synthesis = synthesizeMacroCall("<% macro.name %>", [<% macro.param_names %>]);
         const request = buildDeclaredOperationRequest("<% macro.name %>", synthesis);
-<%- if macro.uses_execute %>
+<% if macro.uses_execute %>
         const envelope = await this.executor.executeUnit(request);
         if (!envelope.ok) {
             throwOperationEnvelopeError(envelope);
         }
-<%- else %>
+<% else %>
         const envelope = await this.executor.execute(request);
         if (!envelope.ok) {
             throwOperationEnvelopeError(envelope);
         }
         return envelope.value as <% macro.ts_return %>;
-<%- end if %>
+<% end if %>
     }
-<%- end loop %>
+<% end loop %>
 }
-<%- else %>
+<% else %>
 
 /** Schema macros (empty for this project). */
 export class GeneratedMacros {
@@ -52,8 +52,8 @@ export class GeneratedMacros {
         this.executor = executor;
     }
 }
-<%- end if %>
-<%- loop table in tables_view %>
+<% end if %>
+<% loop table in tables_view %>
 
 export class <% table.name %>Delegate {
     private readonly executor: OperationExecutor;
@@ -139,21 +139,21 @@ export class <% table.name %>Delegate {
         }
     }
 }
-<%- end loop %>
+<% end loop %>
 
 export class DbClient {
-<%- loop table in tables_view %>
+<% loop table in tables_view %>
     readonly <% table.camel_name %>: <% table.name %>Delegate;
-<%- end loop %>
+<% end loop %>
     readonly $macros: GeneratedMacros;
     private readonly executor: OperationExecutor;
 
     constructor(executor: OperationExecutor) {
         this.executor = executor;
         this.$macros = new GeneratedMacros(executor);
-<%- loop table in tables_view %>
+<% loop table in tables_view %>
         this.<% table.camel_name %> = new <% table.name %>Delegate(executor);
-<%- end loop %>
+<% end loop %>
     }
 
     /**
