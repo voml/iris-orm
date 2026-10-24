@@ -17,6 +17,7 @@
         "tests/codegen-g0/positive",
         "tests/codegen-g0/negative",
         "tests/generated-e2e-runner.ts",
+        "tests/generated-e2e-carriers-runner.ts",
         "tests/generated-e2e-cloudflare-runner.ts",
         "tests/generated-project-e2e-runner.ts"
     ]

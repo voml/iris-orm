@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { USER_SCHEMA } from "./fixtures.ts";
-import { requireNativeSqlite, requireNativeSqliteFrom, srcImport } from "./helpers.ts";
+import { srcImport } from "./helpers.ts";
 
 const POST_USER_SCHEMA = `
 table User {
@@ -433,9 +433,6 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
     if (!core) {
         return;
     }
-    if (!requireNativeSqlite(t, core)) {
-        return;
-    }
     const outDir = await mkdtemp(join(tmpdir(), "iris-codegen-e2e-"));
     const generatedRoot = join(outDir, "generated", "iris");
     const result = core.generate(USER_SCHEMA, "typescript", generatedRoot);
@@ -488,9 +485,6 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
 test("generated project Database.open runs CRUD against on-disk sqlite", async (t) => {
     const core = await loadCore(t);
     if (!core) {
-        return;
-    }
-    if (!requireNativeSqlite(t, core)) {
         return;
     }
     const projectRoot = await mkdtemp(join(tmpdir(), "iris-codegen-project-"));
@@ -627,9 +621,6 @@ test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", asyn
     const { buildOperationRequest, declaredVosOperation } = await import(
         srcImport("src/runtime/build-operation-request.ts")
     );
-    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
-        return;
-    }
 
     let executor;
     try {
@@ -674,9 +665,6 @@ test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", asyn
 test("createIrisDbBinding binds parameters through Rust", async (t) => {
     ensureNativeOverride();
     const node = await import(srcImport("src/node/index.ts"));
-    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
-        return;
-    }
     let binding;
     try {
         binding = await node.createIrisDbBinding({
@@ -705,9 +693,6 @@ test("createIrisDbBinding binds parameters through Rust", async (t) => {
 test("createIrisDbBinding splits DML query and DDL execute", async (t) => {
     ensureNativeOverride();
     const node = await import(srcImport("src/node/index.ts"));
-    if (!requireNativeSqliteFrom(t, () => node.loadIrisNative())) {
-        return;
-    }
 
     let binding;
     try {

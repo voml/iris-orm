@@ -5,12 +5,14 @@ on:
   push:
     branches: [master, dev]
     paths:
-      - "../../projects/iris.rs/crates/**"
+      - "projects/iris.rs/crates/**"
+      - "Cargo.toml"
       - ".github/workflows/check-rust.yml"
   pull_request:
     branches: [master, dev]
     paths:
-      - "../../projects/iris.rs/crates/**"
+      - "projects/iris.rs/crates/**"
+      - "Cargo.toml"
       - ".github/workflows/check-rust.yml"
 
 defaults:
@@ -93,6 +95,7 @@ jobs:
           -p iris -p iris-types -p iris-ir -p iris-generator
           -p iris-connector-yydb -p iris-connector-yyds
           -p iris-adapter-mysql -p iris-adapter-postgres
+          -p iris-adapter-sqlite
           -p iris-adapter-redis
           --all-targets -- -D warnings
 

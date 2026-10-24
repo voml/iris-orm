@@ -1,0 +1,77 @@
+name: iris-native
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master, dev]
+    paths:
+      - "projects/iris.ts/packages/iris/**"
+      - "projects/iris.ts/platforms/iris-*"
+      - "projects/iris.rs/crates/**"
+      - "scripts/build-napi.mjs"
+      - "scripts/build-wasm.mjs"
+      - "scripts/resolve-native-artifact.mjs"
+      - "scripts/typecheck-ts.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/check-native.yml"
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "projects/iris.ts/packages/iris/**"
+      - "projects/iris.ts/platforms/iris-*"
+      - "projects/iris.rs/crates/**"
+      - "scripts/build-napi.mjs"
+      - "scripts/build-wasm.mjs"
+      - "scripts/resolve-native-artifact.mjs"
+      - "scripts/typecheck-ts.mjs"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/check-native.yml"
+
+defaults:
+  run:
+    working-directory: .
+
+jobs:
+  node:
+    name: native · typecheck · test
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-07-20
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build WASM
+        run: node scripts/build-wasm.mjs
+
+      - name: Build N-API
+        run: node scripts/build-napi.mjs
+
+      - name: Typecheck
+        run: pnpm typecheck:ts
+
+      - name: Test
+        run: pnpm test:ts

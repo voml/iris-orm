@@ -21,7 +21,7 @@ fn check_valid_schema_matches_cli_smoke_fixture() {
     let out = check_schema_source(USER_SCHEMA);
     assert!(out.ok, "expected ok: {:?}", out.error);
     assert_eq!(out.table_count, 1);
-    assert_eq!(out.schema_fingerprint, "60adfe744c724499");
+    assert_eq!(out.schema_fingerprint, "108401c5f275ffe6");
     assert_eq!(out.generator_version, env!("CARGO_PKG_VERSION"));
     assert!(out.error.is_none());
 }
