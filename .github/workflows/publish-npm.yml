@@ -48,7 +48,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-07-20
+          components: rustfmt, clippy
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -95,8 +98,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly-2026-07-20
+          components: rustfmt, clippy
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
