@@ -3,7 +3,14 @@
 use iris_adapter_mysql::{BACKEND_ID, MysqlSource, adopt_plan, classify_type};
 use iris_ir::RealizationClass;
 use iris_types::{MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, Planner, RowWrite, Value};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Mutex};
+
+/// Live MySQL tests share one `iris` database and mutate the same `User` table.
+static LIVE_MYSQL_LOCK: Mutex<()> = Mutex::new(());
+
+fn live_mysql_lock() -> std::sync::MutexGuard<'static, ()> {
+    LIVE_MYSQL_LOCK.lock().unwrap_or_else(|err| err.into_inner())
+}
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -102,6 +109,7 @@ fn plan_push_emits_add_field_for_missing_columns() {
 
 #[test]
 fn live_managed_push_crud_txn_drift_and_pool() {
+    let _lock = live_mysql_lock();
     let Some(url) = live_url()
     else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
@@ -211,6 +219,7 @@ fn live_managed_push_crud_txn_drift_and_pool() {
 
 #[test]
 fn live_same_connection_txn_visible_and_rolls_back_on_err() {
+    let _lock = live_mysql_lock();
     let Some(url) = live_url()
     else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
@@ -284,6 +293,7 @@ fn live_same_connection_txn_visible_and_rolls_back_on_err() {
 
 #[test]
 fn live_with_rollback_leaves_no_residue_on_success() {
+    let _lock = live_mysql_lock();
     let Some(url) = live_url()
     else {
         eprintln!("skip: set IRIS_TEST_MYSQL_URL for live MySQL conformance");
