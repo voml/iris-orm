@@ -4,9 +4,11 @@
 
 use iris_ir::{CommitToken, DEFAULT_COMMIT_SHARD, OutboxAppend, OutboxEffect, OutboxRecord};
 use iris_types::{RowWrite, Value};
-use sqlite_provider::{SqliteProvider, SqliteValue};
 
-use crate::{Error, Result, execute};
+use crate::{
+    Error, Result, execute,
+    provider::{RusqliteProvider, SqliteValue},
+};
 
 /// True when a physical table is Iris authority meta (hidden from business catalog).
 pub(crate) fn is_meta_table(name: &str) -> bool {
@@ -26,7 +28,7 @@ fn integer_param(value: i64) -> SqliteValue {
 }
 
 /// Idempotent install of commit counter + outbox tables.
-pub fn ensure_schema(provider: &impl SqliteProvider) -> Result<()> {
+pub fn ensure_schema(provider: &RusqliteProvider) -> Result<()> {
     provider.execute_batch(
         "CREATE TABLE IF NOT EXISTS _iris_commit (
             shard TEXT PRIMARY KEY NOT NULL,
@@ -54,7 +56,7 @@ pub fn ensure_schema(provider: &impl SqliteProvider) -> Result<()> {
 }
 
 /// Read the current commit token (seq of last successful authority commit).
-pub fn current_token(provider: &impl SqliteProvider) -> Result<CommitToken> {
+pub fn current_token(provider: &RusqliteProvider) -> Result<CommitToken> {
     ensure_schema(provider)?;
     let result = provider.execute_one("SELECT seq FROM _iris_commit WHERE shard = ?1", &[shard_param()])?;
     let seq = result
@@ -70,12 +72,12 @@ pub fn current_token(provider: &impl SqliteProvider) -> Result<CommitToken> {
 }
 
 /// Writer handle bound to an open authority transaction.
-pub struct AuthorityTxn<'provider, P: SqliteProvider> {
-    provider: &'provider P,
+pub struct AuthorityTxn<'provider> {
+    provider: &'provider RusqliteProvider,
     appends: Vec<OutboxAppend>,
 }
 
-impl<'provider, P: SqliteProvider> AuthorityTxn<'provider, P> {
+impl AuthorityTxn<'_> {
     /// Queue an outbox append (flushed at commit with the new token).
     pub fn append_outbox(&mut self, event: OutboxAppend) {
         self.appends.push(event);
@@ -101,7 +103,7 @@ impl<'provider, P: SqliteProvider> AuthorityTxn<'provider, P> {
 ///
 /// On success, returns the user value and a [`CommitToken`] meaning authority committed
 /// **and** durable outbox accepted propagation duty (not that projections caught up).
-pub fn authority_commit<P: SqliteProvider, R>(provider: &P, f: impl FnOnce(&mut AuthorityTxn<'_, P>) -> Result<R>) -> Result<(R, CommitToken)> {
+pub fn authority_commit<R>(provider: &RusqliteProvider, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
     ensure_schema(provider)?;
     provider.begin_immediate()?;
     let committed = (|| {
@@ -153,7 +155,7 @@ pub fn authority_commit<P: SqliteProvider, R>(provider: &P, f: impl FnOnce(&mut 
 }
 
 /// List durable outbox records with `seq > after_seq` (projector poll shape).
-pub fn outbox_after(provider: &impl SqliteProvider, after_seq: u64, limit: usize) -> Result<Vec<OutboxRecord>> {
+pub fn outbox_after(provider: &RusqliteProvider, after_seq: u64, limit: usize) -> Result<Vec<OutboxRecord>> {
     ensure_schema(provider)?;
     let result = provider.execute_one(
         "SELECT id, shard, seq, operation_id, table_name, entity_id, entity_version, effect
@@ -192,7 +194,7 @@ pub fn outbox_after(provider: &impl SqliteProvider, after_seq: u64, limit: usize
             })
             .ok_or_else(|| Error::Policy("invalid outbox seq".into()))?;
         let id = row
-            .get(0)
+            .first()
             .and_then(|value| match value {
                 SqliteValue::Integer(id) => Some(*id),
                 _ => None,
@@ -241,7 +243,7 @@ pub fn outbox_after(provider: &impl SqliteProvider, after_seq: u64, limit: usize
 }
 
 /// Count pending outbox rows (backlog observability).
-pub fn outbox_backlog(provider: &impl SqliteProvider) -> Result<u64> {
+pub fn outbox_backlog(provider: &RusqliteProvider) -> Result<u64> {
     ensure_schema(provider)?;
     let result = provider.execute_one("SELECT COUNT(*) FROM _iris_outbox", &[])?;
     let count = result

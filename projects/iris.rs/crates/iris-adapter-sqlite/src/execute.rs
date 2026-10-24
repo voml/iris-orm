@@ -2,21 +2,21 @@
 
 use iris_ir::{CmpOp, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
 use iris_types::{Row, RowWrite, Value};
-use sqlite_provider::{SqliteProvider, SqliteValue, StatementResult};
 
 use crate::{
     Result,
+    provider::{RusqliteProvider, SqliteValue, StatementResult},
     types::{from_sql_value, literal_to_sql_value, to_sql_value},
 };
 
-pub(crate) fn execute_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+pub(crate) fn execute_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
     if plan.nodes.iter().any(|node| matches!(node.op, PhysicalOp::Insert { .. } | PhysicalOp::Patch { .. } | PhysicalOp::Delete { .. })) {
         return execute_write_plan(provider, plan);
     }
     execute_read_plan(provider, plan)
 }
 
-fn execute_read_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+fn execute_read_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
     let mut table: Option<String> = None;
     let mut where_sql: Option<String> = None;
     let mut where_params: Vec<SqliteValue> = Vec::new();
@@ -72,7 +72,7 @@ fn execute_read_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Res
     query_rows(provider, &sql, &where_params)
 }
 
-fn execute_write_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Result<Vec<Row>> {
     let mut insert: Option<(String, Vec<WriteField>)> = None;
     let mut patch: Option<(String, Option<Pred>, Vec<WriteField>)> = None;
     let mut delete: Option<(String, Option<Pred>)> = None;
@@ -128,7 +128,7 @@ fn execute_write_plan(provider: &impl SqliteProvider, plan: &PhysicalPlan) -> Re
     Ok(Vec::new())
 }
 
-fn query_rows(provider: &impl SqliteProvider, sql: &str, params: &[SqliteValue]) -> Result<Vec<Row>> {
+fn query_rows(provider: &RusqliteProvider, sql: &str, params: &[SqliteValue]) -> Result<Vec<Row>> {
     let result = provider.execute_one(sql, params)?;
     statement_to_rows(&result)
 }
@@ -185,7 +185,7 @@ fn write_field_to_sql(field: &WriteField) -> SqliteValue {
     literal_to_sql_value(&field.literal, field.kind)
 }
 
-pub(crate) fn insert_row(provider: &impl SqliteProvider, write: &RowWrite) -> Result<()> {
+pub(crate) fn insert_row(provider: &RusqliteProvider, write: &RowWrite) -> Result<()> {
     let cols: Vec<String> = write.fields.keys().map(|k| format!("\"{k}\"")).collect();
     let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
     let sql = format!("INSERT INTO \"{}\" ({}) VALUES ({})", write.table, cols.join(", "), placeholders.join(", "));
@@ -194,7 +194,7 @@ pub(crate) fn insert_row(provider: &impl SqliteProvider, write: &RowWrite) -> Re
     Ok(())
 }
 
-pub(crate) fn update_row(provider: &impl SqliteProvider, write: &RowWrite) -> Result<usize> {
+pub(crate) fn update_row(provider: &RusqliteProvider, write: &RowWrite) -> Result<usize> {
     let key = write.fields.get(&write.primary_key).ok_or_else(|| crate::Error::Policy("update missing primary key value".into()))?;
     let sets: Vec<String> = write.fields.keys().filter(|k| *k != &write.primary_key).map(|k| format!("\"{k}\" = ?")).collect();
     if sets.is_empty() {
@@ -207,7 +207,7 @@ pub(crate) fn update_row(provider: &impl SqliteProvider, write: &RowWrite) -> Re
     Ok(result.changes as usize)
 }
 
-pub(crate) fn delete_row(provider: &impl SqliteProvider, table: &str, primary_key: &str, key: &Value) -> Result<usize> {
+pub(crate) fn delete_row(provider: &RusqliteProvider, table: &str, primary_key: &str, key: &Value) -> Result<usize> {
     let sql = format!("DELETE FROM \"{table}\" WHERE \"{primary_key}\" = ?");
     let result = provider.execute_one(&sql, &[to_sql_value(key)])?;
     Ok(result.changes as usize)

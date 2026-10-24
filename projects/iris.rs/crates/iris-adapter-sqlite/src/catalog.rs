@@ -1,12 +1,11 @@
 //! Catalog inspect, adopt planning, and drift (no SQL in public values).
 
 use iris_types::{DriftReport, FieldMapping, MappingManifest, MappingQuality, ObservedCatalog, ObservedColumn, ObservedTable, TableMapping};
-use sqlite_provider::SqliteProvider;
 use vos::{CanonicalType, CanonicalTypeArgument, SchemaProjection, TypeContract, TypeContractKind};
 
-use crate::{ADAPTER_VERSION, BACKEND_ID, Result, outbox};
+use crate::{ADAPTER_VERSION, BACKEND_ID, Result, outbox, provider::RusqliteProvider};
 
-pub(crate) fn inspect_catalog(provider: &impl SqliteProvider) -> Result<ObservedCatalog> {
+pub(crate) fn inspect_catalog(provider: &RusqliteProvider) -> Result<ObservedCatalog> {
     let snapshot = provider.inspect_catalog()?;
     let mut tables = Vec::new();
     for table in snapshot.tables {

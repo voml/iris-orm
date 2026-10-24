@@ -2,7 +2,8 @@
 
 use iris_ir::LiteralKind;
 use iris_types::Value;
-use sqlite_provider::SqliteValue;
+
+use crate::provider::SqliteValue;
 
 pub(crate) fn to_sql_value(value: &Value) -> SqliteValue {
     match value {

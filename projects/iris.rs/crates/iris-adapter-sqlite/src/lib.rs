@@ -10,6 +10,7 @@ mod catalog;
 mod execute;
 mod migrate;
 mod outbox;
+mod provider;
 mod types;
 
 use std::{
@@ -19,13 +20,12 @@ use std::{
 
 use iris_ir::{CommitToken, IrVersion, OutboxRecord, PhysicalPlan};
 use iris_types::{CapabilitySet, DriftReport, LogicalMigrationPlan, MappingManifest, ObservedCatalog, QueryCaps, Row, RowWrite, WriteCaps};
-use sqlite_provider::{CONTRACT_VERSION, SqliteError, SqliteProvider};
-use sqlite_provider_rusqlite::RusqliteProvider;
+use provider::SqliteError;
 
 pub use catalog::adopt_plan;
 pub use migrate::{PushReport, apply_push, plan_push};
 pub use outbox::AuthorityTxn;
-pub use sqlite_provider::SqliteValue;
+pub use provider::{CatalogColumn, CatalogSnapshot, CatalogTable, RusqliteProvider, SqliteValue, StatementResult};
 
 /// Adapter identifier.
 pub const BACKEND_ID: &str = "sqlite";
@@ -33,7 +33,7 @@ pub const BACKEND_ID: &str = "sqlite";
 /// Adapter crate version label.
 pub const ADAPTER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// SQLite foreign datasource backed by the versioned provider contract.
+/// SQLite foreign datasource backed by the bundled engine.
 pub struct SqliteSource {
     provider: Mutex<RusqliteProvider>,
     path: Option<PathBuf>,
@@ -56,11 +56,6 @@ impl SqliteSource {
             write: WriteCaps::full(),
             budget: iris_types::CompensationBudget::default(),
         }
-    }
-
-    /// Frozen SQLite provider contract version used by this adapter.
-    pub fn provider_contract_version() -> &'static str {
-        CONTRACT_VERSION
     }
 
     /// Open an in-memory SQLite database.
@@ -97,7 +92,7 @@ impl SqliteSource {
     /// Inspect the foreign catalog (Adopt Existing input).
     pub fn inspect(&self) -> Result<ObservedCatalog> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        catalog::inspect_catalog(&*provider)
+        catalog::inspect_catalog(&provider)
     }
 
     /// Build an adopt mapping against a VOS schema document (does not invent semantics).
@@ -118,7 +113,7 @@ impl SqliteSource {
     pub fn apply_managed_push(&self, plan: &LogicalMigrationPlan, vos_schema: &str) -> Result<PushReport> {
         let document = parse_vos(vos_schema)?;
         let provider = self.provider.lock().expect("sqlite mutex");
-        migrate::apply_push(&*provider, plan, &document)
+        migrate::apply_push(&provider, plan, &document)
     }
 
     /// Convenience: plan + apply when the database has no conflicting tables.
@@ -143,25 +138,25 @@ impl SqliteSource {
             return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
         }
         let provider = self.provider.lock().expect("sqlite mutex");
-        execute::execute_plan(&*provider, plan)
+        execute::execute_plan(&provider, plan)
     }
 
     /// Insert a row (typed values; SQL stays private).
     pub fn insert(&self, write: &RowWrite) -> Result<()> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        execute::insert_row(&*provider, write)
+        execute::insert_row(&provider, write)
     }
 
     /// Update by primary key.
     pub fn update(&self, write: &RowWrite) -> Result<usize> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        execute::update_row(&*provider, write)
+        execute::update_row(&provider, write)
     }
 
     /// Delete by primary key.
     pub fn delete(&self, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<usize> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        execute::delete_row(&*provider, table, primary_key, key)
+        execute::delete_row(&provider, table, primary_key, key)
     }
 
     /// Begin a transaction.
@@ -185,34 +180,34 @@ impl SqliteSource {
     /// Install authority commit counter + outbox tables (idempotent).
     pub fn ensure_authority_outbox(&self) -> Result<()> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        outbox::ensure_schema(&*provider)
+        outbox::ensure_schema(&provider)
     }
 
     /// Current authority [`CommitToken`] (last successful composite commit).
     pub fn current_commit_token(&self) -> Result<CommitToken> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        outbox::current_token(&*provider)
+        outbox::current_token(&provider)
     }
 
     /// Authority transaction: business mutations + outbox appends commit atomically.
     ///
     /// Success means authority committed and durable outbox accepted propagation duty --
     /// not that cache/search/vector projections have applied the events.
-    pub fn authority_commit<R>(&self, f: impl FnOnce(&mut AuthorityTxn<'_, RusqliteProvider>) -> Result<R>) -> Result<(R, CommitToken)> {
+    pub fn authority_commit<R>(&self, f: impl FnOnce(&mut AuthorityTxn<'_>) -> Result<R>) -> Result<(R, CommitToken)> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        outbox::authority_commit(&*provider, f)
+        outbox::authority_commit(&provider, f)
     }
 
     /// Poll durable outbox events after a sequence (projector shape).
     pub fn outbox_after(&self, after_seq: u64, limit: usize) -> Result<Vec<OutboxRecord>> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        outbox::outbox_after(&*provider, after_seq, limit)
+        outbox::outbox_after(&provider, after_seq, limit)
     }
 
     /// Outbox backlog size.
     pub fn outbox_backlog(&self) -> Result<u64> {
         let provider = self.provider.lock().expect("sqlite mutex");
-        outbox::outbox_backlog(&*provider)
+        outbox::outbox_backlog(&provider)
     }
 }
 

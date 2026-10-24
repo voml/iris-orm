@@ -2,11 +2,9 @@
 
 use std::collections::BTreeMap;
 
-use iris_adapter_sqlite::{BACKEND_ID, SqliteSource};
+use iris_adapter_sqlite::{BACKEND_ID, RusqliteProvider, SqliteSource, SqliteValue};
 use iris_ir::RealizationClass;
 use iris_types::{Planner, RowWrite, Value};
-use sqlite_provider::{CONTRACT_VERSION, SqliteProvider};
-use sqlite_provider_rusqlite::RusqliteProvider;
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -216,20 +214,17 @@ fn public_api_surface_does_not_return_sql_strings() {
 }
 
 #[test]
-fn adapter_is_not_yydb() {
+fn adapter_owns_its_sqlite_provider_surface() {
     assert_ne!(BACKEND_ID, "yydb");
     assert_ne!(BACKEND_ID, "reference");
     let manifest = include_str!("../Cargo.toml");
     assert!(!manifest.contains("yydb"));
-    assert!(manifest.contains("sqlite-provider"));
-    assert!(
-        !manifest.lines().any(|line| line.trim_start().starts_with("rusqlite") && line.contains('=')),
-        "adapter must not depend on rusqlite directly"
-    );
+    assert!(!manifest.contains("sqlite-provider"));
+    assert!(manifest.contains("rusqlite"));
 }
 
 #[test]
-fn iris_push_file_readable_by_shared_provider_engine() {
+fn iris_push_file_readable_by_raw_sqlite_engine() {
     let path = std::env::temp_dir()
         .join(format!("iris-sqlite-cross-{}.db", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     {
@@ -251,17 +246,15 @@ fn iris_push_file_readable_by_shared_provider_engine() {
     let reader = RusqliteProvider::open(&path).unwrap();
     let catalog = reader.inspect_catalog().expect("catalog");
     assert!(catalog.table("User").is_some());
-    let rows = reader
-        .execute_one("SELECT user_name FROM \"User\" WHERE user_id = ?1", &[sqlite_provider::SqliteValue::Text(b"cross".to_vec())])
-        .expect("select");
-    assert_eq!(rows.rows[0][0], sqlite_provider::SqliteValue::Text(b"provider".to_vec()));
+    let rows =
+        reader.execute_one("SELECT user_name FROM \"User\" WHERE user_id = ?1", &[SqliteValue::Text(b"cross".to_vec())]).expect("select");
+    assert_eq!(rows.rows[0][0], SqliteValue::Text(b"provider".to_vec()));
     let _ = std::fs::remove_file(&path);
 }
 
 #[test]
-fn adapter_uses_versioned_sqlite_provider_contract() {
+fn adapter_reports_native_engine_identity() {
     let db = SqliteSource::open_in_memory().unwrap();
-    assert_eq!(SqliteSource::provider_contract_version(), CONTRACT_VERSION);
     let version = db.sqlite_version().expect("sqlite version");
     assert!(!version.is_empty());
     let source_id = db.sqlite_source_id().expect("sqlite source id");

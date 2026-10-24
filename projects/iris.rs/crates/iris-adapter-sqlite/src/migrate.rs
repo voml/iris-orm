@@ -6,10 +6,9 @@ use std::{
 };
 
 use iris_types::{LogicalChange, LogicalMigrationPlan, ObservedCatalog};
-use sqlite_provider::SqliteProvider;
 use vos::{CanonicalType, FieldContract, SchemaProjection, TypeContract, TypeContractKind};
 
-use crate::{Error, Result};
+use crate::{Error, Result, provider::RusqliteProvider};
 
 /// Report after applying a managed push.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,7 +39,7 @@ pub fn plan_push(document: &SchemaProjection, observed: &ObservedCatalog) -> Res
 }
 
 /// Apply a reviewed logical plan by emitting private SQLite DDL.
-pub fn apply_push(provider: &impl SqliteProvider, plan: &LogicalMigrationPlan, document: &SchemaProjection) -> Result<PushReport> {
+pub fn apply_push(provider: &RusqliteProvider, plan: &LogicalMigrationPlan, document: &SchemaProjection) -> Result<PushReport> {
     if plan.destructive {
         return Err(Error::Policy("refusing to apply destructive plan without explicit policy".into()));
     }

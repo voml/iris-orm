@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
 members = ["projects/iris.rs/crates/*"]
-exclude = ["projects/iris.rs/crates/iris-adapter-sqlite"]  # FIXME: sqlite-provider-rusqlite removed upstream
 default-members = [
     "projects/iris.rs/crates/iris",
 ]
@@ -23,8 +22,9 @@ dejavu = { git = "https://github.com/doki-land/dejavu-engine.git", branch = "dev
 
 once_cell = "1"
 clap = { version = "4", features = ["derive"] }
-# sqlite-provider = { git = "https://github.com/yy-database/yyds.git", branch = "dev" }  # FIXME: no longer consumed (iris-adapter-sqlite excluded from workspace)
-# sqlite-provider-rusqlite = { git = "https://github.com/yy-database/yyds.git", branch = "dev" }  # FIXME: crate no longer exists on yyds dev
+# The SQLite execution surface is owned by `iris-adapter-sqlite`: upstream
+# `sqlite-provider` / `sqlite-provider-rusqlite` are no longer published.
+rusqlite = { version = "0.37", features = ["bundled"] }
 postgres = "0.19"
 r2d2 = "0.8"
 r2d2_postgres = "0.18"
@@ -45,7 +45,7 @@ iris-connector-yydb = { path = "projects/iris.rs/crates/iris-connector-yydb" }
 iris-connector-yyds = { path = "projects/iris.rs/crates/iris-connector-yyds" }
 iris-adapter-mysql = { path = "projects/iris.rs/crates/iris-adapter-mysql" }
 iris-adapter-postgres = { path = "projects/iris.rs/crates/iris-adapter-postgres" }
-# iris-adapter-sqlite = { path = "projects/iris.rs/crates/iris-adapter-sqlite" }  # FIXME: sqlite-provider-rusqlite removed upstream
+iris-adapter-sqlite = { path = "projects/iris.rs/crates/iris-adapter-sqlite" }
 iris-adapter-redis = { path = "projects/iris.rs/crates/iris-adapter-redis" }
 napi = { version = "3.12", default-features = false, features = ["napi9"] }
 napi-derive = "3.6"
