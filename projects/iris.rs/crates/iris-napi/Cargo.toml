@@ -10,16 +10,11 @@ publish = false
 [lib]
 crate-type = ["cdylib"]
 
-[features]
-default = []
-# FIXME: sqlite adapter temporarily gated — `sqlite-provider-rusqlite` no longer exists on yyds dev
-sqlite = []
-
 [dependencies]
 iris = { workspace = true, features = ["migrate"] }
 iris-generator = { workspace = true }
 iris-wasm = { workspace = true }
-# iris-adapter-sqlite = { workspace = true, optional = true }  # FIXME: upstream crate removed
+iris-adapter-sqlite = { workspace = true }
 iris-adapter-postgres = { workspace = true }
 iris-adapter-mysql = { workspace = true }
 iris-connector-yydb = { workspace = true }

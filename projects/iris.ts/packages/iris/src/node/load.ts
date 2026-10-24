@@ -23,7 +23,6 @@ type NativeMemorySession = {
     managedPush?: (schema: string) => void;
     sqliteEngineVersion?: () => string;
     sqliteSourceId?: () => string;
-    sqliteProviderContractVersion?: () => string | undefined;
 };
 
 function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
@@ -51,9 +50,6 @@ function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
     if (session.sqliteSourceId) {
         binding.sqliteSourceId = () => session.sqliteSourceId!();
     }
-    if (session.sqliteProviderContractVersion) {
-        binding.sqliteProviderContractVersion = () => session.sqliteProviderContractVersion!();
-    }
     return binding;
 }
 
@@ -63,19 +59,6 @@ function loadModule(specifier: string): IrisNodeBindings {
         const module = (loaded.default ?? loaded) as Record<string, unknown>;
         return {
             irisVersion: () => String((module.irisVersion as () => string)()),
-            sqliteAdapterEnabled:
-                typeof module.sqliteAdapterEnabled === "function"
-                    ? () => Boolean((module.sqliteAdapterEnabled as () => boolean)())
-                    : undefined,
-            sqliteProviderContractVersion: module.sqliteProviderContractVersion
-                ? () => {
-                      try {
-                          return String((module.sqliteProviderContractVersion as () => string)());
-                      } catch {
-                          return undefined;
-                      }
-                  }
-                : undefined,
             checkSource: (source) => (module.checkSource as (s: string) => CheckSourceResult)(source),
             introspectSchema: (source) => String((module.introspectSchema as (s: string) => string)(source)),
             openMemorySession: () => {

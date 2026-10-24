@@ -21,30 +21,6 @@ pub fn iris_version() -> String {
     iris::version().to_string()
 }
 
-/// Whether this native build includes the SQLite adapter.
-///
-/// The writable SQLite provider is currently unavailable upstream, so release
-/// builds ship without the `sqlite` feature. Callers must gate SQLite paths on
-/// this value instead of assuming the adapter exists.
-#[napi]
-pub fn sqlite_adapter_enabled() -> bool {
-    cfg!(feature = "sqlite")
-}
-
-/// Frozen SQLite provider contract version shared with YYDS `@yyds/sqlite`.
-#[napi]
-#[cfg(feature = "sqlite")]
-pub fn sqlite_provider_contract_version() -> Result<String> {
-    Ok(iris_adapter_sqlite::SqliteSource::provider_contract_version().to_string())
-}
-
-#[cfg(not(feature = "sqlite"))]
-#[napi]
-/// Frozen SQLite provider contract version shared with YYDS `@yyds/sqlite`.
-pub fn sqlite_provider_contract_version() -> Result<String> {
-    Err(Error::from_reason("sqlite adapter disabled in this build"))
-}
-
 /// Result of validating a VOS / `.iris` schema source via the Rust core.
 #[napi(object)]
 pub struct CheckSourceResult {
@@ -246,15 +222,8 @@ pub fn open_session(options: Option<OpenSessionOptions>) -> Result<MemorySession
     match profile {
         "memory" | "reference" => Ok(MemorySession::open_memory()),
         "sqlite" => {
-            #[cfg(feature = "sqlite")]
-            {
-                let path = opts.sqlite_path.unwrap_or_else(|| ":memory:".into());
-                MemorySession::open_sqlite(path)
-            }
-            #[cfg(not(feature = "sqlite"))]
-            {
-                Err(Error::from_reason("open_session(profile=sqlite): sqlite adapter disabled in this build"))
-            }
+            let path = opts.sqlite_path.unwrap_or_else(|| ":memory:".into());
+            MemorySession::open_sqlite(path)
         }
         "postgres" => {
             let url = opts.postgres_url.ok_or_else(|| Error::from_reason("open_session(profile=postgres): postgres_url is required"))?;
@@ -275,16 +244,8 @@ pub fn open_session(options: Option<OpenSessionOptions>) -> Result<MemorySession
 
 /// Open a SQLite session on a filesystem path or `:memory:`.
 #[napi]
-#[cfg(feature = "sqlite")]
 pub fn open_sqlite_session(path: String) -> Result<MemorySession> {
     MemorySession::open_sqlite(path)
-}
-
-/// Open a SQLite session on a filesystem path or `:memory:`.
-#[napi]
-#[cfg(not(feature = "sqlite"))]
-pub fn open_sqlite_session(_path: String) -> Result<MemorySession> {
-    Err(Error::from_reason("open_sqlite_session: sqlite adapter disabled in this build"))
 }
 
 /// Open a PostgreSQL session from a connection URL.

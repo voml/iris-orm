@@ -10,7 +10,6 @@ use iris::{
 };
 use iris_adapter_mysql::MysqlSource;
 use iris_adapter_postgres::PostgresSource;
-#[cfg(feature = "sqlite")]
 use iris_adapter_sqlite::SqliteSource;
 use iris_connector_yydb::YydbSource;
 use iris_wasm::{bind, wire::rows_to_json};
@@ -29,7 +28,6 @@ fn err_result(message: String) -> ExecuteResult {
 enum SessionStore {
     Memory(Iris),
     Yydb(YydbSource),
-    #[cfg(feature = "sqlite")]
     Sqlite(SqliteSource),
     Postgres(PostgresSource),
     Mysql(MysqlSource),
@@ -40,7 +38,6 @@ impl SessionStore {
         match self {
             Self::Memory(_) => CapabilitySet::reference_full(),
             Self::Yydb(_) => YydbSource::capabilities(),
-            #[cfg(feature = "sqlite")]
             Self::Sqlite(_) => SqliteSource::capabilities(),
             Self::Postgres(_) => PostgresSource::capabilities(),
             Self::Mysql(_) => MysqlSource::capabilities(),
@@ -51,7 +48,6 @@ impl SessionStore {
         match self {
             Self::Memory(iris) => iris.session().query(source).map_err(|err| err.to_string()),
             Self::Yydb(db) => db.query(source).map_err(|err| err.to_string()),
-            #[cfg(feature = "sqlite")]
             Self::Sqlite(db) => {
                 let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
                 db.execute_plan(&plan).map_err(|err| err.to_string())
@@ -71,7 +67,6 @@ impl SessionStore {
         match self {
             Self::Memory(iris) => iris.session().execute(source).map_err(|err| err.to_string()),
             Self::Yydb(db) => db.execute(source).map_err(|err| err.to_string()),
-            #[cfg(feature = "sqlite")]
             Self::Sqlite(db) => {
                 let plan = planner.plan_source(source).map_err(|err| err.to_string())?;
                 db.execute_plan(&plan).map_err(|err| err.to_string())?;
@@ -138,7 +133,6 @@ impl MemorySession {
         Self::new_store(SessionStore::Memory(Iris::new(CapabilitySet::reference_full(), ReferenceStore::new())), None)
     }
 
-    #[cfg(feature = "sqlite")]
     pub(crate) fn open_sqlite(path: String) -> Result<Self> {
         let db = if path == ":memory:" {
             SqliteSource::open_in_memory().map_err(|err| Error::from_reason(err.to_string()))?
@@ -149,7 +143,6 @@ impl MemorySession {
         Ok(Self::new_store(SessionStore::Sqlite(db), None))
     }
 
-    #[cfg(feature = "sqlite")]
     fn sqlite_source(&self) -> Result<&SqliteSource> {
         match &self.store {
             SessionStore::Sqlite(db) => Ok(db),
@@ -179,14 +172,9 @@ impl MemorySession {
                 let revision = db.schema_handshake().map_err(|err| Error::from_reason(err.to_string()))?.ddl_revision;
                 (SessionStore::Yydb(db), Some(revision))
             }
-            #[cfg(feature = "sqlite")]
             DatasourceKind::Sqlite => {
                 let path = resolve_path(&project_dir, &expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?);
                 (SessionStore::Sqlite(SqliteSource::open(path).map_err(|err| Error::from_reason(err.to_string()))?), None)
-            }
-            #[cfg(not(feature = "sqlite"))]
-            DatasourceKind::Sqlite => {
-                return Err(Error::from_reason("sqlite datasource requires the `sqlite` feature in iris-napi"));
             }
             DatasourceKind::Postgres => {
                 let url = expand_endpoint(ds, &source).map_err(|err| Error::from_reason(err))?;
@@ -289,7 +277,6 @@ impl MemorySession {
                 db.ensure_schema(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
-            #[cfg(feature = "sqlite")]
             SessionStore::Sqlite(db) => {
                 db.managed_push(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
@@ -298,9 +285,8 @@ impl MemorySession {
         }
     }
 
-    /// Upstream SQLite engine version for the active sqlite session.
+    /// SQLite engine version for the active sqlite session.
     #[napi(js_name = sqliteEngineVersion)]
-    #[cfg(feature = "sqlite")]
     pub fn sqlite_engine_version(&self) -> Result<String> {
         if self.closed {
             return Err(Error::from_reason("session closed"));
@@ -308,46 +294,13 @@ impl MemorySession {
         self.sqlite_source()?.sqlite_version().map_err(|err| Error::from_reason(err.to_string()))
     }
 
-    /// Upstream SQLite engine version for the active sqlite session.
-    #[napi(js_name = sqliteEngineVersion)]
-    #[cfg(not(feature = "sqlite"))]
-    pub fn sqlite_engine_version(&self) -> Result<String> {
-        Err(Error::from_reason("sqlite adapter disabled in this build"))
-    }
-
-    /// Upstream SQLite source id for the active sqlite session.
+    /// SQLite engine source id for the active sqlite session.
     #[napi(js_name = sqliteSourceId)]
-    #[cfg(feature = "sqlite")]
     pub fn sqlite_source_id(&self) -> Result<String> {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
         self.sqlite_source()?.sqlite_source_id().map_err(|err| Error::from_reason(err.to_string()))
-    }
-
-    /// Upstream SQLite source id for the active sqlite session.
-    #[napi(js_name = sqliteSourceId)]
-    #[cfg(not(feature = "sqlite"))]
-    pub fn sqlite_source_id(&self) -> Result<String> {
-        Err(Error::from_reason("sqlite adapter disabled in this build"))
-    }
-
-    /// Frozen provider contract version used by this sqlite session.
-    #[napi(js_name = sqliteProviderContractVersion)]
-    #[cfg(feature = "sqlite")]
-    pub fn sqlite_provider_contract_version(&self) -> Result<String> {
-        if self.closed {
-            return Err(Error::from_reason("session closed"));
-        }
-        self.sqlite_source()?;
-        Ok(SqliteSource::provider_contract_version().to_string())
-    }
-
-    /// Frozen provider contract version used by this sqlite session.
-    #[napi(js_name = sqliteProviderContractVersion)]
-    #[cfg(not(feature = "sqlite"))]
-    pub fn sqlite_provider_contract_version(&self) -> Result<String> {
-        Err(Error::from_reason("sqlite adapter disabled in this build"))
     }
 
     #[napi]

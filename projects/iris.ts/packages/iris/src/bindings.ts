@@ -21,7 +21,6 @@ export type MemorySessionBinding = {
     managedPush?: (schema: string) => void;
     sqliteEngineVersion?: () => string;
     sqliteSourceId?: () => string;
-    sqliteProviderContractVersion?: () => string | undefined;
 };
 
 /** N-API `openSession` wire shape (camelCase from napi-rs). */
@@ -37,9 +36,6 @@ export type OpenSessionNapiOptions = {
 /** Shared semantic core consumed by `buildRuntime` on every host. */
 export type IrisBindings = {
     irisVersion(): string;
-    /** Whether this native build ships the gated SQLite adapter. */
-    sqliteAdapterEnabled?(): boolean;
-    sqliteProviderContractVersion?(): string | undefined;
     checkSource(source: string): CheckSourceResult;
     introspectSchema(source: string): string;
     openMemorySession(): MemorySessionBinding;
