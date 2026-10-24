@@ -22,7 +22,7 @@ if (!entry) {
     process.exit(1);
 }
 
-const artifact = join(root, "projects/packages", entry.packageDir, "lib", entry.fileName);
+const artifact = join(root, "projects/iris.ts/platforms", entry.packageDir, "lib", entry.fileName);
 if (!existsSync(artifact)) {
     console.error(`iris: native artifact missing: ${artifact}`);
     console.error("Run: pnpm build:napi");

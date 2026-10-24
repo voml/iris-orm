@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           out="dist/${{ matrix.short }}"
           mkdir -p "$out"
-          src="projects/crates/iris-napi"
+          src="projects/iris.rs/crates/iris-napi"
           node="$(find "$src" -maxdepth 1 -name '*.node' | head -n 1)"
           if [[ -z "$node" ]]; then
             echo "missing native binary under $src" >&2
@@ -125,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wasm-lib
-          path: projects/packages/iris-unknown-wasm32/lib
+          path: projects/iris.ts/platforms/iris-unknown-wasm32/lib
           if-no-files-found: error
 
   publish:
@@ -198,7 +198,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wasm-lib
-          path: projects/packages/iris-unknown-wasm32/lib
+          path: projects/iris.ts/platforms/iris-unknown-wasm32/lib
 
       - name: Build TypeScript dist
         run: pnpm build:ts

@@ -1,0 +1,117 @@
+{
+    "name": "@yydb/iris",
+    "version": "0.0.12",
+    "description": "Iris ORM — VOS data-access layer for Node.js and browsers (N-API + WASM facades, iris CLI)",
+    "homepage": "https://iris-orm.pages.dev/",
+    "keywords": [
+        "iris",
+        "orm",
+        "vos",
+        "yydb",
+        "wasm",
+        "napi",
+        "typescript"
+    ],
+    "readme": "README.md",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/voml/iris-orm.git",
+        "directory": "projects/iris.ts/packages/iris"
+    },
+    "bugs": {
+        "url": "https://github.com/voml/iris-orm/issues"
+    },
+    "type": "module",
+    "license": "MPL-2.0",
+    "sideEffects": false,
+    "types": "./dist/browser/index.d.ts",
+    "typesVersions": {
+        "*": {
+            "types": [
+                "./dist/types/index.d.ts"
+            ],
+            "node": [
+                "./dist/node/index.d.ts"
+            ],
+            "wasm": [
+                "./dist/wasm/index.d.ts"
+            ],
+            "cloudflare": [
+                "./dist/cloudflare/index.d.ts"
+            ],
+            "node/tooling": [
+                "./dist/node/tooling.d.ts"
+            ]
+        }
+    },
+    "exports": {
+        ".": {
+            "types": "./dist/browser/index.d.ts",
+            "browser": "./dist/browser/index.js",
+            "default": "./dist/browser/index.js"
+        },
+        "./node": {
+            "types": "./dist/node/index.d.ts",
+            "node": "./dist/node/index.js",
+            "default": "./dist/node/unsupported.js"
+        },
+        "./wasm": {
+            "types": "./dist/wasm/index.d.ts",
+            "browser": "./dist/wasm/index.js",
+            "default": "./dist/wasm/index.js"
+        },
+        "./types": {
+            "types": "./dist/types/index.d.ts",
+            "default": "./dist/types/index.js"
+        },
+        "./cloudflare": {
+            "types": "./dist/cloudflare/index.d.ts",
+            "workerd": "./dist/cloudflare/index.js",
+            "default": "./dist/cloudflare/index.js"
+        },
+        "./node/tooling": {
+            "types": "./dist/node/tooling.d.ts",
+            "node": "./dist/node/tooling.js",
+            "default": "./dist/node/unsupported.js"
+        }
+    },
+    "bin": {
+        "iris": "./bin/iris.mjs"
+    },
+    "files": [
+        "bin",
+        "dist",
+        "src",
+        "README.md"
+    ],
+    "scripts": {
+        "prepublishOnly": "node ./scripts/build-dist.mjs",
+        "build": "node ./scripts/build-dist.mjs",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
+        "iris": "node ./bin/iris.mjs",
+        "pretest": "node ./scripts/build-dist.mjs",
+        "test": "node --test \"./tests/**/*.test.ts\""
+    },
+    "dependencies": {
+        "@vmz/commander": "^0.2.0",
+        "@voml/vos": "^0.0.5",
+        "@yydb/iris-unknown-wasm32": "workspace:*"
+    },
+    "optionalDependencies": {
+        "@yydb/iris-darwin-arm64": "workspace:*",
+        "@yydb/iris-darwin-x64": "workspace:*",
+        "@yydb/iris-linux-arm64": "workspace:*",
+        "@yydb/iris-linux-x64": "workspace:*",
+        "@yydb/iris-win32-x64": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^22.15.0",
+        "typescript": "^5.9.2"
+    },
+    "engines": {
+        "node": ">=24.12.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
+}

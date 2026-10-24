@@ -16,7 +16,9 @@ export default defineConfig({
             "pnpm-workspace.yaml",
             "nifty.config.ts",
             "scripts/**",
-            "projects/packages/**",
+            "projects/iris.ts/packages/**",
+            "projects/iris.ts/platforms/**",
+            "projects/iris.ts/homepage/**",
         ],
         excludes: [
             "**/node_modules/**",

@@ -48,9 +48,9 @@ const NATIVE_PLATFORMS = [
 
 /** @type {{ dir: string; publishName?: string }[]} */
 const JS_PACKAGES = [
-    { dir: "projects/packages/iris-unknown-wasm32" },
-    { dir: "projects/packages/iris-skills" },
-    { dir: "projects/packages/iris", publishName: "@yydb/iris" },
+    { dir: "projects/iris.ts/platforms/iris-unknown-wasm32" },
+    { dir: "projects/iris.ts/packages/iris-skills" },
+    { dir: "projects/iris.ts/packages/iris", publishName: "@yydb/iris" },
 ];
 
 function fail(msg) {
@@ -221,7 +221,7 @@ function publishNative(version, artifactsRoot) {
     const otherFailed = [];
     for (const plat of NATIVE_PLATFORMS) {
         const name = `@yydb/iris-${plat.short}`;
-        const packageDir = path.join(ROOT, "projects/packages", `iris-${plat.short}`);
+        const packageDir = path.join(ROOT, "projects/iris.ts/platforms", `iris-${plat.short}`);
         const artDir = path.join(artifactsRoot, plat.short);
         if (!fs.existsSync(artDir)) {
             console.log(` · ${name} no artifact (${plat.short}) — skip`);

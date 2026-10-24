@@ -5,12 +5,12 @@ on:
   push:
     branches: [master, dev]
     paths:
-      - "projects/crates/**"
+      - "../../projects/iris.rs/crates/**"
       - ".github/workflows/check-rust.yml"
   pull_request:
     branches: [master, dev]
     paths:
-      - "projects/crates/**"
+      - "../../projects/iris.rs/crates/**"
       - ".github/workflows/check-rust.yml"
 
 defaults:

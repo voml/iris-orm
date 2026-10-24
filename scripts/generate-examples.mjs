@@ -12,8 +12,8 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const examplesRoot = join(root, "projects/examples");
-const irisCli = join(root, "projects/packages/iris/bin/iris.mjs");
-const irisBuild = join(root, "projects/packages/iris/scripts/build-dist.mjs");
+const irisCli = join(root, "projects/iris.ts/packages/iris/bin/iris.mjs");
+const irisBuild = join(root, "projects/iris.ts/packages/iris/scripts/build-dist.mjs");
 
 const EXAMPLES = ["hono", "express", "fastify", "next", "nuxt", "sveltekit", "astro", "cloudflare"];
 
@@ -24,7 +24,7 @@ function ensureNativeArtifact() {
         return;
     } catch {
         const dll = join(root, "target/release/iris_napi.dll");
-        const destDir = join(root, "projects/packages/iris-win32-x64/lib");
+        const destDir = join(root, "projects/iris.ts/platforms/iris-win32-x64/lib");
         const dest = join(destDir, "iris-win32-x64-msvc.node");
         if (process.platform === "win32" && existsSync(dll)) {
             execSync(`node -e "const fs=require('fs');const d='${destDir.replace(/\\/g, "/")}';fs.mkdirSync(d,{recursive:true});fs.copyFileSync('${dll.replace(/\\/g, "/")}','${dest.replace(/\\/g, "/")}')"`, {
