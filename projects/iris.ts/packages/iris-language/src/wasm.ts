@@ -35,15 +35,7 @@ let cached: Promise<IrisBindings> | undefined;
 let active: IrisBindings | null = null;
 
 async function importWasmPackage(): Promise<WasmPackage> {
-    try {
-        return (await import(WEB_CORE_PACKAGE)) as WasmPackage;
-    } catch {
-        const workspaceEntry = new URL(
-            "../../../platforms/iris-unknown-wasm32/src/index.ts",
-            import.meta.url,
-        );
-        return (await import(workspaceEntry.href)) as WasmPackage;
-    }
+    return (await import(WEB_CORE_PACKAGE)) as WasmPackage;
 }
 
 function wrapWasmSession(session: WasmMemorySession): MemorySessionBinding {
