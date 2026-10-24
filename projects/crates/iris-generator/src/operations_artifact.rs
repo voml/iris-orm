@@ -109,9 +109,7 @@ fn serialize_span<S: serde::Serializer>(span: &Range<usize>, serializer: S) -> R
     (span.start..span.end).serialize(serializer)
 }
 
-fn deserialize_span<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<Range<usize>, D::Error> {
+fn deserialize_span<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<Range<usize>, D::Error> {
     let span = SpanWire::deserialize(deserializer)?;
     if span.start > span.end {
         return Err(serde::de::Error::custom("span start is after span end"));
@@ -132,8 +130,7 @@ impl IrisOperationArtifact {
     /// Deserialize a V0 operation projection artifact from its JSON string
     /// representation and run Iris's compatibility validations.
     pub fn from_json(input: &str) -> Result<Self, OperationArtifactError> {
-        let artifact: Self = serde_json::from_str(input)
-            .map_err(|e| OperationArtifactError::Decode(e.to_string()))?;
+        let artifact: Self = serde_json::from_str(input).map_err(|e| OperationArtifactError::Decode(e.to_string()))?;
         artifact.validate()?;
         Ok(artifact)
     }
@@ -152,10 +149,7 @@ impl IrisOperationArtifact {
                 message: "unsupported operation projection version or stage".into(),
             });
         }
-        if env.schema_fingerprint.is_some()
-            || env.source_units.len() != 1
-            || env.source_units[0].source_unit_id != 0
-        {
+        if env.schema_fingerprint.is_some() || env.source_units.len() != 1 || env.source_units[0].source_unit_id != 0 {
             return Err(OperationArtifactError::Validate {
                 code: "OPR012".into(),
                 message: "invalid operation projection source unit or fingerprint state".into(),
@@ -164,10 +158,7 @@ impl IrisOperationArtifact {
         // Spot-check every operation has a non-empty name.
         for op in &self.operations {
             if op.name.is_empty() {
-                return Err(OperationArtifactError::Validate {
-                    code: "OPR013".into(),
-                    message: "operation name cannot be empty".into(),
-                });
+                return Err(OperationArtifactError::Validate { code: "OPR013".into(), message: "operation name cannot be empty".into() });
             }
         }
         Ok(())

@@ -43,7 +43,8 @@ pub fn emit_typescript_client(model: &GenerationModel) -> Result<Vec<(String, St
     let base_ops = render_ts("typescript/operations", &ctx)?;
     let ops_content = if model.operations.is_empty() {
         base_ops
-    } else {
+    }
+    else {
         let stubs = crate::emit_ts_operation_stubs(model);
         let mut merged = base_ops;
         merged.push_str(&stubs);

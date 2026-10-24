@@ -72,7 +72,13 @@ fn vos_execute_inserts_a_row_and_query_finds_it() {
     let rows = db.query(r#"User.filter(x => true).collect()"#).expect("query");
     assert_eq!(rows.len(), 1);
     let first = &rows[0];
-    assert_eq!(first.get("user_name").and_then(|v| match v { iris_types::Value::Str(s) => Some(s.as_str()), _ => None }), Some("ada"));
+    assert_eq!(
+        first.get("user_name").and_then(|v| match v {
+            iris_types::Value::Str(s) => Some(s.as_str()),
+            _ => None,
+        }),
+        Some("ada")
+    );
     assert_eq!(first.get("active"), Some(&iris_types::Value::Bool(true)));
 }
 
@@ -82,14 +88,8 @@ fn vos_prepared_statement_executes_and_stale_checked() {
     db.ensure_schema(USER_SCHEMA).unwrap();
 
     // Insert two users
-    db.execute(
-        r#"User { user_id: "11111111-1111-1111-1111-111111111111", user_name: "ada", active: true }.insert()"#,
-    )
-    .unwrap();
-    db.execute(
-        r#"User { user_id: "22222222-2222-2222-2222-222222222222", user_name: "bob", active: false }.insert()"#,
-    )
-    .unwrap();
+    db.execute(r#"User { user_id: "11111111-1111-1111-1111-111111111111", user_name: "ada", active: true }.insert()"#).unwrap();
+    db.execute(r#"User { user_id: "22222222-2222-2222-2222-222222222222", user_name: "bob", active: false }.insert()"#).unwrap();
 
     // Prepare a read plan
     let plan = db.prepare(r#"User.filter(x => x.active == true).collect()"#).expect("prepare");
@@ -98,7 +98,10 @@ fn vos_prepared_statement_executes_and_stale_checked() {
     let rows = plan.execute(&db).expect("execute");
     assert_eq!(rows.len(), 1);
     assert_eq!(
-        rows[0].get("user_name").and_then(|v| match v { iris_types::Value::Str(s) => Some(s.as_str()), _ => None }),
+        rows[0].get("user_name").and_then(|v| match v {
+            iris_types::Value::Str(s) => Some(s.as_str()),
+            _ => None,
+        }),
         Some("ada")
     );
 }
@@ -145,10 +148,7 @@ fn vos_transaction_begin_commit_rollback() {
 
     // begin → insert → commit
     db.begin().unwrap();
-    db.execute(
-        r#"User { user_id: "33333333-3333-3333-3333-333333333333", user_name: "charlie", active: true }.insert()"#,
-    )
-    .unwrap();
+    db.execute(r#"User { user_id: "33333333-3333-3333-3333-333333333333", user_name: "charlie", active: true }.insert()"#).unwrap();
     db.commit().unwrap();
 
     let rows = db.query(r#"User.filter(x => x.user_name == "charlie").collect()"#).unwrap();
@@ -156,10 +156,7 @@ fn vos_transaction_begin_commit_rollback() {
 
     // begin → insert → rollback → row disappears
     db.begin().unwrap();
-    db.execute(
-        r#"User { user_id: "44444444-4444-4444-4444-444444444444", user_name: "dave", active: true }.insert()"#,
-    )
-    .unwrap();
+    db.execute(r#"User { user_id: "44444444-4444-4444-4444-444444444444", user_name: "dave", active: true }.insert()"#).unwrap();
     db.rollback().unwrap();
 
     let rows = db.query(r#"User.filter(x => x.user_name == "dave").collect()"#).unwrap();

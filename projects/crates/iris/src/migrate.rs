@@ -54,7 +54,7 @@ pub fn migrate_plan(config: &Path, source: &str, out: Option<&Path>) -> Result<P
     let schema = read_schema(&project_dir, &project)?;
     let plan = match ds.kind {
         DatasourceKind::Sqlite => {
-            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into())
+            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into());
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;
@@ -86,7 +86,7 @@ pub fn migrate_apply(config: &Path, source: &str, plan_path: &Path) -> Result<Ap
     let plan: LogicalMigrationPlan = von::from_str(&plan_text).map_err(|e| e.to_string())?;
     let (plan_id, created) = match ds.kind {
         DatasourceKind::Sqlite => {
-            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into())
+            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into());
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;
@@ -115,7 +115,7 @@ pub fn migrate_verify(config: &Path, source: &str) -> Result<(), String> {
     let schema = read_schema(&project_dir, &project)?;
     let drift = match ds.kind {
         DatasourceKind::Sqlite => {
-            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into())
+            return Err("sqlite migrate: adapter temporarily disabled (sqlite-provider-rusqlite no longer exists upstream)".into());
         }
         DatasourceKind::Postgres => {
             let url = expand_endpoint(ds, source)?;

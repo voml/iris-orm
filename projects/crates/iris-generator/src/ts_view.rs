@@ -329,11 +329,11 @@ fn nullable_where_suffix(optional: bool) -> &'static str {
 }
 
 fn patch_value_type(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> String {
-    if let Some(ref target) = field.reference_target {
-        if entity_names.contains(target.as_str()) {
-            let inner = format!("{}RefInput", target);
-            return if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") };
-        }
+    if let Some(ref target) = field.reference_target
+        && entity_names.contains(target.as_str())
+    {
+        let inner = format!("{}RefInput", target);
+        return if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") };
     }
     let inner = if field.primary {
         format!("{}Id", table.name)
@@ -414,10 +414,10 @@ fn emit_patch_field(table: &TableModel, field: &FieldModel, entity_names: &HashS
     if field.primary {
         return None;
     }
-    if let Some(ref target) = field.reference_target {
-        if !entity_names.contains(target.as_str()) {
-            return None;
-        }
+    if let Some(ref target) = field.reference_target
+        && !entity_names.contains(target.as_str())
+    {
+        return None;
     }
     Some(format!("    {}?: {};", field_ts_name(field), patch_value_type(table, field, entity_names)))
 }

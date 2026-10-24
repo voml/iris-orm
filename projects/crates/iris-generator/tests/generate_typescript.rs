@@ -353,10 +353,7 @@ table User {
     let file = |name: &str| files.iter().find(|(p, _)| p == name).map(|(_, c)| c.as_str()).expect(name);
 
     let ops = file("operations.ts");
-    assert!(
-        ops.contains("GeneratedOperations"),
-        "operations.ts should contain GeneratedOperations class"
-    );
+    assert!(ops.contains("GeneratedOperations"), "operations.ts should contain GeneratedOperations class");
     assert!(ops.contains("async get_user(id: string): Promise<"));
     assert!(ops.contains("async hash_password(raw: string): Promise<string>"));
     assert!(ops.contains("async seed_user(): Promise<void>"));
@@ -365,4 +362,3 @@ table User {
     assert!(ops.contains("class GeneratedMacros"));
     assert!(ops.contains("async seed_user()"));
 }
-

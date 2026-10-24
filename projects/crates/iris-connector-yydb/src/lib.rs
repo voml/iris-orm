@@ -10,14 +10,15 @@
 
 mod error;
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::{Path, PathBuf},
+};
 
 use iris_ir::IrVersion;
 use iris_types::{CapabilitySet, QueryCaps, WriteCaps};
 use serde::{Deserialize, Serialize};
-use yydb::{Connection, SchemaVersion};
-use yydb::query::PreparedStatement;
+use yydb::{Connection, SchemaVersion, query::PreparedStatement};
 
 pub use error::{Error, Result};
 
@@ -72,7 +73,8 @@ impl ReadinessReport {
             code: if vos_executor_ready { "IRIS-YYDB-VOS-EXECUTOR-READY" } else { READINESS_CODE }.into(),
             message: if vos_executor_ready {
                 "YYDB native VOS executor is live on the public Connection facade".into()
-            } else {
+            }
+            else {
                 "YYDB native VOS executor not yet available on the Connection facade".into()
             },
         }
@@ -283,11 +285,7 @@ impl PreparedVos {
     }
 
     /// Execute with named parameter bindings.
-    pub fn execute_with_params(
-        &self,
-        source: &YydbSource,
-        named: BTreeMap<String, yydb::Value>,
-    ) -> Result<Vec<iris_types::Row>> {
+    pub fn execute_with_params(&self, source: &YydbSource, named: BTreeMap<String, yydb::Value>) -> Result<Vec<iris_types::Row>> {
         source.require_vos_executor()?;
         let handshake = source.schema_handshake()?;
         if handshake.ddl_revision != self.ddl_revision {
@@ -357,11 +355,7 @@ impl PreparedVos {
 
     /// Execute with named parameters, stale-checked.
     #[deprecated(note = "renamed to PreparedVos::execute_with_params")]
-    pub fn execute_params_stale_checked(
-        &self,
-        source: &YydbSource,
-        named: BTreeMap<String, yydb::Value>,
-    ) -> Result<Vec<iris_types::Row>> {
+    pub fn execute_params_stale_checked(&self, source: &YydbSource, named: BTreeMap<String, yydb::Value>) -> Result<Vec<iris_types::Row>> {
         self.execute_with_params(source, named)
     }
 }

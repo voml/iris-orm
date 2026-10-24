@@ -250,14 +250,10 @@ impl GenerationModel {
                 .iter()
                 .map(|p| {
                     let vos_ty = type_label(&p.type_expr);
-                    OperationParamModel {
-                        name: p.name.clone(),
-                        ts_type: carrier::vos_type_to_ts(&vos_ty),
-                        vos_type: vos_ty,
-                    }
+                    OperationParamModel { name: p.name.clone(), ts_type: carrier::vos_type_to_ts(&vos_ty), vos_type: vos_ty }
                 })
                 .collect();
-            let ret = op.return_type.as_ref().map(|rt| type_label(rt));
+            let ret = op.return_type.as_ref().map(type_label);
             operations.push(OperationModel {
                 operation_id: op.operation_id.clone(),
                 kind: kind_str,
@@ -266,21 +262,15 @@ impl GenerationModel {
                 params: params.clone(),
                 return_type: ret.clone(),
             });
-            if op.kind == vos::types::OperationKind::Macro {
-                if seen_macro.insert(op.name.clone()) {
-                    macros.push(MacroModel {
-                        name: op.name.clone(),
-                        return_type: ret.unwrap_or_else(|| "unit".into()),
-                        params: params
-                            .iter()
-                            .map(|p| MacroParamModel {
-                                name: p.name.clone(),
-                                vos_type: p.vos_type.clone(),
-                                ts_type: p.ts_type.clone(),
-                            })
-                            .collect(),
-                    });
-                }
+            if op.kind == vos::types::OperationKind::Macro && seen_macro.insert(op.name.clone()) {
+                macros.push(MacroModel {
+                    name: op.name.clone(),
+                    return_type: ret.unwrap_or_else(|| "unit".into()),
+                    params: params
+                        .iter()
+                        .map(|p| MacroParamModel { name: p.name.clone(), vos_type: p.vos_type.clone(), ts_type: p.ts_type.clone() })
+                        .collect(),
+                });
             }
         }
         operations.sort_by(|a, b| a.operation_id.cmp(&b.operation_id));
@@ -343,11 +333,7 @@ impl GenerationModel {
                 .iter()
                 .map(|param| {
                     let vos_ty = type_label(&param.type_expr);
-                    OperationParamModel {
-                        name: param.name.clone(),
-                        ts_type: carrier::vos_type_to_ts(&vos_ty),
-                        vos_type: vos_ty,
-                    }
+                    OperationParamModel { name: param.name.clone(), ts_type: carrier::vos_type_to_ts(&vos_ty), vos_type: vos_ty }
                 })
                 .collect();
             let ret = operation.return_type.as_ref().map(type_label);
@@ -366,11 +352,7 @@ impl GenerationModel {
                     return_type: ret.unwrap_or_else(|| "unit".into()),
                     params: params
                         .iter()
-                        .map(|p| MacroParamModel {
-                            name: p.name.clone(),
-                            vos_type: p.vos_type.clone(),
-                            ts_type: p.ts_type.clone(),
-                        })
+                        .map(|p| MacroParamModel { name: p.name.clone(), vos_type: p.vos_type.clone(), ts_type: p.ts_type.clone() })
                         .collect(),
                 });
             }
@@ -451,11 +433,7 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
     let metadata = format!("{header}\n{}\n", render("rust/metadata", &ctx)?);
     let errors = format!("{header}\n{}\n", render("rust/errors", &ctx)?);
     let base_ops = format!("{header}\n{}\n", unescape_rust_template(&render("rust/operations", &ctx)?),);
-    let operations = if model.operations.is_empty() {
-        base_ops
-    } else {
-        format!("{base_ops}\n{}", emit_rust_operation_stubs(model))
-    };
+    let operations = if model.operations.is_empty() { base_ops } else { format!("{base_ops}\n{}", emit_rust_operation_stubs(model)) };
     let index = format!("{header}\n{}\n", render("rust/rust_index", &ctx)?);
 
     Ok(vec![
@@ -746,11 +724,8 @@ pub(crate) fn emit_rust_operation_stubs(model: &GenerationModel) -> String {
     out.push_str("// --- Projected operation stubs (from VOS OperationProjectionArtifact) ---\n");
     out.push_str("// These are thin declarations. Implement bodies in your host adapter.\n\n");
     for op in &model.operations {
-        let ret = op
-            .return_type
-            .as_ref()
-            .map(|t| carrier::rust_carrier_for_label(carrier::base_vos_type(t)).unwrap_or("String"))
-            .unwrap_or("()");
+        let ret =
+            op.return_type.as_ref().map(|t| carrier::rust_carrier_for_label(carrier::base_vos_type(t)).unwrap_or("String")).unwrap_or("()");
         let kind_doc = operation_kind_rust_doc(op.kind.as_str());
         out.push_str(&format!(
             "/// VOS {kind_doc:?} operation `{name}` (op_id: {op_id}).\n\
@@ -802,23 +777,9 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> String {
     out.push_str("        this.executor = executor;\n");
     out.push_str("    }\n\n");
     for op in &model.operations {
-        let ts_ret = op
-            .return_type
-            .as_ref()
-            .map(|t| carrier::vos_type_to_ts(t))
-            .unwrap_or_else(|| "void".into());
-        let param_sig = op
-            .params
-            .iter()
-            .map(|p| format!("{}: {}", p.name, p.ts_type))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let param_obj = op
-            .params
-            .iter()
-            .map(|p| format!("\"{}\"", p.name))
-            .collect::<Vec<_>>()
-            .join(", ");
+        let ts_ret = op.return_type.as_ref().map(|t| carrier::vos_type_to_ts(t)).unwrap_or_else(|| "void".into());
+        let param_sig = op.params.iter().map(|p| format!("{}: {}", p.name, p.ts_type)).collect::<Vec<_>>().join(", ");
+        let param_obj = op.params.iter().map(|p| format!("\"{}\"", p.name)).collect::<Vec<_>>().join(", ");
         let use_execute = ts_ret == "void";
         let kind_label = operation_kind_ts_label(op.kind.as_str());
         out.push_str(&format!(
@@ -831,7 +792,7 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> String {
             param_sig = param_sig,
             param_obj = param_obj,
             ts_ret = ts_ret,
-            indent = if use_execute { "        " } else { "        " },
+            indent = "        ",
             exec_fn = if use_execute { "executeUnit" } else { "execute" },
         ));
         out.push_str("        if (!envelope.ok) {\n");

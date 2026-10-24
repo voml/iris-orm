@@ -350,8 +350,8 @@ table User {
     let contract_json = contract.to_json().expect("serialize contract");
 
     // Now feed BOTH artifacts to GenerationModel::from_artifacts.
-    let model = GenerationModel::from_artifacts(&contract_json, OPERATION_ARTIFACT_JSON)
-        .expect("from_artifacts should parse contract + operations");
+    let model =
+        GenerationModel::from_artifacts(&contract_json, OPERATION_ARTIFACT_JSON).expect("from_artifacts should parse contract + operations");
 
     // Schema side intact.
     assert_eq!(model.tables.len(), 1);
@@ -412,10 +412,7 @@ table User {
     let files = iris_generator::emit_rust_files(&model).unwrap();
     let (_, ops_content) = files.iter().find(|(name, _)| name == "operations.rs").expect("operations.rs");
 
-    assert!(
-        ops_content.contains("// --- Projected operation stubs"),
-        "operations.rs should contain operation stubs section"
-    );
+    assert!(ops_content.contains("// --- Projected operation stubs"), "operations.rs should contain operation stubs section");
     assert!(ops_content.contains("fn get_user("));
     assert!(ops_content.contains("fn hash_password(raw: String) -> String"));
     assert!(ops_content.contains("fn seed_user() -> ()"));
