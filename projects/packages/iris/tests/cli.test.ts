@@ -5,11 +5,11 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const pkgRoot = fileURLToPath(new URL("..", import.meta.url));
-const cli = join(pkgRoot, "bin/iris.ts");
+const cli = join(pkgRoot, "bin/iris.mjs");
 const nodeBin = process.execPath;
 
 function runCli(args: string[]) {
-    return spawnSync(nodeBin, ["--experimental-strip-types", cli, ...args], {
+    return spawnSync(nodeBin, [cli, ...args], {
         encoding: "utf8",
     });
 }

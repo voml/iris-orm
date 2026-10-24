@@ -24,53 +24,53 @@
     "type": "module",
     "license": "MPL-2.0",
     "sideEffects": false,
-    "types": "./src/browser/index.ts",
+    "types": "./dist/browser/index.d.ts",
     "typesVersions": {
         "*": {
             "types": [
-                "./src/types/index.ts"
+                "./dist/types/index.d.ts"
             ],
             "node": [
-                "./src/node/index.ts"
+                "./dist/node/index.d.ts"
             ],
             "wasm": [
-                "./src/wasm/index.ts"
+                "./dist/wasm/index.d.ts"
             ],
             "cloudflare": [
-                "./src/cloudflare/index.ts"
+                "./dist/cloudflare/index.d.ts"
             ],
             "node/tooling": [
-                "./src/node/tooling.ts"
+                "./dist/node/tooling.d.ts"
             ]
         }
     },
     "exports": {
         ".": {
-            "types": "./src/browser/index.ts",
+            "types": "./dist/browser/index.d.ts",
             "browser": "./dist/browser/index.js",
             "default": "./dist/browser/index.js"
         },
         "./node": {
-            "types": "./src/node/index.ts",
+            "types": "./dist/node/index.d.ts",
             "node": "./dist/node/index.js",
             "default": "./dist/node/unsupported.js"
         },
         "./wasm": {
-            "types": "./src/wasm/index.ts",
+            "types": "./dist/wasm/index.d.ts",
             "browser": "./dist/wasm/index.js",
             "default": "./dist/wasm/index.js"
         },
         "./types": {
-            "types": "./src/types/index.ts",
+            "types": "./dist/types/index.d.ts",
             "default": "./dist/types/index.js"
         },
         "./cloudflare": {
-            "types": "./src/cloudflare/index.ts",
+            "types": "./dist/cloudflare/index.d.ts",
             "workerd": "./dist/cloudflare/index.js",
             "default": "./dist/cloudflare/index.js"
         },
         "./node/tooling": {
-            "types": "./src/node/tooling.ts",
+            "types": "./dist/node/tooling.d.ts",
             "node": "./dist/node/tooling.js",
             "default": "./dist/node/unsupported.js"
         }
@@ -89,6 +89,7 @@
         "build": "node ./scripts/build-dist.mjs",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "iris": "node ./bin/iris.mjs",
+        "pretest": "node ./scripts/build-dist.mjs",
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "dependencies": {

@@ -1,16 +1,8 @@
 #!/usr/bin/env node
 /**
- * `iris` CLI — published bin entry (loads TypeScript CLI via jiti).
+ * `iris` CLI — published bin entry (loads the compiled CLI from `dist`).
  */
-import { fileURLToPath } from "node:url";
+const { runCli } = await import("../dist/cli/cli.js");
 
-import { createJiti } from "jiti";
-
-const jiti = createJiti(fileURLToPath(import.meta.url), {
-    interopDefault: true,
-    moduleCache: false,
-});
-
-const { runCli } = await jiti.import("../src/cli/cli.ts");
 const code = await runCli(process.argv);
 process.exit(code);
