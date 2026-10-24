@@ -21,7 +21,7 @@
         "check:rs": "node scripts/check-rs.mjs",
         "test:rs": "node scripts/test-rs.mjs",
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
-        "iris": "pnpm --filter @yydb/iris exec node ./bin/iris.ts",
+        "iris": "pnpm --filter @yydb/iris run build && node ./projects/packages/iris/bin/iris.mjs",
         "build:ts": "pnpm --filter @yydb/iris-unknown-wasm32 build && pnpm --filter @yydb/iris build",
         "build:napi": "node scripts/build-napi.mjs",
         "build:wasm": "node scripts/build-wasm.mjs",
