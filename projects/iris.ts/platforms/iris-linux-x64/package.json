@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris-linux-x64",
-    "version": "0.0.12",
+    "version": "0.0.13",
     "description": "Prebuilt Iris ORM N-API binary for Linux x64",
     "homepage": "https://iris-orm.pages.dev/",
     "repository": {
