@@ -77,7 +77,10 @@ jobs:
 
       - name: Build wheel
         working-directory: projects/iris.py/packages/iris
-        run: maturin build --manifest-path ../../../../projects/iris.rs/crates/iris-pyo3/Cargo.toml --out dist/python
+        # `pyproject.toml` owns `manifest-path`, `module-name` and `python-source`.
+        # Passing `--manifest-path` makes maturin ignore it and emit an `iris_pyo3`
+        # wheel that `pip install iris` cannot resolve.
+        run: maturin build --out dist/python
 
       - name: Create the test environment
         run: python -m venv .venv-python
