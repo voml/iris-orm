@@ -79,3 +79,9 @@ impl MemorySession {
         self.closed = true;
     }
 }
+
+impl Default for MemorySession {
+    fn default() -> Self {
+        Self::new()
+    }
+}
