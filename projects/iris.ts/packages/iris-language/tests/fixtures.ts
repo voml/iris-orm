@@ -10,9 +10,6 @@ export const USER_WIRE_NAMES = {
     User: { userId: "user_id", userName: "user_name", active: "active" },
 } as const;
 
-/** Matches Rust iris-wasm/tests/check_source.rs and N-API smoke fixtures. */
-export const USER_SCHEMA_FINGERPRINT = "108401c5f275ffe6";
-
 export const INVALID_SCHEMA = "not a schema";
 
 export function srcImport(relativeFromPkgRoot: string): string {

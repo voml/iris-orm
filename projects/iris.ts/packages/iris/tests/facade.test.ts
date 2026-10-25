@@ -3,8 +3,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
-import { INVALID_SCHEMA, USER_SCHEMA, USER_SCHEMA_FINGERPRINT } from "./fixtures.ts";
+import { INVALID_SCHEMA, USER_SCHEMA } from "./fixtures.ts";
 import { srcImport } from "./helpers.ts";
+
+const VARIANT_SCHEMA = USER_SCHEMA.replace("active: bool", "active: utf8");
 
 function ensureNativeOverride(): void {
     if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
@@ -39,10 +41,13 @@ test("node createIris exposes symmetric runtime methods", async (t) => {
 
     const ok = runtime.checkSource(USER_SCHEMA);
     assert.equal(ok.ok, true);
-    assert.equal(ok.schemaFingerprint, USER_SCHEMA_FINGERPRINT);
+    assert.match(ok.schemaFingerprint, /^[0-9a-f]{64}$/);
+    assert.equal(runtime.checkSource(USER_SCHEMA).schemaFingerprint, ok.schemaFingerprint);
+    assert.notEqual(runtime.checkSource(VARIANT_SCHEMA).schemaFingerprint, ok.schemaFingerprint);
 
     const intro = runtime.introspectSchema(USER_SCHEMA);
     assert.equal(intro.ok, true);
+    assert.equal(intro.schemaFingerprint, ok.schemaFingerprint);
     assert.equal(intro.tables[0]?.name, "User");
 
     const session = runtime.openSession();

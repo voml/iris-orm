@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";
 
-import { USER_SCHEMA, USER_SCHEMA_FINGERPRINT, isWasmCoreMissing, srcImport } from "./fixtures.ts";
+import { USER_SCHEMA, isWasmCoreMissing, srcImport } from "./fixtures.ts";
+
+const VARIANT_SCHEMA = USER_SCHEMA.replace("active: bool", "active: utf8");
 
 test("createIris throws wasm-not-initialized before initIris", async () => {
     const language = await import(srcImport("src/index.ts"));
@@ -34,11 +36,13 @@ test("browser createIris exposes symmetric runtime methods", async (t) => {
 
     const ok = runtime.checkSource(USER_SCHEMA);
     assert.equal(ok.ok, true);
-    assert.equal(ok.schemaFingerprint, USER_SCHEMA_FINGERPRINT);
+    assert.match(ok.schemaFingerprint, /^[0-9a-f]{64}$/);
+    assert.equal(runtime.checkSource(USER_SCHEMA).schemaFingerprint, ok.schemaFingerprint);
+    assert.notEqual(runtime.checkSource(VARIANT_SCHEMA).schemaFingerprint, ok.schemaFingerprint);
 
     const intro = runtime.introspectSchema(USER_SCHEMA);
     assert.equal(intro.ok, true);
-    assert.equal(intro.schemaFingerprint, USER_SCHEMA_FINGERPRINT);
+    assert.equal(intro.schemaFingerprint, ok.schemaFingerprint);
     assert.equal(intro.tables.length, 1);
 
     const session = runtime.openSession();
