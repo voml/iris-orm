@@ -150,14 +150,14 @@ fn query_rows(provider: &RusqliteProvider, sql: &str, params: &[SqliteValue], ex
 }
 
 fn statement_to_rows(result: &StatementResult, expected: Option<&[TypedColumn]>) -> Result<Vec<Row>> {
-    if let Some(expected) = expected {
-        if result.columns.len() != expected.len() || result.columns.iter().zip(expected).any(|(actual, expected)| actual != &expected.name) {
-            return Err(crate::Error::Policy(format!(
-                "typed result columns {:?} do not match plan columns {}",
-                result.columns,
-                expected.iter().map(|column| column.name.as_str()).collect::<Vec<_>>().join(", ")
-            )));
-        }
+    if let Some(expected) = expected
+        && (result.columns.len() != expected.len() || result.columns.iter().zip(expected).any(|(actual, expected)| actual != &expected.name))
+    {
+        return Err(crate::Error::Policy(format!(
+            "typed result columns {:?} do not match plan columns {}",
+            result.columns,
+            expected.iter().map(|column| column.name.as_str()).collect::<Vec<_>>().join(", ")
+        )));
     }
     let mut rows = Vec::new();
     for row_values in &result.rows {
