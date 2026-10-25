@@ -11,7 +11,7 @@ export const USER_WIRE_NAMES = {
 } as const;
 
 /** Matches Rust iris-wasm/tests/check_source.rs and N-API smoke fixtures. */
-export const USER_SCHEMA_FINGERPRINT = "60adfe744c724499";
+export const USER_SCHEMA_FINGERPRINT = "108401c5f275ffe6";
 
 export const INVALID_SCHEMA = "not a schema";
 
