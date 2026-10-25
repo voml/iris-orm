@@ -1,6 +1,6 @@
 /** Runtime VOS synthesis for generated delegates (use-site reference paths, not include/relation). */
 
-import type { OperationRequest, ResultEnvelope } from "@yydb/iris/types";
+import type { OperationRequest, ResultEnvelope } from "./contract-types.js";
 import type { IrisGeneratedError } from "../errors.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_REFERENCE_TARGETS, IRIS_SCHEMA_FINGERPRINT } from "../metadata.js";
 

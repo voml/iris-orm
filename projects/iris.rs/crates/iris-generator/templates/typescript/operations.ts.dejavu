@@ -1,4 +1,4 @@
-import type { OperationExecutor } from "@yydb/iris/types";
+import type { OperationExecutor } from "./_internal/contract-types.js";
 import {
     buildDeclaredOperationRequest,
     synthesizeCreate,

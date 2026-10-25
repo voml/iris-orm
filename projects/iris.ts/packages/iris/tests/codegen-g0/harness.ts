@@ -40,8 +40,10 @@ export type ResultEnvelope<T = unknown> =
   | { ok: true; value: T; diagnostics?: readonly IrisDiagnostic[] }
   | { ok: false; diagnostics: readonly IrisDiagnostic[] };
 
+export type ExecutionRow = Record<string, string | number | boolean | bigint | Uint8Array | null>;
+
 export type OperationExecutor = {
-  execute(request: OperationRequest): Promise<ResultEnvelope<readonly Record<string, unknown>[]>>;
+  execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>>;
   executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
   close(): Promise<void>;
 };
@@ -64,9 +66,17 @@ export type CreateIrisDbBindingOptions = {
     );
     await writeFile(
         join(stubDir, "iris-operation.ts"),
-        `export type IrisOperation =
-  | { kind: "declared-vos"; source: string }
-  | { kind: "source"; source: string };
+        `export type IrisScalar = string | number | boolean | null;
+
+export interface IrisWhereEq {
+  field: string;
+  value: IrisScalar;
+}
+
+export type IrisOperation =
+  | { kind: "find-many"; entity: string; where?: IrisWhereEq; take?: number }
+  | { kind: "find-unique"; entity: string; where: IrisWhereEq }
+  | { kind: "declared-vos"; source: string };
 `,
         "utf8",
     );

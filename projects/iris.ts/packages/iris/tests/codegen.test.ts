@@ -59,7 +59,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const root = join(outDir, "generated", "iris");
     const result = core.generate(USER_SCHEMA, "typescript", root);
     assert.equal(result.ok, true);
-    assert.equal(result.files.length, 12);
+    assert.equal(result.files.length, 13);
 
     assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris$/);
 
@@ -83,6 +83,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris-language/);
+    assert.match(browserEntry, /CreateIrisDbBindingOptions/);
+    assert.doesNotMatch(browserEntry, /@yydb\/iris\/types/);
+    assert.doesNotMatch(browserEntry, /@yydb\/iris\/runtime/);
+    assert.doesNotMatch(browserEntry, /"@yydb\/iris"/);
     assert.match(browserEntry, /createIrisOperationExecutor/);
     assert.match(browserEntry, /wireNamesByEntity: IRIS_FIELD_WIRE_NAMES/);
     assert.match(browserEntry, /IRIS_SCHEMA_FINGERPRINT/);
@@ -132,6 +136,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const operations = await readFile(join(root, "operations.ts"), "utf8");
     assert.match(operations, /OperationExecutor/);
+    assert.match(operations, /from "\.\/_internal\/contract-types\.js"/);
+    assert.doesNotMatch(operations, /@yydb\/iris\/types/);
     assert.match(operations, /buildDeclaredOperationRequest/);
     assert.match(operations, /\$query<T = unknown>/);
     assert.match(operations, /findMany<const A extends UserFindManyArgs>/);
@@ -149,6 +155,8 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.doesNotMatch(operations, /::insert\(\{ \.\.\. \}\)/);
 
     const synthesize = await readFile(join(root, "_internal", "synthesize.ts"), "utf8");
+    assert.match(synthesize, /from "\.\/contract-types\.js"/);
+    assert.doesNotMatch(synthesize, /@yydb\/iris\/types/);
     assert.match(synthesize, /compileWherePredicates/);
     assert.match(synthesize, /synthesizeCreate/);
     assert.match(synthesize, /synthesizeUpdate/);
@@ -189,6 +197,8 @@ test("generated multi-table + reference client typechecks under tsc", async (t) 
   readonly unknownCommit?: boolean;
 };
 
+export type ExecutionRow = Record<string, string | number | boolean | bigint | Uint8Array | null>;
+
 export type ResultEnvelope<T = unknown> =
   | { ok: true; value: T; diagnostics?: readonly IrisDiagnostic[] }
   | { ok: false; diagnostics: readonly IrisDiagnostic[] };
@@ -211,7 +221,7 @@ export type OperationRequest = {
 };
 
 export interface OperationExecutor {
-  execute(request: OperationRequest): Promise<ResultEnvelope<readonly unknown[]>>;
+  execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>>;
   executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
   close(): Promise<void>;
 }
@@ -228,6 +238,9 @@ export type CreateIrisDbBindingOptions = {
   project?: string;
   source?: string;
   schema?: string;
+  contractFingerprint?: string;
+  wireNamesByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  valueCarriersByEntity?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 };
 `,
         "utf8",
@@ -247,6 +260,7 @@ export async function createIrisOperationExecutor(_options?: CreateIrisDbBinding
     await writeFile(
         join(stubDir, "iris-language.ts"),
         `import type { CreateIrisDbBindingOptions, IrisDbBinding, OperationExecutor } from "./iris-types.js";
+export type { CreateIrisDbBindingOptions } from "./iris-types.js";
 export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions): Promise<IrisDbBinding> {
   throw new Error("stub");
 }
@@ -291,7 +305,6 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
                 exclude: [
                     "./src/generated/iris/consumer-negative.ts",
                     "./src/generated/iris/node.ts",
-                    "./src/generated/iris/browser.ts",
                     "./src/generated/iris/cloudflare.ts",
                 ],
             },

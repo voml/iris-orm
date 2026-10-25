@@ -1,5 +1,4 @@
-import { createIrisOperationExecutor } from "@yydb/iris-language";
-import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
+import { createIrisOperationExecutor, type CreateIrisDbBindingOptions } from "@yydb/iris-language";
 import { createClient, type DbClient } from "./operations.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
 

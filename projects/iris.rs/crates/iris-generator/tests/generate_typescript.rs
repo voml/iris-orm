@@ -45,12 +45,13 @@ fn typescript_emit_writes_ux_layout() {
         .join(format!("iris-ts-gen-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let paths = write_typescript_client(&model, &root).expect("write");
-    assert_eq!(paths.len(), 12);
+    assert_eq!(paths.len(), 13);
     assert!(root.join("index.ts").is_file());
     assert!(root.join("models.ts").is_file());
     assert!(root.join("operations.ts").is_file());
     assert!(root.join("metadata.ts").is_file());
     assert!(root.join("errors.ts").is_file());
+    assert!(root.join("_internal/contract-types.ts").is_file());
     assert!(root.join("_internal/synthesize.ts").is_file());
     assert!(!root.join("synthesize.ts").is_file());
     assert!(!root.join("db.ts").is_file());
@@ -71,7 +72,7 @@ fn generate_dispatch_typescript_target() {
         .join(format!("iris-ts-dispatch-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let (_, paths) = iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root).expect("generate");
-    assert_eq!(paths.len(), 12);
+    assert_eq!(paths.len(), 13);
     assert!(paths.iter().all(|path| path.starts_with(&root)));
     assert!(paths.iter().any(|path| path.file_name().is_some_and(|name| name == "metadata.ts")));
     let _ = std::fs::remove_dir_all(dir);
@@ -108,10 +109,54 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
 fn typescript_emit_compact_layout_for_all_files() {
     let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    assert_eq!(files.len(), 12);
+    assert_eq!(files.len(), 13);
     for (name, content) in &files {
         assert_compact_ts_layout(name, content);
     }
+}
+
+#[test]
+fn typescript_browser_artifacts_stay_host_neutral() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let file = |name: &str| {
+        files
+            .iter()
+            .find(|(path, _)| path == name)
+            .map(|(_, content)| content.as_str())
+            .expect(name)
+    };
+
+    let browser = file("browser.ts");
+    assert!(browser.contains("@yydb/iris-language"), "{browser}");
+    assert!(browser.contains("CreateIrisDbBindingOptions"), "{browser}");
+
+    // Everything reachable from `browser.ts` must stay off the desktop package.
+    for name in [
+        "browser.ts",
+        "operations.ts",
+        "_internal/synthesize.ts",
+        "_internal/contract-types.ts",
+        "index.ts",
+        "errors.ts",
+        "metadata.ts",
+        "models.ts",
+        "inputs.ts",
+        "references.ts",
+    ] {
+        let content = file(name);
+        assert!(!content.contains("@yydb/iris/"), "{name} must not import desktop subpaths");
+        assert!(!content.contains("\"@yydb/iris\""), "{name} must not import the desktop root");
+    }
+
+    let contract = file("_internal/contract-types.ts");
+    assert!(contract.contains("interface OperationExecutor"), "{contract}");
+    assert!(contract.contains("type OperationRequest"), "{contract}");
+    assert!(contract.contains("type ResultEnvelope"), "{contract}");
+
+    let node = file("node.ts");
+    assert!(node.contains("@yydb/iris/types"), "{node}");
+    assert!(!node.contains("@yydb/iris-language"), "{node}");
 }
 
 #[test]
