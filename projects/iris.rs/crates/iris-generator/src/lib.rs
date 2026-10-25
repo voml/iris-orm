@@ -70,7 +70,7 @@ mod typescript;
 
 include!(concat!(env!("OUT_DIR"), "/aot_registry.rs"));
 
-pub use typescript::{emit_typescript_client, write_typescript_client};
+pub use typescript::{emit_typescript_client, emit_typescript_runtime, write_typescript_client, write_typescript_runtime};
 
 /// One VOS field in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

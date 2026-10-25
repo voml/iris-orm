@@ -15,3 +15,9 @@ Rules:
 |------|--------|
 | `rust/*.dejavu` | `src/generated/iris/rust/` |
 | `typescript/*.dejavu` | `src/generated/iris/` |
+| `typescript/runtime/*.dejavu` | `projects/iris.ts/packages/{iris,iris-language}/src/runtime/` |
+
+`typescript/runtime` is the single author source for the host-neutral runtime
+modules both TypeScript host packages carry. Regenerate the committed copies with
+`cargo run -p iris-generator --bin iris-runtime-sync`, and keep host differences in
+each package's `runtime/host.ts` adapter.

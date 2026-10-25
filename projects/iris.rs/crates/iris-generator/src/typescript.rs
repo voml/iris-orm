@@ -2,13 +2,20 @@
 
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::{GenerationModel, Result, render, unescape_dejavu_template};
 
 fn render_ts(name: &str, ctx: &Value) -> Result<String> {
     let rendered = unescape_dejavu_template(&render(name, ctx)?);
     Ok(normalize_ts_blank_lines(&rendered))
+}
+
+/// Runtime templates are read as ordinary package source, so keep their blank lines.
+fn render_runtime_ts(name: &str) -> Result<String> {
+    let mut normalized = unescape_dejavu_template(&render(name, &json!({}))?).replace("\r\n", "\n").trim().to_string();
+    normalized.push('\n');
+    Ok(normalized)
 }
 
 /// Dejavu templates interleave blank lines for readability; compact before write.
@@ -69,6 +76,39 @@ pub fn write_typescript_client(model: &GenerationModel, out_dir: &Path) -> Resul
         }
         let tmp_name = name.replace('/', "__");
         let tmp = root.join(format!("{tmp_name}.tmp"));
+        std::fs::write(&tmp, content)?;
+        std::fs::rename(&tmp, &target)?;
+        written.push(target);
+    }
+    Ok(written)
+}
+
+/// Host-neutral runtime module stems, rendered from `templates/typescript/runtime/`.
+const RUNTIME_TEMPLATE_NAMES: &[&str] =
+    &["base64", "db-binding", "operation-binding", "operation-parameters", "parse", "validate-contract", "value-carrier", "wire-row-map"];
+
+/// Emit the host-neutral runtime modules shared by `@yydb/iris` and `@yydb/iris-language`.
+///
+/// Both host packages keep their own host-specific modules (session construction,
+/// capability negotiation, package exports) plus a small `host.ts` type adapter.
+/// Everything returned here comes from the one template set under
+/// `templates/typescript/runtime/`, so the two committed copies stay identical.
+pub fn emit_typescript_runtime() -> Result<Vec<(String, String)>> {
+    let mut files: Vec<(String, String)> = Vec::with_capacity(RUNTIME_TEMPLATE_NAMES.len());
+    for name in RUNTIME_TEMPLATE_NAMES {
+        files.push((format!("{name}.ts"), render_runtime_ts(&format!("typescript/runtime/{name}"))?));
+    }
+    files.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(files)
+}
+
+/// Write the host-neutral runtime modules into a package `src/runtime/` directory.
+pub fn write_typescript_runtime(runtime_dir: &Path) -> Result<Vec<PathBuf>> {
+    std::fs::create_dir_all(runtime_dir)?;
+    let mut written = Vec::new();
+    for (name, content) in emit_typescript_runtime()? {
+        let target = runtime_dir.join(&name);
+        let tmp = runtime_dir.join(format!("{name}.tmp"));
         std::fs::write(&tmp, content)?;
         std::fs::rename(&tmp, &target)?;
         written.push(target);
