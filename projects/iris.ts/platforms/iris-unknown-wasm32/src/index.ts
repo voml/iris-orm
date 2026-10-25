@@ -1,11 +1,6 @@
-/** Result of validating a VOS / `.iris` schema source via the Rust core. */
-export interface CheckSourceResult {
-    ok: boolean;
-    tableCount: number;
-    schemaFingerprint: string;
-    generatorVersion: string;
-    error?: string | null;
-}
+import type { CheckSourceResult, WebMemorySessionBinding } from "./binding.ts";
+
+export type * from "./binding.ts";
 
 /** WASM bytes or module handle for custom asset pipelines. */
 export type WasmInitInput = URL | Request | Response | ArrayBuffer | Uint8Array | WebAssembly.Module;
@@ -150,7 +145,7 @@ export function executeVosMemory(source: string): string {
 }
 
 /** Stateful in-memory reference session. */
-export function openMemorySession(): GlueMemorySession {
+export function openMemorySession(): WebMemorySessionBinding {
     const api = glueApi();
     if (!api.MemorySession) {
         throw new Error("@yydb/iris-unknown-wasm32: MemorySession export missing; rebuild wasm artifacts");

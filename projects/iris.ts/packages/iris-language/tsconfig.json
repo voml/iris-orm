@@ -10,12 +10,7 @@
         "declaration": true,
         "isolatedModules": true,
         "allowImportingTsExtensions": true,
-        "allowJs": true,
-        "baseUrl": ".",
-        "paths": {
-            "@yydb/iris/runtime": ["../iris/src/runtime/index.ts"],
-            "@yydb/iris/types": ["../iris/src/types/index.ts"]
-        }
+        "allowJs": true
     },
     "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

@@ -1,6 +1,10 @@
-import type { CheckSourceResult } from "@yydb/iris/types";
-import { IrisFacadeError } from "@yydb/iris/types";
-import type { IrisBindings, MemorySessionBinding } from "@yydb/iris/runtime";
+import type {
+    CheckSourceResult,
+    WebIrisBindings,
+    WebMemorySessionBinding,
+} from "@yydb/iris-unknown-wasm32";
+
+import { IrisLanguageError } from "./errors.ts";
 
 const WEB_CORE_PACKAGE = "@yydb/iris-unknown-wasm32";
 
@@ -20,25 +24,18 @@ type WasmPackage = {
     irisVersion(): string;
     checkSource(source: string): CheckSourceResult;
     introspectSchema(source: string): string;
-    openMemorySession(): WasmMemorySession;
+    openMemorySession(): WebMemorySessionBinding;
     resetWasmBindingForTests(): void;
 };
 
-type WasmMemorySession = {
-    query ? (source: string, parametersJson?: string | null) : string;
-    execute ? (source: string, parametersJson?: string | null) : string;
-    executeVos(source: string, parametersJson?: string | null): string;
-    close(): void;
-};
-
-let cached: Promise<IrisBindings> | undefined;
-let active: IrisBindings | null = null;
+let cached: Promise<WebIrisBindings> | undefined;
+let active: WebIrisBindings | null = null;
 
 async function importWasmPackage(): Promise<WasmPackage> {
     return (await import(WEB_CORE_PACKAGE)) as WasmPackage;
 }
 
-function wrapWasmSession(session: WasmMemorySession): MemorySessionBinding {
+function wrapWasmSession(session: WebMemorySessionBinding): WebMemorySessionBinding {
     const executeVos = (source: string, parametersJson?: string | null) =>
         session.executeVos(source, parametersJson ?? null);
     return {
@@ -53,7 +50,7 @@ function wrapWasmSession(session: WasmMemorySession): MemorySessionBinding {
     };
 }
 
-function toBindings(pkg: WasmPackage): IrisBindings {
+function toBindings(pkg: WasmPackage): WebIrisBindings {
     return {
         irisVersion: () => pkg.irisVersion(),
         checkSource: (source) => pkg.checkSource(source),
@@ -63,13 +60,13 @@ function toBindings(pkg: WasmPackage): IrisBindings {
 }
 
 /** Load and initialize the browser WASM semantic core (browser-safe dynamic import). */
-export async function loadIrisWasm(options: IrisWasmOptions = {}): Promise<IrisBindings> {
+export async function loadIrisWasm(options: IrisWasmOptions = {}): Promise<WebIrisBindings> {
     let pkg: WasmPackage;
     try {
         pkg = await importWasmPackage();
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new IrisFacadeError(
+        throw new IrisLanguageError(
             "wasm-package-missing",
             `@yydb/iris-language: browser semantic core not installed (install @yydb/iris-unknown-wasm32): ${message}`,
         );
@@ -79,7 +76,7 @@ export async function loadIrisWasm(options: IrisWasmOptions = {}): Promise<IrisB
         await pkg.initWasm({ module: options.module });
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new IrisFacadeError(
+        throw new IrisLanguageError(
             "wasm-package-missing",
             `@yydb/iris-language: browser semantic core not built (run the wasm build): ${message}`,
         );
@@ -88,7 +85,7 @@ export async function loadIrisWasm(options: IrisWasmOptions = {}): Promise<IrisB
 }
 
 /** Cached WASM binding loader (panduck `loadPanduckWeb` shape). */
-export function loadIrisWeb(options: IrisWasmOptions = {}): Promise<IrisBindings> {
+export function loadIrisWeb(options: IrisWasmOptions = {}): Promise<WebIrisBindings> {
     if (cached) {
         return cached;
     }
@@ -106,9 +103,9 @@ export async function initIris(options: IrisWasmOptions = {}): Promise<void> {
 }
 
 /** Active semantic core after `loadIrisWeb()` / `initIris()`. */
-export function getWasmSemanticCore(): IrisBindings {
+export function getWasmSemanticCore(): WebIrisBindings {
     if (active == null) {
-        throw new IrisFacadeError(
+        throw new IrisLanguageError(
             "wasm-not-initialized",
             "@yydb/iris-language: call initIris() or loadIrisWeb() before createIris()",
         );

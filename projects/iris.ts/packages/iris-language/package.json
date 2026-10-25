@@ -42,7 +42,6 @@
         "test": "node --experimental-strip-types --test \"./tests/**/*.test.ts\""
     },
     "dependencies": {
-        "@yydb/iris": "workspace:*",
         "@yydb/iris-unknown-wasm32": "workspace:*"
     },
     "devDependencies": {

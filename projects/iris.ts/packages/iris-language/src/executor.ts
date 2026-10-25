@@ -1,18 +1,19 @@
 import type {
-    CreateIrisDbBindingOptions,
-    IrisBindingHost,
-    IrisDbBinding,
-    IrisSession,
-    OperationExecutor,
-} from "@yydb/iris/types";
-import { IrisFacadeError } from "@yydb/iris/types";
+    WebCreateIrisDbBindingOptions,
+    WebIrisBindingHost,
+    WebIrisDbBinding,
+    WebIrisSession,
+    WebOperationExecutor,
+} from "@yydb/iris-unknown-wasm32";
+
+import { IrisLanguageError } from "./errors.ts";
 import {
     buildRuntime,
     createIrisDbBindingFromSession,
     createOperationExecutorFromSession,
     guardOperationExecutor,
     openBindingSession,
-} from "@yydb/iris/runtime";
+} from "./runtime/index.ts";
 import { getWasmSemanticCore } from "./wasm.ts";
 
 export type CreateIrisBrowserOptions = {
@@ -23,7 +24,7 @@ export type CreateIrisBrowserOptions = {
 /**
  * @deprecated Use generated `IrisClient` + browser executor wiring. WASM init only.
  */
-export async function createIris(_options: CreateIrisBrowserOptions = {}): Promise<IrisBindingHost> {
+export async function createIris(_options: CreateIrisBrowserOptions = {}): Promise<WebIrisBindingHost> {
     return buildRuntime("browser", getWasmSemanticCore(), "memory");
 }
 
@@ -32,13 +33,13 @@ export async function createIris(_options: CreateIrisBrowserOptions = {}): Promi
  *
  * Requires prior `initIris()` / `loadIrisWeb()`. Browser host currently uses WASM in-memory ReferenceStore only.
  */
-export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {
+export async function createIrisDbBinding(options: WebCreateIrisDbBindingOptions = {}): Promise<WebIrisDbBinding> {
     const session = await openBindingSession("browser", getWasmSemanticCore(), options);
     return createIrisDbBindingFromSession(session);
 }
 
 /** Create the async operation executor for generated browser clients (preferred ABI). */
-export async function createIrisOperationExecutor(options: CreateIrisDbBindingOptions = {}): Promise<OperationExecutor> {
+export async function createIrisOperationExecutor(options: WebCreateIrisDbBindingOptions = {}): Promise<WebOperationExecutor> {
     const session = await openBindingSession("browser", getWasmSemanticCore(), options);
     const executor = createOperationExecutorFromSession(session, {
         wireNamesByEntity: options.wireNamesByEntity,
@@ -70,7 +71,7 @@ export interface LocalStore {
     readonly backend: LocalStoreBackend;
     readonly name: string;
     /** Open a WASM memory-backed Iris session (no browser persistence yet). */
-    openSession(): IrisSession;
+    openSession(): WebIrisSession;
     close(): Promise<void>;
 }
 
@@ -78,7 +79,7 @@ export interface LocalStore {
 export async function openLocalStore(options: OpenLocalStoreOptions): Promise<LocalStore> {
     const backend = options.backend ?? "memory";
     if (backend !== "memory") {
-        throw new IrisFacadeError(
+        throw new IrisLanguageError(
             "local-store-unsupported",
             `@yydb/iris-language: Local Web Backend "${backend}" is not wired yet; use backend "memory"`,
         );
