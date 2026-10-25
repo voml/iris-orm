@@ -23,6 +23,11 @@ dist/
 *.wasm
 pnpm-lock.yaml
 
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
 # Secrets / local env
 .env
 .env.*

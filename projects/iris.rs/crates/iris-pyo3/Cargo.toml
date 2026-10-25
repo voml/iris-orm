@@ -1,0 +1,22 @@
+[package]
+name = "iris-pyo3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Python (pyo3) binding skeleton for Iris ORM"
+publish = false
+
+[lib]
+name = "iris_pyo3"
+crate-type = ["cdylib"]
+# `pyo3`'s `extension-module` feature leaves `libpython` unlinked, so a Rust test
+# binary cannot resolve its symbols on Unix. The binding has no Rust-side test
+# target: it is exercised through the Python suite after a `maturin` wheel build.
+test = false
+doctest = false
+
+[dependencies]
+iris = { workspace = true }
+iris-types = { workspace = true }
+pyo3 = { workspace = true }
