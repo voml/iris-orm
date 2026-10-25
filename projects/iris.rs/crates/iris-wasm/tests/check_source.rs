@@ -14,7 +14,7 @@ table User {
 /// semantic projection model. This is the single golden lock for the schema
 /// fingerprint; the TypeScript suites assert shape and determinism instead of
 /// duplicating the literal.
-const USER_SCHEMA_FINGERPRINT: &str = "d0a25e372ad68380bc5acc0e556cdef3374388fbdc8839568cc7715b69b767d3";
+const USER_SCHEMA_FINGERPRINT: &str = "9aa42fa9c64ad101a7ff011c481e6820d1213c331ba72897513e4cdea8b64385";
 
 #[test]
 fn iris_version_matches_workspace_crate() {

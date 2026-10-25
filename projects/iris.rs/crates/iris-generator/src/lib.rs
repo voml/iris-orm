@@ -687,7 +687,7 @@ struct CanonicalFingerprintType {
 #[derive(Serialize)]
 struct CanonicalFingerprintField {
     name: String,
-    ty: String,
+    ty: CanonicalType,
     attributes: Vec<String>,
 }
 
@@ -696,13 +696,13 @@ struct CanonicalFingerprintOperation {
     kind: String,
     name: String,
     params: Vec<CanonicalFingerprintParam>,
-    return_type: String,
+    return_type: Option<CanonicalType>,
 }
 
 #[derive(Serialize)]
 struct CanonicalFingerprintParam {
     name: String,
-    ty: String,
+    ty: CanonicalType,
 }
 
 fn type_kind_label(kind: TypeContractKind) -> String {
@@ -717,8 +717,9 @@ fn type_kind_label(kind: TypeContractKind) -> String {
 ///
 /// The canonical model above is serialized as JSON and hashed, so unrelated
 /// code, internal layout, `Debug` derives and dependency versions cannot move
-/// the value. Declaration and field order are normalized because order is not
-/// identity.
+/// the value. Types are hashed structurally rather than as display labels, so
+/// formatting changes cannot move it either. Declaration and field order are
+/// normalized because order is not identity.
 fn projection_fingerprint(projection: &SchemaProjection, operations: &[vos::OperationProjection]) -> String {
     let mut types = projection
         .types
@@ -731,14 +732,14 @@ fn projection_fingerprint(projection: &SchemaProjection, operations: &[vos::Oper
                     let mut attributes = field.attributes.iter().map(|attribute| attribute.name.clone()).collect::<Vec<_>>();
                     attributes.sort();
                     attributes.dedup();
-                    CanonicalFingerprintField { name: field.canonical_name.clone(), ty: type_label(&field.canonical_type), attributes }
+                    CanonicalFingerprintField { name: field.canonical_name.clone(), ty: field.canonical_type.clone(), attributes }
                 })
                 .collect::<Vec<_>>();
-            fields.sort_by(|a, b| a.name.cmp(&b.name));
+            fields.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| canonical_json(a).cmp(&canonical_json(b))));
             CanonicalFingerprintType { path: item.canonical_path.clone(), kind: type_kind_label(item.kind), fields }
         })
         .collect::<Vec<_>>();
-    types.sort_by(|a, b| a.path.cmp(&b.path).then_with(|| a.kind.cmp(&b.kind)));
+    types.sort_by(|a, b| a.path.cmp(&b.path).then_with(|| a.kind.cmp(&b.kind)).then_with(|| canonical_json(a).cmp(&canonical_json(b))));
 
     let mut operations = operations
         .iter()
@@ -748,22 +749,20 @@ fn projection_fingerprint(projection: &SchemaProjection, operations: &[vos::Oper
             params: operation
                 .parameters
                 .iter()
-                .map(|param| CanonicalFingerprintParam { name: param.name.clone(), ty: type_label(&param.type_expr) })
+                .map(|param| CanonicalFingerprintParam { name: param.name.clone(), ty: param.type_expr.clone() })
                 .collect(),
-            return_type: operation.return_type.as_ref().map(type_label).unwrap_or_else(|| "unit".to_owned()),
+            return_type: operation.return_type.clone(),
         })
         .collect::<Vec<_>>();
-    operations.sort_by(|a, b| {
-        a.name
-            .cmp(&b.name)
-            .then_with(|| a.kind.cmp(&b.kind))
-            .then_with(|| a.params.iter().map(|param| (&param.name, &param.ty)).cmp(b.params.iter().map(|param| (&param.name, &param.ty))))
-            .then_with(|| a.return_type.cmp(&b.return_type))
-    });
+    operations.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.kind.cmp(&b.kind)).then_with(|| canonical_json(a).cmp(&canonical_json(b))));
 
     let wire = serde_json::to_vec(&CanonicalSchemaFingerprint { fingerprint_version: SCHEMA_FINGERPRINT_VERSION, types, operations })
         .expect("canonical schema fingerprint model serializes");
     Sha256::digest(wire).iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn canonical_json<T: Serialize>(value: &T) -> String {
+    serde_json::to_string(value).expect("canonical fingerprint component serializes")
 }
 
 #[allow(dead_code)]
