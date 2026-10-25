@@ -1,22 +1,18 @@
-import type {
-    WebExecutionWireResult,
-    WebIrisDbBinding,
-    WebMemorySessionBinding,
-    WebSessionExecuteWire,
-    WebVosParameters,
-} from "@yydb/iris-unknown-wasm32";
-
+import type { MemorySessionBinding, SessionExecuteWire } from "./host.ts";
+import type { ExecutionWireResult } from "./host.ts";
+import type { IrisDbBinding, VosParameters } from "./host.ts";
+import { mapWireToQueryValue } from "./host.ts";
 import { parseExecuteJson, parseRowsJson } from "./parse.ts";
 import { stringifyOperationParameters } from "./operation-parameters.ts";
 
-/** Session surface consumed by generated browser `db` bindings. */
-export type DbBindingSession = WebMemorySessionBinding;
+/** Session surface consumed by generated `db` bindings (Node N-API + browser WASM). */
+export type DbBindingSession = MemorySessionBinding;
 
-function parametersJson(parameters?: WebVosParameters): string | null {
+function parametersJson(parameters?: VosParameters): string | null {
     return parameters === undefined ? null : stringifyOperationParameters(parameters);
 }
 
-function wireToRows(raw: WebSessionExecuteWire): WebExecutionWireResult {
+function wireToRows(raw: SessionExecuteWire): ExecutionWireResult {
     if (typeof raw === "string") {
         const parsed = parseExecuteJson(raw);
         if (!parsed.ok) {
@@ -31,7 +27,7 @@ function wireToRows(raw: WebSessionExecuteWire): WebExecutionWireResult {
     return { kind: "rows", rows };
 }
 
-function runQuery(session: DbBindingSession, source: string, parameters?: WebVosParameters): WebExecutionWireResult {
+function runQuery(session: DbBindingSession, source: string, parameters?: VosParameters): ExecutionWireResult {
     const json = parametersJson(parameters);
     if (session.query) {
         return wireToRows(session.query(source, json));
@@ -39,7 +35,7 @@ function runQuery(session: DbBindingSession, source: string, parameters?: WebVos
     return wireToRows(session.executeVos(source, json));
 }
 
-function runExecute(session: DbBindingSession, source: string, parameters?: WebVosParameters): void {
+function runExecute(session: DbBindingSession, source: string, parameters?: VosParameters): void {
     const json = parametersJson(parameters);
     if (session.execute) {
         wireToRows(session.execute(source, json));
@@ -48,27 +44,13 @@ function runExecute(session: DbBindingSession, source: string, parameters?: WebV
     runQuery(session, source, parameters);
 }
 
-/** Map binding wire shape to the VOS value surfaced by `db.$query`. */
-function mapWireToQueryValue(wire: WebExecutionWireResult): unknown {
-    switch (wire.kind) {
-        case "rows":
-            return wire.rows;
-        case "value":
-            return wire.value;
-        case "affected":
-            return wire.affected;
-        case "unit":
-            return undefined;
-    }
-}
-
-/** Build the generated-client binding from an open session. */
-export function createIrisDbBindingFromSession(session: DbBindingSession): WebIrisDbBinding {
+/** Build the symmetric generated-client binding from an open session. */
+export function createIrisDbBindingFromSession(session: DbBindingSession): IrisDbBinding {
     return {
-        async query(source: string, parameters?: WebVosParameters): Promise<unknown> {
+        async query(source: string, parameters?: VosParameters): Promise<unknown> {
             return mapWireToQueryValue(runQuery(session, source, parameters));
         },
-        async execute(source: string, parameters?: WebVosParameters): Promise<void> {
+        async execute(source: string, parameters?: VosParameters): Promise<void> {
             runExecute(session, source, parameters);
         },
         async close() {

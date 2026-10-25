@@ -1,7 +1,6 @@
-import type { SchemaIntrospection } from "../types/schema-introspection.ts";
-import type { ExecuteResult, IrisRow } from "../types/session.ts";
+import type { ExecuteResult, IrisRow, SchemaIntrospection } from "./host.ts";
 
-/** Parse execute JSON from Rust bindings. */
+/** Parse execute JSON from the host binding. */
 export function parseExecuteJson(raw: string): ExecuteResult {
     const parsed = JSON.parse(raw) as {
         ok?: boolean;
@@ -15,12 +14,12 @@ export function parseExecuteJson(raw: string): ExecuteResult {
     };
 }
 
-/** Parse introspection JSON from Rust bindings. */
+/** Parse introspection JSON from the host binding. */
 export function parseIntrospectionJson(raw: string): SchemaIntrospection {
     return JSON.parse(raw) as SchemaIntrospection;
 }
 
-/** Parse N-API `rows_json` payload. */
+/** Parse a `rows_json` payload. */
 export function parseRowsJson(raw: string): IrisRow[] {
     const parsed = JSON.parse(raw) as unknown;
     return Array.isArray(parsed) ? (parsed as IrisRow[]) : [];

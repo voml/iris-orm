@@ -1,4 +1,5 @@
-import type { ExecutionRow } from "../types/execution-result.ts";
+import type { ExecutionRow } from "./host.ts";
+
 import { decodeWireValueByCarrier } from "./value-carrier.ts";
 
 /** Parse `Entity.operation` operation ids into entity names. */
@@ -11,7 +12,7 @@ export function entityFromOperationId(operationId: string): string | null {
 }
 
 /**
- * Map one SQLite/D1 wire row into TypeScript author field names and carriers.
+ * Map one SQLite / D1 wire row into TypeScript author field names and carriers.
  *
  * `valueCarriers` is the generated `IRIS_VALUE_CARRIERS[entity]` table; it keeps
  * delivered values on the carrier the generated types declare (`i64` → `bigint`).

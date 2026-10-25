@@ -8,7 +8,7 @@
  * by silently stringifying it.
  */
 
-import type { WireCarrierValue } from "../types/execution-result.ts";
+import type { WireCarrierValue } from "./host.ts";
 
 import { decodeBase64 } from "./base64.ts";
 
@@ -76,8 +76,7 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
  * `carrier` is the VOS base label from `IRIS_VALUE_CARRIERS` (`i64`, `u64`,
  * `bytes`, …). Labels without a distinct JS carrier pass through. `i64` accepts
  * exact decimal strings (the wire shape for values past 2^53) or safe numbers.
- * `bytes` accepts base64 text, `ArrayBuffer` and views; a binary provider that
- * hands back `BLOB`/`ArrayBuffer` binds straight into the same carrier.
+ * `bytes` accepts base64 text, `ArrayBuffer` and views.
  */
 export function decodeWireValueByCarrier(carrier: string | undefined, value: unknown, field = "value"): WireCarrierValue {
     if (value === null || value === undefined) {

@@ -1,4 +1,4 @@
-import type { WebExecutionRow } from "@yydb/iris-unknown-wasm32";
+import type { ExecutionRow } from "./host.ts";
 
 import { decodeWireValueByCarrier } from "./value-carrier.ts";
 
@@ -21,8 +21,8 @@ export function wireRowToAuthorRow(
     wireToTs: Readonly<Record<string, string>>,
     row: Record<string, unknown>,
     valueCarriers: Readonly<Record<string, string>> = {},
-): WebExecutionRow {
-    const mapped: WebExecutionRow = {};
+): ExecutionRow {
+    const mapped: ExecutionRow = {};
     for (const [tsName, wireName] of Object.entries(wireToTs)) {
         if (wireName in row) {
             mapped[tsName] = decodeWireValueByCarrier(valueCarriers[tsName], row[wireName], tsName);
@@ -33,10 +33,10 @@ export function wireRowToAuthorRow(
 
 /** Map wire rows when a generated-client wire table is available. */
 export function mapRowsToAuthorSurface(
-    rows: readonly WebExecutionRow[],
+    rows: readonly ExecutionRow[],
     wireToTs: Readonly<Record<string, string>>,
     valueCarriers: Readonly<Record<string, string>> = {},
-): readonly WebExecutionRow[] {
+): readonly ExecutionRow[] {
     if (Object.keys(wireToTs).length === 0) {
         return rows;
     }

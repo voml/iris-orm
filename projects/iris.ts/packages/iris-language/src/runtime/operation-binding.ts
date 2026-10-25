@@ -1,13 +1,7 @@
-import type {
-    WebExecutionRow,
-    WebIrisDiagnostic,
-    WebMemorySessionBinding,
-    WebOperationExecutor,
-    WebOperationRequest,
-    WebResultEnvelope,
-    WebSessionExecuteWire,
-} from "@yydb/iris-unknown-wasm32";
-
+import type { MemorySessionBinding, SessionExecuteWire } from "./host.ts";
+import type { OperationRequest, ResultEnvelope } from "./host.ts";
+import type { ExecutionRow } from "./host.ts";
+import type { OperationExecutor } from "./host.ts";
 import { parseExecuteJson, parseRowsJson } from "./parse.ts";
 import {
     IrisParameterEncodingError,
@@ -22,7 +16,7 @@ export type OperationExecutorSessionOptions = {
     valueCarriersByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
 };
 
-function wireToEnvelope(raw: WebSessionExecuteWire): WebResultEnvelope<readonly WebExecutionRow[]> {
+function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly ExecutionRow[]> {
     if (typeof raw === "string") {
         const parsed = parseExecuteJson(raw);
         if (!parsed.ok) {
@@ -55,11 +49,11 @@ function wireToEnvelope(raw: WebSessionExecuteWire): WebResultEnvelope<readonly 
 }
 
 function mapExecuteEnvelope(
-    envelope: WebResultEnvelope<readonly WebExecutionRow[]>,
+    envelope: ResultEnvelope<readonly ExecutionRow[]>,
     operationId: string,
     wireNamesByEntity: Readonly<Record < string, Readonly < Record < string, string >>> >,
     valueCarriersByEntity: Readonly<Record < string, Readonly < Record < string, string >>> >,
-): WebResultEnvelope<readonly WebExecutionRow[]> {
+): ResultEnvelope<readonly ExecutionRow[]> {
     if (!envelope.ok) {
         return envelope;
     }
@@ -69,7 +63,7 @@ function mapExecuteEnvelope(
     return { ok: true, value: mapRowsToAuthorSurface(envelope.value, wireToTs, valueCarriers) };
 }
 
-function encodingFailure(error: unknown): Extract<WebResultEnvelope<never>, { ok: false }> {
+function encodingFailure(error: unknown): Extract<ResultEnvelope<never>, { ok: false }> {
     const message = error instanceof Error ? error.message : String(error);
     return {
         ok: false,
@@ -84,11 +78,11 @@ function encodingFailure(error: unknown): Extract<WebResultEnvelope<never>, { ok
 }
 
 function declaredVosWire(
-    request: WebOperationRequest,
-    runQuery: (source: string, parametersJson?: string | null) => WebSessionExecuteWire,
-    runExecute: ((source: string, parametersJson?: string | null) => WebSessionExecuteWire) | undefined,
+    request: OperationRequest,
+    runQuery: (source: string, parametersJson?: string | null) => SessionExecuteWire,
+    runExecute: ((source: string, parametersJson?: string | null) => SessionExecuteWire) | undefined,
     mode: "query" | "execute",
-): WebSessionExecuteWire {
+): SessionExecuteWire {
     if (request.operation.kind !== "declared-vos") {
         return { ok: false, rowsJson: "[]", error: "session fallback requires declared-vos operations" };
     }
@@ -102,9 +96,9 @@ function declaredVosWire(
 
 /** Build the async operation executor from an open in-process session. */
 export function createOperationExecutorFromSession(
-    session: WebMemorySessionBinding,
+    session: MemorySessionBinding,
     options: OperationExecutorSessionOptions = {},
-): WebOperationExecutor {
+): OperationExecutor {
     const wireNamesByEntity = options.wireNamesByEntity ?? {};
     const valueCarriersByEntity = options.valueCarriersByEntity ?? {};
     const runOperation = session.executeOperation?.bind(session);
@@ -112,7 +106,7 @@ export function createOperationExecutorFromSession(
     const runExecute = session.execute?.bind(session);
 
     return {
-        async execute(request: WebOperationRequest): Promise<WebResultEnvelope<readonly WebExecutionRow[]>> {
+        async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
             if (runOperation) {
                 let requestJson: string;
                 try {
@@ -128,7 +122,7 @@ export function createOperationExecutorFromSession(
                     valueCarriersByEntity,
                 );
             }
-            let raw: WebSessionExecuteWire;
+            let raw: SessionExecuteWire;
             try {
                 raw = declaredVosWire(request, runQuery, runExecute, "query");
             } catch (error) {
@@ -141,8 +135,8 @@ export function createOperationExecutorFromSession(
                 valueCarriersByEntity,
             );
         },
-        async executeUnit(request: WebOperationRequest): Promise<WebResultEnvelope<void>> {
-            let raw: WebSessionExecuteWire;
+        async executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>> {
+            let raw: SessionExecuteWire;
             try {
                 if (request.operation.kind === "declared-vos" && runExecute) {
                     raw = declaredVosWire(request, runQuery, runExecute, "execute");

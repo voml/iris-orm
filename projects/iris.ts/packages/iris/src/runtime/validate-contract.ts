@@ -1,5 +1,4 @@
-import type { IrisDiagnostic, OperationRequest } from "../types/contract.ts";
-import type { OperationExecutor } from "../types/operation-executor.ts";
+import type { IrisDiagnostic, OperationExecutor, OperationRequest } from "./host.ts";
 
 /** Validate operation identity against the expected build-time contract fingerprint. */
 export function validateContractFingerprint(

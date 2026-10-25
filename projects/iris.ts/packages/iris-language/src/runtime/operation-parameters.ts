@@ -1,5 +1,5 @@
 /**
- * Operation-parameter encoding for the JSON transport (WASM host).
+ * Operation-parameter encoding for the JSON transport (N-API / WASM hosts).
  *
  * VOS parameters are bound by the Rust authority (`bind_parameters`), so the
  * request has to cross a JSON boundary first. Two carriers cannot do that
@@ -16,7 +16,7 @@
  * Nested objects are rejected instead of being silently stringified.
  */
 
-import type { WebOperationRequest } from "@yydb/iris-unknown-wasm32";
+import type { OperationRequest } from "./host.ts";
 
 import { encodeBase64 } from "./base64.ts";
 
@@ -104,7 +104,7 @@ export function stringifyOperationParameters(parameters?: Readonly<Record<string
 }
 
 /** JSON text of an operation request whose parameters keep `bigint` / `bytes` carriers. */
-export function stringifyOperationRequest(request: WebOperationRequest): string {
+export function stringifyOperationRequest(request: OperationRequest): string {
     const { parameters, ...rest } = request;
     const head = JSON.stringify(rest);
     if (parameters === undefined) {

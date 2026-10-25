@@ -1,14 +1,10 @@
-import type {
-    WebIrisDiagnostic,
-    WebOperationExecutor,
-    WebOperationRequest,
-} from "@yydb/iris-unknown-wasm32";
+import type { IrisDiagnostic, OperationExecutor, OperationRequest } from "./host.ts";
 
 /** Validate operation identity against the expected build-time contract fingerprint. */
 export function validateContractFingerprint(
-    request: WebOperationRequest,
+    request: OperationRequest,
     expectedFingerprint: string,
-): WebIrisDiagnostic | null {
+): IrisDiagnostic | null {
     if (request.identity.contractFingerprint !== expectedFingerprint) {
         return {
             code: "IRIS-CONTRACT-MISMATCH",
@@ -19,21 +15,21 @@ export function validateContractFingerprint(
     return null;
 }
 
-function rejectEnvelope(diagnostic: WebIrisDiagnostic) {
+function rejectEnvelope(diagnostic: IrisDiagnostic) {
     return { ok: false as const, diagnostics: [diagnostic] };
 }
 
 /** Wrap an executor so every request must match the bound contract fingerprint. */
-export function guardOperationExecutor(executor: WebOperationExecutor, expectedFingerprint: string): WebOperationExecutor {
+export function guardOperationExecutor(executor: OperationExecutor, expectedFingerprint: string): OperationExecutor {
     return {
-        async execute(request: WebOperationRequest) {
+        async execute(request: OperationRequest) {
             const diagnostic = validateContractFingerprint(request, expectedFingerprint);
             if (diagnostic) {
                 return rejectEnvelope(diagnostic);
             }
             return executor.execute(request);
         },
-        async executeUnit(request: WebOperationRequest) {
+        async executeUnit(request: OperationRequest) {
             const diagnostic = validateContractFingerprint(request, expectedFingerprint);
             if (diagnostic) {
                 return rejectEnvelope(diagnostic);

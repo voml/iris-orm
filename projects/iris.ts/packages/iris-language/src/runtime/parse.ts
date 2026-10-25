@@ -1,10 +1,10 @@
-import type { WebExecuteResult, WebIrisRow, WebSchemaIntrospection } from "@yydb/iris-unknown-wasm32";
+import type { ExecuteResult, IrisRow, SchemaIntrospection } from "./host.ts";
 
-/** Parse execute JSON from the WASM binding. */
-export function parseExecuteJson(raw: string): WebExecuteResult {
+/** Parse execute JSON from the host binding. */
+export function parseExecuteJson(raw: string): ExecuteResult {
     const parsed = JSON.parse(raw) as {
         ok?: boolean;
-        rows?: WebIrisRow[];
+        rows?: IrisRow[];
         error?: string | null;
     };
     return {
@@ -14,13 +14,13 @@ export function parseExecuteJson(raw: string): WebExecuteResult {
     };
 }
 
-/** Parse introspection JSON from the WASM binding. */
-export function parseIntrospectionJson(raw: string): WebSchemaIntrospection {
-    return JSON.parse(raw) as WebSchemaIntrospection;
+/** Parse introspection JSON from the host binding. */
+export function parseIntrospectionJson(raw: string): SchemaIntrospection {
+    return JSON.parse(raw) as SchemaIntrospection;
 }
 
 /** Parse a `rows_json` payload. */
-export function parseRowsJson(raw: string): WebIrisRow[] {
+export function parseRowsJson(raw: string): IrisRow[] {
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as WebIrisRow[]) : [];
+    return Array.isArray(parsed) ? (parsed as IrisRow[]) : [];
 }

@@ -3,8 +3,8 @@
  *
  * `i64` and `bytes` are the two carriers that cannot cross a JSON boundary
  * natively: `i64` is sent as exact decimal digits and `bytes` as base64 text.
- * Both sides of the wire (parameter encoding and row decoding) must use this
- * single codec so a round trip stays byte-identical.
+ * Parameter encoding and row decoding must use this single codec so a round
+ * trip stays byte-identical.
  */
 
 const BASE64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

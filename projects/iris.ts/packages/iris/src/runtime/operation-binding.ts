@@ -1,7 +1,7 @@
-import type { MemorySessionBinding, SessionExecuteWire } from "../bindings.ts";
-import type { OperationRequest, ResultEnvelope } from "../types/contract.ts";
-import type { ExecutionRow } from "../types/execution-result.ts";
-import type { OperationExecutor } from "../types/operation-executor.ts";
+import type { MemorySessionBinding, SessionExecuteWire } from "./host.ts";
+import type { OperationRequest, ResultEnvelope } from "./host.ts";
+import type { ExecutionRow } from "./host.ts";
+import type { OperationExecutor } from "./host.ts";
 import { parseExecuteJson, parseRowsJson } from "./parse.ts";
 import {
     IrisParameterEncodingError,
@@ -78,7 +78,6 @@ function encodingFailure(error: unknown): Extract<ResultEnvelope<never>, { ok: f
 }
 
 function declaredVosWire(
-    session: MemorySessionBinding,
     request: OperationRequest,
     runQuery: (source: string, parametersJson?: string | null) => SessionExecuteWire,
     runExecute: ((source: string, parametersJson?: string | null) => SessionExecuteWire) | undefined,
@@ -125,7 +124,7 @@ export function createOperationExecutorFromSession(
             }
             let raw: SessionExecuteWire;
             try {
-                raw = declaredVosWire(session, request, runQuery, runExecute, "query");
+                raw = declaredVosWire(request, runQuery, runExecute, "query");
             } catch (error) {
                 return encodingFailure(error);
             }
@@ -140,11 +139,11 @@ export function createOperationExecutorFromSession(
             let raw: SessionExecuteWire;
             try {
                 if (request.operation.kind === "declared-vos" && runExecute) {
-                    raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
+                    raw = declaredVosWire(request, runQuery, runExecute, "execute");
                 } else if (runOperation) {
                     raw = runOperation(stringifyOperationRequest(request));
                 } else {
-                    raw = declaredVosWire(session, request, runQuery, runExecute, "execute");
+                    raw = declaredVosWire(request, runQuery, runExecute, "execute");
                 }
             } catch (error) {
                 const failure = encodingFailure(error);

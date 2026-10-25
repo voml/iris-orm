@@ -16,7 +16,7 @@
  * Nested objects are rejected instead of being silently stringified.
  */
 
-import type { OperationRequest } from "../types/contract.ts";
+import type { OperationRequest } from "./host.ts";
 
 import { encodeBase64 } from "./base64.ts";
 

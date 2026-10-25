@@ -8,7 +8,7 @@
  * by silently stringifying it.
  */
 
-import type { WebWireCarrierValue } from "@yydb/iris-unknown-wasm32";
+import type { WireCarrierValue } from "./host.ts";
 
 import { decodeBase64 } from "./base64.ts";
 
@@ -17,7 +17,7 @@ function carrierError(field: string, carrier: string, detail: string): Error {
 }
 
 /** Wire scalars surfaced as-is; only non-scalar leftovers are stringified. */
-function normalizeWireScalar(value: unknown): WebWireCarrierValue {
+function normalizeWireScalar(value: unknown): WireCarrierValue {
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
         return value;
     }
@@ -78,7 +78,7 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
  * exact decimal strings (the wire shape for values past 2^53) or safe numbers.
  * `bytes` accepts base64 text, `ArrayBuffer` and views.
  */
-export function decodeWireValueByCarrier(carrier: string | undefined, value: unknown, field = "value"): WebWireCarrierValue {
+export function decodeWireValueByCarrier(carrier: string | undefined, value: unknown, field = "value"): WireCarrierValue {
     if (value === null || value === undefined) {
         return null;
     }
