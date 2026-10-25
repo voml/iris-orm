@@ -32,6 +32,55 @@ fn generation_model_from_vos_is_deterministic() {
     assert!(a.tables[0].fields.iter().any(|f| f.name == "active" && f.rust_ty == "bool"));
 }
 
+fn assert_canonical_fingerprint(fingerprint: &str) {
+    assert_eq!(fingerprint.len(), 64, "fingerprint `{fingerprint}` must be a SHA-256 hex digest");
+    assert!(fingerprint.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')), "fingerprint `{fingerprint}` must be lowercase hex");
+}
+
+#[test]
+fn schema_fingerprint_is_content_addressed_and_stable() {
+    let first = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap().schema_fingerprint;
+    let second = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap().schema_fingerprint;
+    assert_canonical_fingerprint(&first);
+    assert_eq!(first, second);
+}
+
+#[test]
+fn schema_fingerprint_ignores_declaration_and_field_order() {
+    const REORDERED: &str = r#"
+table User {
+    active: bool,
+    @user_name: utf8,
+    @@user_id: utf8,
+}
+"#;
+    let original = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap().schema_fingerprint;
+    let reordered = GenerationModel::from_vos_schema(REORDERED).unwrap().schema_fingerprint;
+    assert_eq!(original, reordered);
+}
+
+#[test]
+fn schema_fingerprint_tracks_semantic_changes() {
+    const CHANGED_TYPE: &str = r#"
+table User {
+    @@user_id: utf8,
+    @user_name: utf8,
+    active: utf8,
+}
+"#;
+    const REMOVED_FIELD: &str = r#"
+table User {
+    @@user_id: utf8,
+    @user_name: utf8,
+}
+"#;
+    let original = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap().schema_fingerprint;
+    let changed_type = GenerationModel::from_vos_schema(CHANGED_TYPE).unwrap().schema_fingerprint;
+    let removed_field = GenerationModel::from_vos_schema(REMOVED_FIELD).unwrap().schema_fingerprint;
+    assert_ne!(original, changed_type);
+    assert_ne!(original, removed_field);
+}
+
 #[test]
 fn generation_rejects_schema_without_a_table_primary() {
     assert!(GenerationModel::from_vos_schema("table User { id: utf8 }").is_err());

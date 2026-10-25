@@ -9,16 +9,13 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-use std::{
-    collections::{HashMap, hash_map::DefaultHasher},
-    hash::{Hash, Hasher},
-    sync::Mutex,
-};
+use std::{collections::HashMap, sync::Mutex};
 
 use dejavu::{Dejavu, IrDocument};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use vos::{CanonicalType, CanonicalTypeArgument, ContractDiagnostic, SchemaProjection, TypeContract, TypeContractKind};
 
 /// Generator errors.
@@ -359,7 +356,7 @@ impl GenerationModel {
         }
         Ok(Self {
             generator_version: env!("CARGO_PKG_VERSION").into(),
-            schema_fingerprint: fingerprint_schema(&projection, &operations),
+            schema_fingerprint: projection_fingerprint(&projection, &operations),
             tables,
             macros,
             operations: operation_models,
@@ -662,11 +659,111 @@ fn format_diagnostics(diagnostics: &[ContractDiagnostic]) -> String {
     diagnostics.iter().map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message)).collect::<Vec<_>>().join("\n")
 }
 
-fn fingerprint_schema(projection: &SchemaProjection, operations: &[vos::OperationProjection]) -> String {
-    let mut h = DefaultHasher::new();
-    format!("{projection:?}").hash(&mut h);
-    format!("{operations:?}").hash(&mut h);
-    format!("{:x}", h.finish())
+/// Version of the canonical schema fingerprint model.
+///
+/// Bump this whenever the canonical structure below changes, so a model change
+/// is an explicit decision instead of an unexplained fingerprint drift.
+const SCHEMA_FINGERPRINT_VERSION: &str = "iris/schema-fingerprint/v0";
+
+/// Canonical schema fingerprint model hashed by [`projection_fingerprint`].
+///
+/// Only semantics that change generation participate: declaration kind and
+/// canonical path, field name/type/generation attributes, and operation
+/// signatures. Spans, internal indices and source order stay out.
+#[derive(Serialize)]
+struct CanonicalSchemaFingerprint {
+    fingerprint_version: &'static str,
+    types: Vec<CanonicalFingerprintType>,
+    operations: Vec<CanonicalFingerprintOperation>,
+}
+
+#[derive(Serialize)]
+struct CanonicalFingerprintType {
+    path: Vec<String>,
+    kind: String,
+    fields: Vec<CanonicalFingerprintField>,
+}
+
+#[derive(Serialize)]
+struct CanonicalFingerprintField {
+    name: String,
+    ty: String,
+    attributes: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct CanonicalFingerprintOperation {
+    kind: String,
+    name: String,
+    params: Vec<CanonicalFingerprintParam>,
+    return_type: String,
+}
+
+#[derive(Serialize)]
+struct CanonicalFingerprintParam {
+    name: String,
+    ty: String,
+}
+
+fn type_kind_label(kind: TypeContractKind) -> String {
+    match kind {
+        TypeContractKind::Table => "table",
+        TypeContractKind::Class => "class",
+    }
+    .to_owned()
+}
+
+/// Content-addressed schema fingerprint (SHA-256, lowercase hex).
+///
+/// The canonical model above is serialized as JSON and hashed, so unrelated
+/// code, internal layout, `Debug` derives and dependency versions cannot move
+/// the value. Declaration and field order are normalized because order is not
+/// identity.
+fn projection_fingerprint(projection: &SchemaProjection, operations: &[vos::OperationProjection]) -> String {
+    let mut types = projection
+        .types
+        .iter()
+        .map(|item| {
+            let mut fields = item
+                .fields
+                .iter()
+                .map(|field| {
+                    let mut attributes = field.attributes.iter().map(|attribute| attribute.name.clone()).collect::<Vec<_>>();
+                    attributes.sort();
+                    attributes.dedup();
+                    CanonicalFingerprintField { name: field.canonical_name.clone(), ty: type_label(&field.canonical_type), attributes }
+                })
+                .collect::<Vec<_>>();
+            fields.sort_by(|a, b| a.name.cmp(&b.name));
+            CanonicalFingerprintType { path: item.canonical_path.clone(), kind: type_kind_label(item.kind), fields }
+        })
+        .collect::<Vec<_>>();
+    types.sort_by(|a, b| a.path.cmp(&b.path).then_with(|| a.kind.cmp(&b.kind)));
+
+    let mut operations = operations
+        .iter()
+        .map(|operation| CanonicalFingerprintOperation {
+            kind: operation_kind_label(operation.kind),
+            name: operation.name.clone(),
+            params: operation
+                .parameters
+                .iter()
+                .map(|param| CanonicalFingerprintParam { name: param.name.clone(), ty: type_label(&param.type_expr) })
+                .collect(),
+            return_type: operation.return_type.as_ref().map(type_label).unwrap_or_else(|| "unit".to_owned()),
+        })
+        .collect::<Vec<_>>();
+    operations.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then_with(|| a.kind.cmp(&b.kind))
+            .then_with(|| a.params.iter().map(|param| (&param.name, &param.ty)).cmp(b.params.iter().map(|param| (&param.name, &param.ty))))
+            .then_with(|| a.return_type.cmp(&b.return_type))
+    });
+
+    let wire = serde_json::to_vec(&CanonicalSchemaFingerprint { fingerprint_version: SCHEMA_FINGERPRINT_VERSION, types, operations })
+        .expect("canonical schema fingerprint model serializes");
+    Sha256::digest(wire).iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[allow(dead_code)]
