@@ -119,13 +119,7 @@ fn typescript_emit_compact_layout_for_all_files() {
 fn typescript_browser_artifacts_stay_host_neutral() {
     let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    let file = |name: &str| {
-        files
-            .iter()
-            .find(|(path, _)| path == name)
-            .map(|(_, content)| content.as_str())
-            .expect(name)
-    };
+    let file = |name: &str| files.iter().find(|(path, _)| path == name).map(|(_, content)| content.as_str()).expect(name);
 
     let browser = file("browser.ts");
     assert!(browser.contains("@yydb/iris-language"), "{browser}");
