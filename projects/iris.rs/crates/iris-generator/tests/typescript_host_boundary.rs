@@ -1,0 +1,117 @@
+//! Generated TypeScript host boundary: every emitted file may only import the
+//! host modules assigned to it by the generation contract.
+
+use std::collections::BTreeSet;
+
+use iris_generator::{GenerationModel, emit_typescript_client};
+
+const BLOG_SCHEMA: &str = r#"
+table User {
+    @@user_id: uuid,
+    user_name: utf8,
+    active: bool,
+}
+
+table Post {
+    @@post_id: uuid,
+    author: &User,
+    title: utf8,
+    published: bool,
+}
+"#;
+
+/// Host package specifiers each generated file is allowed to import.
+///
+/// Only the three host entry points may reach a host package: `node.ts` owns the
+/// desktop `@yydb/iris` surface, `browser.ts` owns `@yydb/iris-language`, and
+/// `cloudflare.ts` owns `@yydb/iris/cloudflare`. Everything else is shared
+/// generated code and must stay host neutral.
+const HOST_IMPORT_WHITELIST: &[(&str, &[&str])] = &[
+    ("metadata.ts", &[]),
+    ("index.ts", &[]),
+    ("node.ts", &["@yydb/iris/node", "@yydb/iris/types"]),
+    ("browser.ts", &["@yydb/iris-language"]),
+    ("cloudflare.ts", &["@yydb/iris/cloudflare"]),
+    ("_internal/d1-plans.ts", &[]),
+    ("_internal/contract-types.ts", &[]),
+    ("_internal/synthesize.ts", &[]),
+    ("references.ts", &[]),
+    ("models.ts", &[]),
+    ("inputs.ts", &[]),
+    ("errors.ts", &[]),
+    ("operations.ts", &[]),
+];
+
+fn allowed_host_imports(name: &str) -> Option<&'static [&'static str]> {
+    HOST_IMPORT_WHITELIST.iter().find(|(file, _)| *file == name).map(|(_, allowed)| *allowed)
+}
+
+/// Module specifiers of every static `import` / `export ... from` in a file.
+fn module_specifiers(source: &str) -> Vec<String> {
+    let mut specs = Vec::new();
+    for line in source.lines() {
+        let trimmed = line.trim();
+        let tail = trimmed.split_once("from \"").map(|(_, tail)| tail).or_else(|| trimmed.strip_prefix("import \""));
+        if let Some(tail) = tail
+            && let Some(specifier) = tail.split_once('"').map(|(specifier, _)| specifier)
+        {
+            specs.push(specifier.to_owned());
+        }
+    }
+    specs
+}
+
+#[test]
+fn generated_typescript_imports_stay_inside_host_whitelist() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = emit_typescript_client(&model).expect("emit");
+
+    let generated: BTreeSet<&str> = files.iter().map(|(name, _)| name.as_str()).collect();
+    let declared: BTreeSet<&str> = HOST_IMPORT_WHITELIST.iter().map(|(name, _)| *name).collect();
+    assert_eq!(
+        generated, declared,
+        "generated file set drifted from the host import whitelist. Update `HOST_IMPORT_WHITELIST` with the new file's host boundary"
+    );
+
+    for (name, content) in &files {
+        let allowed = allowed_host_imports(name).expect("whitelist covers every generated file");
+        for specifier in module_specifiers(content) {
+            if !specifier.starts_with("@yydb/") {
+                continue;
+            }
+            assert!(allowed.contains(&specifier.as_str()), "`{name}` imports `{specifier}`, which is outside its host whitelist {allowed:?}");
+        }
+    }
+}
+
+#[test]
+fn browser_entry_stays_on_the_web_language_package() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = emit_typescript_client(&model).expect("emit");
+    let browser = files.iter().find(|(name, _)| name == "browser.ts").map(|(_, content)| content.as_str()).expect("browser.ts");
+
+    for specifier in module_specifiers(browser) {
+        assert_ne!(specifier, "@yydb/iris", "browser entry must not import the desktop root");
+        assert!(!specifier.starts_with("@yydb/iris/"), "browser entry must not import a desktop subpath, found `{specifier}`");
+    }
+    assert!(browser.contains("@yydb/iris-language"), "{browser}");
+}
+
+#[test]
+fn shared_generated_layer_never_reaches_a_desktop_entry() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = emit_typescript_client(&model).expect("emit");
+
+    for (name, content) in &files {
+        if name == "node.ts" || name == "cloudflare.ts" {
+            continue;
+        }
+        for specifier in module_specifiers(content) {
+            assert_ne!(specifier, "@yydb/iris", "`{name}` is shared generated code and must not import the desktop root");
+            assert!(
+                !specifier.starts_with("@yydb/iris/"),
+                "`{name}` is shared generated code and must not import desktop subpath `{specifier}`"
+            );
+        }
+    }
+}
