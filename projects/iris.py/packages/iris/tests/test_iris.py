@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+try:
+    import iris
+except ImportError:  # running the suite from a source checkout
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+    import iris
 
-import iris
-
-NATIVE_AVAILABLE = importlib.util.find_spec("iris_pyo3") is not None
+try:
+    import iris_pyo3  # noqa: F401
+except ImportError:
+    NATIVE_AVAILABLE = False
+else:
+    NATIVE_AVAILABLE = True
 NATIVE_REASON = (
     "the `iris_pyo3` native module is not built. Install the wheel or run "
     "`maturin develop` in `projects/iris.py/packages/iris` first"
