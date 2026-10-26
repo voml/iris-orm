@@ -80,6 +80,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(nodeEntry, /static async create/);
     assert.match(nodeEntry, /static async open/);
     assert.match(nodeEntry, /static async close/);
+    assert.doesNotMatch(nodeEntry, /@yydb\/iris-language/);
+    assert.doesNotMatch(nodeEntry, /@yydb\/hermes/);
+    assert.doesNotMatch(nodeEntry, /@yydb\/iris-unknown-wasm32/);
+    assert.doesNotMatch(nodeEntry, /\.wasm/);
 
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris-language/);
@@ -87,6 +91,10 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.doesNotMatch(browserEntry, /@yydb\/iris\/types/);
     assert.doesNotMatch(browserEntry, /@yydb\/iris\/runtime/);
     assert.doesNotMatch(browserEntry, /"@yydb\/iris"/);
+    assert.doesNotMatch(browserEntry, /@yydb\/iris\/node/);
+    assert.doesNotMatch(browserEntry, /@yydb\/hermes/);
+    assert.doesNotMatch(browserEntry, /@yydb\/iris-unknown-wasm32/);
+    assert.doesNotMatch(browserEntry, /\.wasm/);
     assert.match(browserEntry, /createIrisOperationExecutor/);
     assert.match(browserEntry, /wireNamesByEntity: IRIS_FIELD_WIRE_NAMES/);
     assert.match(browserEntry, /IRIS_SCHEMA_FINGERPRINT/);
