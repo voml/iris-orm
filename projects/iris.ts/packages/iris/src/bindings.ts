@@ -74,6 +74,13 @@ export type IrisNodeBindings = IrisBindings & {
     materializeRuntimeProject(projectDir: string, documentJson: string): string;
     readSchema(projectRoot: string, schemaGlob: string): string;
     generate(source: string, target: string, outDir: string): GenerateResult;
+    /** Route B variant: generate from pre-resolved VOS artifacts instead of source text. */
+    generateFromArtifacts(
+        contractJson: string,
+        operationsJson: string,
+        target: string,
+        outDir: string,
+    ): GenerateResult;
     migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;
     migrateRunCmd ? (
         configPath: string,

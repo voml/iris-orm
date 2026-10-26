@@ -11,7 +11,7 @@ pub mod wire;
 
 pub use bind::bind_parameters;
 
-pub use core::{SchemaCheck, check_schema_source, introspect_schema_json, iris_version};
+pub use core::{SchemaCheck, check_artifacts, check_schema_source, generate_from_artifacts, introspect_from_artifacts, introspect_schema_json, iris_version};
 #[allow(deprecated)]
 pub use session::{MemorySession, execute_vos_memory, query_memory};
 
@@ -96,4 +96,23 @@ pub fn query_memory_js(source: &str) -> String {
 pub fn execute_vos(source: &str) -> String {
     #[allow(deprecated)]
     execute_vos_memory(source)
+}
+
+/// Validate pre-resolved VOS artifacts (Route B counterpart of [`check_source`]).
+#[wasm_bindgen(js_name = checkArtifacts)]
+pub fn check_artifacts_js(contract_json: &str, operations_json: &str) -> CheckSourceResult {
+    check_artifacts(contract_json, operations_json).into()
+}
+
+/// Read-only schema introspection JSON from pre-resolved artifacts (Route B).
+#[wasm_bindgen(js_name = introspectFromArtifacts)]
+pub fn introspect_from_artifacts_js(contract_json: &str, operations_json: &str) -> String {
+    introspect_from_artifacts(contract_json, operations_json)
+}
+
+/// Generate bindings from pre-resolved artifacts; returns JSON
+/// `{ ok, schemaFingerprint, target, files: [{ name, content }], error }`.
+#[wasm_bindgen(js_name = generateFromArtifacts)]
+pub fn generate_from_artifacts_js(contract_json: &str, operations_json: &str, target: &str) -> String {
+    generate_from_artifacts(contract_json, operations_json, target)
 }

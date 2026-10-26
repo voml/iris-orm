@@ -93,6 +93,29 @@ function loadModule(specifier: string): IrisNodeBindings {
             readSchema: (projectRoot, schemaGlob) => String((module.readSchema as (r: string, g: string) => string)(projectRoot, schemaGlob)),
             generate: (source, target, outDir) =>
                 (module.generate as (s: string, t: string, o: string) => GenerateResult)(source, target, outDir),
+            generateFromArtifacts:
+                typeof module.generateFromArtifacts === "function"
+                    ? (contractJson, operationsJson, target, outDir) =>
+                          (
+                              module.generateFromArtifacts as (
+                                  c: string,
+                                  op: string,
+                                  t: string,
+                                  o: string,
+                              ) => GenerateResult
+                          )(contractJson, operationsJson, target, outDir)
+                    : // Backfill for older native builds that only expose `generate`.
+                      // Hosts with resolved artifacts must bundle a compatible native
+                      // build; we fail fast here rather than silently corrupting output.
+                      (() => {
+                          const missing = (): GenerateResult => {
+                              throw new IrisFacadeError(
+                                  "native-missing-generate-from-artifacts",
+                                  "generateFromArtifacts requires a native build with Route B support (iris-napi >= current)",
+                              );
+                          };
+                          return missing;
+                      })(),
             migratePlanCmd: (configPath, source, outDir) =>
                 (module.migratePlanCmd as (c: string, s: string, o?: string | null) => MigratePlanResult)(
                     configPath,

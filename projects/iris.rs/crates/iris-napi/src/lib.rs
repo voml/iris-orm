@@ -133,6 +133,43 @@ pub fn generate(source: String, target: String, out_dir: String) -> Result<Gener
     }
 }
 
+/// Generate client bindings from pre-resolved VOS artifacts (Route B).
+///
+/// `contract_json` is a resolved VOS contract artifact, `operations_json` is a
+/// VOS operation projection artifact. Skips source parsing and identity
+/// allocation when the caller already holds both artifacts.
+#[napi]
+pub fn generate_from_artifacts(
+    contract_json: String,
+    operations_json: String,
+    target: String,
+    out_dir: String,
+) -> Result<GenerateResult> {
+    match iris_generator::generate_from_artifacts(&contract_json, &operations_json, &target, Path::new(&out_dir)) {
+        Ok((model, paths)) => {
+            let output_path = match target.as_str() {
+                "rust" => iris_generator::rust_target_dir(Path::new(&out_dir)).display().to_string(),
+                "typescript" | "ts" => out_dir.clone(),
+                _ => out_dir.clone(),
+            };
+            Ok(GenerateResult {
+                ok: true,
+                output_path,
+                schema_fingerprint: model.schema_fingerprint,
+                files: paths.into_iter().map(|path| path.display().to_string()).collect(),
+                error: None,
+            })
+        }
+        Err(err) => Ok(GenerateResult {
+            ok: false,
+            output_path: String::new(),
+            schema_fingerprint: String::new(),
+            files: vec![],
+            error: Some(err.to_string()),
+        }),
+    }
+}
+
 /// Migration plan summary.
 #[napi(object)]
 pub struct MigratePlanResult {

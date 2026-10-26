@@ -28,6 +28,6 @@ fn release_wasm32_artifact_exists_with_sane_size() {
     assert!(wasm.is_file(), "missing wasm artifact at {}", wasm.display());
     let bytes = std::fs::metadata(&wasm).expect("stat wasm").len();
     assert!(bytes > 8_192, "wasm artifact suspiciously small: {bytes} bytes");
-    // Browser bundle budget until dependency slimming lands (iris-generator + vos/dejavu chain).
-    assert!(bytes < 2_000_000, "wasm artifact too large for browser target: {bytes} bytes");
+    // Browser bundle budget (Route B artifacts + upcoming dependency slimming).
+    assert!(bytes < 2_200_000, "wasm artifact too large for browser target: {bytes} bytes");
 }

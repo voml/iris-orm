@@ -483,11 +483,53 @@ pub fn generate(model: &GenerationModel, target: &str, generate_root: &std::path
     }
 }
 
+/// Emit target file contents from a `GenerationModel` without writing to the
+/// filesystem (used by WASM / in-memory hosts).
+pub fn emit_target_files(model: &GenerationModel, target: &str) -> Result<Vec<(String, String)>> {
+    match target {
+        "rust" => emit_rust_files(model),
+        "typescript" | "ts" => emit_typescript_client(model),
+        other => Err(typescript::unsupported_target(other)),
+    }
+}
+
 /// Parse schema source and generate bindings for `target`.
 pub fn generate_from_source(source: &str, target: &str, generate_root: &std::path::Path) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
     let model = GenerationModel::from_vos_schema(source)?;
     let paths = generate(&model, target, generate_root)?;
     Ok((model, paths))
+}
+
+/// Build a `GenerationModel` from pre-resolved VOS artifacts and generate
+/// bindings for `target` under `generate_root`.
+///
+/// Route B counterpart of [`generate_from_source`]: skips schema parsing and
+/// identity allocation when the caller already holds a resolved contract JSON
+/// and a VOS operation projection artifact.
+pub fn generate_from_artifacts(
+    contract_json: &str,
+    operations_json: &str,
+    target: &str,
+    generate_root: &std::path::Path,
+) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
+    let model = GenerationModel::from_artifacts(contract_json, operations_json)?;
+    let paths = generate(&model, target, generate_root)?;
+    Ok((model, paths))
+}
+
+/// Emit target file contents from pre-resolved VOS artifacts without writing
+/// to the filesystem (used by WASM hosts).
+///
+/// Returns `(model, files)` where each `(filename, content)` pair is one
+/// generated artifact.
+pub fn emit_from_artifacts(
+    contract_json: &str,
+    operations_json: &str,
+    target: &str,
+) -> Result<(GenerationModel, Vec<(String, String)>)> {
+    let model = GenerationModel::from_artifacts(contract_json, operations_json)?;
+    let files = emit_target_files(&model, target)?;
+    Ok((model, files))
 }
 
 struct MappedFieldType {
