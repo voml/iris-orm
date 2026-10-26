@@ -23,8 +23,8 @@ export {
     irisVersion,
     openMemorySession,
 } from "@yydb/iris-unknown-wasm32";
-export type { CheckSourceResult } from "@yydb/iris-unknown-wasm32";
-export type { WebCreateIrisDbBindingOptions as CreateIrisDbBindingOptions } from "@yydb/iris-unknown-wasm32";
+export type { CheckSourceResult } from "./web-contract.ts";
+export type { WebCreateIrisDbBindingOptions as CreateIrisDbBindingOptions } from "./web-contract.ts";
 
 export {
     createBrowserIrisDbBinding,

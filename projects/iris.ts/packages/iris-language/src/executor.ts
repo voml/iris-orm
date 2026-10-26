@@ -4,7 +4,7 @@ import type {
     WebIrisDbBinding,
     WebIrisSession,
     WebOperationExecutor,
-} from "@yydb/iris-unknown-wasm32";
+} from "./web-contract.ts";
 
 import { IrisLanguageError } from "./errors.ts";
 import {

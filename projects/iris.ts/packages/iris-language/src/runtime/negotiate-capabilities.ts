@@ -4,7 +4,7 @@ import type {
     WebIrisDurability,
     WebIrisHost,
     WebIrisStorageProfile,
-} from "@yydb/iris-unknown-wasm32";
+} from "../web-contract.ts";
 
 export type NegotiateCapabilitiesInput = {
     host: WebIrisHost;

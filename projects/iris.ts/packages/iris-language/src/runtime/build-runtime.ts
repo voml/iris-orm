@@ -8,7 +8,7 @@ import type {
     WebOpenSessionOptions,
     WebSchemaIntrospection,
     WebSessionExecuteWire,
-} from "@yydb/iris-unknown-wasm32";
+} from "../web-contract.ts";
 
 import { negotiateCapabilities } from "./negotiate-capabilities.ts";
 import { parseExecuteJson, parseIntrospectionJson, parseRowsJson } from "./parse.ts";

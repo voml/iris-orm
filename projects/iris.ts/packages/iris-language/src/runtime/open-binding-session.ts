@@ -4,7 +4,7 @@ import type {
     WebIrisBindings,
     WebIrisHost,
     WebMemorySessionBinding,
-} from "@yydb/iris-unknown-wasm32";
+} from "../web-contract.ts";
 
 import { IrisLanguageError } from "../errors.ts";
 

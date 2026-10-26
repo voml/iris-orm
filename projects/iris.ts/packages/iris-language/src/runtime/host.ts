@@ -22,7 +22,7 @@ import type {
     WebSessionExecuteWire,
     WebVosParameters,
     WebWireCarrierValue,
-} from "@yydb/iris-unknown-wasm32";
+} from "../web-contract.ts";
 
 export type {
     WebExecuteResult as ExecuteResult,
