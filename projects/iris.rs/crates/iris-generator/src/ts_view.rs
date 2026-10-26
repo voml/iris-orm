@@ -65,6 +65,12 @@ struct TsTemplateContext {
     tables_view: Vec<TsTableView>,
     macros_view: Vec<TsMacroView>,
     has_macros: bool,
+    /// Pre-computed per-entity wire-name map inlined into synthesize.ts
+    /// so the runtime no longer imports IRIS_FIELD_WIRE_NAMES from metadata.
+    synthesize_wire_map_lines: String,
+    /// Pre-computed per-entity reference-target map inlined into synthesize.ts
+    /// so the runtime no longer imports IRIS_REFERENCE_TARGETS from metadata.
+    synthesize_reference_target_lines: String,
 }
 
 impl GenerationModel {
@@ -237,6 +243,13 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         })
         .collect();
 
+    // Pre-computed maps that get inlined directly into synthesize.ts so the
+    // runtime no longer pulls them from metadata.ts. Same shape as
+    // wire_map_lines / reference_target_lines — just consumed by a different
+    // template, keeping metadata.ts's copies for node/browser/cloudflare.
+    let synthesize_wire_map_lines = wire_map_lines.clone();
+    let synthesize_reference_target_lines = reference_target_lines.clone();
+
     TsTemplateContext {
         generator_version: model.generator_version.clone(),
         schema_fingerprint: model.schema_fingerprint.clone(),
@@ -255,6 +268,8 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         tables_view,
         macros_view,
         has_macros: !model.macros.is_empty(),
+        synthesize_wire_map_lines,
+        synthesize_reference_target_lines,
     }
 }
 

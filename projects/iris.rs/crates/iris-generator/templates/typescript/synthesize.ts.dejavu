@@ -2,7 +2,18 @@
 
 import type { OperationRequest, ResultEnvelope } from "./contract-types.js";
 import type { IrisGeneratedError } from "../errors.js";
-import { IRIS_FIELD_WIRE_NAMES, IRIS_REFERENCE_TARGETS, IRIS_SCHEMA_FINGERPRINT } from "../metadata.js";
+import { IRIS_SCHEMA_FINGERPRINT } from "../metadata.js";
+
+// Pre-computed per-entity maps inlined at codegen time — synthesize.ts is
+// self-contained for wire-name + reference-target lookup and no longer pulls
+// IRIS_FIELD_WIRE_NAMES / IRIS_REFERENCE_TARGETS from metadata.ts. Those
+// constants remain in metadata.ts for node/browser/cloudflare entry points.
+const SYNTHESIZE_WIRE_NAMES: Record<string, Readonly<Record<string, string>>> = {
+<% synthesize_wire_map_lines %>
+};
+const SYNTHESIZE_REF_TARGETS: Record<string, Readonly<Record<string, string>>> = {
+<% synthesize_reference_target_lines %>
+};
 
 export type VosParameters = Record<string, unknown>;
 
@@ -51,11 +62,11 @@ function isFilterOperatorObject(value: Record<string, unknown>): boolean {
 }
 
 function wireName(entity: string, tsField: string): string {
-    return IRIS_FIELD_WIRE_NAMES[entity]?.[tsField] ?? tsField;
+    return SYNTHESIZE_WIRE_NAMES[entity]?.[tsField] ?? tsField;
 }
 
 function referenceTargetEntity(entity: string, tsField: string): string | undefined {
-    return IRIS_REFERENCE_TARGETS[entity]?.[tsField];
+    return SYNTHESIZE_REF_TARGETS[entity]?.[tsField];
 }
 
 function nextParam(parameters: VosParameters, hint: string, value: unknown): string {
