@@ -722,4 +722,132 @@ mod tests {
         assert!(!s.contains("operation_hint"));
     }
 
+    // -- lowering 单元测试 -------------------------------------------------
+
+    fn users_meta(kind: OperationKind) -> OperationMeta {
+        OperationMeta {
+            table: "users".into(),
+            key_column: "id".into(),
+            kind,
+            columns: vec!["name".into(), "email".into()],
+        }
+    }
+
+    #[test]
+    fn lower_find_produces_select_by_key() {
+        let meta = users_meta(OperationKind::Find);
+        let params = vec![WireValue::Int(42)];
+        let op = lower_operation(&meta, params).expect("ok");
+        assert_eq!(op.sql, "SELECT * FROM \"users\" WHERE \"id\" = ?");
+        assert_eq!(op.mode, D1ExecutionMode::Read);
+        assert_eq!(op.returning, ReturningProjection::None);
+        assert_eq!(op.params.len(), 1);
+        assert_eq!(op.params[0], WireValue::Int(42));
+    }
+
+    #[test]
+    fn lower_delete_produces_delete_by_key() {
+        let meta = users_meta(OperationKind::Delete);
+        let params = vec![WireValue::Int(7)];
+        let op = lower_operation(&meta, params).expect("ok");
+        assert_eq!(op.sql, "DELETE FROM \"users\" WHERE \"id\" = ?");
+        assert_eq!(op.mode, D1ExecutionMode::Write);
+        assert_eq!(op.returning, ReturningProjection::None);
+    }
+
+    #[test]
+    fn lower_create_produces_insert_returning() {
+        let meta = users_meta(OperationKind::Create);
+        let params = vec![WireValue::Str("alice".into()), WireValue::Str("a@x.com".into())];
+        let op = lower_operation(&meta, params).expect("ok");
+        assert_eq!(
+            op.sql,
+            "INSERT INTO \"users\" (\"name\", \"email\") VALUES (?, ?) RETURNING *"
+        );
+        assert_eq!(op.mode, D1ExecutionMode::WriteReturning);
+        assert_eq!(op.returning, ReturningProjection::All);
+        assert_eq!(op.params.len(), 2);
+    }
+
+    #[test]
+    fn lower_update_produces_update_returning() {
+        let meta = users_meta(OperationKind::Update);
+        // Update params = [name, email, key]
+        let params = vec![
+            WireValue::Str("bob".into()),
+            WireValue::Str("b@x.com".into()),
+            WireValue::Int(99),
+        ];
+        let op = lower_operation(&meta, params).expect("ok");
+        assert_eq!(
+            op.sql,
+            "UPDATE \"users\" SET \"name\" = ?, \"email\" = ? WHERE \"id\" = ? RETURNING *"
+        );
+        assert_eq!(op.mode, D1ExecutionMode::WriteReturning);
+        assert_eq!(op.returning, ReturningProjection::All);
+        assert_eq!(op.params.len(), 3);
+        assert_eq!(op.params[2], WireValue::Int(99));
+    }
+
+    #[test]
+    fn lower_rejects_invalid_table_identifier() {
+        let meta = OperationMeta {
+            table: "users; DROP TABLE users--".into(),
+            key_column: "id".into(),
+            kind: OperationKind::Find,
+            columns: vec![],
+        };
+        let err = lower_operation(&meta, vec![WireValue::Int(1)]).expect_err("must reject");
+        assert!(matches!(err, LoweringError::InvalidIdentifier(_)));
+    }
+
+    #[test]
+    fn lower_rejects_empty_columns_on_update() {
+        let meta = OperationMeta {
+            table: "users".into(),
+            key_column: "id".into(),
+            kind: OperationKind::Update,
+            columns: vec![],
+        };
+        let err = lower_operation(&meta, vec![WireValue::Int(1)]).expect_err("must reject");
+        assert!(matches!(err, LoweringError::MissingMetadata(_)));
+    }
+
+    #[test]
+    fn lower_rejects_param_count_mismatch() {
+        let meta = users_meta(OperationKind::Find);
+        let err = lower_operation(&meta, vec![WireValue::Int(1), WireValue::Int(2)])
+            .expect_err("must reject");
+        assert!(matches!(
+            err,
+            LoweringError::ParamCountMismatch { kind: OperationKind::Find, expected: 1, actual: 2 }
+        ));
+    }
+
+    #[test]
+    fn lower_round_trips_serde_for_prepared_op() {
+        let meta = users_meta(OperationKind::Find);
+        let op = lower_operation(&meta, vec![WireValue::Int(42)]).expect("ok");
+        let s = serde_json::to_string(&op).unwrap();
+        let back: PreparedOp = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, op);
+    }
+
+    #[test]
+    fn d1_request_with_hint_serde_round_trip() {
+        let req = D1Request {
+            sql: "PLACEHOLDER".into(),
+            params: vec![WireValue::Int(42)],
+            mode: D1ExecutionMode::Read,
+            returning: ReturningProjection::None,
+            contract_fingerprint: iris_ir::SchemaFingerprint("abc".into()),
+            operation_hint: Some(OperationHint {
+                meta: users_meta(OperationKind::Find),
+            }),
+        };
+        let s = serde_json::to_string(&req).unwrap();
+        assert!(s.contains("operation_hint"), "hint should serialize");
+        let back: D1Request = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, req);
+    }
 }

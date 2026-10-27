@@ -349,6 +349,126 @@ mod tests {
         assert_eq!(parsed["returning"], "all");
     }
 
+    // -- lowering 触发测试（operation_hint 存在时真正 lower SQL）------------
+
+    #[test]
+    fn prepare_with_hint_lowers_find_overrides_placeholder_sql() {
+        // 输入 sql 是占位符，operation_hint 存在时会被真正的 lowering 覆盖。
+        let req_json = r#"{
+            "sql": "PLACEHOLDER_SQL",
+            "params": [{"kind": "int", "value": 42}],
+            "mode": "write",
+            "returning": {"columns": ["id", "name"]},
+            "contract_fingerprint": "abc",
+            "operation_hint": {
+                "meta": {
+                    "table": "users",
+                    "key_column": "id",
+                    "kind": "find",
+                    "columns": ["name", "email"]
+                }
+            }
+        }"#;
+        let out = prepare_d1_operation_inner(req_json).expect("ok");
+        let parsed: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+        // SQL 被真正 lower 了
+        assert_eq!(parsed["sql"], "SELECT * FROM \"users\" WHERE \"id\" = ?");
+        // mode 从 hint 推断是 read
+        assert_eq!(parsed["mode"], "read");
+        // returning 也被覆盖为 none（find 不需要）
+        assert_eq!(parsed["returning"], "none");
+        // operation_hint 不应出现在输出里（skip_serializing_if=None）
+        assert!(parsed.get("operation_hint").is_none());
+    }
+
+    #[test]
+    fn prepare_with_hint_lowers_create_to_insert_returning() {
+        let req_json = r#"{
+            "sql": "PLACEHOLDER",
+            "params": [{"kind": "str", "value": "alice"}, {"kind": "str", "value": "a@x.com"}],
+            "mode": "read",
+            "returning": "none",
+            "contract_fingerprint": "xyz",
+            "operation_hint": {
+                "meta": {
+                    "table": "users",
+                    "key_column": "id",
+                    "kind": "create",
+                    "columns": ["name", "email"]
+                }
+            }
+        }"#;
+        let out = prepare_d1_operation_inner(req_json).expect("ok");
+        let parsed: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+        assert_eq!(
+            parsed["sql"],
+            "INSERT INTO \"users\" (\"name\", \"email\") VALUES (?, ?) RETURNING *"
+        );
+        assert_eq!(parsed["mode"], "write-returning");
+        assert_eq!(parsed["returning"], "all");
+    }
+
+    #[test]
+    fn prepare_with_hint_lowers_delete_to_plain_write() {
+        let req_json = r#"{
+            "sql": "PLACEHOLDER",
+            "params": [{"kind": "int", "value": 7}],
+            "mode": "read",
+            "returning": "all",
+            "contract_fingerprint": "del",
+            "operation_hint": {
+                "meta": {
+                    "table": "users",
+                    "key_column": "id",
+                    "kind": "delete",
+                    "columns": ["name"]
+                }
+            }
+        }"#;
+        let out = prepare_d1_operation_inner(req_json).expect("ok");
+        let parsed: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+        assert_eq!(parsed["sql"], "DELETE FROM \"users\" WHERE \"id\" = ?");
+        assert_eq!(parsed["mode"], "write");
+        assert_eq!(parsed["returning"], "none");
+    }
+
+    #[test]
+    fn prepare_with_hint_errors_on_param_count_mismatch() {
+        let req_json = r#"{
+            "sql": "PLACEHOLDER",
+            "params": [{"kind": "int", "value": 1}, {"kind": "int", "value": 2}],
+            "mode": "read",
+            "returning": "none",
+            "contract_fingerprint": "err",
+            "operation_hint": {
+                "meta": {
+                    "table": "users",
+                    "key_column": "id",
+                    "kind": "find",
+                    "columns": []
+                }
+            }
+        }"#;
+        let err = prepare_d1_operation_inner(req_json).expect_err("lowering should fail");
+        assert!(err.contains("ParamCountMismatch") || err.contains("expected 1"));
+    }
+
+    #[test]
+    fn prepare_without_hint_stays_round_trip() {
+        // 没有 operation_hint 时，保持原有的 round-trip 行为
+        let req_json = r#"{
+            "sql": "SELECT 1",
+            "params": [],
+            "mode": "read",
+            "returning": "none",
+            "contract_fingerprint": "plain"
+        }"#;
+        let out = prepare_d1_operation_inner(req_json).expect("ok");
+        let parsed: serde_json::Value = serde_json::from_str(&out).expect("valid json");
+        assert_eq!(parsed["sql"], "SELECT 1");
+        assert_eq!(parsed["mode"], "read");
+    }
+
     // -- decode_d1_result tests -------------------------------------------
 
     #[test]
