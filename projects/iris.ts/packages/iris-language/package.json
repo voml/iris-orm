@@ -1,6 +1,6 @@
 {
     "name": "@yydb/iris-language",
-    "version": "0.0.18",
+    "version": "0.0.19",
     "description": "Iris ORM browser / Worker language layer on the WASM semantic core",
     "homepage": "https://iris-orm.pages.dev/",
     "keywords": [

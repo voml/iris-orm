@@ -23,7 +23,7 @@
         "typecheck:ts": "node scripts/typecheck-ts.mjs",
         "test:ci": "node --test \"scripts/ci/*.test.mjs\"",
         "iris": "pnpm --filter @yydb/iris run build && node ./projects/iris.ts/packages/iris/bin/iris.mjs",
-        "build:ts": "pnpm --filter @yydb/iris-unknown-wasm32 build && pnpm --filter @yydb/iris build && pnpm --filter @yydb/iris-language build",
+        "build:ts": "pnpm --filter @yydb/iris-unknown-wasm32 build && pnpm --filter @yydb/iris-language build && pnpm --filter @yydb/iris build",
         "build:napi": "node scripts/build-napi.mjs",
         "build:wasm": "node scripts/build-wasm.mjs",
         "napi:build": "node scripts/build-napi.mjs",
