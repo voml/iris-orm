@@ -156,36 +156,6 @@ export class DbClient {
 <% end loop %>
     }
 
-    /**
-     * Escape hatch for ad-hoc VOS. Prefer generated delegates for typed args and results.
-     * @internal
-     */
-    async $query<T = unknown>(
-        source: string,
-        parameters?: Readonly<Record<string, unknown>>,
-    ): Promise<T> {
-        const envelope = await this.executor.execute(
-            buildDeclaredOperationRequest("$query", { source, parameters: parameters ?? {} }),
-        );
-        if (!envelope.ok) {
-            throwOperationEnvelopeError(envelope);
-        }
-        return envelope.value as T;
-    }
-
-    /** Direct VOS DDL. Success maps VOS unit to void. */
-    async $execute(
-        source: string,
-        parameters?: Readonly<Record<string, unknown>>,
-    ): Promise<void> {
-        const envelope = await this.executor.executeUnit(
-            buildDeclaredOperationRequest("$execute", { source, parameters: parameters ?? {} }),
-        );
-        if (!envelope.ok) {
-            throwOperationEnvelopeError(envelope);
-        }
-    }
-
     async $close(): Promise<void> {
         await this.executor.close();
     }

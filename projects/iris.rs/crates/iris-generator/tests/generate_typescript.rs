@@ -56,7 +56,8 @@ fn typescript_emit_writes_ux_layout() {
     assert!(!root.join("synthesize.ts").is_file());
     assert!(!root.join("db.ts").is_file());
     let ops = std::fs::read_to_string(root.join("operations.ts")).expect("read operations");
-    assert!(ops.contains("$query<T = unknown>"));
+    assert!(!ops.contains("$query"), "escape hatch `$query` must not be emitted in generated TS clients");
+    assert!(!ops.contains("$execute"), "escape hatch `$execute` must not be emitted in generated TS clients");
     assert!(ops.contains("synthesizeCreate"));
     assert!(ops.contains("./_internal/synthesize.js"));
     assert!(!ops.contains("@yydb/iris/node"));
