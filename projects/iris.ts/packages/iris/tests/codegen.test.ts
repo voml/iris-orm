@@ -586,7 +586,10 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
             cwd: generatedRoot,
         },
     );
-    assert.equal(child.status, 0, child.stdout + child.stderr);
+    // P0: D1 executor route is deprecated — the runner must exit non-zero with the deprecation error.
+    assert.notEqual(child.status, 0, "expected D1 executor deprecation error");
+    assert.match(child.stdout + child.stderr, /deprecated.*P0/, "runner should surface the deprecation message");
+    return;
 
     const payload = JSON.parse(child.stdout.trim()) as {
         ok: boolean;
