@@ -58,3 +58,15 @@ test("wireRowToAuthorRow keeps fields without a carrier scalar", () => {
     const mapped = wireRowToAuthorRow(carrierWireToTs, { seq: "7", payload: null, note: "Ada" });
     assert.deepEqual(mapped, { seq: "7", payload: null, note: "Ada" });
 });
+
+test("wireRowToAuthorRow throws on unknown VOS label instead of falling back", () => {
+    assert.throws(
+        () =>
+            wireRowToAuthorRow(
+                carrierWireToTs,
+                { seq: "x", payload: null, note: null },
+                { seq: "customTypeX", payload: "bytes", note: "utf16" },
+            ),
+        /unknown VOS label `customTypeX`/,
+    );
+});
