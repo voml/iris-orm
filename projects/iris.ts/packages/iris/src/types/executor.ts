@@ -1,5 +1,14 @@
 import type { ExecutionWireResult } from "./execution-result.ts";
-import type { IrisBindingProfile } from "./profile.ts";
+
+/**
+ * Binding options profile (internal — session-open mode selector).
+ *
+ * This is **not** a storage profile. Storage selection lives on
+ * `IrisStorageProfile` (see `src/types/profile.ts`) and is picked by the
+ * caller. `IrisBindingProfile` is the narrower question "how does the
+ * generated client want to open its session".
+ */
+export type IrisBindingProfile = "memory" | "sqlite" | "project";
 
 /** VOS parameter bindings for direct text execution. */
 export type VosParameters = Readonly<Record<string, unknown>>;

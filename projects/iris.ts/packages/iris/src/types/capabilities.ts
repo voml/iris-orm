@@ -1,4 +1,4 @@
-import type { IrisDurability, IrisHost, IrisStorageProfile } from "./profile.ts";
+import type { IrisHost, IrisStorageProfile, IrisDurability } from "./profile.ts";
 
 /** Execution surface negotiated for the active host. */
 export interface IrisExecutionCapabilities {
@@ -9,20 +9,21 @@ export interface IrisExecutionCapabilities {
 }
 
 /**
- * Storage backends Iris binds directly (not necessarily the active profile).
+ * Storage backends a host can bind (not the active profile — see
+ * `IrisCapabilityMatrix.storage` for the actually chosen backend).
  *
- * Browser OPFS persistence is a YYDB host adapter concern. Iris must not wire
- * OPFS or other web database APIs; consumers use YYDB when persistence is needed.
+ * Fields mirror `IrisStorageProfile` one-to-one so `hostSupportsStorage`
+ * can answer the same question with a single boolean access.
  */
 export interface IrisStorageCapabilities {
     readonly memory: boolean;
-    readonly localFs: boolean;
-    /** Always false: Iris does not implement OPFS; see YYDB Living `06` / `08`. */
-    readonly opfs: boolean;
+    readonly sqlite: boolean;
     readonly d1: boolean;
+    readonly yyds: boolean;
+    readonly remoteHttp: boolean;
 }
 
-/** Transaction semantics exposed by the active profile. */
+/** Transaction semantics exposed by the active storage profile. */
 export interface IrisTransactionCapabilities {
     readonly local: boolean;
     readonly batch: boolean;
@@ -37,18 +38,19 @@ export interface IrisLimitsCapabilities {
 }
 
 /**
- * Full capability matrix for the active host + profile pair.
+ * Full capability matrix for a **host + storage pair** (P0 decoupled).
  *
- * Replaces the legacy `{ host, bindingReady }` placeholder.
+ * `storage` is the **explicitly chosen** storage profile — no inference from
+ * `host`. `storageBackends` is the full backend menu the host can address.
  */
 export interface IrisCapabilityMatrix {
     readonly host: IrisHost;
-    readonly profile: IrisStorageProfile;
+    readonly storage: IrisStorageProfile;
     readonly durability: IrisDurability;
     /** Whether the semantic core binding finished loading. */
     readonly bindingReady: boolean;
     readonly execution: IrisExecutionCapabilities;
-    readonly storage: IrisStorageCapabilities;
+    readonly storageBackends: IrisStorageCapabilities;
     readonly transaction: IrisTransactionCapabilities;
     readonly limits: IrisLimitsCapabilities;
 }

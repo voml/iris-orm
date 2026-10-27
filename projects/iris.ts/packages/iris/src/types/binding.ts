@@ -4,7 +4,7 @@ import type { SchemaIntrospection } from "./schema-introspection.ts";
 import type { IrisHost } from "./profile.ts";
 import type { IrisSession, OpenSessionOptions } from "./session.ts";
 
-export type { IrisHost, IrisStorageProfile, IrisBindingProfile, IrisDurability } from "./profile.ts";
+export type { IrisHost, IrisStorageProfile, IrisDurability } from "./profile.ts";
 export type { IrisCapabilityMatrix } from "./capabilities.ts";
 
 /** @deprecated Use `IrisCapabilityMatrix`. */

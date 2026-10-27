@@ -1,7 +1,6 @@
 export { IrisConfigError, IrisFacadeError } from "./errors.ts";
 export type {
     IrisBindingHost,
-    IrisBindingProfile,
     IrisCapabilities,
     IrisCapabilityMatrix,
     IrisDurability,
@@ -27,10 +26,11 @@ export type { OperationExecutor } from "./operation-executor.ts";
 export type { IrisOperation, IrisScalar, IrisWhereEq } from "./operation.ts";
 export {
     defaultDurability,
+    hostExecutionCapabilities,
+    hostSupportsStorage,
     normalizeIrisHost,
-    resolveStorageProfile,
-    resolveStorageProfileForHost,
 } from "./profile.ts";
+export type { IrisHostExecutionCapabilities } from "./profile.ts";
 export type { IrisPlaceholder } from "./placeholder.ts";
 export type { CheckSourceResult } from "./check-source.ts";
 export type { SchemaFieldModel, SchemaIntrospection, SchemaMacroModel, SchemaTableModel } from "./schema-introspection.ts";

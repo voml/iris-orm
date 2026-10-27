@@ -54,5 +54,7 @@ export const createIrisExecutor = createIrisDbBinding;
 export async function createIrisBindingHost(options: CreateIrisDbBindingOptions = {}) {
     const { buildRuntime } = await import("../runtime/build-runtime.ts");
     const core = loadIrisNative();
-    return buildRuntime("node", core, resolveBindingProfile(options));
+    const bindingProfile = resolveBindingProfile(options);
+    const storage = bindingProfile === "memory" ? "memory" : "sqlite";
+    return buildRuntime("node", core, storage);
 }

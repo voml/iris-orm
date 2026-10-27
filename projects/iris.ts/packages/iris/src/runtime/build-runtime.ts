@@ -1,5 +1,5 @@
 import type { IrisBindings, MemorySessionBinding, OpenSessionNapiOptions } from "../bindings.ts";
-import type { IrisBindingHost, IrisHost } from "../types/binding.ts";
+import type { IrisBindingHost, IrisHost, IrisStorageProfile } from "../types/binding.ts";
 import type { OperationRequest } from "../types/contract.ts";
 import type { SchemaIntrospection } from "../types/schema-introspection.ts";
 import type { IrisSession, OpenSessionOptions } from "../types/session.ts";
@@ -81,24 +81,19 @@ function resolveSessionBinding(host: IrisHost, core: IrisBindings, options?: Ope
     return core.openMemorySession();
 }
 
-function sessionProfile(options?: OpenSessionOptions): "memory" | "sqlite" | "project" {
-    if (options?.profile === "sqlite" || options?.sqlitePath) {
-        return "sqlite";
-    }
-    if (options?.profile === "project" || options?.project) {
-        return "project";
-    }
-    if (options?.postgresUrl || options?.mysqlUrl) {
-        return "project";
-    }
+function sessionStorage(options?: OpenSessionOptions): IrisStorageProfile {
+    if (options?.profile === "memory") return "memory";
+    if (options?.profile === "sqlite" || options?.sqlitePath) return "sqlite";
+    if (options?.profile === "project" || options?.project) return "sqlite";
+    if (options?.postgresUrl || options?.mysqlUrl) return "sqlite";
     return "memory";
 }
 
 /** Build the symmetric Iris runtime facade from a loaded semantic core. */
-export function buildRuntime(host: IrisHost, core: IrisBindings, profile: "memory" | "sqlite" | "project" = "memory"): IrisBindingHost {
+export function buildRuntime(host: IrisHost, core: IrisBindings, storage: IrisStorageProfile = "memory"): IrisBindingHost {
     return {
         host,
-        capabilities: negotiateCapabilities({ host, profile, bindingReady: true }),
+        capabilities: negotiateCapabilities({ host, storage, bindingReady: true }),
         version: () => core.irisVersion(),
         checkSource: (source) => core.checkSource(source),
         introspectSchema: (source): SchemaIntrospection => parseIntrospectionJson(core.introspectSchema(source)),
@@ -108,5 +103,5 @@ export function buildRuntime(host: IrisHost, core: IrisBindings, profile: "memor
 
 /** Build runtime with capabilities derived from session open options. */
 export function buildRuntimeForSession(host: IrisHost, core: IrisBindings, options?: OpenSessionOptions): IrisBindingHost {
-    return buildRuntime(host, core, sessionProfile(options));
+    return buildRuntime(host, core, sessionStorage(options));
 }

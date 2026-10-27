@@ -1,6 +1,6 @@
 import type { IrisBindings, MemorySessionBinding } from "../bindings.ts";
-import type { CreateIrisDbBindingOptions } from "../types/executor.ts";
-import type { IrisBindingProfile, IrisHost } from "../types/profile.ts";
+import type { CreateIrisDbBindingOptions, IrisBindingProfile } from "../types/executor.ts";
+import type { IrisHost } from "../types/profile.ts";
 import { normalizeIrisHost } from "../types/profile.ts";
 
 /** Node-only project wiring for generated `Database.create` (`profile: "project"`). */
