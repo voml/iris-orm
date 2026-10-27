@@ -69,7 +69,8 @@ test("@yydb/iris exposes runtime helpers and no WASM entry", async () => {
     assert.equal(pkg.exports["./wasm"], undefined);
     assert.equal(pkg.typesVersions["*"].wasm, undefined);
     assert.equal(pkg.dependencies["@yydb/iris-unknown-wasm32"], undefined);
-    assert.equal(pkg.dependencies["@yydb/iris-language"], undefined);
+    // Worker hosts route through @yydb/iris-language which owns the WASM dep.
+    assert.equal(pkg.dependencies["@yydb/iris-language"], "workspace:*");
 });
 
 test("unsupported /node stub throws node-host-required", async () => {

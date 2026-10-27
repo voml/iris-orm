@@ -1,11 +1,17 @@
+/**
+ * Cloudflare Worker wiring for generated clients (`profile: d1`).
+ *
+ * Thin facade over `createD1OperationExecutor` from `./d1-executor.ts`.
+ * See that module for the WASM round-trip contract.
+ */
 import type { CreateIrisDbBindingOptions } from "../types/executor.ts";
 import type { OperationExecutor } from "../types/operation-executor.ts";
 
+import { createD1OperationExecutor } from "./d1-executor.ts";
 import type { IrisD1Database } from "./types.ts";
 
-/** Cloudflare Worker wiring for generated clients (`profile: d1`). */
 export interface CreateIrisCloudflareExecutorOptions extends CreateIrisDbBindingOptions {
-    /** Bound D1 database from the Worker environment. */
+    /** Bound D1 database from the Worker environment (`env.DB`). */
     d1: IrisD1Database;
     /** Build-time physical plan artifact from generated `_internal/d1-plans.ts`. */
     plans?: import("./d1-plan.ts").D1PlanRegistry;
@@ -16,21 +22,20 @@ export interface CreateIrisCloudflareExecutorOptions extends CreateIrisDbBinding
 }
 
 /**
- * P0 2026-10-27 — **DEPRECATED**
+ * Create the async D1-backed `OperationExecutor` generated Worker clients
+ * consume.
  *
- * The Cloudflare Worker + D1 executor route is frozen / abandoned. The
- * long-lived Edge runtime contract is tracked in `06-d1-adapter-and-edge-host.md`
- * (root design repo). Types remain available but execution **throws**.
- *
- * `cloudflare-worker` as a host now uses `hostSupportsStorage` gating against
- * the explicitly chosen `IrisStorageProfile`. D1 happens to be supported as a
- * storage value on that host, but the executor binding below is not the
- * adapter we will ship.
+ * Replaces the previous runtime-throw stub (P0 2026-10-27).  The executor
+ * routes every call through the WASM `prepareD1Operation` → D1 execute →
+ * `decodeD1Result` bridge in `@yydb/iris-language/cloudflare/d1-wasm-bridge`.
  */
 export async function createIrisOperationExecutor(
-    _options: CreateIrisCloudflareExecutorOptions,
+    options: CreateIrisCloudflareExecutorOptions,
 ): Promise<OperationExecutor> {
-    throw new Error(
-        "@yydb/iris/cloudflare: D1 executor route is deprecated (P0) — see 06-d1-adapter-and-edge-host.md for the new Edge storage adapter contract",
+    return createD1OperationExecutor(
+        options.d1,
+        options.plans,
+        options.wireNamesByEntity,
+        options.valueCarriersByEntity,
     );
 }

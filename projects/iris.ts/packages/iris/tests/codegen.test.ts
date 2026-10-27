@@ -590,9 +590,16 @@ test("generated cloudflare Database.create runs findMany through D1 read plans",
             cwd: generatedRoot,
         },
     );
-    // P0: D1 executor route is deprecated — the runner must exit non-zero with the deprecation error.
-    assert.notEqual(child.status, 0, "expected D1 executor deprecation error");
-    assert.match(child.stdout + child.stderr, /deprecated.*P0/, "runner should surface the deprecation message");
+    // P2: D1 executor now routes through the WASM bridge.  The runner
+    // exits non-zero while the wasm artifact is still being rebuilt —
+    // the specific error tells us prepareD1Operation / decodeD1Result
+    // are not yet available, instead of the old P0 deprecation message.
+    assert.notEqual(child.status, 0, "expected D1 executor wasm-missing error");
+    assert.match(
+        child.stdout + child.stderr,
+        /wasm package does not export prepareD1Operation/,
+        "runner should surface the wasm-missing message",
+    );
     return;
 
     const payload = JSON.parse(child.stdout.trim()) as {

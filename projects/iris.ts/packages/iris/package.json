@@ -93,7 +93,8 @@
     },
     "dependencies": {
         "@vmz/commander": "^0.2.0",
-        "@voml/vos": "^0.0.5"
+        "@voml/vos": "^0.0.5",
+        "@yydb/iris-language": "workspace:*"
     },
     "optionalDependencies": {
         "@yydb/iris-darwin-arm64": "workspace:*",

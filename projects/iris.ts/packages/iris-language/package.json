@@ -29,6 +29,11 @@
             "types": "./dist/index.d.ts",
             "browser": "./dist/index.js",
             "default": "./dist/index.js"
+        },
+        "./cloudflare/d1-wasm-bridge": {
+            "types": "./dist/cloudflare/d1-wasm-bridge.d.ts",
+            "workerd": "./dist/cloudflare/d1-wasm-bridge.js",
+            "default": "./dist/cloudflare/d1-wasm-bridge.js"
         }
     },
     "files": [

@@ -91,21 +91,36 @@ test("resolveD1Plan selects parameter variant keys", () => {
     assert.equal(coerceD1BindValue(false), 0);
 });
 
-// ── P0: D1 executor route is deprecated (runtime throws) ───────────────────
+// ── P2: D1 executor routes through WASM bridge ──────────────────────────
 
-test("P0: createD1ReadOperationExecutor throws structured deprecation error", () => {
-    assert.throws(
-        () => createD1ReadOperationExecutor(fakeD1, plans, wireNames),
-        /deprecated.*P0/,
-    );
+// The bridge calls `prepareD1Operation` / `decodeD1Result` on
+// `@yydb/iris-unknown-wasm32`.  Until the Rust side rebuilds that artifact,
+// the bridge correctly reports "wasm export missing" — the executor no
+// longer throws a deprecation error.
+
+test("P2: createD1ReadOperationExecutor surfaces wasm-missing as diagnostic when WASM not rebuilt", async () => {
+    const executor = createD1ReadOperationExecutor(fakeD1, plans, wireNames);
+    const result = await executor.execute(buildOp("User.findMany"));
+    assert.equal(result.ok, false);
+    assert.match(result.diagnostics[0]?.message ?? "", /wasm package does not export prepareD1Operation/);
 });
 
-test("P0: createIrisOperationExecutor throws structured deprecation error", async () => {
-    await assert.rejects(
-        () => createIrisOperationExecutor({ d1: fakeD1, plans, wireNamesByEntity: wireNames }),
-        /deprecated.*P0/,
-    );
+test("P2: createIrisOperationExecutor surfaces wasm-missing as diagnostic when WASM not rebuilt", async () => {
+    const executor = await createIrisOperationExecutor({ d1: fakeD1, plans, wireNamesByEntity: wireNames });
+    const result = await executor.execute(buildOp("User.findMany"));
+    assert.equal(result.ok, false);
+    assert.match(result.diagnostics[0]?.message ?? "", /wasm package does not export prepareD1Operation/);
 });
+
+// Build a minimal OperationRequest from an operation id so executor tests
+// don't need the full generated-client build path.
+function buildOp(operationId: string) {
+    return {
+        identity: { operationId, contractFingerprint: "cf-test-v1" },
+        operation: { kind: "find-many", entity: "User" } as const,
+        parameters: undefined,
+    };
+}
 
 // ── P0 smoke: host + storage combinations (explicit, no inference) ────────
 
