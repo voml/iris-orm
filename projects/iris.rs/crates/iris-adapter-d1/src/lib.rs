@@ -59,6 +59,31 @@ impl WireValue {
             iris_types::Value::Object(_) => Self::Null,
         }
     }
+
+    /// Convert a [`WireValue`] back into the canonical [`iris_types::Value`].
+    ///
+    /// The reverse of [`WireValue::from_iris`]; used by `decode_d1_result`
+    /// when the WASM bridge hands raw D1 rows back to the Iris runtime.
+    /// `f64` rounds to `Int` when integral, otherwise surfaces as `Str`
+    /// (Iris canonical value has no float carrier); Blob becomes `Null`
+    /// since there is no canonical binary type in Iris `Value`.
+    pub fn to_iris(&self) -> iris_types::Value {
+        match self {
+            Self::Null => iris_types::Value::Null,
+            Self::Bool(b) => iris_types::Value::Bool(*b),
+            Self::Int(i) => iris_types::Value::Int(*i),
+            Self::F64(f) => {
+                // Integral f64 → Int, otherwise text lossless representation.
+                if f.fract() == 0.0 && f.is_finite() {
+                    iris_types::Value::Int(*f as i64)
+                } else {
+                    iris_types::Value::Str(f.to_string())
+                }
+            }
+            Self::Str(s) => iris_types::Value::Str(s.clone()),
+            Self::Blob(_) => iris_types::Value::Null,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

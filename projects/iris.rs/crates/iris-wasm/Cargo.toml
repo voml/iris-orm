@@ -13,6 +13,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 iris-types = { workspace = true }
 iris-generator = { workspace = true }
+iris-adapter-d1 = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 wasm-bindgen = { workspace = true }
 # `vos::uuid` / `uuid` pull getrandom; wasm-pack target needs the JS Crypto backend.
