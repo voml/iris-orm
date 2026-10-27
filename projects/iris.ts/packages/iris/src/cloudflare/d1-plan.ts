@@ -1,3 +1,13 @@
+/**
+ * P0 2026-10-27 — **FROZEN**
+ *
+ * D1 plan utilities are kept as pure helpers (used by the sqlite plan executor)
+ * but the full Cloudflare Worker + D1 adapter route is deprecated. See
+ * `06-d1-adapter-and-edge-host.md` in the root design repo for the new Edge
+ * storage adapter contract. These plan primitives may still be useful when we
+ * rebuild that path; until then they compile but callers must not wire them
+ * into production hosts without explicit approval.
+ */
 import type { OperationRequest } from "../types/contract.ts";
 
 import { exactI64Text } from "../runtime/operation-parameters.ts";

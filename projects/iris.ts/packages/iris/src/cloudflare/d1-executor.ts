@@ -12,31 +12,33 @@ import type { IrisSqliteDatabase } from "../sqlite/types.ts";
 
 import type { IrisD1Database } from "./types.ts";
 
-
-
 /**
-
- * D1 operation executor driven by build-time plan artifacts.
-
+ * P0 2026-10-27 — **DEPRECATED**
  *
-
- * Read and `write-returning` plans run on `execute`. Plain `write` plans run on `executeUnit`.
-
+ * The Cloudflare Worker + D1 executor route is frozen / abandoned. The
+ * long-lived Edge runtime contract is tracked in `06-d1-adapter-and-edge-host.md`
+ * (root design repo). This function still **compiles** (types remain
+ * available) but throws at runtime to prevent accidental use.
+ *
+ * A future adapter (`yyds` / `remote-http` storage) will replace this path.
  */
-
 export function createD1OperationExecutor(
 
-    d1: IrisD1Database,
+    _d1: IrisD1Database,
 
-    plans: D1PlanRegistry = {},
+    _plans: D1PlanRegistry = {},
 
-    wireNamesByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
+    _wireNamesByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
 
-    valueCarriersByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
+    _valueCarriersByEntity: Readonly<Record < string, Readonly < Record < string, string >>> > = {},
 
 ): OperationExecutor {
 
-    return createSqlitePlanOperationExecutor(d1 as IrisSqliteDatabase, plans, wireNamesByEntity, valueCarriersByEntity);
+    throw new Error(
+
+        "@yydb/iris/cloudflare: D1 executor route is deprecated (P0) — see 06-d1-adapter-and-edge-host.md for the new Edge storage adapter contract",
+
+    );
 
 }
 
@@ -45,5 +47,3 @@ export function createD1OperationExecutor(
 /** @deprecated Use `createD1OperationExecutor`. */
 
 export const createD1ReadOperationExecutor = createD1OperationExecutor;
-
-
