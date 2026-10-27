@@ -171,6 +171,22 @@ interface D1WasmExports {
 let wasmApi: D1WasmExports | undefined;
 
 /**
+ * Override the WASM API handle (tests only).
+ *
+ * The bridge normally lazy-loads `prepareD1Operation` / `decodeD1Result`
+ * from `@yydb/iris-unknown-wasm32`.  Tests can inject a fake here so they
+ * don't need a rebuilt WASM artifact.
+ */
+export function setWasmApiForTest(api: D1WasmExports | undefined): void {
+    wasmApi = api;
+}
+
+/** Clear the WASM API override (tests only). */
+export function resetWasmApiForTest(): void {
+    wasmApi = undefined;
+}
+
+/**
  * Lazy-load the WASM semantic core's D1 bridge exports.
  *
  * The underlying package is `@yydb/iris-unknown-wasm32` (workspace dep of
