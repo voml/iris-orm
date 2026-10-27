@@ -48,6 +48,7 @@ iris-adapter-mysql = { path = "projects/iris.rs/crates/iris-adapter-mysql" }
 iris-adapter-postgres = { path = "projects/iris.rs/crates/iris-adapter-postgres" }
 iris-adapter-sqlite = { path = "projects/iris.rs/crates/iris-adapter-sqlite" }
 iris-adapter-redis = { path = "projects/iris.rs/crates/iris-adapter-redis" }
+iris-adapter-d1 = { path = "projects/iris.rs/crates/iris-adapter-d1" }
 pyo3 = { version = "0.30.1", features = ["extension-module"] }
 napi = { version = "3.12", default-features = false, features = ["napi9"] }
 napi-derive = "3.6"
