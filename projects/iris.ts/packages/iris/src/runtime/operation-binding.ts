@@ -10,6 +10,41 @@ import {
 } from "./operation-parameters.ts";
 import { entityFromOperationId, mapRowsToAuthorSurface } from "./wire-row-map.ts";
 
+const REMOVED_ESCAPE_HATCH_IDS: ReadonlySet<string> = new Set(["$query", "$execute"]);
+
+function escapeHatchRejection(operationId: string): ResultEnvelope<never> {
+    return {
+        ok: false,
+        diagnostics: [
+            {
+                code: "IRIS-ESCAPE-HATCH-REMOVED",
+                message: `\`${operationId}\` escape hatch has been removed. Use only generated typed delegates from your VOS schema.`,
+                severity: "error",
+            },
+        ],
+    };
+}
+
+function escapeHatchRejectionForUnit(operationId: string): ResultEnvelope<void> {
+    return {
+        ok: false,
+        diagnostics: [
+            {
+                code: "IRIS-ESCAPE-HATCH-REMOVED",
+                message: `\`${operationId}\` escape hatch has been removed. Use only generated typed delegates from your VOS schema.`,
+                severity: "error",
+            },
+        ],
+    };
+}
+
+function rejectIfEscapeHatch(request: OperationRequest): ResultEnvelope<never> | null {
+    if (REMOVED_ESCAPE_HATCH_IDS.has(request.identity.operationId)) {
+        return escapeHatchRejection(request.identity.operationId);
+    }
+    return null;
+}
+
 export type OperationExecutorSessionOptions = {
     wireNamesByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
     /** Generated `IRIS_VALUE_CARRIERS` table (VOS carrier label per author field). */
@@ -107,6 +142,10 @@ export function createOperationExecutorFromSession(
 
     return {
         async execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>> {
+            const rejected = rejectIfEscapeHatch(request);
+            if (rejected) {
+                return rejected;
+            }
             if (runOperation) {
                 let requestJson: string;
                 try {
@@ -136,6 +175,9 @@ export function createOperationExecutorFromSession(
             );
         },
         async executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>> {
+            if (REMOVED_ESCAPE_HATCH_IDS.has(request.identity.operationId)) {
+                return escapeHatchRejectionForUnit(request.identity.operationId);
+            }
             let raw: SessionExecuteWire;
             try {
                 if (request.operation.kind === "declared-vos" && runExecute) {

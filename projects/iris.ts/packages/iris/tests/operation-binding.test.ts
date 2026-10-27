@@ -32,7 +32,7 @@ test("executeUnit routes declared-vos through session execute instead of execute
 
     const executor = createOperationExecutorFromSession(session);
     const request = buildOperationRequest(
-        { operationId: "$execute", contractFingerprint: "fp" },
+        { operationId: "User.delete", contractFingerprint: "fp" },
         declaredVosOperation("User.filter(x => x.active).collect()"),
     );
     const result = await executor.executeUnit(request);
@@ -40,6 +40,46 @@ test("executeUnit routes declared-vos through session execute instead of execute
     assert.equal(result.ok, true);
     assert.equal(executeCalls, 1);
     assert.equal(operationCalls, 0);
+});
+
+test("escape hatch `$query` and `$execute` are rejected at runtime", async () => {
+    const session: MemorySessionBinding = {
+        executeOperation() {
+            return wire(true, '[{"user_id":"should-not-run"}]');
+        },
+        execute() {
+            return wire(true);
+        },
+        query() {
+            return wire(true, "[]");
+        },
+        executeVos() {
+            return wire(true, "[]");
+        },
+        close() {},
+    };
+
+    const executor = createOperationExecutorFromSession(session);
+
+    const queryRequest = buildOperationRequest(
+        { operationId: "$query", contractFingerprint: "fp" },
+        declaredVosOperation("User.filter(x => x.active).collect()"),
+    );
+    const queryResult = await executor.execute(queryRequest);
+    assert.equal(queryResult.ok, false);
+    if (!queryResult.ok) {
+        assert.equal(queryResult.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+    }
+
+    const executeRequest = buildOperationRequest(
+        { operationId: "$execute", contractFingerprint: "fp" },
+        declaredVosOperation("User.filter(x => x.active).collect()"),
+    );
+    const executeResult = await executor.executeUnit(executeRequest);
+    assert.equal(executeResult.ok, false);
+    if (!executeResult.ok) {
+        assert.equal(executeResult.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+    }
 });
 
 test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", async () => {
@@ -68,11 +108,23 @@ test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", asyn
 
     const result = await executor.executeUnit(
         buildOperationRequest(
-            { operationId: "$execute", contractFingerprint: "unused" },
+            { operationId: "User.delete", contractFingerprint: "unused" },
             declaredVosOperation("User.filter(x => x.active).collect()"),
         ),
     );
     assert.equal(result.ok, true);
+
+    const rejected = await executor.executeUnit(
+        buildOperationRequest(
+            { operationId: "$execute", contractFingerprint: "unused" },
+            declaredVosOperation("User.filter(x => x.active).collect()"),
+        ),
+    );
+    assert.equal(rejected.ok, false);
+    if (!rejected.ok) {
+        assert.equal(rejected.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+    }
+
     await executor.close();
 });
 

@@ -147,7 +147,11 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(operations, /from "\.\/_internal\/contract-types\.js"/);
     assert.doesNotMatch(operations, /@yydb\/iris\/types/);
     assert.match(operations, /buildDeclaredOperationRequest/);
+    // Escape-hatch `$query` / `$execute` are still present in the generated surface
+    // (template lives on the Rust side) but runtime now rejects them with
+    // `IRIS-ESCAPE-HATCH-REMOVED` — see operation-binding.test.ts.
     assert.match(operations, /\$query<T = unknown>/);
+    assert.match(operations, /async \$execute\(/);
     assert.match(operations, /findMany<const A extends UserFindManyArgs>/);
     assert.match(operations, /ReadonlyArray<UserGetPayload<A>>/);
     assert.match(operations, /synthesizeCreate/);
