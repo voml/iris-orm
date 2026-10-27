@@ -123,8 +123,222 @@ pub enum ReturningProjection {
 }
 
 // ---------------------------------------------------------------------------
+// Operation lowering types.
+// ---------------------------------------------------------------------------
+
+/// Canonical CRUD operation kinds supported by the D1 lowering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum OperationKind {
+    /// SELECT by primary key (Read mode).
+    Find,
+    /// INSERT row(s) (WriteReturning mode when returning is requested).
+    Create,
+    /// UPDATE by primary key (WriteReturning mode when returning is requested).
+    Update,
+    /// DELETE by primary key (Write mode, no returning).
+    Delete,
+}
+
+/// Operation metadata required for SQL lowering.
+///
+/// Phase 1: 可以 hardcode 或用最小 fixture 构造。以后接 VOS contract 时从
+/// IrEnvelope / PhysicalOp 树里提取。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationMeta {
+    /// Target table name (unquoted; lowering 内部做 `"table"` 引用).
+    pub table: String,
+    /// Primary key column name.
+    pub key_column: String,
+    /// Canonical operation kind.
+    pub kind: OperationKind,
+    /// Non-key columns touched by Create / Update (顺序必须和 params 对应).
+    pub columns: Vec<String>,
+}
+
+/// Error produced during SQL lowering.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LoweringError {
+    /// Unknown operation kind (custom SQL or future variant).
+    UnsupportedOperation(String),
+    /// Missing metadata required for this operation kind.
+    MissingMetadata(String),
+    /// Table / column identifier 校验失败（SQL 注入防护）.
+    InvalidIdentifier(String),
+    /// 参数数量与 lowering 预期不匹配.
+    ParamCountMismatch {
+        /// Operation kind that produced the mismatch.
+        kind: OperationKind,
+        /// Expected parameter count.
+        expected: usize,
+        /// Actual parameter count received.
+        actual: usize,
+    },
+}
+
+impl std::fmt::Display for LoweringError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedOperation(name) => {
+                write!(f, "D1 lowering: unsupported operation kind `{name}`")
+            }
+            Self::MissingMetadata(field) => {
+                write!(f, "D1 lowering: missing metadata field `{field}`")
+            }
+            Self::InvalidIdentifier(name) => {
+                write!(f, "D1 lowering: invalid identifier `{name}` (must match [A-Za-z_][A-Za-z0-9_]*)")
+            }
+            Self::ParamCountMismatch { kind, expected, actual } => write!(
+                f,
+                "D1 lowering {:?}: expected {expected} params, got {actual}",
+                kind
+            ),
+        }
+    }
+}
+
+impl std::error::Error for LoweringError {}
+
+/// Result of successful lowering: SQL text + positional wire params + mode.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PreparedOp {
+    /// D1 SQL text (already quoted identifiers, positional `?` placeholders).
+    pub sql: String,
+    /// Positional parameter values (one per `?`).
+    pub params: Vec<WireValue>,
+    /// Execution mode for the TS host bridge.
+    pub mode: D1ExecutionMode,
+    /// `RETURNING` projection (matches mode).
+    pub returning: ReturningProjection,
+}
+
+// ---------------------------------------------------------------------------
+// SQL lowering core.
+// ---------------------------------------------------------------------------
+
+/// Lower a canonical CRUD operation into D1 SQL + positional params.
+///
+/// # Arguments
+/// * `meta` — Operation metadata (table, key column, kind, columns).
+/// * `params` — Positional parameter values.  顺序约定:
+///   - `Find` / `Delete`: `[key_value]`
+///   - `Create`: `[col1_value, col2_value, ...]` (columns 顺序)
+///   - `Update`: `[col1_value, ..., key_value]` (SET columns 顺序 + key)
+///
+/// # Returns
+/// `PreparedOp` with D1 SQL text, wire params, D1ExecutionMode, and ReturningProjection.
+pub fn lower_operation(
+    meta: &OperationMeta,
+    params: Vec<WireValue>,
+) -> std::result::Result<PreparedOp, LoweringError> {
+    validate_ident(&meta.table)?;
+    validate_ident(&meta.key_column)?;
+    for col in &meta.columns {
+        validate_ident(col)?;
+    }
+
+    let table = quote_ident(&meta.table);
+    let key_col = quote_ident(&meta.key_column);
+
+    let (sql, mode, returning, expected) = match meta.kind {
+        OperationKind::Find => {
+            // SELECT * FROM "table" WHERE "key" = ?
+            let sql = format!("SELECT * FROM {table} WHERE {key_col} = ?");
+            (sql, D1ExecutionMode::Read, ReturningProjection::None, 1usize)
+        }
+        OperationKind::Delete => {
+            // DELETE FROM "table" WHERE "key" = ?
+            let sql = format!("DELETE FROM {table} WHERE {key_col} = ?");
+            (sql, D1ExecutionMode::Write, ReturningProjection::None, 1usize)
+        }
+        OperationKind::Create => {
+            // INSERT INTO "table" (col1, col2, ...) VALUES (?, ?, ...) RETURNING *
+            let cols: Vec<String> = meta.columns.iter().map(|c| quote_ident(c)).collect();
+            let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
+            let sql = format!(
+                "INSERT INTO {table} ({}) VALUES ({}) RETURNING *",
+                cols.join(", "),
+                placeholders.join(", ")
+            );
+            let n = meta.columns.len();
+            (sql, D1ExecutionMode::WriteReturning, ReturningProjection::All, n)
+        }
+        OperationKind::Update => {
+            // UPDATE "table" SET col1=?, col2=?, ... WHERE "key" = ? RETURNING *
+            if meta.columns.is_empty() {
+                return Err(LoweringError::MissingMetadata(
+                    "Update requires at least one non-key column".into(),
+                ));
+            }
+            let sets: Vec<String> = meta
+                .columns
+                .iter()
+                .map(|c| format!("{} = ?", quote_ident(c)))
+                .collect();
+            let sql = format!(
+                "UPDATE {table} SET {} WHERE {key_col} = ? RETURNING *",
+                sets.join(", ")
+            );
+            let n = meta.columns.len() + 1; // SET columns + key
+            (sql, D1ExecutionMode::WriteReturning, ReturningProjection::All, n)
+        }
+    };
+
+    if params.len() != expected {
+        return Err(LoweringError::ParamCountMismatch {
+            kind: meta.kind,
+            expected,
+            actual: params.len(),
+        });
+    }
+
+    Ok(PreparedOp {
+        sql,
+        params,
+        mode,
+        returning,
+    })
+}
+
+/// Validate a SQL identifier: ASCII `[A-Za-z_][A-Za-z0-9_]*` only.
+///
+/// 防止通过元数据字段注入恶意 SQL 片段。
+fn validate_ident(name: &str) -> std::result::Result<(), LoweringError> {
+    if name.is_empty() {
+        return Err(LoweringError::InvalidIdentifier(name.into()));
+    }
+    let mut chars = name.chars();
+    let first = chars.next().unwrap();
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return Err(LoweringError::InvalidIdentifier(name.into()));
+    }
+    for c in chars {
+        if !c.is_ascii_alphanumeric() && c != '_' {
+            return Err(LoweringError::InvalidIdentifier(name.into()));
+        }
+    }
+    Ok(())
+}
+
+/// Quote a SQL identifier with double quotes (D1 = SQLite dialect).
+fn quote_ident(name: &str) -> String {
+    format!("\"{name}\"")
+}
+
+// ---------------------------------------------------------------------------
 // Request + response.
 // ---------------------------------------------------------------------------
+
+/// Optional lowering hint carried by a `D1Request`.
+///
+/// When present, `prepare_d1_operation_inner` 会忽略已有的 `sql` 字段，
+/// 调用 [`lower_operation`] 重新生成 SQL。没有 hint 时走原有的 serde
+/// round-trip 路径（向后兼容）。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OperationHint {
+    /// Operation metadata (table, key, kind, columns).
+    pub meta: OperationMeta,
+}
 
 /// A fully-lowered D1 request, ready to be handed to the TS host bridge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -140,6 +354,10 @@ pub struct D1Request {
     /// Schema contract fingerprint for the owning operation (identifies
     /// which VOS schema this SQL was lowered from).
     pub contract_fingerprint: iris_ir::SchemaFingerprint,
+    /// Optional lowering hint.  当存在时，`prepare_d1_operation` 会调用
+    /// [`lower_operation`] 重新生成 SQL + params（覆盖已有值）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operation_hint: Option<OperationHint>,
 }
 
 /// Raw row returned by D1 (ordered column values by the wire carrier).
@@ -495,9 +713,13 @@ mod tests {
             mode: D1ExecutionMode::Read,
             returning: ReturningProjection::None,
             contract_fingerprint: iris_ir::SchemaFingerprint("abc123".into()),
+            operation_hint: None,
         };
         let s = serde_json::to_string(&req).unwrap();
         let back: D1Request = serde_json::from_str(&s).unwrap();
         assert_eq!(back, req);
+        // operation_hint = None 时不应序列化到 JSON.
+        assert!(!s.contains("operation_hint"));
     }
+
 }

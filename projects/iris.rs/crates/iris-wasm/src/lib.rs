@@ -19,7 +19,9 @@ use std::collections::BTreeMap;
 
 use wasm_bindgen::prelude::*;
 
-use iris_adapter_d1::{D1Request, D1Response, D1WireRow, WireValue};
+use iris_adapter_d1::{
+    D1Request, D1Response, D1WireRow, WireValue, lower_operation,
+};
 
 /// Library version (matches workspace `@yydb/iris` semver).
 #[wasm_bindgen(js_name = irisVersion)]
@@ -181,10 +183,15 @@ struct CanonicalResult {
     last_insert_rowid: Option<i64>,
 }
 
-/// Accept a serialised [`D1Request`] and emit the lightweight prepared
-/// op envelope that the TS host bridge hands to `env.DB.prepare()`.
+/// Accept a serialised [`D1Request`] and emit the prepared op envelope that
+/// the TS host bridge hands to `env.DB.prepare()`.
 ///
-/// The envelope shape:
+/// 当输入的 `D1Request` 带有 `operation_hint` 时，这个函数会调用
+/// `lower_operation` 把 canonical CRUD operation 真正 lower 成
+/// D1 SQL + positional params，覆盖输入里原有的 `sql` 字段。
+/// 没有 hint 时走纯 serde round-trip（向后兼容）。
+///
+/// 输出 envelope shape 不变:
 /// ```json
 /// {
 ///   "sql": "SELECT * FROM users WHERE id = ?",
@@ -193,10 +200,6 @@ struct CanonicalResult {
 ///   "returning": "none"
 /// }
 /// ```
-///
-/// This is deliberately a pure serde round-trip -- the heavy lifting
-/// (SQL lowering, capability checks) happens on the Rust build side
-/// before [`D1Request`] ever reaches this function.
 #[wasm_bindgen(js_name = prepareD1Operation)]
 pub fn prepare_d1_operation(request_json: &str) -> Result<String, JsValue> {
     prepare_d1_operation_inner(request_json).map_err(js_err)
@@ -204,7 +207,20 @@ pub fn prepare_d1_operation(request_json: &str) -> Result<String, JsValue> {
 
 /// Native-testable core of [`prepare_d1_operation`].
 pub(crate) fn prepare_d1_operation_inner(request_json: &str) -> Result<String, String> {
-    let req: D1Request = serde_json::from_str(request_json).map_err(|e| e.to_string())?;
+    let mut req: D1Request = serde_json::from_str(request_json).map_err(|e| e.to_string())?;
+
+    // 如果有 lowering hint，调用 lower_operation 覆盖 sql/params/mode/returning。
+    if let Some(hint) = req.operation_hint.as_ref() {
+        let prepared =
+            lower_operation(&hint.meta, req.params.clone()).map_err(|e| e.to_string())?;
+        req.sql = prepared.sql;
+        req.params = prepared.params;
+        req.mode = prepared.mode;
+        req.returning = prepared.returning;
+        // lowering 完成后清空 hint，避免泄漏到 TS host bridge。
+        req.operation_hint = None;
+    }
+
     serde_json::to_string(&req).map_err(|e| e.to_string())
 }
 
