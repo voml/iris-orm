@@ -77,11 +77,11 @@ impl GenerationModel {
     /// JSON context for TypeScript `.dejavu` templates.
     pub fn typescript_template_context(&self) -> Result<Value> {
         validate_ts_naming(self)?;
-        Ok(serde_json::to_value(build_ts_context(self)).expect("TsTemplateContext serializes"))
+        Ok(serde_json::to_value(build_ts_context(self)?).expect("TsTemplateContext serializes"))
     }
 }
 
-fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
+fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
     let entity_names: HashSet<&str> = model.tables.iter().map(|t| t.name.as_str()).collect();
     let entity_union = if model.tables.is_empty() {
         "never".into()
@@ -112,7 +112,10 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
     let needed = reference_targets(model);
     let ref_type_imports = needed.iter().flat_map(|name| [format!("{name}Id"), format!("{name}Reference")]).collect::<Vec<_>>().join(", ");
 
-    let tables_view = model.tables.iter().map(|table| build_table_view(table, &entity_names)).collect();
+    let mut tables_view = Vec::with_capacity(model.tables.len());
+    for table in &model.tables {
+        tables_view.push(build_table_view(table, &entity_names)?);
+    }
 
     let wire_map_lines = model
         .tables
@@ -222,26 +225,23 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         .collect::<Vec<_>>()
         .join("\n");
 
-    let macros_view = model
-        .macros
-        .iter()
-        .map(|macro_def| {
-            let ts_return = macro_return_ts(&macro_def.return_type);
-            let params = macro_def
-                .params
-                .iter()
-                .map(|param| TsMacroParamView { name: param.name.clone(), ts_type: param.ts_type.clone() })
-                .collect::<Vec<_>>();
-            let param_signature = if params.is_empty() {
-                String::new()
-            }
-            else {
-                params.iter().map(|param| format!("{}: {}", param.name, param.ts_type)).collect::<Vec<_>>().join(", ")
-            };
-            let param_names = params.iter().map(|param| param.name.clone()).collect::<Vec<_>>().join(", ");
-            TsMacroView { name: macro_def.name.clone(), uses_execute: ts_return == "void", ts_return, params, param_signature, param_names }
-        })
-        .collect();
+    let mut macros_view = Vec::with_capacity(model.macros.len());
+    for macro_def in &model.macros {
+        let ts_return = macro_return_ts(&macro_def.return_type)?;
+        let params = macro_def
+            .params
+            .iter()
+            .map(|param| TsMacroParamView { name: param.name.clone(), ts_type: param.ts_type.clone() })
+            .collect::<Vec<_>>();
+        let param_signature = if params.is_empty() {
+            String::new()
+        }
+        else {
+            params.iter().map(|param| format!("{}: {}", param.name, param.ts_type)).collect::<Vec<_>>().join(", ")
+        };
+        let param_names = params.iter().map(|param| param.name.clone()).collect::<Vec<_>>().join(", ");
+        macros_view.push(TsMacroView { name: macro_def.name.clone(), uses_execute: ts_return == "void", ts_return, params, param_signature, param_names });
+    }
 
     // Pre-computed maps that get inlined directly into synthesize.ts so the
     // runtime no longer pulls them from metadata.ts. Same shape as
@@ -250,7 +250,7 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
     let synthesize_wire_map_lines = wire_map_lines.clone();
     let synthesize_reference_target_lines = reference_target_lines.clone();
 
-    TsTemplateContext {
+    Ok(TsTemplateContext {
         generator_version: model.generator_version.clone(),
         schema_fingerprint: model.schema_fingerprint.clone(),
         tables: model.tables.clone(),
@@ -270,14 +270,14 @@ fn build_ts_context(model: &GenerationModel) -> TsTemplateContext {
         has_macros: !model.macros.is_empty(),
         synthesize_wire_map_lines,
         synthesize_reference_target_lines,
-    }
+    })
 }
 
-fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTableView {
+fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> Result<TsTableView> {
     let pk = primary_key_field(table);
     let pk_name = pk.map(|f| f.name.as_str()).unwrap_or("id");
     let pk_vos = pk.map(|f| f.vos_type.as_str()).unwrap_or("utf8");
-    let pk_ts_scalar = carrier::vos_type_to_ts(pk_vos);
+    let pk_ts_scalar = carrier::vos_type_to_ts(pk_vos)?;
 
     let primary_fields: Vec<_> = table.fields.iter().filter(|f| f.primary).collect();
     let unique_where_lines = if primary_fields.is_empty() {
@@ -287,21 +287,20 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
         primary_fields.iter().map(|field| format!("    {}: {}Id;", field_ts_name(field), table.name)).collect::<Vec<_>>().join("\n")
     };
 
-    let fields = table
-        .fields
-        .iter()
-        .map(|field| TsFieldView {
+    let mut fields = Vec::with_capacity(table.fields.len());
+    for field in &table.fields {
+        fields.push(TsFieldView {
             name: field.name.clone(),
             ts_name: field_ts_name(field),
-            ts_model_type: model_field_type(table, field),
-            where_line: emit_where_field(table, field, entity_names),
+            ts_model_type: model_field_type(table, field)?,
+            where_line: emit_where_field(table, field, entity_names)?,
             select_line: emit_select_field(field, entity_names),
-            create_line: emit_create_field(table, field, entity_names),
-            patch_line: emit_patch_field(table, field, entity_names),
-        })
-        .collect();
+            create_line: emit_create_field(table, field, entity_names)?,
+            patch_line: emit_patch_field(table, field, entity_names)?,
+        });
+    }
 
-    TsTableView {
+    Ok(TsTableView {
         name: table.name.clone(),
         camel_name: camel_case(&table.name),
         pk_name: pk_name.into(),
@@ -310,7 +309,7 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> TsTable
         pk_ts_scalar,
         fields,
         unique_where_lines,
-    }
+    })
 }
 
 fn camel_case(name: &str) -> String {
@@ -336,41 +335,41 @@ fn vos_filter_name(vos_type: &str) -> &'static str {
     }
 }
 
-fn model_field_type(table: &TableModel, field: &FieldModel) -> String {
+fn model_field_type(table: &TableModel, field: &FieldModel) -> Result<String> {
     if let Some(ref target) = field.reference_target {
         let reference = format!("{target}Reference");
-        return if field.optional { format!("{reference} | null") } else { reference };
+        return Ok(if field.optional { format!("{reference} | null") } else { reference });
     }
     if field.primary {
-        return format!("{}Id", table.name);
+        return Ok(format!("{}Id", table.name));
     }
-    let base = carrier::vos_type_to_ts(&field.vos_type);
-    if field.optional { format!("{base} | null") } else { base }
+    let base = carrier::vos_type_to_ts(&field.vos_type)?;
+    Ok(if field.optional { format!("{base} | null") } else { base })
 }
 
-fn scalar_filter_type(table: &TableModel, field: &FieldModel) -> String {
-    if field.primary { format!("{}Id", table.name) } else { carrier::vos_type_to_ts(&field.vos_type) }
+fn scalar_filter_type(table: &TableModel, field: &FieldModel) -> Result<String> {
+    if field.primary { Ok(format!("{}Id", table.name)) } else { carrier::vos_type_to_ts(&field.vos_type) }
 }
 
 fn nullable_where_suffix(optional: bool) -> &'static str {
     if optional { " | { readonly isNull: true } | { readonly isNotNull: true }" } else { "" }
 }
 
-fn patch_value_type(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> String {
+fn patch_value_type(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Result<String> {
     if let Some(ref target) = field.reference_target
         && entity_names.contains(target.as_str())
     {
         let inner = format!("{}RefInput", target);
-        return if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") };
+        return Ok(if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") });
     }
     let inner = if field.primary {
         format!("{}Id", table.name)
     }
     else {
-        let model_ty = model_field_type(table, field);
+        let model_ty = model_field_type(table, field)?;
         strip_null_union(&model_ty)
     };
-    if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") }
+    Ok(if field.optional { format!("NullablePatchValue<{inner}>") } else { format!("PatchValue<{inner}>") })
 }
 
 fn strip_null_union(ty: &str) -> String {
@@ -394,22 +393,22 @@ fn reference_targets(model: &GenerationModel) -> HashSet<String> {
     targets
 }
 
-fn emit_where_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
+fn emit_where_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Result<Option<String>> {
     if let Some(ref target) = field.reference_target {
         if entity_names.contains(target.as_str()) {
-            return Some(format!(
+            return Ok(Some(format!(
                 "    {}?: WherePathFor<\"{}\"> | {{ readonly is: WherePathFor<\"{}\"> }};",
                 field_ts_name(field),
                 target,
                 target
-            ));
+            )));
         }
-        return None;
+        return Ok(None);
     }
-    let scalar = scalar_filter_type(table, field);
+    let scalar = scalar_filter_type(table, field)?;
     let filter = vos_filter_name(&field.vos_type);
     let nullable = nullable_where_suffix(field.optional);
-    Some(format!("    {}?: {scalar} | {filter}{nullable};", field_ts_name(field), scalar = scalar, filter = filter, nullable = nullable,))
+    Ok(Some(format!("    {}?: {scalar} | {filter}{nullable};", field_ts_name(field), scalar = scalar, filter = filter, nullable = nullable,)))
 }
 
 fn emit_select_field(field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
@@ -422,35 +421,31 @@ fn emit_select_field(field: &FieldModel, entity_names: &HashSet<&str>) -> Option
     Some(format!("    {}?: boolean;", field_ts_name(field)))
 }
 
-fn emit_create_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
+fn emit_create_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Result<Option<String>> {
     if let Some(ref target) = field.reference_target {
         if !entity_names.contains(target.as_str()) {
-            return None;
+            return Ok(None);
         }
         let req = if field.optional { "?" } else { "" };
-        return Some(format!("    {}{}: {}RefInput;", field_ts_name(field), req, target));
+        return Ok(Some(format!("    {}{}: {}RefInput;", field_ts_name(field), req, target)));
     }
-    if field.optional {
-        Some(format!("    {}?: {};", field_ts_name(field), model_field_type(table, field)))
-    }
-    else {
-        Some(format!("    {}: {};", field_ts_name(field), model_field_type(table, field)))
-    }
+    let ty = model_field_type(table, field)?;
+    Ok(Some(format!("    {}{}: {};", field_ts_name(field), if field.optional { "?" } else { "" }, ty)))
 }
 
-fn emit_patch_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Option<String> {
+fn emit_patch_field(table: &TableModel, field: &FieldModel, entity_names: &HashSet<&str>) -> Result<Option<String>> {
     if field.primary {
-        return None;
+        return Ok(None);
     }
     if let Some(ref target) = field.reference_target
         && !entity_names.contains(target.as_str())
     {
-        return None;
+        return Ok(None);
     }
-    Some(format!("    {}?: {};", field_ts_name(field), patch_value_type(table, field, entity_names)))
+    Ok(Some(format!("    {}?: {};", field_ts_name(field), patch_value_type(table, field, entity_names)?)))
 }
 
-fn macro_return_ts(return_type: &str) -> String {
+fn macro_return_ts(return_type: &str) -> Result<String> {
     carrier::vos_type_to_ts(return_type)
 }
 

@@ -36,6 +36,9 @@ pub enum Error {
     /// Unsupported VOS type for the Rust emitter.
     #[error("unsupported VOS type for Rust emit: {0}")]
     UnsupportedType(String),
+    /// VOS type label not in the faithful carrier table.
+    #[error("unknown VOS label `{0}` is not in the carrier table")]
+    UnknownVosLabel(String),
     /// Unsupported generate target.
     #[error("unsupported generate target `{0}` (use rust or typescript)")]
     UnsupportedTarget(String),
@@ -247,9 +250,9 @@ impl GenerationModel {
                 .iter()
                 .map(|p| {
                     let vos_ty = type_label(&p.type_expr);
-                    OperationParamModel { name: p.name.clone(), ts_type: carrier::vos_type_to_ts(&vos_ty), vos_type: vos_ty }
+                    carrier::vos_type_to_ts(&vos_ty).map(|ts_type| OperationParamModel { name: p.name.clone(), ts_type, vos_type: vos_ty })
                 })
-                .collect();
+                .collect::<Result<Vec<_>>>()?;
             let ret = op.return_type.as_ref().map(type_label);
             operations.push(OperationModel {
                 operation_id: op.operation_id.clone(),
@@ -330,9 +333,9 @@ impl GenerationModel {
                 .iter()
                 .map(|param| {
                     let vos_ty = type_label(&param.type_expr);
-                    OperationParamModel { name: param.name.clone(), ts_type: carrier::vos_type_to_ts(&vos_ty), vos_type: vos_ty }
+                    carrier::vos_type_to_ts(&vos_ty).map(|ts_type| OperationParamModel { name: param.name.clone(), ts_type, vos_type: vos_ty })
                 })
-                .collect();
+                .collect::<Result<Vec<_>>>()?;
             let ret = operation.return_type.as_ref().map(type_label);
             let kind_str = operation_kind_label(operation.kind);
             operation_models.push(OperationModel {
@@ -901,9 +904,9 @@ fn operation_kind_rust_doc(kind: &str) -> &'static str {
 
 /// Emit TypeScript stub method declarations for every projected operation.
 /// Returns an empty string when no operations are present.
-pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> String {
+pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String> {
     if model.operations.is_empty() {
-        return String::new();
+        return Ok(String::new());
     }
     let mut out = String::new();
     out.push_str("\n/** --- Projected operation stubs (from VOS OperationProjectionArtifact) ---\n");
@@ -915,7 +918,10 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> String {
     out.push_str("        this.executor = executor;\n");
     out.push_str("    }\n\n");
     for op in &model.operations {
-        let ts_ret = op.return_type.as_ref().map(|t| carrier::vos_type_to_ts(t)).unwrap_or_else(|| "void".into());
+        let ts_ret = match op.return_type.as_ref() {
+            Some(t) => carrier::vos_type_to_ts(t)?,
+            None => "void".to_owned(),
+        };
         let param_sig = op.params.iter().map(|p| format!("{}: {}", p.name, p.ts_type)).collect::<Vec<_>>().join(", ");
         let param_obj = op.params.iter().map(|p| format!("\"{}\"", p.name)).collect::<Vec<_>>().join(", ");
         let use_execute = ts_ret == "void";
@@ -942,7 +948,7 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> String {
         out.push_str("    }\n\n");
     }
     out.push_str("}\n");
-    out
+    Ok(out)
 }
 
 fn operation_kind_ts_label(kind: &str) -> &'static str {

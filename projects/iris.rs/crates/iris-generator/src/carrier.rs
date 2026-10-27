@@ -5,6 +5,8 @@
 //! TypeScript carrier is the same JS type. Nothing else in the generator may
 //! restate this mapping.
 
+use crate::Error as GenError;
+
 /// Strips a trailing `?` and a leading `&` to reach the base VOS type label.
 pub(crate) fn base_vos_type(vos_type: &str) -> &str {
     vos_type.trim_end_matches('?').trim_start_matches('&')
@@ -59,17 +61,19 @@ pub(crate) fn faithful_label(spelling: &str) -> Option<&str> {
 
 /// TypeScript carrier of a VOS type label, wrappers stripped.
 ///
-/// Named types and `::` paths pass through unchanged; genuinely unknown labels
-/// become `unknown` instead of failing generation.
-pub(crate) fn vos_type_to_ts(vos_type: &str) -> String {
+/// Named types and `::` paths pass through unchanged. Faithful builtin labels
+/// resolve to their TS carrier. Anything else — an unknown label, a typo,
+/// or a label not yet in the carrier table — hard-fails the compile instead
+/// of silently falling back to `unknown`.
+pub(crate) fn vos_type_to_ts(vos_type: &str) -> Result<String, GenError> {
     let base = base_vos_type(vos_type);
     if let Some(carrier) = ts_carrier_for_label(base) {
-        return carrier.to_owned();
+        return Ok(carrier.to_owned());
     }
     if base.contains("::") || base.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
-        return base.to_owned();
+        return Ok(base.to_owned());
     }
-    "unknown".to_owned()
+    Err(GenError::UnknownVosLabel(base.to_owned()))
 }
 
 /// Rust carrier and faithful VOS label of a builtin spelling.
