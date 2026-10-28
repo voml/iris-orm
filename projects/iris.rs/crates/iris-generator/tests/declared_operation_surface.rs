@@ -6,9 +6,7 @@
 
 use iris_generator::{Error, GenerationModel, emit_target_files};
 use serde_json::{Value, json};
-use vos::{
-    FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract,
-};
+use vos::{FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -121,20 +119,20 @@ fn operation_artifact_with_unknown_kind_is_rejected() {
 
 #[test]
 fn undeclared_operation_model_is_rejected() {
-    let error = project_error(vec![operation(
-        "query",
-        "get_ghost",
-        "op_0123456789abcdef",
-        vec![],
-        json!({ "optional": { "named": ["Ghost"] } }),
-    )]);
+    let error =
+        project_error(vec![operation("query", "get_ghost", "op_0123456789abcdef", vec![], json!({ "optional": { "named": ["Ghost"] } }))]);
     assert!(matches!(error, Error::UndeclaredOperationModel { ref ty, .. } if ty == "Ghost"), "{error}");
 }
 
 #[test]
 fn bytes_parameter_is_rejected() {
-    let error =
-        project_error(vec![operation("udf", "store_blob", "op_0123456789abcdef", vec![param("payload", json!({ "named": ["bytes"] }))], json!({ "named": ["utf8"] }))]);
+    let error = project_error(vec![operation(
+        "udf",
+        "store_blob",
+        "op_0123456789abcdef",
+        vec![param("payload", json!({ "named": ["bytes"] }))],
+        json!({ "named": ["utf8"] }),
+    )]);
     assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "bytes"), "{error}");
 }
 
@@ -152,8 +150,7 @@ fn vector_parameter_is_rejected() {
 
 #[test]
 fn file_return_type_is_rejected() {
-    let error =
-        project_error(vec![operation("query", "download", "op_0123456789abcdef", vec![], json!({ "named": ["file"] }))]);
+    let error = project_error(vec![operation("query", "download", "op_0123456789abcdef", vec![], json!({ "named": ["file"] }))]);
     assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "file"), "{error}");
 }
 

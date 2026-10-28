@@ -437,10 +437,7 @@ impl GenerationModel {
         let mut seen: HashSet<&str> = HashSet::with_capacity(self.operations.len());
         for operation in &self.operations {
             if operation_kind_rust_doc(operation.kind.as_str()).is_none() {
-                return Err(Error::UnsupportedOperationKind {
-                    operation: operation.name.clone(),
-                    kind: operation.kind.clone(),
-                });
+                return Err(Error::UnsupportedOperationKind { operation: operation.name.clone(), kind: operation.kind.clone() });
             }
             if operation.operation_id.is_empty() {
                 return Err(Error::MissingOperationIdentity { operation: operation.name.clone() });
@@ -481,11 +478,8 @@ fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet
     let base = carrier::base_vos_type(trimmed);
     let optional = trimmed.ends_with('?');
     let is_reference = trimmed.starts_with('&');
-    let unsupported = |reason: &'static str| Error::UnsupportedOperationType {
-        operation: operation.to_owned(),
-        ty: vos_type.to_owned(),
-        reason,
-    };
+    let unsupported =
+        |reason: &'static str| Error::UnsupportedOperationType { operation: operation.to_owned(), ty: vos_type.to_owned(), reason };
 
     if base.contains('[') || base.contains('<') || base.contains(',') {
         return Err(unsupported("collection and generic shapes have no declared-vos operation carrier"));
@@ -679,11 +673,7 @@ pub fn generate_from_artifacts(
 ///
 /// Returns `(model, files)` where each `(filename, content)` pair is one
 /// generated artifact.
-pub fn emit_from_artifacts(
-    contract_json: &str,
-    operations_json: &str,
-    target: &str,
-) -> Result<(GenerationModel, Vec<(String, String)>)> {
+pub fn emit_from_artifacts(contract_json: &str, operations_json: &str, target: &str) -> Result<(GenerationModel, Vec<(String, String)>)> {
     let model = GenerationModel::from_artifacts(contract_json, operations_json)?;
     let files = emit_target_files(&model, target)?;
     Ok((model, files))
@@ -1027,10 +1017,8 @@ pub(crate) fn emit_rust_operation_stubs(model: &GenerationModel) -> Result<Strin
             Some(ret) => resolve_operation_carrier(&op.name, ret, &declared)?.rust_ty,
             None => "()".to_owned(),
         };
-        let kind_doc = operation_kind_rust_doc(op.kind.as_str()).ok_or_else(|| Error::UnsupportedOperationKind {
-            operation: op.name.clone(),
-            kind: op.kind.clone(),
-        })?;
+        let kind_doc = operation_kind_rust_doc(op.kind.as_str())
+            .ok_or_else(|| Error::UnsupportedOperationKind { operation: op.name.clone(), kind: op.kind.clone() })?;
         out.push_str(&format!(
             "/// VOS {kind_doc:?} operation `{name}` (op_id: {op_id}).\n\
              fn {name}({params}) -> {ret} {{ unimplemented!(\"VOS op {name}\") }}\n\n",
@@ -1086,10 +1074,8 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
         let param_sig = op.params.iter().map(|p| format!("{}: {}", p.name, p.ts_type)).collect::<Vec<_>>().join(", ");
         let param_values = op.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
         let use_execute = ts_ret == "void";
-        let kind_label = operation_kind_ts_label(op.kind.as_str()).ok_or_else(|| Error::UnsupportedOperationKind {
-            operation: op.name.clone(),
-            kind: op.kind.clone(),
-        })?;
+        let kind_label = operation_kind_ts_label(op.kind.as_str())
+            .ok_or_else(|| Error::UnsupportedOperationKind { operation: op.name.clone(), kind: op.kind.clone() })?;
         out.push_str(&format!(
             "    /** VOS {kind} operation `{name}` (op_id: {op_id}). */\n\
              async {name}({param_sig}): Promise<{ts_ret}> {{\n\

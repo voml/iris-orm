@@ -52,10 +52,9 @@ impl WireValue {
             iris_types::Value::Bool(b) => Self::Bool(*b),
             iris_types::Value::Int(i) => Self::Int(*i),
             iris_types::Value::Str(s) => Self::Str(s.clone()),
-            iris_types::Value::Decimal(s)
-            | iris_types::Value::Date(s)
-            | iris_types::Value::Time(s)
-            | iris_types::Value::DateTime(s) => Self::Str(s.clone()),
+            iris_types::Value::Decimal(s) | iris_types::Value::Date(s) | iris_types::Value::Time(s) | iris_types::Value::DateTime(s) => {
+                Self::Str(s.clone())
+            }
             iris_types::Value::Object(_) => Self::Null,
         }
     }
@@ -74,11 +73,7 @@ impl WireValue {
             Self::Int(i) => iris_types::Value::Int(*i),
             Self::F64(f) => {
                 // Integral f64 → Int, otherwise text lossless representation.
-                if f.fract() == 0.0 && f.is_finite() {
-                    iris_types::Value::Int(*f as i64)
-                } else {
-                    iris_types::Value::Str(f.to_string())
-                }
+                if f.fract() == 0.0 && f.is_finite() { iris_types::Value::Int(*f as i64) } else { iris_types::Value::Str(f.to_string()) }
             }
             Self::Str(s) => iris_types::Value::Str(s.clone()),
             Self::Blob(_) => iris_types::Value::Null,
@@ -188,11 +183,9 @@ impl std::fmt::Display for LoweringError {
             Self::InvalidIdentifier(name) => {
                 write!(f, "D1 lowering: invalid identifier `{name}` (must match [A-Za-z_][A-Za-z0-9_]*)")
             }
-            Self::ParamCountMismatch { kind, expected, actual } => write!(
-                f,
-                "D1 lowering {:?}: expected {expected} params, got {actual}",
-                kind
-            ),
+            Self::ParamCountMismatch { kind, expected, actual } => {
+                write!(f, "D1 lowering {:?}: expected {expected} params, got {actual}", kind)
+            }
         }
     }
 }
@@ -227,10 +220,7 @@ pub struct PreparedOp {
 ///
 /// # Returns
 /// `PreparedOp` with D1 SQL text, wire params, D1ExecutionMode, and ReturningProjection.
-pub fn lower_operation(
-    meta: &OperationMeta,
-    params: Vec<WireValue>,
-) -> std::result::Result<PreparedOp, LoweringError> {
+pub fn lower_operation(meta: &OperationMeta, params: Vec<WireValue>) -> std::result::Result<PreparedOp, LoweringError> {
     validate_ident(&meta.table)?;
     validate_ident(&meta.key_column)?;
     for col in &meta.columns {
@@ -255,49 +245,27 @@ pub fn lower_operation(
             // INSERT INTO "table" (col1, col2, ...) VALUES (?, ?, ...) RETURNING *
             let cols: Vec<String> = meta.columns.iter().map(|c| quote_ident(c)).collect();
             let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
-            let sql = format!(
-                "INSERT INTO {table} ({}) VALUES ({}) RETURNING *",
-                cols.join(", "),
-                placeholders.join(", ")
-            );
+            let sql = format!("INSERT INTO {table} ({}) VALUES ({}) RETURNING *", cols.join(", "), placeholders.join(", "));
             let n = meta.columns.len();
             (sql, D1ExecutionMode::WriteReturning, ReturningProjection::All, n)
         }
         OperationKind::Update => {
             // UPDATE "table" SET col1=?, col2=?, ... WHERE "key" = ? RETURNING *
             if meta.columns.is_empty() {
-                return Err(LoweringError::MissingMetadata(
-                    "Update requires at least one non-key column".into(),
-                ));
+                return Err(LoweringError::MissingMetadata("Update requires at least one non-key column".into()));
             }
-            let sets: Vec<String> = meta
-                .columns
-                .iter()
-                .map(|c| format!("{} = ?", quote_ident(c)))
-                .collect();
-            let sql = format!(
-                "UPDATE {table} SET {} WHERE {key_col} = ? RETURNING *",
-                sets.join(", ")
-            );
+            let sets: Vec<String> = meta.columns.iter().map(|c| format!("{} = ?", quote_ident(c))).collect();
+            let sql = format!("UPDATE {table} SET {} WHERE {key_col} = ? RETURNING *", sets.join(", "));
             let n = meta.columns.len() + 1; // SET columns + key
             (sql, D1ExecutionMode::WriteReturning, ReturningProjection::All, n)
         }
     };
 
     if params.len() != expected {
-        return Err(LoweringError::ParamCountMismatch {
-            kind: meta.kind,
-            expected,
-            actual: params.len(),
-        });
+        return Err(LoweringError::ParamCountMismatch { kind: meta.kind, expected, actual: params.len() });
     }
 
-    Ok(PreparedOp {
-        sql,
-        params,
-        mode,
-        returning,
-    })
+    Ok(PreparedOp { sql, params, mode, returning })
 }
 
 /// Validate a SQL identifier: ASCII `[A-Za-z_][A-Za-z0-9_]*` only.
@@ -448,11 +416,7 @@ impl D1Capabilities {
             max_params: 100,
             max_sql_bytes: 100 * 1024,
             max_batch_size: 50,
-            retryable_errors: vec![
-                "D1_NETWORK_ERROR".into(),
-                "D1_BUSY".into(),
-                "D1_RESOURCE_EXHAUSTED".into(),
-            ],
+            retryable_errors: vec!["D1_NETWORK_ERROR".into(), "D1_BUSY".into(), "D1_RESOURCE_EXHAUSTED".into()],
         }
     }
 
@@ -503,10 +467,7 @@ impl D1Capabilities {
         if op.approx_params > self.max_params {
             diags.push(iris_types::Diagnostic {
                 code: "IRIS-D1-PARAMS-EXCEEDED".into(),
-                message: format!(
-                    "D1 parameter count {} exceeds max_params {}",
-                    op.approx_params, self.max_params
-                ),
+                message: format!("D1 parameter count {} exceeds max_params {}", op.approx_params, self.max_params),
                 span: Default::default(),
                 stage: iris_types::StageKind::Plan,
                 backend: Some("iris-adapter-d1".into()),
@@ -517,10 +478,7 @@ impl D1Capabilities {
         if op.approx_sql_bytes > self.max_sql_bytes {
             diags.push(iris_types::Diagnostic {
                 code: "IRIS-D1-SQL-TOO-LARGE".into(),
-                message: format!(
-                    "D1 SQL size {} bytes exceeds max_sql_bytes {}",
-                    op.approx_sql_bytes, self.max_sql_bytes
-                ),
+                message: format!("D1 SQL size {} bytes exceeds max_sql_bytes {}", op.approx_sql_bytes, self.max_sql_bytes),
                 span: Default::default(),
                 stage: iris_types::StageKind::Plan,
                 backend: Some("iris-adapter-d1".into()),
@@ -531,10 +489,7 @@ impl D1Capabilities {
         if op.batch_size > self.max_batch_size {
             diags.push(iris_types::Diagnostic {
                 code: "IRIS-D1-BATCH-EXCEEDED".into(),
-                message: format!(
-                    "D1 batch size {} exceeds max_batch_size {}",
-                    op.batch_size, self.max_batch_size
-                ),
+                message: format!("D1 batch size {} exceeds max_batch_size {}", op.batch_size, self.max_batch_size),
                 span: Default::default(),
                 stage: iris_types::StageKind::Plan,
                 backend: Some("iris-adapter-d1".into()),
@@ -596,11 +551,9 @@ impl std::fmt::Display for D1Error {
                 }
                 Ok(())
             }
-            Self::FingerprintMismatch { expected, observed } => write!(
-                f,
-                "D1 contract fingerprint mismatch: expected {}, observed {}",
-                expected.0, observed.0
-            ),
+            Self::FingerprintMismatch { expected, observed } => {
+                write!(f, "D1 contract fingerprint mismatch: expected {}, observed {}", expected.0, observed.0)
+            }
             Self::SqlPreflight(m) => write!(f, "D1 SQL preflight: {m}"),
         }
     }
@@ -627,22 +580,10 @@ mod tests {
 
     #[test]
     fn wire_value_from_iris_round_trip() {
-        assert_eq!(
-            WireValue::from_iris(&iris_types::Value::Null),
-            WireValue::Null
-        );
-        assert_eq!(
-            WireValue::from_iris(&iris_types::Value::Bool(true)),
-            WireValue::Bool(true)
-        );
-        assert_eq!(
-            WireValue::from_iris(&iris_types::Value::Int(42)),
-            WireValue::Int(42)
-        );
-        assert_eq!(
-            WireValue::from_iris(&iris_types::Value::Str("x".into())),
-            WireValue::Str("x".into())
-        );
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Null), WireValue::Null);
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Bool(true)), WireValue::Bool(true));
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Int(42)), WireValue::Int(42));
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Str("x".into())), WireValue::Str("x".into()));
     }
 
     #[test]
@@ -667,9 +608,7 @@ mod tests {
             approx_params: 101, // > 100
         };
         let diags = c.supports(&op);
-        assert!(diags
-            .iter()
-            .any(|d| d.code == "IRIS-D1-PARAMS-EXCEEDED"));
+        assert!(diags.iter().any(|d| d.code == "IRIS-D1-PARAMS-EXCEEDED"));
     }
 
     #[test]
@@ -688,10 +627,7 @@ mod tests {
 
     #[test]
     fn supports_missing_capability_when_disabled() {
-        let c = D1Capabilities {
-            migration: false,
-            ..D1Capabilities::mock()
-        };
+        let c = D1Capabilities { migration: false, ..D1Capabilities::mock() };
         let op = OperationDescriptor {
             effect: iris_ir::EffectKind::Schema,
             needs_returning: false,
@@ -700,9 +636,7 @@ mod tests {
             approx_params: 0,
         };
         let diags = c.supports(&op);
-        assert!(diags
-            .iter()
-            .any(|d| d.code == "IRIS-D1-CAPABILITY-MISSING"));
+        assert!(diags.iter().any(|d| d.code == "IRIS-D1-CAPABILITY-MISSING"));
     }
 
     #[test]
@@ -725,12 +659,7 @@ mod tests {
     // -- lowering 单元测试 -------------------------------------------------
 
     fn users_meta(kind: OperationKind) -> OperationMeta {
-        OperationMeta {
-            table: "users".into(),
-            key_column: "id".into(),
-            kind,
-            columns: vec!["name".into(), "email".into()],
-        }
+        OperationMeta { table: "users".into(), key_column: "id".into(), kind, columns: vec!["name".into(), "email".into()] }
     }
 
     #[test]
@@ -760,10 +689,7 @@ mod tests {
         let meta = users_meta(OperationKind::Create);
         let params = vec![WireValue::Str("alice".into()), WireValue::Str("a@x.com".into())];
         let op = lower_operation(&meta, params).expect("ok");
-        assert_eq!(
-            op.sql,
-            "INSERT INTO \"users\" (\"name\", \"email\") VALUES (?, ?) RETURNING *"
-        );
+        assert_eq!(op.sql, "INSERT INTO \"users\" (\"name\", \"email\") VALUES (?, ?) RETURNING *");
         assert_eq!(op.mode, D1ExecutionMode::WriteReturning);
         assert_eq!(op.returning, ReturningProjection::All);
         assert_eq!(op.params.len(), 2);
@@ -773,16 +699,9 @@ mod tests {
     fn lower_update_produces_update_returning() {
         let meta = users_meta(OperationKind::Update);
         // Update params = [name, email, key]
-        let params = vec![
-            WireValue::Str("bob".into()),
-            WireValue::Str("b@x.com".into()),
-            WireValue::Int(99),
-        ];
+        let params = vec![WireValue::Str("bob".into()), WireValue::Str("b@x.com".into()), WireValue::Int(99)];
         let op = lower_operation(&meta, params).expect("ok");
-        assert_eq!(
-            op.sql,
-            "UPDATE \"users\" SET \"name\" = ?, \"email\" = ? WHERE \"id\" = ? RETURNING *"
-        );
+        assert_eq!(op.sql, "UPDATE \"users\" SET \"name\" = ?, \"email\" = ? WHERE \"id\" = ? RETURNING *");
         assert_eq!(op.mode, D1ExecutionMode::WriteReturning);
         assert_eq!(op.returning, ReturningProjection::All);
         assert_eq!(op.params.len(), 3);
@@ -791,24 +710,15 @@ mod tests {
 
     #[test]
     fn lower_rejects_invalid_table_identifier() {
-        let meta = OperationMeta {
-            table: "users; DROP TABLE users--".into(),
-            key_column: "id".into(),
-            kind: OperationKind::Find,
-            columns: vec![],
-        };
+        let meta =
+            OperationMeta { table: "users; DROP TABLE users--".into(), key_column: "id".into(), kind: OperationKind::Find, columns: vec![] };
         let err = lower_operation(&meta, vec![WireValue::Int(1)]).expect_err("must reject");
         assert!(matches!(err, LoweringError::InvalidIdentifier(_)));
     }
 
     #[test]
     fn lower_rejects_empty_columns_on_update() {
-        let meta = OperationMeta {
-            table: "users".into(),
-            key_column: "id".into(),
-            kind: OperationKind::Update,
-            columns: vec![],
-        };
+        let meta = OperationMeta { table: "users".into(), key_column: "id".into(), kind: OperationKind::Update, columns: vec![] };
         let err = lower_operation(&meta, vec![WireValue::Int(1)]).expect_err("must reject");
         assert!(matches!(err, LoweringError::MissingMetadata(_)));
     }
@@ -816,12 +726,8 @@ mod tests {
     #[test]
     fn lower_rejects_param_count_mismatch() {
         let meta = users_meta(OperationKind::Find);
-        let err = lower_operation(&meta, vec![WireValue::Int(1), WireValue::Int(2)])
-            .expect_err("must reject");
-        assert!(matches!(
-            err,
-            LoweringError::ParamCountMismatch { kind: OperationKind::Find, expected: 1, actual: 2 }
-        ));
+        let err = lower_operation(&meta, vec![WireValue::Int(1), WireValue::Int(2)]).expect_err("must reject");
+        assert!(matches!(err, LoweringError::ParamCountMismatch { kind: OperationKind::Find, expected: 1, actual: 2 }));
     }
 
     #[test]
@@ -841,9 +747,7 @@ mod tests {
             mode: D1ExecutionMode::Read,
             returning: ReturningProjection::None,
             contract_fingerprint: iris_ir::SchemaFingerprint("abc".into()),
-            operation_hint: Some(OperationHint {
-                meta: users_meta(OperationKind::Find),
-            }),
+            operation_hint: Some(OperationHint { meta: users_meta(OperationKind::Find) }),
         };
         let s = serde_json::to_string(&req).unwrap();
         assert!(s.contains("operation_hint"), "hint should serialize");

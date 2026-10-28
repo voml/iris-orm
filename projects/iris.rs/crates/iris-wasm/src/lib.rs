@@ -11,7 +11,9 @@ pub mod wire;
 
 pub use bind::bind_parameters;
 
-pub use core::{SchemaCheck, check_artifacts, check_schema_source, generate_from_artifacts, introspect_from_artifacts, introspect_schema_json, iris_version};
+pub use core::{
+    SchemaCheck, check_artifacts, check_schema_source, generate_from_artifacts, introspect_from_artifacts, introspect_schema_json, iris_version,
+};
 #[allow(deprecated)]
 pub use session::{MemorySession, execute_vos_memory, query_memory};
 
@@ -19,9 +21,7 @@ use std::collections::BTreeMap;
 
 use wasm_bindgen::prelude::*;
 
-use iris_adapter_d1::{
-    D1Request, D1Response, D1WireRow, WireValue, lower_operation,
-};
+use iris_adapter_d1::{D1Request, D1Response, D1WireRow, WireValue, lower_operation};
 
 /// Library version (matches workspace `@yydb/iris` semver).
 #[wasm_bindgen(js_name = irisVersion)]
@@ -211,8 +211,7 @@ pub(crate) fn prepare_d1_operation_inner(request_json: &str) -> Result<String, S
 
     // 如果有 lowering hint，调用 lower_operation 覆盖 sql/params/mode/returning。
     if let Some(hint) = req.operation_hint.as_ref() {
-        let prepared =
-            lower_operation(&hint.meta, req.params.clone()).map_err(|e| e.to_string())?;
+        let prepared = lower_operation(&hint.meta, req.params.clone()).map_err(|e| e.to_string())?;
         req.sql = prepared.sql;
         req.params = prepared.params;
         req.mode = prepared.mode;
@@ -256,32 +255,20 @@ pub fn decode_d1_result(raw_json: &str) -> Result<String, JsValue> {
 
 /// Native-testable core of [`decode_d1_result`].
 pub(crate) fn decode_d1_result_inner(raw_json: &str) -> Result<String, String> {
-    let raw: D1RawResult =
-        serde_json::from_str(raw_json).map_err(|e| format!("D1 decode parse failed: {e}"))?;
+    let raw: D1RawResult = serde_json::from_str(raw_json).map_err(|e| format!("D1 decode parse failed: {e}"))?;
 
     if !raw.success {
         let msg = raw.error.unwrap_or_else(|| "D1 call failed".into());
         return Err(format!("D1 decode failed: {msg}"));
     }
 
-    let D1Response {
-        rows,
-        row_count,
-        last_insert_rowid,
-    } = D1Response {
-        rows: raw.results,
-        row_count: raw.changes,
-        last_insert_rowid: raw.last_row_id,
-    };
+    let D1Response { rows, row_count, last_insert_rowid } =
+        D1Response { rows: raw.results, row_count: raw.changes, last_insert_rowid: raw.last_row_id };
 
     let col_names = raw.column_names.unwrap_or_default();
     let canonical_rows = canonicalise_rows(&rows, &col_names);
 
-    let envelope = CanonicalResult {
-        rows: canonical_rows,
-        row_count,
-        last_insert_rowid,
-    };
+    let envelope = CanonicalResult { rows: canonical_rows, row_count, last_insert_rowid };
 
     serde_json::to_string(&envelope).map_err(|e| e.to_string())
 }
@@ -291,10 +278,7 @@ fn canonicalise_rows(rows: &[D1WireRow], col_names: &[String]) -> Vec<CanonicalR
     for row in rows {
         let mut map = BTreeMap::new();
         for (idx, wire) in row.iter().enumerate() {
-            let key = col_names
-                .get(idx)
-                .cloned()
-                .unwrap_or_else(|| format!("col_{idx}"));
+            let key = col_names.get(idx).cloned().unwrap_or_else(|| format!("col_{idx}"));
             map.insert(key, wire.to_iris());
         }
         out.push(CanonicalRow { values: map });
@@ -400,10 +384,7 @@ mod tests {
         }"#;
         let out = prepare_d1_operation_inner(req_json).expect("ok");
         let parsed: serde_json::Value = serde_json::from_str(&out).expect("valid json");
-        assert_eq!(
-            parsed["sql"],
-            "INSERT INTO \"users\" (\"name\", \"email\") VALUES (?, ?) RETURNING *"
-        );
+        assert_eq!(parsed["sql"], "INSERT INTO \"users\" (\"name\", \"email\") VALUES (?, ?) RETURNING *");
         assert_eq!(parsed["mode"], "write-returning");
         assert_eq!(parsed["returning"], "all");
     }

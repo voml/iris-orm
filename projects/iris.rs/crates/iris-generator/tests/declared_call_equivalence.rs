@@ -10,9 +10,7 @@
 
 use iris_generator::{GenerationModel, emit_rust_files, emit_typescript_client};
 use serde_json::{Value, json};
-use vos::{
-    FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract,
-};
+use vos::{FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -153,7 +151,10 @@ fn generated_and_direct_calls_share_one_request_builder() {
 
     // No second request literal, no second fingerprint, no generated-side gate.
     for forbidden in ["{ identity:", "contractFingerprint", "negotiateCapabilities", "requiredCapabilities"] {
-        assert!(!ops.contains(forbidden), "`operations.ts` must not re-implement request shaping or capability negotiation (`{forbidden}`):\n{ops}");
+        assert!(
+            !ops.contains(forbidden),
+            "`operations.ts` must not re-implement request shaping or capability negotiation (`{forbidden}`):\n{ops}"
+        );
     }
 }
 
@@ -183,12 +184,8 @@ fn rust_stubs_carry_the_same_declared_operation_identity() {
     let files = emit_rust_files(&model()).expect("emit");
     let ops = typescript_file(&files, "operations.rs");
 
-    for (name, operation_id) in [
-        ("get_user", GET_USER),
-        ("hash_password", HASH_PASSWORD),
-        ("seed_user", SEED_USER),
-        ("label_user", LABEL_USER),
-    ] {
+    for (name, operation_id) in [("get_user", GET_USER), ("hash_password", HASH_PASSWORD), ("seed_user", SEED_USER), ("label_user", LABEL_USER)]
+    {
         assert!(ops.contains(&format!("fn {name}(")), "missing Rust stub `{name}`:\n{ops}");
         assert!(ops.contains(&format!("(op_id: {operation_id})")), "Rust stub `{name}` must cite `{operation_id}`:\n{ops}");
     }

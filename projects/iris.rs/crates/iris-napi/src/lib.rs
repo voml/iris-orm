@@ -139,12 +139,7 @@ pub fn generate(source: String, target: String, out_dir: String) -> Result<Gener
 /// VOS operation projection artifact. Skips source parsing and identity
 /// allocation when the caller already holds both artifacts.
 #[napi]
-pub fn generate_from_artifacts(
-    contract_json: String,
-    operations_json: String,
-    target: String,
-    out_dir: String,
-) -> Result<GenerateResult> {
+pub fn generate_from_artifacts(contract_json: String, operations_json: String, target: String, out_dir: String) -> Result<GenerateResult> {
     match iris_generator::generate_from_artifacts(&contract_json, &operations_json, &target, Path::new(&out_dir)) {
         Ok((model, paths)) => {
             let output_path = match target.as_str() {

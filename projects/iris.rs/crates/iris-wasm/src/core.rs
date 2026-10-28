@@ -82,12 +82,8 @@ pub fn introspect_from_artifacts(contract_json: &str, operations_json: &str) -> 
 pub fn generate_from_artifacts(contract_json: &str, operations_json: &str, target: &str) -> String {
     match iris_generator::emit_from_artifacts(contract_json, operations_json, target) {
         Ok((model, files)) => {
-            let file_entries: Vec<Value> = files
-                .into_iter()
-                .map(|(name, content)| {
-                    serde_json::json!({ "name": name, "content": content })
-                })
-                .collect();
+            let file_entries: Vec<Value> =
+                files.into_iter().map(|(name, content)| serde_json::json!({ "name": name, "content": content })).collect();
             serde_json::json!({
                 "ok": true,
                 "schemaFingerprint": model.schema_fingerprint,
