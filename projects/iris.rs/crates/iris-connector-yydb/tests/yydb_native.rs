@@ -1,11 +1,13 @@
 //! Phase 2: native YYDB connector — VOS executor live on the Connection facade.
 
 use std::{
+    collections::BTreeMap,
     fs,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use iris_connector_yydb::{BACKEND_ID, YydbSource};
+use iris_connector_yydb::{BACKEND_ID, PreparedVos, YydbSource};
+use yydb::Value as YydbValue;
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -179,6 +181,83 @@ fn reopen_preserves_schema_document() {
     let db = db.reopen().unwrap();
     let hs = db.schema_handshake().unwrap();
     assert_eq!(hs.schema_version, Some(1));
+    let _ = fs::remove_file(&path);
+}
+
+// ---------------------------------------------------------------------------
+// `bytes`: octets round trip through a real database file and a reopen
+// ---------------------------------------------------------------------------
+
+const BLOB_SCHEMA: &str = r#"
+table Blob {
+    @@blob_id: i64,
+    label: utf8,
+    body: bytes,
+}
+"#;
+
+const BLOB_INSERT: &str = "Blob::insert({ blob_id: $blob_id, label: $label, body: $body })";
+
+const BLOB_QUERY: &str = "Blob.filter(x => x.blob_id == $blob_id).collect()";
+
+/// Payloads that a text path would corrupt: empty, NUL, invalid UTF-8, mixed.
+const BLOB_CASES: [(&str, &[u8]); 4] = [
+    ("empty", &[]),
+    ("nul", &[0x00, 0x00, 0x00]),
+    ("invalid-utf8", &[0xff, 0xfe, 0xc3, 0x28]),
+    ("mixed", &[0x00, 0xff, 0x41, 0xc3, 0x28]),
+];
+
+fn blob_id_params(blob_id: i64) -> BTreeMap<String, YydbValue> {
+    let mut params = BTreeMap::new();
+    params.insert("blob_id".to_string(), YydbValue::I64(blob_id));
+    params
+}
+
+fn blob_write_params(blob_id: i64, label: &str, body: &[u8]) -> BTreeMap<String, YydbValue> {
+    let mut params = blob_id_params(blob_id);
+    params.insert("label".to_string(), YydbValue::Text(label.to_string()));
+    params.insert("body".to_string(), YydbValue::Bytes(body.to_vec()));
+    params
+}
+
+fn read_body(plan: &PreparedVos, db: &YydbSource, blob_id: i64) -> Vec<u8> {
+    let rows = plan.execute_with_params(db, blob_id_params(blob_id)).expect("read `body` back");
+    assert_eq!(rows.len(), 1, "`blob_id` {blob_id} must read back exactly one row");
+    match rows[0].get("body") {
+        Some(iris_types::Value::Bytes(octets)) => octets.clone(),
+        other => panic!("`bytes` must decode to octets, got {other:?}"),
+    }
+}
+
+#[test]
+fn bytes_round_trip_survives_close_and_reopen() {
+    let path = temp_db_path("bytes");
+    let db = YydbSource::open(&path).unwrap();
+    db.ensure_schema(BLOB_SCHEMA).unwrap();
+
+    let conn = db.connection();
+    db.begin().unwrap();
+    for (index, (label, body)) in BLOB_CASES.iter().copied().enumerate() {
+        conn.execute_vos_write_with_params(BLOB_INSERT, &blob_write_params(index as i64 + 1, label, body))
+            .unwrap_or_else(|error| panic!("insert `{label}`: {error}"));
+    }
+    db.commit().unwrap();
+
+    let plan = db.prepare(BLOB_QUERY).expect("prepare");
+    for (index, (label, body)) in BLOB_CASES.iter().copied().enumerate() {
+        let read = read_body(&plan, &db, index as i64 + 1);
+        assert_eq!(read.as_slice(), body, "`{label}` must read back byte for byte before reopen");
+    }
+
+    let db = db.reopen().expect("reopen");
+    let plan = db.prepare(BLOB_QUERY).expect("prepare after reopen");
+    for (index, (label, body)) in BLOB_CASES.iter().copied().enumerate() {
+        let read = read_body(&plan, &db, index as i64 + 1);
+        assert_eq!(read.as_slice(), body, "`{label}` must read back byte for byte after reopen");
+    }
+
+    drop(db);
     let _ = fs::remove_file(&path);
 }
 
