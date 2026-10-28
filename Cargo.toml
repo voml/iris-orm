@@ -14,11 +14,11 @@ repository = "https://github.com/voml/iris-orm"
 homepage = "https://iris-orm.pages.dev/"
 
 [workspace.dependencies]
-# Public VOS/VON/YYDB — git `dev` only (CI / Docker; no sibling path checkouts).
-vos = { git = "https://github.com/voml/vos-language.git", branch = "dev" }
-von = { git = "https://github.com/voml/von-language.git", branch = "dev", features = ["serde"] }
-yydb = { git = "https://github.com/yy-database/yydb.rs.git", branch = "dev" }
-dejavu = { git = "https://github.com/doki-land/dejavu-engine.git", branch = "dev" }
+# Public VOS/VON/YYDB — git `rev` pinned (CI / Docker; no sibling path checkouts).
+vos = { git = "https://github.com/voml/vos-language.git", rev = "67c70cb119ce3dcc55ca7ba607014a49c9c9614e" }
+von = { git = "https://github.com/voml/von-language.git", rev = "ccc58c90c8f94c0be3dfcacb3b0caec98a6ae3e4", features = ["serde"] }
+yydb = { git = "https://github.com/yy-database/yydb.rs.git", rev = "02c5123f63b91567bcc0d54fe1ed0f45d6253128" }
+dejavu = { git = "https://github.com/doki-land/dejavu-engine.git", rev = "8aba1a0a61ac9d7f2112123a57faec649cf67427" }
 
 once_cell = "1"
 clap = { version = "4", features = ["derive"] }
