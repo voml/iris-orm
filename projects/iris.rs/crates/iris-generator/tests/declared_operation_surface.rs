@@ -66,7 +66,7 @@ fn artifact(operations: Vec<Value>) -> String {
 }
 
 fn project_error(operations: Vec<Value>) -> Error {
-    GenerationModel::from_artifacts(&contract_json(), &artifact(operations)).err().expect("artifact must be rejected")
+    GenerationModel::from_artifacts(&contract_json(), &artifact(operations)).expect_err("artifact must be rejected")
 }
 
 fn generation_model_json(kind: &str) -> Value {
