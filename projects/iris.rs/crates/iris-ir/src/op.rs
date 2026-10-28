@@ -63,6 +63,8 @@ pub enum LiteralKind {
     Time,
     /// UTC datetime text.
     DateTime,
+    /// Octets as the lowercase hex text of the VOS `bytes` wire form.
+    Bytes,
     /// Null.
     Null,
 }

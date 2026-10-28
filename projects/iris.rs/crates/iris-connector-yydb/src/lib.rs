@@ -305,10 +305,11 @@ impl PreparedVos {
 
 /// Convert a YYDB runtime Value to Iris Value.
 ///
-/// The mapping is lossy for variants Iris doesn't model (UUID, Bytes, Vector,
-/// Object, File) — they collapse to Iris `Null`. Callers that need full
-/// fidelity should work directly with the YYDB `yydb::Value` via the
-/// `connection()` escape hatch.
+/// `bytes` keeps its octets: YYDB `Value::Bytes` becomes Iris
+/// `Value::Bytes`, never text and never `Null`. The mapping is lossy for
+/// variants Iris doesn't model (Vector, Object, File) — they collapse to Iris
+/// `Null`. Callers that need full fidelity should work directly with the YYDB
+/// `yydb::Value` via the `connection()` escape hatch.
 pub fn value_from_yydb(v: YydbValue) -> iris_types::Value {
     match v {
         YydbValue::Null => iris_types::Value::Null,
@@ -317,7 +318,7 @@ pub fn value_from_yydb(v: YydbValue) -> iris_types::Value {
         YydbValue::I64(i) => iris_types::Value::Int(i),
         YydbValue::U64(u) => iris_types::Value::Int(u as i64),
         YydbValue::F64(f) => iris_types::Value::Str(f.to_string()),
-        YydbValue::Bytes(_) => iris_types::Value::Null,
+        YydbValue::Bytes(octets) => iris_types::Value::Bytes(octets),
         YydbValue::Uuid(u) => iris_types::Value::Str(u.to_string()),
         YydbValue::Vector(_) => iris_types::Value::Null,
         YydbValue::Object(_) => iris_types::Value::Null,

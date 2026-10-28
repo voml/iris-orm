@@ -7,7 +7,7 @@ use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, WriteField};
 use crate::{
     error::{Error, Result},
     lower,
-    value::{Row, Value},
+    value::{Row, Value, hex_to_bytes},
 };
 
 /// In-memory multi-table store used as the Phase 1 reference adapter.
@@ -164,6 +164,7 @@ fn decode_literal(text: &str, kind: LiteralKind) -> Value {
         LiteralKind::Date => Value::Date(text.to_string()),
         LiteralKind::Time => Value::Time(text.to_string()),
         LiteralKind::DateTime => Value::DateTime(text.to_string()),
+        LiteralKind::Bytes => Value::Bytes(hex_to_bytes(text).unwrap_or_default()),
     }
 }
 

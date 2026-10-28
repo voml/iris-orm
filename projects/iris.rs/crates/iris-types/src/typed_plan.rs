@@ -332,6 +332,7 @@ fn canonical_literal(name: &str, value: &Value, scalar: CanonicalScalar, optiona
         (CanonicalScalar::DateTime, Value::DateTime(_)) => {
             Err(TypedPlanError::new(CODE_CANONICAL_VALUE, format!("parameter `{name}` is not a canonical UTC datetime")))
         }
+        (CanonicalScalar::Bytes, Value::Bytes(octets)) => Ok((crate::bytes_to_hex(octets), LiteralKind::Bytes)),
         (CanonicalScalar::U64, Value::Int(_)) => {
             Err(TypedPlanError::new(CODE_ARGUMENT_TYPE, format!("parameter `{name}` is outside the u64 range representable by SQLite")))
         }
@@ -361,6 +362,7 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Date(_) => "date",
         Value::Time(_) => "time",
         Value::DateTime(_) => "datetime",
+        Value::Bytes(_) => "bytes",
         Value::Object(_) => "object",
     }
 }

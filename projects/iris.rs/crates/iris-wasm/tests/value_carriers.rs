@@ -66,6 +66,19 @@ fn exact_i64_filter_matches_and_survives_the_wire() {
 }
 
 #[test]
+fn bytes_leave_the_wire_as_base64_without_a_text_guess() {
+    let mut row = BTreeMap::new();
+    row.insert("empty".to_string(), Value::Bytes(Vec::new()));
+    row.insert("nul".to_string(), Value::Bytes(vec![0, 0, 0]));
+    row.insert("mixed".to_string(), Value::Bytes(vec![0x00, 0xff, 0x41, 0xc3, 0x28]));
+
+    let json = rows_to_json(vec![row]);
+    assert_eq!(json[0]["empty"], JsonValue::String(String::new()));
+    assert_eq!(json[0]["nul"], JsonValue::String("AAAA".into()));
+    assert_eq!(json[0]["mixed"], JsonValue::String("AP9Bwyg=".into()));
+}
+
+#[test]
 fn wire_keeps_small_integers_as_numbers() {
     let mut row = BTreeMap::new();
     row.insert("seq".to_string(), Value::Int(42));

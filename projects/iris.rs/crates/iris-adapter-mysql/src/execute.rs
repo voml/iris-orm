@@ -222,6 +222,7 @@ fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(
         LiteralKind::Date => Value::Date(field.literal.clone()),
         LiteralKind::Time => Value::Time(field.literal.clone()),
         LiteralKind::DateTime => Value::DateTime(field.literal.clone()),
+        LiteralKind::Bytes => Value::Bytes(iris_types::hex_to_bytes(&field.literal).unwrap_or_default()),
     };
     to_mysql(&value, table, &field.name, uuid_fields)
 }
@@ -304,6 +305,7 @@ fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uui
         LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
             encode_str(text, table, field, uuid_fields)
         }
+        LiteralKind::Bytes => MysqlValue::Bytes(iris_types::hex_to_bytes(text).unwrap_or_default()),
     }
 }
 
@@ -313,6 +315,7 @@ fn to_mysql(value: &Value, table: &str, field: &str, uuid_fields: &HashSet<(Stri
         Value::Bool(b) => MysqlValue::Int(i64::from(*b)),
         Value::Int(i) => MysqlValue::Int(*i),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => encode_str(s, table, field, uuid_fields),
+        Value::Bytes(octets) => MysqlValue::Bytes(octets.clone()),
         Value::Object(_) => MysqlValue::NULL,
     }
 }

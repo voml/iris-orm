@@ -1,7 +1,7 @@
 //! Physical plan execution and row writes (private PostgreSQL SQL).
 
 use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
-use iris_types::{Row, RowWrite, Value};
+use iris_types::{Row, RowWrite, Value, hex_to_bytes};
 use postgres::{
     Client, GenericClient,
     types::{IsNull, ToSql, Type, to_sql_checked},
@@ -15,6 +15,7 @@ enum OwnedSql {
     Bool(bool),
     Int(i64),
     Text(String),
+    Bytes(Vec<u8>),
 }
 
 impl ToSql for OwnedSql {
@@ -24,6 +25,7 @@ impl ToSql for OwnedSql {
             Self::Bool(v) => v.to_sql(ty, out),
             Self::Int(v) => v.to_sql(ty, out),
             Self::Text(v) => v.to_sql(ty, out),
+            Self::Bytes(v) => v.to_sql(ty, out),
         }
     }
 
@@ -31,6 +33,7 @@ impl ToSql for OwnedSql {
         <bool as ToSql>::accepts(ty)
             || <i64 as ToSql>::accepts(ty)
             || <String as ToSql>::accepts(ty)
+            || <Vec<u8> as ToSql>::accepts(ty)
             || matches!(*ty, Type::UNKNOWN | Type::TEXT | Type::VARCHAR | Type::BPCHAR)
     }
 
@@ -43,6 +46,7 @@ fn to_owned(value: &Value) -> OwnedSql {
         Value::Bool(b) => OwnedSql::Bool(*b),
         Value::Int(i) => OwnedSql::Int(*i),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => OwnedSql::Text(s.clone()),
+        Value::Bytes(octets) => OwnedSql::Bytes(octets.clone()),
         Value::Object(_) => OwnedSql::Null,
     }
 }
@@ -307,6 +311,7 @@ fn literal_to_owned(text: &str, kind: LiteralKind) -> OwnedSql {
         LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
             OwnedSql::Text(text.to_string())
         }
+        LiteralKind::Bytes => OwnedSql::Bytes(hex_to_bytes(text).unwrap_or_default()),
     }
 }
 
@@ -325,6 +330,12 @@ fn from_pg_row(row: &postgres::Row, idx: usize) -> Value {
     }
     if let Ok(Some(v)) = row.try_get::<_, Option<String>>(idx) {
         return Value::Str(v);
+    }
+    if let Ok(v) = row.try_get::<_, Vec<u8>>(idx) {
+        return Value::Bytes(v);
+    }
+    if let Ok(Some(v)) = row.try_get::<_, Option<Vec<u8>>>(idx) {
+        return Value::Bytes(v);
     }
     Value::Null
 }

@@ -12,6 +12,7 @@ pub(crate) fn to_sql_value(value: &Value) -> SqliteValue {
         Value::Bool(b) => SqliteValue::Integer(i64::from(*b)),
         Value::Int(i) => SqliteValue::Integer(*i),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => SqliteValue::Text(s.as_bytes().to_vec()),
+        Value::Bytes(octets) => SqliteValue::Blob(octets.clone()),
         Value::Object(_) => SqliteValue::Null,
     }
 }
@@ -24,6 +25,7 @@ pub(crate) fn literal_to_sql_value(text: &str, kind: LiteralKind) -> SqliteValue
         LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
             SqliteValue::Text(text.as_bytes().to_vec())
         }
+        LiteralKind::Bytes => SqliteValue::Blob(iris_types::hex_to_bytes(text).unwrap_or_default()),
     }
 }
 
@@ -33,7 +35,7 @@ pub(crate) fn from_sql_value(value: SqliteValue) -> Value {
         SqliteValue::Integer(i) => Value::Int(i),
         SqliteValue::Real(f) => Value::Str(f.to_string()),
         SqliteValue::Text(bytes) => Value::Str(String::from_utf8_lossy(&bytes).into_owned()),
-        SqliteValue::Blob(b) => Value::Str(format!("blob:{}", b.len())),
+        SqliteValue::Blob(b) => Value::Bytes(b),
     }
 }
 

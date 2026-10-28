@@ -23,6 +23,8 @@ pub enum Value {
     Time(String),
     /// UTC datetime in canonical text form.
     DateTime(String),
+    /// Octets of the VOS `bytes` scalar, exactly as the backend produced them.
+    Bytes(Vec<u8>),
     /// Nested object row (query projection).
     Object(BTreeMap<String, Value>),
 }
@@ -39,9 +41,31 @@ impl Value {
             Self::Date(s) => (s.clone(), iris_ir::LiteralKind::Date),
             Self::Time(s) => (s.clone(), iris_ir::LiteralKind::Time),
             Self::DateTime(s) => (s.clone(), iris_ir::LiteralKind::DateTime),
+            Self::Bytes(octets) => (bytes_to_hex(octets), iris_ir::LiteralKind::Bytes),
             Self::Object(_) => ("null".into(), iris_ir::LiteralKind::Null),
         }
     }
+}
+
+/// Encodes octets as the lowercase hex text of the VOS `bytes` wire form.
+///
+/// The encoding comes from VOS itself, so a literal produced here always
+/// decodes through [`hex_to_bytes`] without an intermediate text guess.
+pub fn bytes_to_hex(octets: &[u8]) -> String {
+    vos::types::BytesValue::new(octets.to_vec()).to_wire().data
+}
+
+/// Decodes lowercase VOS hex text back to octets.
+///
+/// Text outside the canonical wire form yields `None` instead of a guess;
+/// every literal produced by [`Value::as_pred_literal`] is canonical.
+pub fn hex_to_bytes(text: &str) -> Option<Vec<u8>> {
+    let wire = vos::types::BytesValueWire {
+        format_version: vos::types::BYTES_VALUE_FORMAT_VERSION.to_owned(),
+        encoding: "hex".to_owned(),
+        data: text.to_owned(),
+    };
+    vos::types::BytesValue::from_wire(wire).ok().map(vos::types::BytesValue::into_octets)
 }
 
 /// One logical row: ordered field map.
