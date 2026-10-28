@@ -8,9 +8,18 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-execFileSync("pnpm", ["-r", "--filter", "./projects/iris.ts/packages/**", "--filter", "./projects/iris.ts/platforms/**", "--filter", "./projects/iris.ts/homepage", "run", "typecheck"], {
-    cwd: rootDir,
-    stdio: "inherit",
-    env: process.env,
-    shell: process.platform === "win32",
-});
+function runPnpm(args) {
+    execFileSync("pnpm", args, {
+        cwd: rootDir,
+        stdio: "inherit",
+        env: process.env,
+        shell: process.platform === "win32",
+    });
+}
+
+// `@yydb/iris` resolves `@yydb/iris-language/cloudflare/d1-wasm-bridge` through the
+// published `exports` of that package, which point at `dist`. Emit `dist` first so
+// typecheck does not depend on an earlier build step happening to have run.
+runPnpm(["--filter", "@yydb/iris-language", "run", "build"]);
+
+runPnpm(["-r", "--filter", "./projects/iris.ts/packages/**", "--filter", "./projects/iris.ts/platforms/**", "--filter", "./projects/iris.ts/homepage", "run", "typecheck"]);
