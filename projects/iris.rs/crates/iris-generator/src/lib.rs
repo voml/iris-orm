@@ -470,9 +470,11 @@ struct OperationCarrier {
 /// Resolves one operation signature type to declared-vos host carriers.
 ///
 /// Only two shapes may cross a generated delegate: a VOS builtin label the
-/// faithful carrier table maps, or a type the schema itself declares. `bytes`,
-/// `vector` and `file` payloads, collection/generic shapes, undeclared models
-/// and unknown labels all hard-fail here so generation never guesses a carrier.
+/// faithful carrier table maps, or a type the schema itself declares. `bytes`
+/// crosses as its VOS carrier (`Vec<u8>` / `Uint8Array`) because the backend
+/// channel carries octets, never text. `vector` and `file` payloads,
+/// collection/generic shapes, undeclared models and unknown labels all
+/// hard-fail here so generation never guesses a carrier.
 fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet<String>) -> Result<OperationCarrier> {
     let trimmed = vos_type.trim();
     let base = carrier::base_vos_type(trimmed);
@@ -485,7 +487,6 @@ fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet
         return Err(unsupported("collection and generic shapes have no declared-vos operation carrier"));
     }
     match base {
-        "bytes" => return Err(unsupported("`bytes` payloads have no declared-vos operation carrier")),
         "vector" | "file" => return Err(unsupported("`vector` and `file` payloads have no declared-vos operation carrier")),
         _ => {}
     }

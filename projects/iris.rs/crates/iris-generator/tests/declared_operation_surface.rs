@@ -69,6 +69,14 @@ fn project_error(operations: Vec<Value>) -> Error {
     GenerationModel::from_artifacts(&contract_json(), &artifact(operations)).expect_err("artifact must be rejected")
 }
 
+fn project_model(operations: Vec<Value>) -> GenerationModel {
+    GenerationModel::from_artifacts(&contract_json(), &artifact(operations)).expect("artifact must project")
+}
+
+fn target_file<'a>(files: &'a [(String, String)], name: &str) -> &'a str {
+    files.iter().find(|(path, _)| path == name).map(|(_, content)| content.as_str()).unwrap_or_else(|| panic!("`{name}`"))
+}
+
 fn generation_model_json(kind: &str) -> Value {
     json!({
         "generator_version": "test",
@@ -125,15 +133,53 @@ fn undeclared_operation_model_is_rejected() {
 }
 
 #[test]
-fn bytes_parameter_is_rejected() {
-    let error = project_error(vec![operation(
+fn bytes_operation_types_cross_as_the_vos_carrier() {
+    let model = project_model(vec![operation(
         "udf",
         "store_blob",
         "op_0123456789abcdef",
         vec![param("payload", json!({ "named": ["bytes"] }))],
-        json!({ "named": ["utf8"] }),
+        json!({ "named": ["bytes"] }),
     )]);
-    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "bytes"), "{error}");
+
+    let rust = emit_target_files(&model, "rust").expect("rust target");
+    let operations = target_file(&rust, "operations.rs");
+    assert!(
+        operations.contains("fn store_blob(payload: Vec<u8>) -> Vec<u8>"),
+        "`bytes` must cross as raw octets, never text:\n{operations}"
+    );
+
+    let typescript = emit_target_files(&model, "typescript").expect("typescript target");
+    let operations = target_file(&typescript, "operations.ts");
+    assert!(
+        operations.contains("async store_blob(payload: Uint8Array): Promise<Uint8Array>"),
+        "`bytes` must keep the `Uint8Array` carrier on both sides:\n{operations}"
+    );
+}
+
+#[test]
+fn optional_bytes_operation_type_keeps_the_declared_optionality() {
+    let model = project_model(vec![operation(
+        "udf",
+        "store_optional_blob",
+        "op_0123456789abcdef",
+        vec![param("payload", json!({ "optional": { "named": ["bytes"] } }))],
+        json!({ "optional": { "named": ["bytes"] } }),
+    )]);
+
+    let rust = emit_target_files(&model, "rust").expect("rust target");
+    let operations = target_file(&rust, "operations.rs");
+    assert!(
+        operations.contains("fn store_optional_blob(payload: Option<Vec<u8>>) -> Option<Vec<u8>>"),
+        "an optional `bytes` type must stay optional in Rust:\n{operations}"
+    );
+
+    let typescript = emit_target_files(&model, "typescript").expect("typescript target");
+    let operations = target_file(&typescript, "operations.ts");
+    assert!(
+        operations.contains("async store_optional_blob(payload: Uint8Array): Promise<Uint8Array>"),
+        "the `bytes` carrier is `Uint8Array` on both sides:\n{operations}"
+    );
 }
 
 #[test]
@@ -146,6 +192,18 @@ fn vector_parameter_is_rejected() {
         Value::Null,
     )]);
     assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "vector"), "{error}");
+}
+
+#[test]
+fn dimensioned_vector_parameter_is_still_rejected() {
+    let error = project_error(vec![operation(
+        "query",
+        "search",
+        "op_0123456789abcdef",
+        vec![param("embedding", json!({ "generic": { "path": ["vector"], "arguments": [{ "literal": "3" }] } }))],
+        Value::Null,
+    )]);
+    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "vector<3>"), "{error}");
 }
 
 #[test]
