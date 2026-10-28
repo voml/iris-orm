@@ -76,6 +76,7 @@ struct TsTemplateContext {
 impl GenerationModel {
     /// JSON context for TypeScript `.dejavu` templates.
     pub fn typescript_template_context(&self) -> Result<Value> {
+        self.validate_operation_surface()?;
         validate_ts_naming(self)?;
         Ok(serde_json::to_value(build_ts_context(self)?).expect("TsTemplateContext serializes"))
     }
@@ -320,9 +321,14 @@ fn camel_case(name: &str) -> String {
     }
 }
 
-fn vos_filter_name(vos_type: &str) -> &'static str {
+/// Typed filter surface of one VOS label (`None` = the label has no filter).
+///
+/// Returning `Option` keeps generation honest: a label with no declared filter
+/// type hard-fails in `emit_where_field` instead of silently becoming
+/// `StringFilter`.
+fn vos_filter_name(vos_type: &str) -> Option<&'static str> {
     let base = carrier::base_vos_type(vos_type);
-    match base {
+    Some(match base {
         "bool" => "BooleanFilter",
         "i64" | "u64" => "BigIntFilter",
         "i8" | "i16" | "i32" | "u8" | "u16" | "u32" | "f32" | "f64" => "NumberFilter",
@@ -331,8 +337,8 @@ fn vos_filter_name(vos_type: &str) -> &'static str {
         "decimal" => "DecimalFilter",
         "date" | "time" | "datetimeUtc" => "DateTimeFilter",
         "bytes" => "BytesFilter",
-        _ => "StringFilter",
-    }
+        _ => return None,
+    })
 }
 
 fn model_field_type(table: &TableModel, field: &FieldModel) -> Result<String> {
@@ -406,7 +412,11 @@ fn emit_where_field(table: &TableModel, field: &FieldModel, entity_names: &HashS
         return Ok(None);
     }
     let scalar = scalar_filter_type(table, field)?;
-    let filter = vos_filter_name(&field.vos_type);
+    let filter = vos_filter_name(&field.vos_type).ok_or_else(|| Error::UnsupportedFilterType {
+        entity: table.name.clone(),
+        field: field.name.clone(),
+        vos_type: field.vos_type.clone(),
+    })?;
     let nullable = nullable_where_suffix(field.optional);
     Ok(Some(format!("    {}?: {scalar} | {filter}{nullable};", field_ts_name(field), scalar = scalar, filter = filter, nullable = nullable,)))
 }

@@ -9,7 +9,10 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+};
 
 use dejavu::{Dejavu, IrDocument};
 use once_cell::sync::OnceCell;
@@ -39,6 +42,54 @@ pub enum Error {
     /// VOS type label not in the faithful carrier table.
     #[error("unknown VOS label `{0}` is not in the carrier table")]
     UnknownVosLabel(String),
+    /// Operation declaration kind outside the projected VOS operation set.
+    #[error("operation `{operation}` uses unsupported kind `{kind}` (expected query, udf, micro or macro)")]
+    UnsupportedOperationKind {
+        /// Operation author name.
+        operation: String,
+        /// Declared kind label that is not a VOS operation kind.
+        kind: String,
+    },
+    /// Operation signature references a model that the schema does not declare.
+    #[error("operation `{operation}` references undeclared model `{ty}`")]
+    UndeclaredOperationModel {
+        /// Operation author name.
+        operation: String,
+        /// Named type no declared table provides.
+        ty: String,
+    },
+    /// Operation signature type the declared-vos execution path cannot carry.
+    #[error("operation `{operation}` uses unsupported type `{ty}`: {reason}")]
+    UnsupportedOperationType {
+        /// Operation author name.
+        operation: String,
+        /// Offending VOS type label.
+        ty: String,
+        /// Why the type has no execution carrier.
+        reason: &'static str,
+    },
+    /// Operation without a durable VOS operation identity.
+    #[error("operation `{operation}` has no durable VOS operation identity")]
+    MissingOperationIdentity {
+        /// Operation author name.
+        operation: String,
+    },
+    /// Two operations claim the same durable identity.
+    #[error("duplicate operation identity `{operation_id}`")]
+    DuplicateOperationId {
+        /// Durable operation identity claimed more than once.
+        operation_id: String,
+    },
+    /// Field label with no typed filter surface on the generated client.
+    #[error("unsupported filter type `{vos_type}` on `{entity}.{field}`")]
+    UnsupportedFilterType {
+        /// Entity that declares the field.
+        entity: String,
+        /// VOS wire field name.
+        field: String,
+        /// VOS type label that has no generated filter.
+        vos_type: String,
+    },
     /// Unsupported generate target.
     #[error("unsupported generate target `{0}` (use rust or typescript)")]
     UnsupportedTarget(String),
@@ -240,6 +291,7 @@ impl GenerationModel {
     pub fn from_artifacts(contract_json: &str, operations_json: &str) -> Result<Self> {
         let mut model = Self::from_resolved_artifact(contract_json)?;
         let artifact = operations_artifact::IrisOperationArtifact::from_json(operations_json)?;
+        let declared: HashSet<String> = model.tables.iter().map(|table| table.name.clone()).collect();
         let mut operations = Vec::with_capacity(artifact.len());
         let mut macros: Vec<MacroModel> = Vec::new();
         let mut seen_macro = std::collections::HashSet::new();
@@ -250,7 +302,8 @@ impl GenerationModel {
                 .iter()
                 .map(|p| {
                     let vos_ty = type_label(&p.type_expr);
-                    carrier::vos_type_to_ts(&vos_ty).map(|ts_type| OperationParamModel { name: p.name.clone(), ts_type, vos_type: vos_ty })
+                    let carrier = resolve_operation_carrier(&op.name, &vos_ty, &declared)?;
+                    Ok(OperationParamModel { name: p.name.clone(), ts_type: carrier.ts_type, vos_type: vos_ty })
                 })
                 .collect::<Result<Vec<_>>>()?;
             let ret = op.return_type.as_ref().map(type_label);
@@ -285,6 +338,7 @@ impl GenerationModel {
         if let Some(fp) = artifact.schema_fingerprint() {
             model.schema_fingerprint = fp.to_owned();
         }
+        model.validate_operation_surface()?;
         Ok(model)
     }
 
@@ -325,6 +379,7 @@ impl GenerationModel {
             };
             tables.push(TableModel { type_id: None, name: name.clone(), rust_type: name.clone(), fields });
         }
+        let declared: HashSet<String> = tables.iter().map(|table| table.name.clone()).collect();
         let mut macros = Vec::new();
         let mut operation_models = Vec::new();
         for operation in &operations {
@@ -333,13 +388,14 @@ impl GenerationModel {
                 .iter()
                 .map(|param| {
                     let vos_ty = type_label(&param.type_expr);
-                    carrier::vos_type_to_ts(&vos_ty).map(|ts_type| OperationParamModel { name: param.name.clone(), ts_type, vos_type: vos_ty })
+                    let carrier = resolve_operation_carrier(&operation.name, &vos_ty, &declared)?;
+                    Ok(OperationParamModel { name: param.name.clone(), ts_type: carrier.ts_type, vos_type: vos_ty })
                 })
                 .collect::<Result<Vec<_>>>()?;
             let ret = operation.return_type.as_ref().map(type_label);
             let kind_str = operation_kind_label(operation.kind);
             operation_models.push(OperationModel {
-                operation_id: String::new(),
+                operation_id: operation.operation_id.to_string(),
                 kind: kind_str,
                 name: operation.name.clone(),
                 identity_key: None,
@@ -357,19 +413,116 @@ impl GenerationModel {
                 });
             }
         }
-        Ok(Self {
+        let mut model = Self {
             generator_version: env!("CARGO_PKG_VERSION").into(),
             schema_fingerprint: projection_fingerprint(&projection, &operations),
             tables,
             macros,
             operations: operation_models,
-        })
+        };
+        model.operations.sort_by(|a, b| a.operation_id.cmp(&b.operation_id));
+        model.validate_operation_surface()?;
+        Ok(model)
+    }
+
+    /// Hard-fails when a projected operation leaves the declared VOS surface.
+    ///
+    /// A generated delegate is a projection of declared operations: it may not
+    /// invent an entry point, a type carrier, or an identity the schema does not
+    /// declare. Unknown operation kinds, signature types without a declared-vos
+    /// carrier, models no table declares, and operations without a durable
+    /// identity fail here instead of silently degrading to a guessed type.
+    fn validate_operation_surface(&self) -> Result<()> {
+        let declared: HashSet<String> = self.tables.iter().map(|table| table.name.clone()).collect();
+        let mut seen: HashSet<&str> = HashSet::with_capacity(self.operations.len());
+        for operation in &self.operations {
+            if operation_kind_rust_doc(operation.kind.as_str()).is_none() {
+                return Err(Error::UnsupportedOperationKind {
+                    operation: operation.name.clone(),
+                    kind: operation.kind.clone(),
+                });
+            }
+            if operation.operation_id.is_empty() {
+                return Err(Error::MissingOperationIdentity { operation: operation.name.clone() });
+            }
+            if !seen.insert(operation.operation_id.as_str()) {
+                return Err(Error::DuplicateOperationId { operation_id: operation.operation_id.clone() });
+            }
+            for param in &operation.params {
+                resolve_operation_carrier(&operation.name, &param.vos_type, &declared)?;
+            }
+            if let Some(ret) = operation.return_type.as_ref() {
+                resolve_operation_carrier(&operation.name, ret, &declared)?;
+            }
+        }
+        Ok(())
     }
 
     /// JSON value for Dejavu contexts.
     pub fn to_json(&self) -> Value {
         serde_json::to_value(self).expect("GenerationModel serializes")
     }
+}
+
+/// Host carriers of one declared operation parameter or return type.
+struct OperationCarrier {
+    rust_ty: String,
+    ts_type: String,
+}
+
+/// Resolves one operation signature type to declared-vos host carriers.
+///
+/// Only two shapes may cross a generated delegate: a VOS builtin label the
+/// faithful carrier table maps, or a type the schema itself declares. `bytes`,
+/// `vector` and `file` payloads, collection/generic shapes, undeclared models
+/// and unknown labels all hard-fail here so generation never guesses a carrier.
+fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet<String>) -> Result<OperationCarrier> {
+    let trimmed = vos_type.trim();
+    let base = carrier::base_vos_type(trimmed);
+    let optional = trimmed.ends_with('?');
+    let is_reference = trimmed.starts_with('&');
+    let unsupported = |reason: &'static str| Error::UnsupportedOperationType {
+        operation: operation.to_owned(),
+        ty: vos_type.to_owned(),
+        reason,
+    };
+
+    if base.contains('[') || base.contains('<') || base.contains(',') {
+        return Err(unsupported("collection and generic shapes have no declared-vos operation carrier"));
+    }
+    match base {
+        "bytes" => return Err(unsupported("`bytes` payloads have no declared-vos operation carrier")),
+        "vector" | "file" => return Err(unsupported("`vector` and `file` payloads have no declared-vos operation carrier")),
+        _ => {}
+    }
+    if let Some(label) = carrier::faithful_label(base) {
+        if label == "unit" {
+            return Ok(OperationCarrier { rust_ty: "()".into(), ts_type: "void".into() });
+        }
+        let (Some(rust_ty), Some(ts_type)) = (carrier::rust_carrier_for_label(label), carrier::ts_carrier_for_label(label))
+        else {
+            return Err(unsupported("no host carrier exists for this VOS label"));
+        };
+        let rust_ty = if optional { format!("Option<{rust_ty}>") } else { rust_ty.to_owned() };
+        return Ok(OperationCarrier { rust_ty, ts_type: ts_type.to_owned() });
+    }
+    if base.contains("::") || base.chars().next().is_some_and(|c| c.is_ascii_uppercase()) {
+        if !declared.contains(base) {
+            return Err(Error::UndeclaredOperationModel { operation: operation.to_owned(), ty: base.to_owned() });
+        }
+        let rust_ty = if is_reference {
+            format!("{base}Ref")
+        }
+        else if optional {
+            format!("Option<{base}>")
+        }
+        else {
+            base.to_owned()
+        };
+        let ts_type = if is_reference { format!("{base}Reference") } else { base.to_owned() };
+        return Ok(OperationCarrier { rust_ty, ts_type });
+    }
+    Err(Error::UnknownVosLabel(base.to_owned()))
 }
 
 /// Render a registered template by stem name.
@@ -424,6 +577,7 @@ pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
 
 /// Emit Rust target files: `mod` / `models` / `operations` / `metadata` / `errors`.
 pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>> {
+    model.validate_operation_surface()?;
     let ctx = model.rust_template_context()?;
     let header = rust_file_header(model)?;
     let structs = unescape_rust_template(&render("rust/domain_mod", &model.to_json())?);
@@ -433,7 +587,7 @@ pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>>
     let metadata = format!("{header}\n{}\n", render("rust/metadata", &ctx)?);
     let errors = format!("{header}\n{}\n", render("rust/errors", &ctx)?);
     let base_ops = format!("{header}\n{}\n", unescape_rust_template(&render("rust/operations", &ctx)?),);
-    let operations = if model.operations.is_empty() { base_ops } else { format!("{base_ops}\n{}", emit_rust_operation_stubs(model)) };
+    let operations = if model.operations.is_empty() { base_ops } else { format!("{base_ops}\n{}", emit_rust_operation_stubs(model)?) };
     let index = format!("{header}\n{}\n", render("rust/rust_index", &ctx)?);
 
     Ok(vec![
@@ -857,49 +1011,55 @@ fn operation_kind_label(kind: vos::types::OperationKind) -> String {
 
 /// Emit Rust stub function declarations for every projected operation.
 /// Returns an empty string when no operations are present.
-pub(crate) fn emit_rust_operation_stubs(model: &GenerationModel) -> String {
+///
+/// Signature types come from the declared-vos carrier resolver only; an
+/// operation the schema cannot carry is a hard failure, never a `String` stub.
+pub(crate) fn emit_rust_operation_stubs(model: &GenerationModel) -> Result<String> {
     if model.operations.is_empty() {
-        return String::new();
+        return Ok(String::new());
     }
+    let declared: HashSet<String> = model.tables.iter().map(|table| table.name.clone()).collect();
     let mut out = String::new();
     out.push_str("// --- Projected operation stubs (from VOS OperationProjectionArtifact) ---\n");
     out.push_str("// These are thin declarations. Implement bodies in your host adapter.\n\n");
     for op in &model.operations {
-        let ret =
-            op.return_type.as_ref().map(|t| carrier::rust_carrier_for_label(carrier::base_vos_type(t)).unwrap_or("String")).unwrap_or("()");
-        let kind_doc = operation_kind_rust_doc(op.kind.as_str());
+        let ret = match op.return_type.as_ref() {
+            Some(ret) => resolve_operation_carrier(&op.name, ret, &declared)?.rust_ty,
+            None => "()".to_owned(),
+        };
+        let kind_doc = operation_kind_rust_doc(op.kind.as_str()).ok_or_else(|| Error::UnsupportedOperationKind {
+            operation: op.name.clone(),
+            kind: op.kind.clone(),
+        })?;
         out.push_str(&format!(
             "/// VOS {kind_doc:?} operation `{name}` (op_id: {op_id}).\n\
              fn {name}({params}) -> {ret} {{ unimplemented!(\"VOS op {name}\") }}\n\n",
             kind_doc = kind_doc,
             name = op.name,
             op_id = op.operation_id,
-            params = emit_rust_params(op),
+            params = emit_rust_params(op, &declared)?,
             ret = ret,
         ));
     }
-    out
+    Ok(out)
 }
 
-fn emit_rust_params(op: &OperationModel) -> String {
+fn emit_rust_params(op: &OperationModel, declared: &HashSet<String>) -> Result<String> {
     op.params
         .iter()
-        .map(|p| {
-            let rust_ty = carrier::rust_carrier_for_label(carrier::base_vos_type(&p.vos_type)).unwrap_or("String");
-            format!("{}: {}", p.name, rust_ty)
-        })
-        .collect::<Vec<_>>()
-        .join(", ")
+        .map(|p| Ok(format!("{}: {}", p.name, resolve_operation_carrier(&op.name, &p.vos_type, declared)?.rust_ty)))
+        .collect::<Result<Vec<_>>>()
+        .map(|params| params.join(", "))
 }
 
-fn operation_kind_rust_doc(kind: &str) -> &'static str {
-    match kind {
+fn operation_kind_rust_doc(kind: &str) -> Option<&'static str> {
+    Some(match kind {
         "query" => "query",
         "udf" => "udf",
         "micro" => "micro",
         "macro" => "macro",
-        _ => "op",
-    }
+        _ => return None,
+    })
 }
 
 /// Emit TypeScript stub method declarations for every projected operation.
@@ -908,6 +1068,7 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
     if model.operations.is_empty() {
         return Ok(String::new());
     }
+    let declared: HashSet<String> = model.tables.iter().map(|table| table.name.clone()).collect();
     let mut out = String::new();
     out.push_str("\n/** --- Projected operation stubs (from VOS OperationProjectionArtifact) ---\n");
     out.push_str(" * These delegate to `this.executor` with the declared operation id.\n");
@@ -919,13 +1080,16 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
     out.push_str("    }\n\n");
     for op in &model.operations {
         let ts_ret = match op.return_type.as_ref() {
-            Some(t) => carrier::vos_type_to_ts(t)?,
+            Some(t) => resolve_operation_carrier(&op.name, t, &declared)?.ts_type,
             None => "void".to_owned(),
         };
         let param_sig = op.params.iter().map(|p| format!("{}: {}", p.name, p.ts_type)).collect::<Vec<_>>().join(", ");
         let param_obj = op.params.iter().map(|p| format!("\"{}\"", p.name)).collect::<Vec<_>>().join(", ");
         let use_execute = ts_ret == "void";
-        let kind_label = operation_kind_ts_label(op.kind.as_str());
+        let kind_label = operation_kind_ts_label(op.kind.as_str()).ok_or_else(|| Error::UnsupportedOperationKind {
+            operation: op.name.clone(),
+            kind: op.kind.clone(),
+        })?;
         out.push_str(&format!(
             "    /** VOS {kind} operation `{name}` (op_id: {op_id}). */\n\
              async {name}({param_sig}): Promise<{ts_ret}> {{\n\
@@ -951,12 +1115,12 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
     Ok(out)
 }
 
-fn operation_kind_ts_label(kind: &str) -> &'static str {
-    match kind {
+fn operation_kind_ts_label(kind: &str) -> Option<&'static str> {
+    Some(match kind {
         "query" => "query",
         "udf" => "udf",
         "micro" => "micro",
         "macro" => "macro",
-        _ => "op",
-    }
+        _ => return None,
+    })
 }

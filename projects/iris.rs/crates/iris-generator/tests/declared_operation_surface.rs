@@ -1,0 +1,238 @@
+//! Negative surface: generated delegates may only project declared VOS operations.
+//!
+//! Every case here is a stable `Error` classification — generation never falls
+//! back to a guessed carrier (`String`), a guessed kind (`op`) or a guessed
+//! filter (`StringFilter`), and never panics.
+
+use iris_generator::{Error, GenerationModel, emit_target_files};
+use serde_json::{Value, json};
+use vos::{
+    FieldIdentity, IDENTITY_MANIFEST_VERSION, IdentityManifest, TypeContractKind, TypeIdentity, parse_oak, resolve_contract,
+};
+
+const USER_SCHEMA: &str = r#"
+table User {
+    @@id: uuid,
+    name: utf8,
+}
+"#;
+
+fn contract_json() -> String {
+    let projection = parse_oak(USER_SCHEMA).unwrap().project_schema().unwrap();
+    let manifest = IdentityManifest {
+        format_version: IDENTITY_MANIFEST_VERSION.to_owned(),
+        types: vec![TypeIdentity {
+            canonical_path: vec!["User".to_owned()],
+            type_id: 42,
+            kind: TypeContractKind::Table,
+            fields: vec![
+                FieldIdentity { canonical_name: "id".to_owned(), field_id: 1, virtual_field_index: Some(0) },
+                FieldIdentity { canonical_name: "name".to_owned(), field_id: 2, virtual_field_index: Some(1) },
+            ],
+        }],
+    };
+    resolve_contract(&projection, &manifest).unwrap().to_json().unwrap()
+}
+
+fn param(name: &str, type_expr: Value) -> Value {
+    json!({ "name": name, "typeExpr": type_expr, "span": { "start": 0, "end": 1 } })
+}
+
+fn operation(kind: &str, name: &str, operation_id: &str, params: Vec<Value>, return_type: Value) -> Value {
+    json!({
+        "kind": kind,
+        "name": name,
+        "identityKey": format!("{kind}:{name}"),
+        "operationId": operation_id,
+        "parameters": params,
+        "returnType": return_type,
+        "signature": null,
+        "body": null,
+        "span": { "start": 0, "end": 1 }
+    })
+}
+
+fn artifact(operations: Vec<Value>) -> String {
+    json!({
+        "envelope": {
+            "stage": "operation-syntax-projection",
+            "contractFormatVersion": "vos-operation-contract-v0",
+            "languageVersion": "vos-language-v0",
+            "canonicalizationVersion": "vos-canonical-v0",
+            "schemaFingerprint": null,
+            "sourceUnits": [{ "sourceUnitId": 0, "source": "" }]
+        },
+        "operations": operations
+    })
+    .to_string()
+}
+
+fn project_error(operations: Vec<Value>) -> Error {
+    GenerationModel::from_artifacts(&contract_json(), &artifact(operations)).err().expect("artifact must be rejected")
+}
+
+fn generation_model_json(kind: &str) -> Value {
+    json!({
+        "generator_version": "test",
+        "schema_fingerprint": "0".repeat(64),
+        "tables": [{
+            "name": "User",
+            "rust_type": "User",
+            "fields": [{
+                "name": "id",
+                "rust_ty": "String",
+                "vos_type": "uuid",
+                "primary": true,
+                "optional": false,
+                "is_uuid": true
+            }]
+        }],
+        "operations": [{
+            "operation_id": "op_0123456789abcdef",
+            "kind": kind,
+            "name": "get_user",
+            "params": [],
+            "return_type": null
+        }]
+    })
+}
+
+#[test]
+fn unknown_operation_kind_is_rejected_at_generation() {
+    let model: GenerationModel = serde_json::from_value(generation_model_json("subscription")).expect("model decodes");
+    for target in ["rust", "typescript"] {
+        let error = emit_target_files(&model, target).expect_err("unsupported operation kind must fail");
+        assert!(matches!(error, Error::UnsupportedOperationKind { ref kind, .. } if kind == "subscription"), "{target}: {error}");
+    }
+}
+
+#[test]
+fn declared_operation_kind_is_accepted() {
+    let model: GenerationModel = serde_json::from_value(generation_model_json("query")).expect("model decodes");
+    assert!(emit_target_files(&model, "rust").is_ok());
+    assert!(emit_target_files(&model, "typescript").is_ok());
+}
+
+#[test]
+fn operation_artifact_with_unknown_kind_is_rejected() {
+    let error = project_error(vec![operation("subscription", "watch_users", "op_0123456789abcdef", vec![], Value::Null)]);
+    assert!(matches!(error, Error::OperationArtifact(_)), "{error}");
+}
+
+#[test]
+fn undeclared_operation_model_is_rejected() {
+    let error = project_error(vec![operation(
+        "query",
+        "get_ghost",
+        "op_0123456789abcdef",
+        vec![],
+        json!({ "optional": { "named": ["Ghost"] } }),
+    )]);
+    assert!(matches!(error, Error::UndeclaredOperationModel { ref ty, .. } if ty == "Ghost"), "{error}");
+}
+
+#[test]
+fn bytes_parameter_is_rejected() {
+    let error =
+        project_error(vec![operation("udf", "store_blob", "op_0123456789abcdef", vec![param("payload", json!({ "named": ["bytes"] }))], json!({ "named": ["utf8"] }))]);
+    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "bytes"), "{error}");
+}
+
+#[test]
+fn vector_parameter_is_rejected() {
+    let error = project_error(vec![operation(
+        "query",
+        "search",
+        "op_0123456789abcdef",
+        vec![param("embedding", json!({ "named": ["vector"] }))],
+        Value::Null,
+    )]);
+    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "vector"), "{error}");
+}
+
+#[test]
+fn file_return_type_is_rejected() {
+    let error =
+        project_error(vec![operation("query", "download", "op_0123456789abcdef", vec![], json!({ "named": ["file"] }))]);
+    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "file"), "{error}");
+}
+
+#[test]
+fn list_parameter_is_rejected() {
+    let error = project_error(vec![operation(
+        "query",
+        "by_ids",
+        "op_0123456789abcdef",
+        vec![param("ids", json!({ "list": { "named": ["uuid"] } }))],
+        Value::Null,
+    )]);
+    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "[uuid]"), "{error}");
+}
+
+#[test]
+fn unknown_label_parameter_is_rejected() {
+    let error = project_error(vec![operation(
+        "udf",
+        "hash",
+        "op_0123456789abcdef",
+        vec![param("raw", json!({ "named": ["bogus"] }))],
+        json!({ "named": ["utf8"] }),
+    )]);
+    assert!(matches!(error, Error::UnknownVosLabel(ref label) if label == "bogus"), "{error}");
+}
+
+#[test]
+fn operation_without_identity_is_rejected() {
+    let error = project_error(vec![operation("query", "get_user", "", vec![], Value::Null)]);
+    assert!(matches!(error, Error::MissingOperationIdentity { .. }), "{error}");
+}
+
+#[test]
+fn duplicate_operation_identity_is_rejected() {
+    let error = project_error(vec![
+        operation("query", "get_user", "op_0123456789abcdef", vec![], Value::Null),
+        operation("query", "find_user", "op_0123456789abcdef", vec![], Value::Null),
+    ]);
+    assert!(matches!(error, Error::DuplicateOperationId { ref operation_id } if operation_id == "op_0123456789abcdef"), "{error}");
+}
+
+#[test]
+fn label_without_filter_surface_is_rejected() {
+    const UNIT_FIELD_SCHEMA: &str = r#"
+table Doc {
+    @@id: uuid,
+    marker: unit,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(UNIT_FIELD_SCHEMA).expect("model");
+    let error = emit_target_files(&model, "typescript").expect_err("a label without a filter type must fail");
+    assert!(
+        matches!(
+            error,
+            Error::UnsupportedFilterType { ref entity, ref field, ref vos_type }
+                if entity == "Doc" && field == "marker" && vos_type == "unit"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn source_operations_carry_durable_identity() {
+    const SCHEMA: &str = r#"
+table User {
+    @@id: uuid,
+    name: utf8,
+}
+
+macro seed_user(prefix: utf8) -> unit {
+    User::insert({ id: "1", name: prefix })
+}
+"#;
+    let model = GenerationModel::from_vos_schema(SCHEMA).expect("model");
+    let seed_user = model.operations.iter().find(|operation| operation.name == "seed_user").expect("seed_user operation");
+    let projected = parse_oak(SCHEMA).unwrap().project_operations().unwrap();
+    let declared = projected.iter().find(|operation| operation.name == "seed_user").expect("projected seed_user");
+    assert_eq!(seed_user.operation_id, declared.operation_id.to_string());
+    assert!(seed_user.operation_id.starts_with("op_"), "{}", seed_user.operation_id);
+    assert_eq!(seed_user.operation_id.len(), 3 + 64);
+}
