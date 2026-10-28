@@ -53,6 +53,7 @@ fn operation(name: &str, scalar: CanonicalScalar) -> OperationContract {
         capabilities: vec![SemanticCapability::Storage],
         source_unit_id: 0,
         span: Range { start: 0, end: 1 },
+        stable_id_hint: None,
     }
 }
 
