@@ -1084,7 +1084,7 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
             None => "void".to_owned(),
         };
         let param_sig = op.params.iter().map(|p| format!("{}: {}", p.name, p.ts_type)).collect::<Vec<_>>().join(", ");
-        let param_obj = op.params.iter().map(|p| format!("\"{}\"", p.name)).collect::<Vec<_>>().join(", ");
+        let param_values = op.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
         let use_execute = ts_ret == "void";
         let kind_label = operation_kind_ts_label(op.kind.as_str()).ok_or_else(|| Error::UnsupportedOperationKind {
             operation: op.name.clone(),
@@ -1093,12 +1093,13 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
         out.push_str(&format!(
             "    /** VOS {kind} operation `{name}` (op_id: {op_id}). */\n\
              async {name}({param_sig}): Promise<{ts_ret}> {{\n\
-             {indent}const envelope = await this.executor.{exec_fn}(buildDeclaredOperationRequest(\"{name}\", {{ parameters: [{param_obj}] }}));\n",
+             {indent}const synthesis = synthesizeOperationCall(\"{name}\", [{param_values}]);\n\
+             {indent}const envelope = await this.executor.{exec_fn}(buildDeclaredOperationRequest(\"{op_id}\", synthesis));\n",
             kind = kind_label,
             name = op.name,
             op_id = op.operation_id,
             param_sig = param_sig,
-            param_obj = param_obj,
+            param_values = param_values,
             ts_ret = ts_ret,
             indent = "        ",
             exec_fn = if use_execute { "executeUnit" } else { "execute" },

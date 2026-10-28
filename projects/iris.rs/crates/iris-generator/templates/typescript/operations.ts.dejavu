@@ -7,7 +7,7 @@ import {
     synthesizeFindFirst,
     synthesizeFindMany,
     synthesizeFindUnique,
-    synthesizeMacroCall,
+    synthesizeOperationCall,
     throwOperationEnvelopeError,
 } from "./_internal/synthesize.js";
 import type {
@@ -25,8 +25,8 @@ export class GeneratedMacros {
 <% loop macro_view in macros_view %>
 
     async <% macro_view.name %>(<% macro_view.param_signature %>): Promise<<% macro_view.ts_return %>> {
-        const synthesis = synthesizeMacroCall("<% macro_view.name %>", [<% macro_view.param_names %>]);
-        const request = buildDeclaredOperationRequest("<% macro_view.name %>", synthesis);
+        const synthesis = synthesizeOperationCall("<% macro_view.name %>", [<% macro_view.param_names %>]);
+        const request = buildDeclaredOperationRequest("<% macro_view.operation_id %>", synthesis);
 <% if macro_view.uses_execute %>
         const envelope = await this.executor.executeUnit(request);
         if (!envelope.ok) {

@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{Error, FieldModel, GenerationModel, MacroModel, Result, TableModel, carrier};
+use crate::{Error, FieldModel, GenerationModel, MacroModel, Result, TableModel, carrier, resolve_operation_carrier};
 
 #[derive(Debug, Clone, Serialize)]
 struct TsFieldView {
@@ -39,6 +39,8 @@ struct TsMacroParamView {
 #[derive(Debug, Clone, Serialize)]
 struct TsMacroView {
     name: String,
+    /// Durable VOS operation identity the delegate must pass to the executor.
+    operation_id: String,
     ts_return: String,
     uses_execute: bool,
     params: Vec<TsMacroParamView>,
@@ -84,6 +86,7 @@ impl GenerationModel {
 
 fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
     let entity_names: HashSet<&str> = model.tables.iter().map(|t| t.name.as_str()).collect();
+    let declared: HashSet<String> = model.tables.iter().map(|table| table.name.clone()).collect();
     let entity_union = if model.tables.is_empty() {
         "never".into()
     }
@@ -226,10 +229,16 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         .collect::<Vec<_>>()
         .join("\n");
 
+    // Declared macro operations are the only macro delegates. Identity comes
+    // from `OperationModel.operation_id`, never from the author name, so a
+    // generated call and a direct call resolve the same declared operation.
     let mut macros_view = Vec::with_capacity(model.macros.len());
-    for macro_def in &model.macros {
-        let ts_return = macro_return_ts(&macro_def.return_type)?;
-        let params = macro_def
+    for operation in model.operations.iter().filter(|operation| operation.kind == "macro") {
+        let ts_return = match operation.return_type.as_deref() {
+            Some(ret) => resolve_operation_carrier(&operation.name, ret, &declared).map(|carrier| carrier.ts_type)?,
+            None => "void".to_owned(),
+        };
+        let params = operation
             .params
             .iter()
             .map(|param| TsMacroParamView { name: param.name.clone(), ts_type: param.ts_type.clone() })
@@ -241,7 +250,15 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
             params.iter().map(|param| format!("{}: {}", param.name, param.ts_type)).collect::<Vec<_>>().join(", ")
         };
         let param_names = params.iter().map(|param| param.name.clone()).collect::<Vec<_>>().join(", ");
-        macros_view.push(TsMacroView { name: macro_def.name.clone(), uses_execute: ts_return == "void", ts_return, params, param_signature, param_names });
+        macros_view.push(TsMacroView {
+            name: operation.name.clone(),
+            operation_id: operation.operation_id.clone(),
+            uses_execute: ts_return == "void",
+            ts_return,
+            params,
+            param_signature,
+            param_names,
+        });
     }
 
     // Pre-computed maps that get inlined directly into synthesize.ts so the
@@ -250,6 +267,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
     // template, keeping metadata.ts's copies for node/browser/cloudflare.
     let synthesize_wire_map_lines = wire_map_lines.clone();
     let synthesize_reference_target_lines = reference_target_lines.clone();
+    let has_macros = !macros_view.is_empty();
 
     Ok(TsTemplateContext {
         generator_version: model.generator_version.clone(),
@@ -268,7 +286,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         d1_plan_lines,
         tables_view,
         macros_view,
-        has_macros: !model.macros.is_empty(),
+        has_macros,
         synthesize_wire_map_lines,
         synthesize_reference_target_lines,
     })
@@ -453,10 +471,6 @@ fn emit_patch_field(table: &TableModel, field: &FieldModel, entity_names: &HashS
         return Ok(None);
     }
     Ok(Some(format!("    {}?: {};", field_ts_name(field), patch_value_type(table, field, entity_names)?)))
-}
-
-fn macro_return_ts(return_type: &str) -> Result<String> {
-    carrier::vos_type_to_ts(return_type)
 }
 
 fn field_ts_name(field: &FieldModel) -> String {

@@ -374,8 +374,8 @@ export function synthesizeCreate(entity: string, args: CreateArgs): VosSynthesis
     return { source, parameters };
 }
 
-/** Synthesize a schema macro call `name($arg0, $arg1, ...)` with positional binds. */
-export function synthesizeMacroCall(name: string, args: readonly unknown[]): VosSynthesis {
+/** Synthesize a declared operation invocation `name($arg0, $arg1, ...)` with positional binds. */
+export function synthesizeOperationCall(name: string, args: readonly unknown[]): VosSynthesis {
     const parameters: VosParameters = {};
     const placeholders = args.map((value, index) => {
         const param = nextParam(parameters, `arg${index}`, flattenRefInput(value));
