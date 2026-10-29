@@ -487,7 +487,7 @@ fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet
         return Err(unsupported("collection and generic shapes have no declared-vos operation carrier"));
     }
     match base {
-        "vector" | "file" => return Err(unsupported("`vector` and `file` payloads have no declared-vos operation carrier")),
+        "vector" => return Err(unsupported("`vector` payloads have no declared-vos operation carrier")),
         _ => {}
     }
     if let Some(label) = carrier::faithful_label(base) {

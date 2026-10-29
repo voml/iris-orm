@@ -25,6 +25,91 @@ pub use error::{Error, Result};
 use yydb::Value as YydbValue;
 
 // ---------------------------------------------------------------------------
+// Tagged file descriptor JSON — Iris::Value 没有 File 变体，chunk manifests
+// round-trip through a string carrier with a single discriminating key.
+// ---------------------------------------------------------------------------
+
+/// Top-level discriminating key for every tagged file descriptor string.
+const IRIS_FILE_TAG: &str = "__iris_file__";
+
+/// Compact tagged-JSON form of `yydb::ChunkManifest` for Iris Value round-trip.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct TaggedObjectRef {
+    algo: String,
+    hash: String,
+    size: u64,
+    kind: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct TaggedChunkManifest {
+    chunk_size: u32,
+    total_size: u64,
+    chunks: Vec<TaggedObjectRef>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct TaggedFileEnvelope {
+    #[serde(rename = "__iris_file__")]
+    iris_file: TaggedChunkManifest,
+}
+
+fn object_ref_to_tagged(r: &yydb::ObjectRef) -> TaggedObjectRef {
+    TaggedObjectRef {
+        algo: r.algo.as_str().to_owned(),
+        hash: hex::encode(r.hash),
+        size: r.size,
+        kind: r.kind.as_str().to_owned(),
+    }
+}
+
+fn object_ref_from_tagged(t: TaggedObjectRef) -> Result<yydb::ObjectRef> {
+    use yydb::{HashAlgo, ObjectKind};
+    let algo = HashAlgo::from_name(&t.algo)
+        .ok_or_else(|| Error::Runtime(format!("unknown object ref algo `{}` in file descriptor", t.algo)))?;
+    let kind = ObjectKind::from_name(&t.kind)
+        .ok_or_else(|| Error::Runtime(format!("unknown object ref kind `{}` in file descriptor", t.kind)))?;
+    let hash = hex::decode(&t.hash)
+        .map_err(|e| Error::Runtime(format!("invalid hash hex in file descriptor: {e}")))?;
+    let hash = <[u8; 32]>::try_from(hash)
+        .map_err(|_| Error::Runtime("hash in file descriptor is not 32 bytes".into()))?;
+    Ok(yydb::ObjectRef { algo, hash, size: t.size, kind })
+}
+
+fn chunk_manifest_to_string(cm: &yydb::ChunkManifest) -> Result<String> {
+    let tagged = TaggedFileEnvelope {
+        iris_file: TaggedChunkManifest {
+            chunk_size: cm.chunk_size,
+            total_size: cm.total_size,
+            chunks: cm.chunks.iter().map(object_ref_to_tagged).collect(),
+        },
+    };
+    serde_json::to_string(&tagged).map_err(|e| Error::Runtime(format!("serialize file descriptor: {e}")))
+}
+
+fn chunk_manifest_from_string(s: &str) -> Option<Result<yydb::ChunkManifest>> {
+    // Fast-path: bail on strings that do not start with our envelope key
+    // so plain text columns never pay a JSON parse cost.
+    if !s.contains(IRIS_FILE_TAG) {
+        return None;
+    }
+    let envelope: TaggedFileEnvelope = serde_json::from_str(s).ok()?;
+    Some(
+        envelope
+            .iris_file
+            .chunks
+            .into_iter()
+            .map(object_ref_from_tagged)
+            .collect::<Result<Vec<_>>>()
+            .map(|chunks| yydb::ChunkManifest {
+                chunk_size: envelope.iris_file.chunk_size,
+                total_size: envelope.iris_file.total_size,
+                chunks,
+            }),
+    )
+}
+
+// ---------------------------------------------------------------------------
 // Readiness probe
 // ---------------------------------------------------------------------------
 
@@ -328,15 +413,22 @@ impl PreparedVos {
 ///
 /// `bytes` stays octets end to end. Nested objects are rejected: YYDB binds a
 /// scalar per `$name` slot and has no text form for one.
-fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Result<BTreeMap<String, YydbValue>> {
+pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Result<BTreeMap<String, YydbValue>> {
     let mut out = BTreeMap::new();
     for (name, value) in named {
         let converted = match value {
             iris_types::Value::Null => YydbValue::Null,
             iris_types::Value::Bool(b) => YydbValue::Bool(*b),
             iris_types::Value::Int(i) => YydbValue::I64(*i),
-            iris_types::Value::Str(s)
-            | iris_types::Value::Decimal(s)
+            iris_types::Value::Str(s) => {
+                if let Some(Ok(cm)) = chunk_manifest_from_string(s) {
+                    YydbValue::File(cm)
+                }
+                else {
+                    YydbValue::Text(s.clone())
+                }
+            }
+            iris_types::Value::Decimal(s)
             | iris_types::Value::Date(s)
             | iris_types::Value::Time(s)
             | iris_types::Value::DateTime(s) => YydbValue::Text(s.clone()),
@@ -393,11 +485,7 @@ pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
              Use the `connection()` escape hatch for full fidelity access."
                 .into(),
         )),
-        YydbValue::File(_) => Err(Error::Runtime(
-            "YYDB returned a chunked `file` manifest which Iris Phase 1 does not model. \
-             Use the `connection()` escape hatch for full fidelity access."
-                .into(),
-        )),
+        YydbValue::File(cm) => Ok(iris_types::Value::Str(chunk_manifest_to_string(&cm)?)),
         #[allow(unreachable_patterns)]
         other => Err(Error::Runtime(format!(
             "YYDB returned an unrecognised `Value` variant that Iris cannot represent: {other:?}. \

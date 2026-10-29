@@ -6,7 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use iris_connector_yydb::{BACKEND_ID, YydbSource};
+use iris_connector_yydb::{BACKEND_ID, YydbSource, value_from_yydb, value_params_to_yydb};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -292,7 +292,7 @@ fn connector_does_not_depend_on_foreign_adapters() {
 // value_from_yydb — non-lossy conversion
 // ---------------------------------------------------------------------------
 
-use iris_connector_yydb::{value_from_yydb, row_from_yydb};
+use iris_connector_yydb::{row_from_yydb};
 
 #[test]
 fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
@@ -321,7 +321,9 @@ fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
 }
 
 #[test]
-fn yydb_vector_object_file_return_error_instead_of_null() {
+fn yydb_vector_and_object_still_fail_closed() {
+    // vector and CAS object handles still have no Iris Phase 1 carrier and
+    // must not silently degrade to Null.
     let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![1.0, 2.0, 3.0])).expect("vector");
     let obj = yydb::ObjectRef {
         algo: yydb::HashAlgo::Blake3,
@@ -329,7 +331,6 @@ fn yydb_vector_object_file_return_error_instead_of_null() {
         size: 0,
         kind: yydb::ObjectKind::VectorPayload,
     };
-    let file = yydb::ChunkManifest { chunk_size: 0, total_size: 0, chunks: vec![] };
 
     let err = value_from_yydb(yydb::Value::Vector(vec))
         .expect_err("`vector` must not silently map to Null");
@@ -338,10 +339,54 @@ fn yydb_vector_object_file_return_error_instead_of_null() {
     let err = value_from_yydb(yydb::Value::Object(obj))
         .expect_err("CAS `object` must not silently map to Null");
     assert!(err.to_string().contains("object"));
+}
 
-    let err = value_from_yydb(yydb::Value::File(file))
-        .expect_err("chunked `file` must not silently map to Null");
-    assert!(err.to_string().contains("file"));
+#[test]
+fn yydb_file_round_trips_through_tagged_json_string() {
+    // Iris has no File Value variant yet, so chunk manifests round-trip as a
+    // single tagged JSON string via Iris::Value::Str.
+    let file = yydb::ChunkManifest {
+        chunk_size: 4096,
+        total_size: 12345,
+        chunks: vec![yydb::ObjectRef {
+            algo: yydb::HashAlgo::Blake3,
+            hash: [0xAB; 32],
+            size: 12345,
+            kind: yydb::ObjectKind::Blob,
+        }],
+    };
+
+    let iris_value = value_from_yydb(yydb::Value::File(file.clone())).expect("File → Iris::Str");
+    match &iris_value {
+        iris_types::Value::Str(s) => {
+            assert!(s.contains("__iris_file__"), "serialized form must carry discriminating key: {s}");
+        }
+        other => panic!("expected Iris::Value::Str, got {other:?}"),
+    }
+
+    let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
+    named.insert("f".into(), iris_value);
+    let out = value_params_to_yydb(&named).expect("Iris params → YYDB binding");
+    match out.get("f") {
+        Some(yydb::Value::File(cm)) => {
+            assert_eq!(cm.chunk_size, file.chunk_size);
+            assert_eq!(cm.total_size, file.total_size);
+            assert_eq!(cm.chunks.len(), file.chunks.len());
+            assert_eq!(cm.chunks[0].hash, file.chunks[0].hash);
+            assert_eq!(cm.chunks[0].size, file.chunks[0].size);
+        }
+        other => panic!("expected YydbValue::File, got {other:?}"),
+    }
+}
+
+#[test]
+fn tagged_file_json_does_not_fool_plain_text_params() {
+    // A plain Iris::Value::Str that does not carry our envelope key must stay
+    // as YydbValue::Text — no accidental reinterpretation of existing code.
+    let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
+    named.insert("s".into(), iris_types::Value::Str("hello world".to_string()));
+    let out = value_params_to_yydb(&named).expect("plain string → YYDB binding");
+    assert_eq!(out.get("s"), Some(&yydb::Value::Text("hello world".to_string())));
 }
 
 #[test]

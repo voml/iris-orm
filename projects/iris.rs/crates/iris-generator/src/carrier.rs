@@ -18,7 +18,7 @@ pub(crate) fn ts_carrier_for_label(label: &str) -> Option<&'static str> {
         "bool" => "boolean",
         "i8" | "i16" | "i32" | "u8" | "u16" | "u32" | "f32" | "f64" => "number",
         "i64" | "u64" => "bigint",
-        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" => "string",
+        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" | "file" => "string",
         "bytes" => "Uint8Array",
         "unit" => "void",
         _ => return None,
@@ -39,7 +39,7 @@ pub(crate) fn rust_carrier_for_label(label: &str) -> Option<&'static str> {
         "u64" => "u64",
         "f32" => "f32",
         "f64" => "f64",
-        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" => "String",
+        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" | "file" => "String",
         "bytes" => "Vec<u8>",
         _ => return None,
     })

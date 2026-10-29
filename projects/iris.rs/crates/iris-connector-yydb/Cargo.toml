@@ -12,6 +12,7 @@ iris-types = { workspace = true }
 iris-ir = { workspace = true }
 yydb = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
+hex = "0.4"
 
 [dev-dependencies]
-serde_json = { workspace = true }
