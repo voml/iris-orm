@@ -77,7 +77,9 @@ pub use typed_plan::{
     is_time, is_utc_datetime,
 };
 pub use uuid_v7::{is_v7, uuid};
-pub use value::{Row, Value, bytes_to_hex, hex_to_bytes};
+pub use value::{
+    Row, TAGGED_JSON_KEY, Value, bytes_from_tagged_json, bytes_to_hex, hex_to_bytes, is_tagged_bytes_json, tagged_bytes_json,
+};
 
 use iris_ir::{IrVersion, PhysicalPlan, RealizationClass};
 

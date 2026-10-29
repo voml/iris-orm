@@ -3,6 +3,10 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
+
+/// Tagged JSON key of the shared `bytes` wire shape (`$yydb`).
+pub const TAGGED_JSON_KEY: &str = "$yydb";
 
 /// Phase 1 value model (VOS-aligned subset, not a SQL value).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -66,6 +70,38 @@ pub fn hex_to_bytes(text: &str) -> Option<Vec<u8>> {
         data: text.to_owned(),
     };
     vos::types::BytesValue::from_wire(wire).ok().map(vos::types::BytesValue::into_octets)
+}
+
+/// JSON value of a tagged `bytes` carrier: `{"$yydb":"bytes","hex":"<lowercase hex>"}`.
+///
+/// This is the one `bytes` shape the N-API host, the browser WASM host and
+/// YYDB's tagged value wire all speak, so octets never degrade into text.
+pub fn tagged_bytes_json(octets: &[u8]) -> JsonValue {
+    let mut object = serde_json::Map::new();
+    object.insert(TAGGED_JSON_KEY.to_owned(), JsonValue::String("bytes".to_owned()));
+    object.insert("hex".to_owned(), JsonValue::String(bytes_to_hex(octets)));
+    JsonValue::Object(object)
+}
+
+/// Octets of a tagged `bytes` carrier, or `None` for any other JSON shape.
+///
+/// Malformed hex is `None` as well: callers that already know the value claims
+/// to be `bytes` should report the failure instead of guessing.
+pub fn bytes_from_tagged_json(value: &JsonValue) -> Option<Vec<u8>> {
+    let object = value.as_object()?;
+    if object.get(TAGGED_JSON_KEY)?.as_str()? != "bytes" {
+        return None;
+    }
+    hex_to_bytes(object.get("hex")?.as_str()?)
+}
+
+/// True when the JSON value claims the tagged `bytes` shape, even if its hex is malformed.
+pub fn is_tagged_bytes_json(value: &JsonValue) -> bool {
+    value
+        .as_object()
+        .and_then(|object| object.get(TAGGED_JSON_KEY))
+        .and_then(JsonValue::as_str)
+        == Some("bytes")
 }
 
 /// One logical row: ordered field map.

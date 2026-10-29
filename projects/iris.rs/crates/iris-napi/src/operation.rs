@@ -54,15 +54,15 @@ pub fn encode_operation_json(json: &str) -> Result<String, String> {
     encode_operation(&op)
 }
 
-pub fn encode_request_json(json: &str) -> Result<String, String> {
+pub fn encode_request_json(json: &str) -> Result<bind::BoundParameters, String> {
     let request: OperationRequest = serde_json::from_str(json).map_err(|err| err.to_string())?;
     let source = encode_operation(&request.operation)?;
     match request.parameters.as_ref() {
         Some(value) => {
             let parameters_json = serde_json::to_string(value).map_err(|err| err.to_string())?;
-            bind::bind_parameters(&source, &parameters_json)
+            bind::bind_parameters_typed(&source, &parameters_json)
         }
-        None => Ok(source),
+        None => Ok(bind::BoundParameters::unbound(&source)),
     }
 }
 
@@ -116,6 +116,19 @@ mod tests {
             "parameters": { "where_active": true }
         }"#;
         let bound = encode_request_json(request).expect("request");
-        assert_eq!(bound, "User.filter(x => x.active == true).collect()");
+        assert_eq!(bound.source, "User.filter(x => x.active == true).collect()");
+        assert!(bound.value_parameters.is_empty());
+    }
+
+    #[test]
+    fn declared_vos_keeps_tagged_bytes_as_a_typed_parameter() {
+        let request = r#"{
+            "identity": { "operationId": "Blob.insert", "contractFingerprint": "fp" },
+            "operation": { "kind": "declared-vos", "source": "Blob::insert({ blob_id: $blob_id, body: $body })" },
+            "parameters": { "blob_id": 7, "body": { "$yydb": "bytes", "hex": "00ff41" } }
+        }"#;
+        let bound = encode_request_json(request).expect("request");
+        assert_eq!(bound.source, "Blob::insert({ blob_id: 7, body: $body })");
+        assert_eq!(bound.value_parameters.get("body"), Some(&iris::Value::Bytes(vec![0x00, 0xff, 0x41])));
     }
 }

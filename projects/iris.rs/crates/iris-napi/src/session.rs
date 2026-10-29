@@ -117,6 +117,29 @@ fn open_yydb_endpoint(project_dir: &Path, endpoint: &str) -> std::result::Result
 }
 
 impl MemorySession {
+    fn bind_parameters(&self, source: &str, parameters_json: Option<&str>) -> Result<bind::BoundParameters> {
+        match parameters_json {
+            Some(json) => bind::bind_parameters_typed(source, json).map_err(Error::from_reason),
+            None => Ok(bind::BoundParameters::unbound(source)),
+        }
+    }
+
+    /// Run a bound read pipeline: YYDB takes typed values, other adapters take text only.
+    fn run_bound_query(&self, bound: &bind::BoundParameters) -> Result<ExecuteResult> {
+        if let SessionStore::Yydb(db) = &self.store {
+            self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
+            return match db.query_with_params(&bound.source, &bound.value_parameters) {
+                Ok(rows) => Ok(ok_result(rows)),
+                Err(err) => Ok(err_result(err.to_string())),
+            };
+        }
+        let source = bound.text_only().map_err(Error::from_reason)?;
+        match self.store.query(&self.planner, source) {
+            Ok(rows) => Ok(ok_result(rows)),
+            Err(err) => Ok(err_result(err)),
+        }
+    }
+
     fn new_store(store: SessionStore, session_ddl_revision: Option<u64>) -> Self {
         let planner = Planner::new(store.capabilities());
         Self { store, planner, closed: false, session_ddl_revision }
@@ -208,17 +231,8 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let source = match parameters_json {
-            Some(json) => bind::bind_parameters(&source, &json).map_err(Error::from_reason)?,
-            None => source,
-        };
-        if let SessionStore::Yydb(db) = &self.store {
-            self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
-        }
-        match self.store.query(&self.planner, &source) {
-            Ok(rows) => Ok(ok_result(rows)),
-            Err(err) => Ok(err_result(err)),
-        }
+        let bound = self.bind_parameters(&source, parameters_json.as_deref())?;
+        self.run_bound_query(&bound)
     }
 
     /// Execute unit-valued / DDL-shaped VOS. Aligns with generated `db.$execute`.
@@ -227,18 +241,16 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let source = match parameters_json {
-            Some(json) => bind::bind_parameters(&source, &json).map_err(Error::from_reason)?,
-            None => source,
-        };
+        let bound = self.bind_parameters(&source, parameters_json.as_deref())?;
         if let SessionStore::Yydb(db) = &self.store {
             self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
-            return match db.execute(&source) {
+            return match db.execute_with_params(&bound.source, &bound.value_parameters) {
                 Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
                 Err(err) => Ok(err_result(err.to_string())),
             };
         }
-        match self.store.execute_unit(&self.planner, &source) {
+        let source = bound.text_only().map_err(Error::from_reason)?;
+        match self.store.execute_unit(&self.planner, source) {
             Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
             Err(err) => Ok(err_result(err)),
         }
@@ -256,14 +268,8 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let source = operation::encode_request_json(&request_json).map_err(|err| Error::from_reason(err))?;
-        if let SessionStore::Yydb(db) = &self.store {
-            self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
-        }
-        match self.store.query(&self.planner, &source) {
-            Ok(rows) => Ok(ok_result(rows)),
-            Err(err) => Ok(err_result(err)),
-        }
+        let bound = operation::encode_request_json(&request_json).map_err(|err| Error::from_reason(err))?;
+        self.run_bound_query(&bound)
     }
 
     /// Apply managed-push schema to a SQLite session (`:memory:` or file path).

@@ -185,15 +185,30 @@ impl YydbSource {
 
     /// Execute a VOS read pipeline and return typed Iris rows.
     pub fn query(&self, program: &str) -> Result<Vec<iris_types::Row>> {
+        self.query_with_params(program, &BTreeMap::new())
+    }
+
+    /// Execute a VOS read pipeline with typed named parameters.
+    ///
+    /// Typed `bytes` parameters move their octets into the column through
+    /// YYDB's own binding, so no text form of the payload is ever decoded.
+    pub fn query_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
-        let rows = self.conn.query_vos(program)?;
+        let named = value_params_to_yydb(named)?;
+        let rows = self.conn.query_vos_with_params(program, &named)?;
         Ok(rows.into_iter().map(row_from_yydb).collect())
     }
 
     /// Execute a VOS write program (schema macros / DML).
     pub fn execute(&self, program: &str) -> Result<()> {
+        self.execute_with_params(program, &BTreeMap::new())
+    }
+
+    /// Execute a VOS write program with typed named parameters.
+    pub fn execute_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<()> {
         self.require_vos_executor()?;
-        self.conn.execute_vos_write(program)?;
+        let named = value_params_to_yydb(named)?;
+        self.conn.execute_vos_write_with_params(program, &named)?;
         Ok(())
     }
 
@@ -302,6 +317,32 @@ impl PreparedVos {
 // ---------------------------------------------------------------------------
 // Row / value conversion — yydb types → iris_types
 // ---------------------------------------------------------------------------
+
+/// Convert Iris typed parameter values into the YYDB binding map.
+///
+/// `bytes` stays octets end to end. Nested objects are rejected: YYDB binds a
+/// scalar per `$name` slot and has no text form for one.
+fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Result<BTreeMap<String, YydbValue>> {
+    let mut out = BTreeMap::new();
+    for (name, value) in named {
+        let converted = match value {
+            iris_types::Value::Null => YydbValue::Null,
+            iris_types::Value::Bool(b) => YydbValue::Bool(*b),
+            iris_types::Value::Int(i) => YydbValue::I64(*i),
+            iris_types::Value::Str(s)
+            | iris_types::Value::Decimal(s)
+            | iris_types::Value::Date(s)
+            | iris_types::Value::Time(s)
+            | iris_types::Value::DateTime(s) => YydbValue::Text(s.clone()),
+            iris_types::Value::Bytes(octets) => YydbValue::Bytes(octets.clone()),
+            iris_types::Value::Object(_) => {
+                return Err(Error::Runtime(format!("typed parameter `${name}` is an object, not a scalar VOS value")));
+            }
+        };
+        out.insert(name.clone(), converted);
+    }
+    Ok(out)
+}
 
 /// Convert a YYDB runtime Value to Iris Value.
 ///

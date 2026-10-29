@@ -9,7 +9,7 @@ mod core;
 mod session;
 pub mod wire;
 
-pub use bind::bind_parameters;
+pub use bind::{BoundParameters, bind_parameters, bind_parameters_typed};
 
 pub use core::{
     SchemaCheck, check_artifacts, check_schema_source, generate_from_artifacts, introspect_from_artifacts, introspect_schema_json, iris_version,

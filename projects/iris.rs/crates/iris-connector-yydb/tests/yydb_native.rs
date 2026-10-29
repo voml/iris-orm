@@ -6,8 +6,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use iris_connector_yydb::{BACKEND_ID, PreparedVos, YydbSource};
-use yydb::Value as YydbValue;
+use iris_connector_yydb::{BACKEND_ID, YydbSource};
 
 const USER_SCHEMA: &str = r#"
 table User {
@@ -17,11 +16,15 @@ table User {
 }
 "#;
 
-fn temp_db_path(label: &str) -> std::path::PathBuf {
+fn temp_layout_path(label: &str, extension: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
     let dir = std::env::temp_dir().join(format!("iris-yydb-{label}-{nanos}"));
     fs::create_dir_all(&dir).expect("temp dir");
-    dir.join("db.yydb")
+    dir.join(format!("db.{extension}"))
+}
+
+fn temp_db_path(label: &str) -> std::path::PathBuf {
+    temp_layout_path(label, "yydb")
 }
 
 // ---------------------------------------------------------------------------
@@ -200,29 +203,44 @@ const BLOB_INSERT: &str = "Blob::insert({ blob_id: $blob_id, label: $label, body
 
 const BLOB_QUERY: &str = "Blob.filter(x => x.blob_id == $blob_id).collect()";
 
-/// Payloads that a text path would corrupt: empty, NUL, invalid UTF-8, mixed.
-const BLOB_CASES: [(&str, &[u8]); 4] = [
-    ("empty", &[]),
-    ("nul", &[0x00, 0x00, 0x00]),
-    ("invalid-utf8", &[0xff, 0xfe, 0xc3, 0x28]),
-    ("mixed", &[0x00, 0xff, 0x41, 0xc3, 0x28]),
-];
-
-fn blob_id_params(blob_id: i64) -> BTreeMap<String, YydbValue> {
-    let mut params = BTreeMap::new();
-    params.insert("blob_id".to_string(), YydbValue::I64(blob_id));
-    params
+/// Payloads that a text path would corrupt, plus the boundaries where YYDB
+/// spills `bytes` into object storage.
+fn blob_cases() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        ("empty", Vec::new()),
+        ("nul", vec![0x00, 0x00, 0x00]),
+        ("invalid-utf8", vec![0xff, 0xfe, 0xc3, 0x28]),
+        ("mixed", vec![0x00, 0xff, 0x41, 0xc3, 0x28]),
+        ("all-256", (0..=255u8).collect()),
+        ("4097", (0..=255u8).cycle().take(4097).collect()),
+    ]
 }
 
-fn blob_write_params(blob_id: i64, label: &str, body: &[u8]) -> BTreeMap<String, YydbValue> {
-    let mut params = blob_id_params(blob_id);
-    params.insert("label".to_string(), YydbValue::Text(label.to_string()));
-    params.insert("body".to_string(), YydbValue::Bytes(body.to_vec()));
-    params
+/// Tagged `bytes` parameter record — the shape the generated runtime sends.
+fn tagged_write_params(blob_id: i64, label: &str, body: &[u8]) -> String {
+    serde_json::json!({
+        "blob_id": blob_id,
+        "label": label,
+        "body": { "$yydb": "bytes", "hex": iris_types::bytes_to_hex(body) },
+    })
+    .to_string()
 }
 
-fn read_body(plan: &PreparedVos, db: &YydbSource, blob_id: i64) -> Vec<u8> {
-    let rows = plan.execute_with_params(db, blob_id_params(blob_id)).expect("read `body` back");
+/// Decode the tagged record into the typed parameter map a host binds.
+fn typed_write_params(blob_id: i64, label: &str, body: &[u8]) -> BTreeMap<String, iris_types::Value> {
+    let params: serde_json::Value = serde_json::from_str(&tagged_write_params(blob_id, label, body)).expect("params JSON");
+    let object = params.as_object().expect("params object");
+    let octets = iris_types::bytes_from_tagged_json(&object["body"]).expect("tagged `bytes`");
+    BTreeMap::from([
+        ("blob_id".to_string(), iris_types::Value::Int(object["blob_id"].as_i64().expect("blob_id"))),
+        ("label".to_string(), iris_types::Value::Str(object["label"].as_str().expect("label").to_owned())),
+        ("body".to_string(), iris_types::Value::Bytes(octets)),
+    ])
+}
+
+fn read_body(db: &YydbSource, blob_id: i64) -> Vec<u8> {
+    let named = BTreeMap::from([("blob_id".to_string(), iris_types::Value::Int(blob_id))]);
+    let rows = db.query_with_params(BLOB_QUERY, &named).expect("read `body` back");
     assert_eq!(rows.len(), 1, "`blob_id` {blob_id} must read back exactly one row");
     match rows[0].get("body") {
         Some(iris_types::Value::Bytes(octets)) => octets.clone(),
@@ -232,33 +250,33 @@ fn read_body(plan: &PreparedVos, db: &YydbSource, blob_id: i64) -> Vec<u8> {
 
 #[test]
 fn bytes_round_trip_survives_close_and_reopen() {
-    let path = temp_db_path("bytes");
+    // `.yydx` selects the object-store layout, so payloads past
+    // `INLINE_BYTES_MAX` spill to sibling blobs instead of being rejected.
+    let path = temp_layout_path("bytes", "yydx");
     let db = YydbSource::open(&path).unwrap();
     db.ensure_schema(BLOB_SCHEMA).unwrap();
 
-    let conn = db.connection();
+    let cases = blob_cases();
     db.begin().unwrap();
-    for (index, (label, body)) in BLOB_CASES.iter().copied().enumerate() {
-        conn.execute_vos_write_with_params(BLOB_INSERT, &blob_write_params(index as i64 + 1, label, body))
+    for (index, (label, body)) in cases.iter().enumerate() {
+        db.execute_with_params(BLOB_INSERT, &typed_write_params(index as i64 + 1, label, body))
             .unwrap_or_else(|error| panic!("insert `{label}`: {error}"));
     }
     db.commit().unwrap();
 
-    let plan = db.prepare(BLOB_QUERY).expect("prepare");
-    for (index, (label, body)) in BLOB_CASES.iter().copied().enumerate() {
-        let read = read_body(&plan, &db, index as i64 + 1);
-        assert_eq!(read.as_slice(), body, "`{label}` must read back byte for byte before reopen");
+    for (index, (label, body)) in cases.iter().enumerate() {
+        assert_eq!(read_body(&db, index as i64 + 1), *body, "`{label}` must read back byte for byte before reopen");
     }
 
     let db = db.reopen().expect("reopen");
-    let plan = db.prepare(BLOB_QUERY).expect("prepare after reopen");
-    for (index, (label, body)) in BLOB_CASES.iter().copied().enumerate() {
-        let read = read_body(&plan, &db, index as i64 + 1);
-        assert_eq!(read.as_slice(), body, "`{label}` must read back byte for byte after reopen");
+    for (index, (label, body)) in cases.iter().enumerate() {
+        assert_eq!(read_body(&db, index as i64 + 1), *body, "`{label}` must read back byte for byte after reopen");
     }
 
     drop(db);
-    let _ = fs::remove_file(&path);
+    if let Some(dir) = path.parent() {
+        let _ = fs::remove_dir_all(dir);
+    }
 }
 
 #[test]

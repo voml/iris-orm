@@ -1,37 +1,47 @@
 //! End-to-end evidence for the `i64` and `bytes` carriers.
 //!
 //! The chain under test is the one every generated client uses: a bound VOS
-//! parameter record → `bind_parameters` → row-producing VOS → host row JSON.
-//! No provider crate is involved, so this covers parameter binding, the
+//! parameter record → `bind_parameters_typed` → row-producing VOS → host row
+//! JSON. No provider crate is involved, so this covers parameter binding, the
 //! reference interpreter's row values and the JSON wire. A writable real
 //! datastore binding is not available in this tree (the SQLite adapter is
 //! excluded and the reference store is read-only), so nothing here claims a
-//! provider round trip.
+//! provider round trip. The real `.yydb` file round trip lives in
+//! `iris-connector-yydb`.
 
 use std::collections::BTreeMap;
 
 use iris_types::{ReferenceStore, Value};
-use iris_wasm::{bind_parameters, wire::rows_to_json};
-use serde_json::Value as JsonValue;
+use iris_wasm::{bind_parameters, bind_parameters_typed, wire::rows_to_json};
+use serde_json::{Value as JsonValue, json};
 
 const INSERT: &str = "Metric::insert({ metric_id: $data_metric_id, seq: $data_seq, payload: $data_payload })";
 
-/// `i64::MAX` with bytes `[1, 2, 3]` as base64 (`AQID`).
-const PARAMS: &str = r#"{"data_metric_id":"m1","data_seq":9223372036854775807,"data_payload":"AQID"}"#;
+/// `i64::MAX` with bytes `[1, 2, 3]` as the tagged `bytes` carrier.
+const PARAMS: &str =
+    r#"{"data_metric_id":"m1","data_seq":9223372036854775807,"data_payload":{"$yydb":"bytes","hex":"010203"}}"#;
 
 fn metric_row() -> BTreeMap<String, Value> {
     let mut row = BTreeMap::new();
     row.insert("metric_id".to_string(), Value::Str("m1".into()));
     row.insert("seq".to_string(), Value::Int(i64::MAX));
-    row.insert("payload".to_string(), Value::Str("AQID".into()));
+    row.insert("payload".to_string(), Value::Bytes(vec![1, 2, 3]));
     row
 }
 
 #[test]
 fn binds_integer_parameter_with_every_bit() {
-    let bound = bind_parameters(INSERT, PARAMS).expect("bind");
-    assert!(bound.contains("seq: 9223372036854775807"), "{bound}");
-    assert!(bound.contains("payload: \"AQID\""), "{bound}");
+    let bound = bind_parameters_typed(INSERT, PARAMS).expect("bind");
+    assert!(bound.source.contains("seq: 9223372036854775807"), "{}", bound.source);
+    assert!(bound.source.contains("payload: $data_payload"), "{}", bound.source);
+    assert_eq!(bound.value_parameters.get("data_payload"), Some(&Value::Bytes(vec![1, 2, 3])));
+}
+
+#[test]
+fn text_binding_refuses_bytes_parameters() {
+    let err = bind_parameters(INSERT, PARAMS).expect_err("bytes has no VOS literal");
+    assert!(err.contains("`bytes`"), "{err}");
+    assert!(err.contains("`$data_payload`"), "{err}");
 }
 
 #[test]
@@ -41,14 +51,13 @@ fn rejects_an_integer_parameter_outside_i64() {
 }
 
 #[test]
-fn bound_i64_and_bytes_reach_the_row_values() {
+fn strlen_parameter_still_reaches_the_row_values() {
     let store = ReferenceStore::new();
-    let insert = bind_parameters(INSERT, PARAMS).expect("bind insert");
+    let insert = bind_parameters("Metric::insert({ metric_id: $data_metric_id })", r#"{"data_metric_id":"m1"}"#).expect("bind insert");
     let rows = store.interpret_source(&insert).expect("insert");
 
     assert_eq!(rows.len(), 1);
-    assert_eq!(rows[0].get("seq"), Some(&Value::Int(i64::MAX)));
-    assert_eq!(rows[0].get("payload"), Some(&Value::Str("AQID".into())));
+    assert_eq!(rows[0].get("metric_id"), Some(&Value::Str("m1".into())));
 }
 
 #[test]
@@ -62,20 +71,20 @@ fn exact_i64_filter_matches_and_survives_the_wire() {
 
     let json = rows_to_json(rows);
     assert_eq!(json[0]["seq"], JsonValue::String("9223372036854775807".into()));
-    assert_eq!(json[0]["payload"], JsonValue::String("AQID".into()));
+    assert_eq!(json[0]["payload"], json!({ "$yydb": "bytes", "hex": "010203" }));
 }
 
 #[test]
-fn bytes_leave_the_wire_as_base64_without_a_text_guess() {
+fn bytes_leave_the_wire_as_the_tagged_hex_carrier() {
     let mut row = BTreeMap::new();
     row.insert("empty".to_string(), Value::Bytes(Vec::new()));
     row.insert("nul".to_string(), Value::Bytes(vec![0, 0, 0]));
     row.insert("mixed".to_string(), Value::Bytes(vec![0x00, 0xff, 0x41, 0xc3, 0x28]));
 
     let json = rows_to_json(vec![row]);
-    assert_eq!(json[0]["empty"], JsonValue::String(String::new()));
-    assert_eq!(json[0]["nul"], JsonValue::String("AAAA".into()));
-    assert_eq!(json[0]["mixed"], JsonValue::String("AP9Bwyg=".into()));
+    assert_eq!(json[0]["empty"], json!({ "$yydb": "bytes", "hex": "" }));
+    assert_eq!(json[0]["nul"], json!({ "$yydb": "bytes", "hex": "000000" }));
+    assert_eq!(json[0]["mixed"], json!({ "$yydb": "bytes", "hex": "00ff41c328" }));
 }
 
 #[test]
