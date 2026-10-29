@@ -9,8 +9,9 @@
  *   `JSON.stringify` throws on it. They are emitted as exact decimal digit
  *   tokens so the Rust side keeps every bit.
  * - `bytes` author values are `Uint8Array`; `JSON.stringify` would turn them
- *   into `{"0":…}` objects, which the binder rejects. They are emitted as
- *   base64 text, the wire shape the `bytes` carrier decodes back.
+ *   into `{"0":…}` objects, which the binder rejects. They are emitted as the
+ *   canonical tagged `{"$yydb":"bytes","hex":"<lowercase hex>"}` value, which
+ *   a typed-value backend binds directly instead of reading as text.
  *
  * Anything else is a scalar VOS literal (`null`, `bool`, number, string).
  * Nested objects are rejected instead of being silently stringified.
@@ -18,7 +19,7 @@
 
 import type { OperationRequest } from "./host.ts";
 
-import { encodeBase64 } from "./base64.ts";
+import { encodeHex } from "./hex.ts";
 
 const I64_MIN = -(2n ** 63n);
 const I64_MAX = 2n ** 63n - 1n;
@@ -61,7 +62,7 @@ function encodeParameterValue(name: string, value: unknown): string | undefined 
         return exactI64Text(value, `parameter \`${name}\``);
     }
     if (isBytes(value)) {
-        return JSON.stringify(encodeBase64(toBytes(value)));
+        return JSON.stringify({ $yydb: "bytes", hex: encodeHex(toBytes(value)) });
     }
     if (typeof value === "number") {
         if (!Number.isFinite(value)) {
@@ -86,8 +87,9 @@ function encodeParameterValue(name: string, value: unknown): string | undefined 
 /**
  * JSON object text of an operation parameter record.
  *
- * `bigint` stays an unquoted exact integer token and `Uint8Array` becomes
- * base64 text. `undefined` entries are dropped, matching `JSON.stringify`.
+ * `bigint` stays an unquoted exact integer token and `Uint8Array` becomes the
+ * canonical tagged `bytes` value. `undefined` entries are dropped, matching
+ * `JSON.stringify`.
  */
 export function stringifyOperationParameters(parameters?: Readonly<Record<string, unknown>>): string {
     if (parameters === undefined) {

@@ -85,7 +85,7 @@ pub fn write_typescript_client(model: &GenerationModel, out_dir: &Path) -> Resul
 
 /// Host-neutral runtime module stems, rendered from `templates/typescript/runtime/`.
 const RUNTIME_TEMPLATE_NAMES: &[&str] =
-    &["base64", "db-binding", "operation-binding", "operation-parameters", "parse", "validate-contract", "value-carrier", "wire-row-map"];
+    &["db-binding", "hex", "operation-binding", "operation-parameters", "parse", "validate-contract", "value-carrier", "wire-row-map"];
 
 /// Emit the host-neutral runtime modules shared by `@yydb/iris` and `@yydb/iris-language`.
 ///

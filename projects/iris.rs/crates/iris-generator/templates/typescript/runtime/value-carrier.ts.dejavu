@@ -10,7 +10,7 @@
 
 import type { WireCarrierValue } from "./host.ts";
 
-import { decodeBase64 } from "./base64.ts";
+import { decodeHex } from "./hex.ts";
 
 function carrierError(field: string, carrier: string, detail: string): Error {
     return new Error(`IRIS-VALUE-CARRIER: \`${field}\` promised VOS \`${carrier}\`: ${detail}`);
@@ -24,12 +24,19 @@ function normalizeWireScalar(value: unknown): WireCarrierValue {
     return value == null ? null : String(value);
 }
 
-function decodeBase64OrThrow(text: string, field: string): Uint8Array {
-    const bytes = decodeBase64(text);
-    if (bytes === null) {
-        throw carrierError(field, "bytes", "received malformed base64 text");
+function taggedBytesHex(value: unknown, field: string): string | null {
+    if (typeof value !== "object" || value === null) {
+        return null;
     }
-    return bytes;
+    const record = value as Record<string, unknown>;
+    if (record["$yydb"] !== "bytes") {
+        return null;
+    }
+    const hex = record["hex"];
+    if (typeof hex !== "string") {
+        throw carrierError(field, "bytes", "received tagged `bytes` without a `hex` string");
+    }
+    return hex;
 }
 
 function toExactBigInt(value: unknown, field: string, carrier: string): bigint {
@@ -64,8 +71,16 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
         copy.set(new Uint8Array(view.buffer as ArrayBuffer, view.byteOffset, view.byteLength));
         return copy;
     }
-    if (typeof value === "string") {
-        return decodeBase64OrThrow(value, field);
+    if (typeof value === "object" && value !== null && !(value instanceof ArrayBuffer) && !ArrayBuffer.isView(value)) {
+        const hex = taggedBytesHex(value, field);
+        if (hex === null) {
+            throw carrierError(field, "bytes", "received an object that is not the tagged `bytes` carrier");
+        }
+        const bytes = decodeHex(hex);
+        if (bytes === null) {
+            throw carrierError(field, "bytes", "received tagged `bytes` without canonical lowercase hex");
+        }
+        return bytes;
     }
     throw carrierError(field, "bytes", `cannot convert ${typeof value} value to Uint8Array`);
 }
@@ -77,7 +92,8 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
  * `bytes`, …). Every label must be in the faithful VOS carrier table — unknown
  * labels hard-fail instead of falling back to `unknown`. `i64` accepts exact
  * decimal strings (the wire shape for values past 2^53) or safe numbers.
- * `bytes` accepts base64 text, `ArrayBuffer` and views.
+ * `bytes` accepts the tagged `{"$yydb":"bytes","hex":…}` value, `ArrayBuffer`
+ * and views.
  */
 
 const KNOWN_VOS_LABELS: ReadonlySet<string> = new Set([
