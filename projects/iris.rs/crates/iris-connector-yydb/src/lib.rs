@@ -192,11 +192,14 @@ impl YydbSource {
     ///
     /// Typed `bytes` parameters move their octets into the column through
     /// YYDB's own binding, so no text form of the payload is ever decoded.
+    ///
+    /// Returns `Err` when the result set contains a YYDB variant Iris cannot
+    /// faithfully represent (`Vector`, `Object` CAS handle, or `File` manifest).
     pub fn query_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
         let named = value_params_to_yydb(named)?;
         let rows = self.conn.query_vos_with_params(program, &named)?;
-        Ok(rows.into_iter().map(row_from_yydb).collect())
+        rows.into_iter().map(row_from_yydb).collect()
     }
 
     /// Execute a VOS write program (schema macros / DML).
@@ -300,6 +303,9 @@ impl PreparedVos {
     }
 
     /// Execute with named parameter bindings.
+    ///
+    /// Returns `Err` when the result set contains a YYDB variant Iris cannot
+    /// faithfully represent (`Vector`, `Object` CAS handle, or `File` manifest).
     pub fn execute_with_params(&self, source: &YydbSource, named: BTreeMap<String, yydb::Value>) -> Result<Vec<iris_types::Row>> {
         source.require_vos_executor()?;
         let handshake = source.schema_handshake()?;
@@ -310,7 +316,7 @@ impl PreparedVos {
             )));
         }
         let rows = source.connection().query_prepared(&self.stmt, &named)?;
-        Ok(rows.into_iter().map(row_from_yydb).collect())
+        rows.into_iter().map(row_from_yydb).collect()
     }
 }
 
@@ -347,41 +353,70 @@ fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Result<B
 /// Convert a YYDB runtime Value to Iris Value.
 ///
 /// `bytes` keeps its octets: YYDB `Value::Bytes` becomes Iris
-/// `Value::Bytes`, never text and never `Null`. The mapping is lossy for
-/// variants Iris doesn't model (Vector, Object, File) — they collapse to Iris
-/// `Null`. Callers that need full fidelity should work directly with the YYDB
-/// `yydb::Value` via the `connection()` escape hatch.
-pub fn value_from_yydb(v: YydbValue) -> iris_types::Value {
+/// `Value::Bytes`, never text and never `Null`. Date / time / decimal scalars
+/// round-trip through their canonical ISO text form, matching the reverse
+/// mapping in [`value_params_to_yydb`].
+///
+/// Returns `Err` for variants Iris Phase 1 does not model — `Vector`, the
+/// CAS `ObjectRef`, and the chunked `File` manifest — so callers cannot
+/// silently read a column as `Null`. Code that needs full fidelity should
+/// work directly with the YYDB `yydb::Value` via the `connection()` escape
+/// hatch.
+pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
     match v {
-        YydbValue::Null => iris_types::Value::Null,
-        YydbValue::Bool(b) => iris_types::Value::Bool(b),
-        YydbValue::Text(s) => iris_types::Value::Str(s),
-        YydbValue::I64(i) => iris_types::Value::Int(i),
-        YydbValue::U64(u) => iris_types::Value::Int(u as i64),
-        YydbValue::F64(f) => iris_types::Value::Str(f.to_string()),
-        YydbValue::Bytes(octets) => iris_types::Value::Bytes(octets),
-        YydbValue::Uuid(u) => iris_types::Value::Str(u.to_string()),
-        YydbValue::Vector(_) => iris_types::Value::Null,
-        YydbValue::Object(_) => iris_types::Value::Null,
-        YydbValue::File(_) => iris_types::Value::Null,
+        YydbValue::Null => Ok(iris_types::Value::Null),
+        YydbValue::Bool(b) => Ok(iris_types::Value::Bool(b)),
+        YydbValue::Text(s) => Ok(iris_types::Value::Str(s)),
+        YydbValue::I64(i) => Ok(iris_types::Value::Int(i)),
+        YydbValue::U64(u) => Ok(iris_types::Value::Int(u as i64)),
+        YydbValue::F64(f) => Ok(iris_types::Value::Str(f.to_string())),
+        YydbValue::Bytes(octets) => Ok(iris_types::Value::Bytes(octets)),
+        YydbValue::Uuid(u) => Ok(iris_types::Value::Str(u.to_string())),
+        YydbValue::Date(d) => Ok(iris_types::Value::Date(d.to_iso())),
+        YydbValue::Time(t) => Ok(iris_types::Value::Time(t.to_iso())),
+        YydbValue::Timestamp(ts) => Ok(iris_types::Value::DateTime(ts.to_iso())),
+        YydbValue::Decimal(d) => Ok(iris_types::Value::Decimal(d.to_string())),
         YydbValue::Row(nested) => {
             let mut out = BTreeMap::new();
             for (k, v) in nested {
-                out.insert(k, value_from_yydb(v));
+                out.insert(k, value_from_yydb(v)?);
             }
-            iris_types::Value::Object(out)
+            Ok(iris_types::Value::Object(out))
         }
-        _ => iris_types::Value::Null,
+        YydbValue::Vector(_) => Err(Error::Runtime(
+            "YYDB returned a `vector` value which Iris Phase 1 does not model. \
+             Use the `connection()` escape hatch for full fidelity access."
+                .into(),
+        )),
+        YydbValue::Object(_) => Err(Error::Runtime(
+            "YYDB returned a CAS `object` handle which Iris Phase 1 does not model. \
+             Use the `connection()` escape hatch for full fidelity access."
+                .into(),
+        )),
+        YydbValue::File(_) => Err(Error::Runtime(
+            "YYDB returned a chunked `file` manifest which Iris Phase 1 does not model. \
+             Use the `connection()` escape hatch for full fidelity access."
+                .into(),
+        )),
+        #[allow(unreachable_patterns)]
+        other => Err(Error::Runtime(format!(
+            "YYDB returned an unrecognised `Value` variant that Iris cannot represent: {other:?}. \
+             This usually means the pinned `yydb` dependency added a new variant; \
+             upgrade `iris-connector-yydb` or use the `connection()` escape hatch."
+        ))),
     }
 }
 
-/// Convert a YYDB query row to an Iris row (BTreeMap<String, Value> → BTreeMap<String, iris_types::Value>).
-pub fn row_from_yydb(row: BTreeMap<String, YydbValue>) -> iris_types::Row {
+/// Convert a YYDB query row to an Iris row.
+///
+/// Returns `Err` when any cell contains a YYDB variant Iris cannot faithfully
+/// represent (`Vector`, `Object` CAS handle, or `File` manifest).
+pub fn row_from_yydb(row: BTreeMap<String, YydbValue>) -> Result<iris_types::Row> {
     let mut out = BTreeMap::new();
     for (k, v) in row {
-        out.insert(k, value_from_yydb(v));
+        out.insert(k, value_from_yydb(v)?);
     }
-    out
+    Ok(out)
 }
 
 // ---------------------------------------------------------------------------

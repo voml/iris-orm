@@ -287,3 +287,93 @@ fn connector_does_not_depend_on_foreign_adapters() {
     }
     assert!(manifest.contains("yydb"));
 }
+
+// ---------------------------------------------------------------------------
+// value_from_yydb — non-lossy conversion
+// ---------------------------------------------------------------------------
+
+use iris_connector_yydb::{value_from_yydb, row_from_yydb};
+
+#[test]
+fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
+    // These variants were previously swallowed by the `_ => Null` wildcard.
+    let date = yydb::Date::from_ymd(2026, 10, 29).expect("valid date");
+    let time = yydb::Time::from_hms_nano(12, 34, 56, 789_000_000).expect("valid time");
+    let ts = yydb::Timestamp::from_parts(date, time).expect("valid timestamp");
+    let dec = yydb::Decimal::new(12345, 5, 2).expect("valid decimal");
+
+    assert!(matches!(
+        value_from_yydb(yydb::Value::Date(date)),
+        Ok(iris_types::Value::Date(_))
+    ));
+    assert!(matches!(
+        value_from_yydb(yydb::Value::Time(time)),
+        Ok(iris_types::Value::Time(_))
+    ));
+    assert!(matches!(
+        value_from_yydb(yydb::Value::Timestamp(ts)),
+        Ok(iris_types::Value::DateTime(_))
+    ));
+    assert!(matches!(
+        value_from_yydb(yydb::Value::Decimal(dec)),
+        Ok(iris_types::Value::Decimal(_))
+    ));
+}
+
+#[test]
+fn yydb_vector_object_file_return_error_instead_of_null() {
+    let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![1.0, 2.0, 3.0])).expect("vector");
+    let obj = yydb::ObjectRef {
+        algo: yydb::HashAlgo::Blake3,
+        hash: [0u8; 32],
+        size: 0,
+        kind: yydb::ObjectKind::VectorPayload,
+    };
+    let file = yydb::ChunkManifest { chunk_size: 0, total_size: 0, chunks: vec![] };
+
+    let err = value_from_yydb(yydb::Value::Vector(vec))
+        .expect_err("`vector` must not silently map to Null");
+    assert!(err.to_string().contains("vector"));
+
+    let err = value_from_yydb(yydb::Value::Object(obj))
+        .expect_err("CAS `object` must not silently map to Null");
+    assert!(err.to_string().contains("object"));
+
+    let err = value_from_yydb(yydb::Value::File(file))
+        .expect_err("chunked `file` must not silently map to Null");
+    assert!(err.to_string().contains("file"));
+}
+
+#[test]
+fn row_from_yydb_propagates_unsupported_cell_error() {
+    // BTreeMap<String, YydbValue> containing a Vector cell must fail the row
+    // conversion instead of silently dropping the cell to Null.
+    let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![0.5])).expect("vector");
+    let mut row: BTreeMap<String, yydb::Value> = BTreeMap::new();
+    row.insert("id".to_string(), yydb::Value::I64(1));
+    row.insert("embedding".to_string(), yydb::Value::Vector(vec));
+
+    let err = row_from_yydb(row).expect_err("row with `vector` cell must fail");
+    let msg = err.to_string();
+    assert!(msg.contains("vector"), "message must name the offending variant: {msg}");
+}
+
+#[test]
+fn row_from_yydb_nested_row_is_still_ok() {
+    // Nested YYDB `Row` correctly lifts to Iris `Value::Object`.
+    let mut inner: BTreeMap<String, yydb::Value> = BTreeMap::new();
+    inner.insert("name".to_string(), yydb::Value::Text("nested".to_string()));
+
+    let mut outer: BTreeMap<String, yydb::Value> = BTreeMap::new();
+    outer.insert("id".to_string(), yydb::Value::I64(1));
+    outer.insert("profile".to_string(), yydb::Value::Row(inner));
+
+    let iris_row = row_from_yydb(outer).expect("nested row must convert");
+    assert_eq!(iris_row.get("id"), Some(&iris_types::Value::Int(1)));
+    match iris_row.get("profile") {
+        Some(iris_types::Value::Object(map)) => {
+            assert_eq!(map.get("name"), Some(&iris_types::Value::Str("nested".to_string())));
+        }
+        other => panic!("expected Object, got {other:?}"),
+    }
+}
