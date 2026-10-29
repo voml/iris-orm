@@ -486,10 +486,6 @@ fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet
     if base.contains('[') || base.contains('<') || base.contains(',') {
         return Err(unsupported("collection and generic shapes have no declared-vos operation carrier"));
     }
-    match base {
-        "vector" => return Err(unsupported("`vector` payloads have no declared-vos operation carrier")),
-        _ => {}
-    }
     if let Some(label) = carrier::faithful_label(base) {
         if label == "unit" {
             return Ok(OperationCarrier { rust_ty: "()".into(), ts_type: "void".into() });

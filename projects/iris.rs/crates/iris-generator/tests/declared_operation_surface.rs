@@ -183,15 +183,36 @@ fn optional_bytes_operation_type_keeps_the_declared_optionality() {
 }
 
 #[test]
-fn vector_parameter_is_rejected() {
-    let error = project_error(vec![operation(
+fn vector_parameter_and_return_use_string_carrier() {
+    // `vector` payloads round-trip through tagged JSON string via
+    // Iris::Value::Str — the generator must accept `vector` as a faithful
+    // VOS label and emit `string` / `String` carriers on both sides of the
+    // declared-vos delegate. The dimension lives inside the tagged string,
+    // not in the generated host types.
+    let model = project_model(vec![operation(
         "query",
         "search",
         "op_0123456789abcdef",
         vec![param("embedding", json!({ "named": ["vector"] }))],
-        Value::Null,
+        json!({ "named": ["vector"] }),
     )]);
-    assert!(matches!(error, Error::UnsupportedOperationType { ref ty, .. } if ty == "vector"), "{error}");
+    let op = model.operations.iter().find(|op| op.name == "search").expect("search op");
+    assert_eq!(op.return_type.as_deref(), Some("vector"));
+    assert_eq!(op.params.len(), 1);
+    assert_eq!(op.params[0].vos_type, "vector");
+    assert_eq!(op.params[0].ts_type, "string");
+
+    // Rust emits String carrier for both param and return.
+    let rust_files = emit_target_files(&model, "rust").expect("rust must generate");
+    let rust_ops = target_file(&rust_files, "operations.rs");
+    assert!(rust_ops.contains("embedding: String"), "Rust param carrier must be String:\n{rust_ops}");
+    assert!(rust_ops.contains("-> String"), "Rust return carrier must be String:\n{rust_ops}");
+
+    // TypeScript emits string carrier on both sides.
+    let ts_files = emit_target_files(&model, "typescript").expect("typescript must generate");
+    let ts_ops = target_file(&ts_files, "operations.ts");
+    assert!(ts_ops.contains("embedding: string"), "TS param carrier must be string:\n{ts_ops}");
+    assert!(ts_ops.contains("Promise<string>"), "TS return carrier must be Promise<string>:\n{ts_ops}");
 }
 
 #[test]

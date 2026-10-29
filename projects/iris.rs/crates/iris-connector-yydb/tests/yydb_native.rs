@@ -321,10 +321,10 @@ fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
 }
 
 #[test]
-fn yydb_vector_and_object_still_fail_closed() {
-    // vector and CAS object handles still have no Iris Phase 1 carrier and
-    // must not silently degrade to Null.
-    let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![1.0, 2.0, 3.0])).expect("vector");
+fn yydb_object_still_fail_closed() {
+    // The CAS `object` handle still has no Iris Phase 1 carrier and must not
+    // silently degrade to Null. `vector` and `file` now round-trip through
+    // a tagged JSON string, but the raw CAS handle remains fail-closed.
     let obj = yydb::ObjectRef {
         algo: yydb::HashAlgo::Blake3,
         hash: [0u8; 32],
@@ -332,13 +332,48 @@ fn yydb_vector_and_object_still_fail_closed() {
         kind: yydb::ObjectKind::VectorPayload,
     };
 
-    let err = value_from_yydb(yydb::Value::Vector(vec))
-        .expect_err("`vector` must not silently map to Null");
-    assert!(err.to_string().contains("vector"));
-
     let err = value_from_yydb(yydb::Value::Object(obj))
         .expect_err("CAS `object` must not silently map to Null");
     assert!(err.to_string().contains("object"));
+}
+
+#[test]
+fn yydb_vector_round_trips_through_tagged_json_string() {
+    // Iris has no Vector Value variant, so vector dimensions + components
+    // round-trip through a single tagged JSON string inside Iris::Value::Str.
+    let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![1.0_f32, 2.0, 3.0])).expect("vector");
+
+    let iris_value = value_from_yydb(yydb::Value::Vector(vec.clone())).expect("Vector → Iris::Str");
+    match &iris_value {
+        iris_types::Value::Str(s) => {
+            assert!(s.contains("__iris_vector__"), "serialized form must carry discriminating key: {s}");
+        }
+        other => panic!("expected Iris::Value::Str, got {other:?}"),
+    }
+
+    let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
+    named.insert("v".into(), iris_value);
+    let out = value_params_to_yydb(&named).expect("Iris params → YYDB binding");
+    match out.get("v") {
+        Some(yydb::Value::Vector(got)) => {
+            assert_eq!(got.dim, vec.dim, "dimension must survive round-trip");
+            assert_eq!(got.data.len(), vec.data.len());
+            for (a, b) in got.data.iter().zip(vec.data.iter()) {
+                assert_eq!(a.to_be_bytes(), b.to_be_bytes(), "component bit-pattern must survive round-trip");
+            }
+        }
+        other => panic!("expected YydbValue::Vector, got {other:?}"),
+    }
+}
+
+#[test]
+fn tagged_vector_json_does_not_fool_plain_text_params() {
+    // A plain Iris::Value::Str that does not carry our envelope key must stay
+    // as YydbValue::Text — no accidental reinterpretation of existing code.
+    let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
+    named.insert("s".into(), iris_types::Value::Str("hello world".to_string()));
+    let out = value_params_to_yydb(&named).expect("plain string → YYDB binding");
+    assert_eq!(out.get("s"), Some(&yydb::Value::Text("hello world".to_string())));
 }
 
 #[test]
@@ -391,16 +426,40 @@ fn tagged_file_json_does_not_fool_plain_text_params() {
 
 #[test]
 fn row_from_yydb_propagates_unsupported_cell_error() {
-    // BTreeMap<String, YydbValue> containing a Vector cell must fail the row
-    // conversion instead of silently dropping the cell to Null.
-    let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![0.5])).expect("vector");
+    // BTreeMap<String, YydbValue> containing a CAS Object cell must fail the
+    // row conversion instead of silently dropping the cell to Null.
+    let obj = yydb::ObjectRef {
+        algo: yydb::HashAlgo::Blake3,
+        hash: [0u8; 32],
+        size: 0,
+        kind: yydb::ObjectKind::Blob,
+    };
+    let mut row: BTreeMap<String, yydb::Value> = BTreeMap::new();
+    row.insert("id".to_string(), yydb::Value::I64(1));
+    row.insert("payload".to_string(), yydb::Value::Object(obj));
+
+    let err = row_from_yydb(row).expect_err("row with CAS `object` cell must fail");
+    let msg = err.to_string();
+    assert!(msg.contains("object"), "message must name the offending variant: {msg}");
+}
+
+#[test]
+fn row_from_yydb_vector_cell_round_trips_via_tagged_string() {
+    // A row cell containing a Vector now round-trips as a tagged JSON string
+    // inside Iris::Value::Str instead of failing.
+    let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![0.5_f32, -1.5, 2.0])).expect("vector");
     let mut row: BTreeMap<String, yydb::Value> = BTreeMap::new();
     row.insert("id".to_string(), yydb::Value::I64(1));
     row.insert("embedding".to_string(), yydb::Value::Vector(vec));
 
-    let err = row_from_yydb(row).expect_err("row with `vector` cell must fail");
-    let msg = err.to_string();
-    assert!(msg.contains("vector"), "message must name the offending variant: {msg}");
+    let iris_row = row_from_yydb(row).expect("vector cell must convert");
+    assert_eq!(iris_row.get("id"), Some(&iris_types::Value::Int(1)));
+    match iris_row.get("embedding") {
+        Some(iris_types::Value::Str(s)) => {
+            assert!(s.contains("__iris_vector__"), "must be tagged vector string: {s}");
+        }
+        other => panic!("expected tagged string, got {other:?}"),
+    }
 }
 
 #[test]

@@ -25,12 +25,16 @@ pub use error::{Error, Result};
 use yydb::Value as YydbValue;
 
 // ---------------------------------------------------------------------------
-// Tagged file descriptor JSON — Iris::Value 没有 File 变体，chunk manifests
-// round-trip through a string carrier with a single discriminating key.
+// Tagged payload JSON — Iris::Value Phase 1 没有 File / Vector 变体，这两类
+// VOS 载荷都通过带单一 tag key 的 string carrier 往返。普通文本不会被
+// 误判：每个转换入口都先用 `contains(tag)` 做 fast-path。
 // ---------------------------------------------------------------------------
 
 /// Top-level discriminating key for every tagged file descriptor string.
 const IRIS_FILE_TAG: &str = "__iris_file__";
+
+/// Top-level discriminating key for every tagged vector string.
+const IRIS_VECTOR_TAG: &str = "__iris_vector__";
 
 /// Compact tagged-JSON form of `yydb::ChunkManifest` for Iris Value round-trip.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,6 +111,55 @@ fn chunk_manifest_from_string(s: &str) -> Option<Result<yydb::ChunkManifest>> {
                 chunks,
             }),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Tagged vector JSON — same path as file: hex LE f32 payload inside a single
+// discriminating key, so Iris::Value::Str carries vector through Phase 1.
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct TaggedVectorEnvelope {
+    dimension: u32,
+    components: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct TaggedVectorOuter {
+    #[serde(rename = "__iris_vector__")]
+    iris_vector: TaggedVectorEnvelope,
+}
+
+fn vector_to_string(v: &yydb::Vector) -> Result<String> {
+    let envelope = TaggedVectorOuter {
+        iris_vector: TaggedVectorEnvelope {
+            dimension: v.dim,
+            components: hex::encode(v.to_le_bytes()),
+        },
+    };
+    serde_json::to_string(&envelope).map_err(|e| Error::Runtime(format!("serialize vector: {e}")))
+}
+
+fn vector_from_string(s: &str) -> Option<Result<yydb::Vector>> {
+    if !s.contains(IRIS_VECTOR_TAG) {
+        return None;
+    }
+    let envelope: TaggedVectorOuter = serde_json::from_str(s).ok()?;
+    let bytes = match hex::decode(&envelope.iris_vector.components) {
+        Ok(b) => b,
+        Err(e) => return Some(Err(Error::Runtime(format!("invalid vector hex: {e}")))),
+    };
+    let vector = match yydb::Vector::from_le_bytes(&bytes) {
+        Ok(v) => v,
+        Err(e) => return Some(Err(Error::Runtime(format!("invalid vector payload: {e}")))),
+    };
+    if vector.dim != envelope.iris_vector.dimension {
+        return Some(Err(Error::Runtime(format!(
+            "vector dimension mismatch: envelope says {} but payload says {}",
+            envelope.iris_vector.dimension, vector.dim
+        ))));
+    }
+    Some(Ok(vector))
 }
 
 // ---------------------------------------------------------------------------
@@ -277,9 +330,12 @@ impl YydbSource {
     ///
     /// Typed `bytes` parameters move their octets into the column through
     /// YYDB's own binding, so no text form of the payload is ever decoded.
+    /// `vector` and `file` payloads are carried as a tagged JSON string inside
+    /// `Iris::Value::Str` and stripped back to their native YYDB variants
+    /// here.
     ///
     /// Returns `Err` when the result set contains a YYDB variant Iris cannot
-    /// faithfully represent (`Vector`, `Object` CAS handle, or `File` manifest).
+    /// faithfully represent — currently only the CAS `Object` handle.
     pub fn query_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
         let named = value_params_to_yydb(named)?;
@@ -390,7 +446,7 @@ impl PreparedVos {
     /// Execute with named parameter bindings.
     ///
     /// Returns `Err` when the result set contains a YYDB variant Iris cannot
-    /// faithfully represent (`Vector`, `Object` CAS handle, or `File` manifest).
+    /// faithfully represent — currently only the CAS `Object` handle.
     pub fn execute_with_params(&self, source: &YydbSource, named: BTreeMap<String, yydb::Value>) -> Result<Vec<iris_types::Row>> {
         source.require_vos_executor()?;
         let handshake = source.schema_handshake()?;
@@ -411,8 +467,12 @@ impl PreparedVos {
 
 /// Convert Iris typed parameter values into the YYDB binding map.
 ///
-/// `bytes` stays octets end to end. Nested objects are rejected: YYDB binds a
-/// scalar per `$name` slot and has no text form for one.
+/// `bytes` stays octets end to end. `vector` and `file` payloads arrive as a
+/// tagged JSON string inside `Iris::Value::Str` — the discriminant key is
+/// stripped here and the original YYDB variant reconstructed. Plain text that
+/// does not carry our envelope keys keeps flowing as `YydbValue::Text`.
+/// Nested objects are rejected: YYDB binds a scalar per `$name` slot and
+/// has no text form for one.
 pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Result<BTreeMap<String, YydbValue>> {
     let mut out = BTreeMap::new();
     for (name, value) in named {
@@ -423,6 +483,9 @@ pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Resu
             iris_types::Value::Str(s) => {
                 if let Some(Ok(cm)) = chunk_manifest_from_string(s) {
                     YydbValue::File(cm)
+                }
+                else if let Some(Ok(vec)) = vector_from_string(s) {
+                    YydbValue::Vector(vec)
                 }
                 else {
                     YydbValue::Text(s.clone())
@@ -449,11 +512,15 @@ pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Resu
 /// round-trip through their canonical ISO text form, matching the reverse
 /// mapping in [`value_params_to_yydb`].
 ///
-/// Returns `Err` for variants Iris Phase 1 does not model — `Vector`, the
-/// CAS `ObjectRef`, and the chunked `File` manifest — so callers cannot
-/// silently read a column as `Null`. Code that needs full fidelity should
-/// work directly with the YYDB `yydb::Value` via the `connection()` escape
-/// hatch.
+/// `file` and `vector` payloads serialise into their tagged JSON form and
+/// ride inside `Iris::Value::Str` — Iris Phase 1 has no dedicated variant
+/// for either, but callers that need full fidelity can still reconstruct the
+/// original YYDB value via the same tag keys.
+///
+/// Returns `Err` for variants Iris Phase 1 does not model — the CAS `Object`
+/// handle — so callers cannot silently read a column as `Null`. Code that
+/// needs full fidelity should work directly with the YYDB `yydb::Value` via
+/// the `connection()` escape hatch.
 pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
     match v {
         YydbValue::Null => Ok(iris_types::Value::Null),
@@ -475,11 +542,7 @@ pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
             }
             Ok(iris_types::Value::Object(out))
         }
-        YydbValue::Vector(_) => Err(Error::Runtime(
-            "YYDB returned a `vector` value which Iris Phase 1 does not model. \
-             Use the `connection()` escape hatch for full fidelity access."
-                .into(),
-        )),
+        YydbValue::Vector(vec) => Ok(iris_types::Value::Str(vector_to_string(&vec)?)),
         YydbValue::Object(_) => Err(Error::Runtime(
             "YYDB returned a CAS `object` handle which Iris Phase 1 does not model. \
              Use the `connection()` escape hatch for full fidelity access."
@@ -498,7 +561,7 @@ pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
 /// Convert a YYDB query row to an Iris row.
 ///
 /// Returns `Err` when any cell contains a YYDB variant Iris cannot faithfully
-/// represent (`Vector`, `Object` CAS handle, or `File` manifest).
+/// represent — currently only the CAS `Object` handle.
 pub fn row_from_yydb(row: BTreeMap<String, YydbValue>) -> Result<iris_types::Row> {
     let mut out = BTreeMap::new();
     for (k, v) in row {
