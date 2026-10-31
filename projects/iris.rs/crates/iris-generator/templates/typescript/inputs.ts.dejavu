@@ -110,7 +110,7 @@ export type SelectPathFor<E extends EntityName> = {
  * operators just because the carrier is `string`.
  */
 export type WherePathFor<E extends EntityName> = {
-    [K in keyof EntityByName[E] as K extends keyof WhereInputByName[E] ? K : never]?: WhereInputByName[E][K];
+    [K in keyof EntityByName[E] as K extends keyof WhereInputByName[E] ? K : never]?: WhereInputByName[E][Extract<K, keyof WhereInputByName[E]>];
 };
 
 /**
