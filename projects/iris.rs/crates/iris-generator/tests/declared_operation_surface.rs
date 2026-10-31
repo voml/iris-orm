@@ -107,7 +107,7 @@ fn generation_model_json(kind: &str) -> Value {
 fn unknown_operation_kind_is_rejected_at_generation() {
     let model: GenerationModel = serde_json::from_value(generation_model_json("subscription")).expect("model decodes");
     for target in ["rust", "typescript"] {
-        let error = emit_target_files(&model, target).expect_err("unsupported operation kind must fail");
+        let error = emit_target_files(&model, target, Some("mysql")).expect_err("unsupported operation kind must fail");
         assert!(matches!(error, Error::UnsupportedOperationKind { ref kind, .. } if kind == "subscription"), "{target}: {error}");
     }
 }
@@ -115,8 +115,8 @@ fn unknown_operation_kind_is_rejected_at_generation() {
 #[test]
 fn declared_operation_kind_is_accepted() {
     let model: GenerationModel = serde_json::from_value(generation_model_json("query")).expect("model decodes");
-    assert!(emit_target_files(&model, "rust").is_ok());
-    assert!(emit_target_files(&model, "typescript").is_ok());
+    assert!(emit_target_files(&model, "rust", Some("mysql")).is_ok());
+    assert!(emit_target_files(&model, "typescript", None).is_ok());
 }
 
 #[test]
@@ -142,11 +142,11 @@ fn bytes_operation_types_cross_as_the_vos_carrier() {
         json!({ "named": ["bytes"] }),
     )]);
 
-    let rust = emit_target_files(&model, "rust").expect("rust target");
+    let rust = emit_target_files(&model, "rust", Some("mysql")).expect("rust target");
     let operations = target_file(&rust, "operations.rs");
     assert!(operations.contains("fn store_blob(payload: Vec<u8>) -> Vec<u8>"), "`bytes` must cross as raw octets, never text:\n{operations}");
 
-    let typescript = emit_target_files(&model, "typescript").expect("typescript target");
+    let typescript = emit_target_files(&model, "typescript", None).expect("typescript target");
     let operations = target_file(&typescript, "operations.ts");
     assert!(
         operations.contains("async store_blob(payload: Uint8Array): Promise<Uint8Array>"),
@@ -164,14 +164,14 @@ fn optional_bytes_operation_type_keeps_the_declared_optionality() {
         json!({ "optional": { "named": ["bytes"] } }),
     )]);
 
-    let rust = emit_target_files(&model, "rust").expect("rust target");
+    let rust = emit_target_files(&model, "rust", Some("mysql")).expect("rust target");
     let operations = target_file(&rust, "operations.rs");
     assert!(
         operations.contains("fn store_optional_blob(payload: Option<Vec<u8>>) -> Option<Vec<u8>>"),
         "an optional `bytes` type must stay optional in Rust:\n{operations}"
     );
 
-    let typescript = emit_target_files(&model, "typescript").expect("typescript target");
+    let typescript = emit_target_files(&model, "typescript", None).expect("typescript target");
     let operations = target_file(&typescript, "operations.ts");
     assert!(
         operations.contains("async store_optional_blob(payload: Uint8Array): Promise<Uint8Array>"),
@@ -197,12 +197,12 @@ fn vector_parameter_and_return_use_native_carrier() {
     assert_eq!(op.params[0].vos_type, "vector");
     assert_eq!(op.params[0].ts_type, "Float32Array");
 
-    let rust_files = emit_target_files(&model, "rust").expect("rust must generate");
+    let rust_files = emit_target_files(&model, "rust", Some("mysql")).expect("rust must generate");
     let rust_ops = target_file(&rust_files, "operations.rs");
     assert!(rust_ops.contains("embedding: Vec<f32>"), "Rust param carrier must be `Vec<f32>`:\n{rust_ops}");
     assert!(rust_ops.contains("-> Vec<f32>"), "Rust return carrier must be `Vec<f32>`:\n{rust_ops}");
 
-    let ts_files = emit_target_files(&model, "typescript").expect("typescript must generate");
+    let ts_files = emit_target_files(&model, "typescript", None).expect("typescript must generate");
     let ts_ops = target_file(&ts_files, "operations.ts");
     assert!(ts_ops.contains("embedding: Float32Array"), "TS param carrier must be `Float32Array`:\n{ts_ops}");
     assert!(ts_ops.contains("Promise<Float32Array>"), "TS return carrier must be `Promise<Float32Array>`:\n{ts_ops}");
@@ -240,12 +240,12 @@ fn file_parameter_and_return_use_native_carrier() {
     assert!(op.params[0].ts_type.contains("readonly octets: bigint"), "{}", op.params[0].ts_type);
     assert!(op.params[0].ts_type.contains("readonly manifest: { readonly hash: string; readonly size: bigint }"), "{}", op.params[0].ts_type);
 
-    let rust_files = emit_target_files(&model, "rust").expect("rust must generate");
+    let rust_files = emit_target_files(&model, "rust", Some("mysql")).expect("rust must generate");
     let rust_ops = target_file(&rust_files, "operations.rs");
     assert!(rust_ops.contains("photo: iris::FileDescriptor"), "Rust param carrier must be `iris::FileDescriptor`:\n{rust_ops}");
     assert!(rust_ops.contains("-> iris::FileDescriptor"), "Rust return carrier must be `iris::FileDescriptor`:\n{rust_ops}");
 
-    let ts_files = emit_target_files(&model, "typescript").expect("typescript must generate");
+    let ts_files = emit_target_files(&model, "typescript", None).expect("typescript must generate");
     let ts_ops = target_file(&ts_files, "operations.ts");
     assert!(
         ts_ops.contains("photo: { readonly digest: string; readonly octets: bigint;"),
@@ -302,7 +302,7 @@ table Doc {
 }
 "#;
     let model = GenerationModel::from_vos_schema(UNIT_FIELD_SCHEMA).expect("model");
-    let error = emit_target_files(&model, "typescript").expect_err("a label without a filter type must fail");
+    let error = emit_target_files(&model, "typescript", None).expect_err("a label without a filter type must fail");
     assert!(
         matches!(
             error,

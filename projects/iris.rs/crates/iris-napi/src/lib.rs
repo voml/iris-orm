@@ -106,9 +106,12 @@ pub struct GenerateResult {
 }
 
 /// Generate client bindings (`rust` | `typescript`) from merged schema source.
+///
+/// `datasource` is required for the `rust` target and selects the adapter
+/// binding for the generated client; the `typescript` target ignores it.
 #[napi]
-pub fn generate(source: String, target: String, out_dir: String) -> Result<GenerateResult> {
-    match iris_generator::generate_from_source(&source, &target, Path::new(&out_dir)) {
+pub fn generate(source: String, target: String, out_dir: String, datasource: Option<String>) -> Result<GenerateResult> {
+    match iris_generator::generate_from_source(&source, &target, Path::new(&out_dir), datasource.as_deref()) {
         Ok((model, paths)) => {
             let output_path = match target.as_str() {
                 "rust" => iris_generator::rust_target_dir(Path::new(&out_dir)).display().to_string(),
@@ -138,9 +141,12 @@ pub fn generate(source: String, target: String, out_dir: String) -> Result<Gener
 /// `contract_json` is a resolved VOS contract artifact, `operations_json` is a
 /// VOS operation projection artifact. Skips source parsing and identity
 /// allocation when the caller already holds both artifacts.
+///
+/// `datasource` is required for the `rust` target and selects the adapter
+/// binding for the generated client; the `typescript` target ignores it.
 #[napi]
-pub fn generate_from_artifacts(contract_json: String, operations_json: String, target: String, out_dir: String) -> Result<GenerateResult> {
-    match iris_generator::generate_from_artifacts(&contract_json, &operations_json, &target, Path::new(&out_dir)) {
+pub fn generate_from_artifacts(contract_json: String, operations_json: String, target: String, out_dir: String, datasource: Option<String>) -> Result<GenerateResult> {
+    match iris_generator::generate_from_artifacts(&contract_json, &operations_json, &target, Path::new(&out_dir), datasource.as_deref()) {
         Ok((model, paths)) => {
             let output_path = match target.as_str() {
                 "rust" => iris_generator::rust_target_dir(Path::new(&out_dir)).display().to_string(),

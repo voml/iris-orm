@@ -1,42 +1,42 @@
 use std::collections::BTreeMap;
 
 use iris::{Planner, Row, RowWrite, Value};
-use iris_adapter_mysql::MysqlSource;
-use super::errors::Result as MysqlResult;
+use <% datasource.adapter_crate %>::<% datasource.source_type %>;
+use super::errors::Result as <% datasource.result_alias %>;
 use super::models::{escape_vos_str, *};
 
 // --- Thin generated client (TS-parity shim; not knife-B GeneratedCall) ---------
 // Prefer these delegates over hand-written VOS strings / RowWrite. Escape hatch:
 // `Db::query` / `Db::execute` (aligns with Session::query / db.$query).
 // `transaction` / `with_rollback` give a `Txn` with the same CRUD surface;
-// the connection is held by Iris — do not call MysqlSource checkout APIs from `f`.
+// the connection is held by Iris — do not call <% datasource.source_type %> checkout APIs from `f`.
 
-/// Generated Iris client bound to a MySQL adapter.
+/// Generated Iris client bound to a `<% datasource.kind %>` adapter.
 pub struct Db<'a> {
-    source: &'a MysqlSource,
+    source: &'a <% datasource.source_type %>,
     planner: Planner,
 }
 
 impl<'a> Db<'a> {
-    /// Bind to an open [`MysqlSource`].
-    pub fn new(source: &'a MysqlSource) -> Self {
+    /// Bind to an open [`<% datasource.source_type %>`].
+    pub fn new(source: &'a <% datasource.source_type %>) -> Self {
         Self {
             source,
-            planner: Planner::new(MysqlSource::capabilities()),
+            planner: Planner::new(<% datasource.source_type %>::capabilities()),
         }
     }
 
     /// Escape hatch: plan + execute VOS DML (returns rows). Prefer typed delegates.
-    pub fn query(&self, source: &str) -> MysqlResult<Vec<Row>> {
+    pub fn query(&self, source: &str) -> <% datasource.result_alias %><Vec<Row>> {
         let plan = self
             .planner
             .plan_source(source)
-            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+            .map_err(|e| <% datasource.adapter_crate %>::Error::Policy(e.to_string()))?;
         self.source.execute_plan(&plan)
     }
 
     /// Escape hatch: unit-valued / DDL-shaped VOS.
-    pub fn execute(&self, source: &str) -> MysqlResult<()> {
+    pub fn execute(&self, source: &str) -> <% datasource.result_alias %><()> {
         let _ = self.query(source)?;
         Ok(())
     }
@@ -44,8 +44,8 @@ impl<'a> Db<'a> {
     /// Commit-on-success transaction. Use [`Txn`] inside `f` (same CRUD names as [`Db`]).
     pub fn transaction<R>(
         &self,
-        f: impl FnOnce(&mut Txn<'_>) -> MysqlResult<R>,
-    ) -> MysqlResult<R> {
+        f: impl FnOnce(&mut Txn<'_>) -> <% datasource.result_alias %><R>,
+    ) -> <% datasource.result_alias %><R> {
         self.source.transaction(|conn| {
             let mut txn = Txn {
                 source: self.source,
@@ -59,8 +59,8 @@ impl<'a> Db<'a> {
     /// Always `ROLLBACK` — shared-DB integration tests (fixtures leave no residue).
     pub fn with_rollback<R>(
         &self,
-        f: impl FnOnce(&mut Txn<'_>) -> MysqlResult<R>,
-    ) -> MysqlResult<R> {
+        f: impl FnOnce(&mut Txn<'_>) -> <% datasource.result_alias %><R>,
+    ) -> <% datasource.result_alias %><R> {
         self.source.with_rollback(|conn| {
             let mut txn = Txn {
                 source: self.source,
@@ -79,23 +79,23 @@ impl<'a> Db<'a> {
 
 /// Transaction handle: same CRUD names as [`Db`]; Iris holds one connection for the closure.
 pub struct Txn<'a> {
-    source: &'a MysqlSource,
+    source: &'a <% datasource.source_type %>,
     planner: &'a Planner,
-    conn: &'a mut iris_adapter_mysql::PooledConn,
+    conn: &'a mut <% datasource.adapter_crate %>::<% datasource.conn_type %>,
 }
 
 impl Txn<'_> {
     /// Escape hatch while the transaction connection is held.
-    pub fn query(&mut self, source: &str) -> MysqlResult<Vec<Row>> {
+    pub fn query(&mut self, source: &str) -> <% datasource.result_alias %><Vec<Row>> {
         let plan = self
             .planner
             .plan_source(source)
-            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+            .map_err(|e| <% datasource.adapter_crate %>::Error::Policy(e.to_string()))?;
         self.source.execute_plan_on(self.conn, &plan)
     }
 
     /// Unit-valued escape hatch while the transaction connection is held.
-    pub fn execute(&mut self, source: &str) -> MysqlResult<()> {
+    pub fn execute(&mut self, source: &str) -> <% datasource.result_alias %><()> {
         let _ = self.query(source)?;
         Ok(())
     }
@@ -119,79 +119,79 @@ impl <% table.name %>Delegate<'_> {
 <% table.synthesize_fns %>
 <% table.row_write_fn %>
     /// Find many rows matching a flat where.
-    pub fn find_many(&self, where_: &<% table.name %>Where) -> MysqlResult<Vec<<% table.name %>>> {
+    pub fn find_many(&self, where_: &<% table.name %>Where) -> <% datasource.result_alias %><Vec<<% table.name %>>> {
         let source = Self::synthesize_find_many(where_);
         let rows = self.db.query(&source)?;
         Ok(rows.iter().filter_map(<% table.name %>::from_row).collect())
     }
 
     /// Find at most one row (adds `.take(1)`).
-    pub fn find_unique(&self, where_: &<% table.name %>Where) -> MysqlResult<Option<<% table.name %>>> {
+    pub fn find_unique(&self, where_: &<% table.name %>Where) -> <% datasource.result_alias %><Option<<% table.name %>>> {
         let source = Self::synthesize_find_unique(where_);
         let rows = self.db.query(&source)?;
         Ok(rows.first().and_then(<% table.name %>::from_row))
     }
 
     /// Insert a row.
-    pub fn insert(&self, row: &<% table.name %>) -> MysqlResult<()> {
+    pub fn insert(&self, row: &<% table.name %>) -> <% datasource.result_alias %><()> {
         self.db.source.insert(&Self::to_row_write(row))
     }
 
     /// Update by primary key.
-    pub fn update(&self, row: &<% table.name %>) -> MysqlResult<u64> {
+    pub fn update(&self, row: &<% table.name %>) -> <% datasource.result_alias %><u64> {
         self.db.source.update(&Self::to_row_write(row))
     }
 
     /// Delete by primary key.
-    pub fn delete(&self, key: &Value) -> MysqlResult<u64> {
+    pub fn delete(&self, key: &Value) -> <% datasource.result_alias %><u64> {
         self.db.source.delete("<% table.name %>", "<% table.primary_key %>", key)
     }
 }
 
 /// Table delegate for `<% table.name %>` while a [`Txn`] holds the connection.
 pub struct <% table.name %>TxnDelegate<'a> {
-    source: &'a MysqlSource,
+    source: &'a <% datasource.source_type %>,
     planner: &'a Planner,
-    conn: &'a mut iris_adapter_mysql::PooledConn,
+    conn: &'a mut <% datasource.adapter_crate %>::<% datasource.conn_type %>,
 }
 
 impl <% table.name %>TxnDelegate<'_> {
     /// Find many rows matching a flat where.
-    pub fn find_many(&mut self, where_: &<% table.name %>Where) -> MysqlResult<Vec<<% table.name %>>> {
+    pub fn find_many(&mut self, where_: &<% table.name %>Where) -> <% datasource.result_alias %><Vec<<% table.name %>>> {
         let source = <% table.name %>Delegate::synthesize_find_many(where_);
         let plan = self
             .planner
             .plan_source(&source)
-            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+            .map_err(|e| <% datasource.adapter_crate %>::Error::Policy(e.to_string()))?;
         let rows = self.source.execute_plan_on(self.conn, &plan)?;
         Ok(rows.iter().filter_map(<% table.name %>::from_row).collect())
     }
 
     /// Find at most one row (adds `.take(1)`).
-    pub fn find_unique(&mut self, where_: &<% table.name %>Where) -> MysqlResult<Option<<% table.name %>>> {
+    pub fn find_unique(&mut self, where_: &<% table.name %>Where) -> <% datasource.result_alias %><Option<<% table.name %>>> {
         let source = <% table.name %>Delegate::synthesize_find_unique(where_);
         let plan = self
             .planner
             .plan_source(&source)
-            .map_err(|e| iris_adapter_mysql::Error::Policy(e.to_string()))?;
+            .map_err(|e| <% datasource.adapter_crate %>::Error::Policy(e.to_string()))?;
         let rows = self.source.execute_plan_on(self.conn, &plan)?;
         Ok(rows.first().and_then(<% table.name %>::from_row))
     }
 
     /// Insert a row.
-    pub fn insert(&mut self, row: &<% table.name %>) -> MysqlResult<()> {
+    pub fn insert(&mut self, row: &<% table.name %>) -> <% datasource.result_alias %><()> {
         self.source
             .insert_on(self.conn, &<% table.name %>Delegate::to_row_write(row))
     }
 
     /// Update by primary key.
-    pub fn update(&mut self, row: &<% table.name %>) -> MysqlResult<u64> {
+    pub fn update(&mut self, row: &<% table.name %>) -> <% datasource.result_alias %><u64> {
         self.source
             .update_on(self.conn, &<% table.name %>Delegate::to_row_write(row))
     }
 
     /// Delete by primary key.
-    pub fn delete(&mut self, key: &Value) -> MysqlResult<u64> {
+    pub fn delete(&mut self, key: &Value) -> <% datasource.result_alias %><u64> {
         self.source.delete_on(self.conn, "<% table.name %>", "<% table.primary_key %>", key)
     }
 }

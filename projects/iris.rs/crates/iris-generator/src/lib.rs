@@ -93,6 +93,12 @@ pub enum Error {
     /// Unsupported generate target.
     #[error("unsupported generate target `{0}` (use rust or typescript)")]
     UnsupportedTarget(String),
+    /// Rust client target requested without a datasource kind to bind against.
+    #[error("rust client generation requires a datasource kind (the adapter binding is chosen per datasource)")]
+    MissingDatasource,
+    /// Datasource kind whose adapter surface has not converged for a Rust client binding.
+    #[error("datasource `{0}` has no converged Rust adapter binding (only `mysql` is bound; sqlite/postgres/redis/yydb/yyds/reference adapter surfaces have not converged)")]
+    UnsupportedDatasource(String),
     /// Two VOS fields map to the same TypeScript author name.
     #[error("TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`")]
     NamingCollision {
@@ -558,8 +564,8 @@ fn rust_file_header(model: &GenerationModel) -> Result<String> {
 }
 
 /// Emit Rust domain + client as a single string (tests / inspection).
-pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
-    let files = emit_rust_files(model)?;
+pub fn emit_rust_domain(model: &GenerationModel, datasource: &str) -> Result<String> {
+    let files = emit_rust_files(model, datasource)?;
     let mut combined = String::new();
     for (name, content) in files {
         combined.push_str(&format!("\n// ===== {name} =====\n"));
@@ -569,9 +575,9 @@ pub fn emit_rust_domain(model: &GenerationModel) -> Result<String> {
 }
 
 /// Emit Rust target files: `mod` / `models` / `operations` / `metadata` / `errors`.
-pub fn emit_rust_files(model: &GenerationModel) -> Result<Vec<(String, String)>> {
+pub fn emit_rust_files(model: &GenerationModel, datasource: &str) -> Result<Vec<(String, String)>> {
     model.validate_operation_surface()?;
-    let ctx = model.rust_template_context()?;
+    let ctx = model.rust_template_context(datasource)?;
     let header = rust_file_header(model)?;
     let structs = unescape_rust_template(&render("rust/domain_mod", &model.to_json())?);
     let helpers = render("rust/models_helpers", &ctx)?;
@@ -619,15 +625,18 @@ fn write_files_atomic(root: &std::path::Path, files: Vec<(String, String)>) -> R
 }
 
 /// Write Rust bindings into `{generate_root}/rust/`.
-pub fn write_rust_domain(model: &GenerationModel, generate_root: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
+pub fn write_rust_domain(model: &GenerationModel, datasource: &str, generate_root: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
     let root = rust_target_dir(generate_root);
-    write_files_atomic(&root, emit_rust_files(model)?)
+    write_files_atomic(&root, emit_rust_files(model, datasource)?)
 }
 
 /// Generate bindings for `target` (`rust` | `typescript`) under `generate_root`.
-pub fn generate(model: &GenerationModel, target: &str, generate_root: &std::path::Path) -> Result<Vec<std::path::PathBuf>> {
+///
+/// The `rust` target binds the generated client to one datasource kind; the
+/// binding table only covers adapter surfaces that have converged.
+pub fn generate(model: &GenerationModel, target: &str, generate_root: &std::path::Path, datasource: Option<&str>) -> Result<Vec<std::path::PathBuf>> {
     match target {
-        "rust" => write_rust_domain(model, generate_root),
+        "rust" => write_rust_domain(model, datasource.ok_or(Error::MissingDatasource)?, generate_root),
         "typescript" | "ts" => write_typescript_client(model, generate_root),
         other => Err(typescript::unsupported_target(other)),
     }
@@ -635,18 +644,18 @@ pub fn generate(model: &GenerationModel, target: &str, generate_root: &std::path
 
 /// Emit target file contents from a `GenerationModel` without writing to the
 /// filesystem (used by WASM / in-memory hosts).
-pub fn emit_target_files(model: &GenerationModel, target: &str) -> Result<Vec<(String, String)>> {
+pub fn emit_target_files(model: &GenerationModel, target: &str, datasource: Option<&str>) -> Result<Vec<(String, String)>> {
     match target {
-        "rust" => emit_rust_files(model),
+        "rust" => emit_rust_files(model, datasource.ok_or(Error::MissingDatasource)?),
         "typescript" | "ts" => emit_typescript_client(model),
         other => Err(typescript::unsupported_target(other)),
     }
 }
 
 /// Parse schema source and generate bindings for `target`.
-pub fn generate_from_source(source: &str, target: &str, generate_root: &std::path::Path) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
+pub fn generate_from_source(source: &str, target: &str, generate_root: &std::path::Path, datasource: Option<&str>) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
     let model = GenerationModel::from_vos_schema(source)?;
-    let paths = generate(&model, target, generate_root)?;
+    let paths = generate(&model, target, generate_root, datasource)?;
     Ok((model, paths))
 }
 
@@ -661,9 +670,10 @@ pub fn generate_from_artifacts(
     operations_json: &str,
     target: &str,
     generate_root: &std::path::Path,
+    datasource: Option<&str>,
 ) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
     let model = GenerationModel::from_artifacts(contract_json, operations_json)?;
-    let paths = generate(&model, target, generate_root)?;
+    let paths = generate(&model, target, generate_root, datasource)?;
     Ok((model, paths))
 }
 
@@ -672,9 +682,9 @@ pub fn generate_from_artifacts(
 ///
 /// Returns `(model, files)` where each `(filename, content)` pair is one
 /// generated artifact.
-pub fn emit_from_artifacts(contract_json: &str, operations_json: &str, target: &str) -> Result<(GenerationModel, Vec<(String, String)>)> {
+pub fn emit_from_artifacts(contract_json: &str, operations_json: &str, target: &str, datasource: Option<&str>) -> Result<(GenerationModel, Vec<(String, String)>)> {
     let model = GenerationModel::from_artifacts(contract_json, operations_json)?;
-    let files = emit_target_files(&model, target)?;
+    let files = emit_target_files(&model, target, datasource)?;
     Ok((model, files))
 }
 

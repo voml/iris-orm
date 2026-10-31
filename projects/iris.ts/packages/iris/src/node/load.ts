@@ -91,19 +91,20 @@ function loadModule(specifier: string): IrisNodeBindings {
                     (module.materializeRuntimeProject as (d: string, j: string) => string)(projectDir, documentJson),
                 ),
             readSchema: (projectRoot, schemaGlob) => String((module.readSchema as (r: string, g: string) => string)(projectRoot, schemaGlob)),
-            generate: (source, target, outDir) =>
-                (module.generate as (s: string, t: string, o: string) => GenerateResult)(source, target, outDir),
+            generate: (source, target, outDir, datasource) =>
+                (module.generate as (s: string, t: string, o: string, d?: string) => GenerateResult)(source, target, outDir, datasource),
             generateFromArtifacts:
                 typeof module.generateFromArtifacts === "function"
-                    ? (contractJson, operationsJson, target, outDir) =>
+                    ? (contractJson, operationsJson, target, outDir, datasource) =>
                           (
                               module.generateFromArtifacts as (
                                   c: string,
                                   op: string,
                                   t: string,
                                   o: string,
+                                  d?: string,
                               ) => GenerateResult
-                          )(contractJson, operationsJson, target, outDir)
+                          )(contractJson, operationsJson, target, outDir, datasource)
                     : // Backfill for older native builds that only expose `generate`.
                       // Hosts with resolved artifacts must bundle a compatible native
                       // build; we fail fast here rather than silently corrupting output.

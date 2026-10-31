@@ -111,7 +111,7 @@ fn generate_dispatch_typescript_target() {
     let dir = std::env::temp_dir()
         .join(format!("iris-ts-dispatch-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
-    let (_, paths) = iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root).expect("generate");
+    let (_, paths) = iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root, None).expect("generate");
     assert_eq!(paths.len(), 13);
     assert!(paths.iter().all(|path| path.starts_with(&root)));
     assert!(paths.iter().any(|path| path.file_name().is_some_and(|name| name == "metadata.ts")));
@@ -228,7 +228,7 @@ table User {
 
 #[test]
 fn generate_rejects_unknown_target() {
-    let err = iris_generator::generate_from_source(USER_SCHEMA, "kotlin", Path::new(".")).unwrap_err();
+    let err = iris_generator::generate_from_source(USER_SCHEMA, "kotlin", Path::new("."), None).unwrap_err();
     assert!(err.to_string().contains("kotlin"));
 }
 

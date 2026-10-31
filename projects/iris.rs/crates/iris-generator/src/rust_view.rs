@@ -30,19 +30,48 @@ pub(crate) struct RustUuidField {
     field: String,
 }
 
+/// Rust adapter binding for one datasource kind whose adapter surface has converged.
+#[derive(Debug, Clone, Serialize)]
+struct RustDatasourceBindingView {
+    kind: String,
+    adapter_crate: &'static str,
+    source_type: &'static str,
+    conn_type: &'static str,
+    result_alias: &'static str,
+}
+
+/// Resolve the Rust client adapter binding for a datasource kind.
+///
+/// Only `mysql` has a converged adapter surface (checkout pools, `_on` variants,
+/// `with_rollback`). `sqlite` / `postgres` / `redis` / `yydb` / `yyds` / `reference`
+/// fail closed until their adapter surfaces converge on the same shape.
+fn rust_datasource_binding(kind: &str) -> Result<RustDatasourceBindingView> {
+    match kind {
+        "mysql" => Ok(RustDatasourceBindingView {
+            kind: kind.to_owned(),
+            adapter_crate: "iris_adapter_mysql",
+            source_type: "MysqlSource",
+            conn_type: "PooledConn",
+            result_alias: "MysqlResult",
+        }),
+        other => Err(Error::UnsupportedDatasource(other.to_owned())),
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct RustTemplateContext {
     generator_version: String,
     schema_fingerprint: String,
+    datasource: RustDatasourceBindingView,
     tables: Vec<TableModel>,
     tables_view: Vec<RustTableView>,
     uuid_fields: Vec<RustUuidField>,
 }
 
 impl GenerationModel {
-    /// JSON context for Rust `.dejavu` templates.
-    pub fn rust_template_context(&self) -> Result<Value> {
-        Ok(serde_json::to_value(build_rust_context(self)?).expect("RustTemplateContext serializes"))
+    /// JSON context for Rust `.dejavu` templates, bound to one datasource kind.
+    pub fn rust_template_context(&self, datasource: &str) -> Result<Value> {
+        Ok(serde_json::to_value(build_rust_context(self, datasource)?).expect("RustTemplateContext serializes"))
     }
 }
 
@@ -50,7 +79,8 @@ pub(crate) fn build_rust_table_views(model: &GenerationModel) -> Result<Vec<Rust
     model.tables.iter().map(build_rust_table_view).collect()
 }
 
-fn build_rust_context(model: &GenerationModel) -> Result<RustTemplateContext> {
+fn build_rust_context(model: &GenerationModel, datasource: &str) -> Result<RustTemplateContext> {
+    let datasource_binding = rust_datasource_binding(datasource)?;
     let tables_view = build_rust_table_views(model)?;
     let uuid_fields = model
         .tables
@@ -63,6 +93,7 @@ fn build_rust_context(model: &GenerationModel) -> Result<RustTemplateContext> {
     Ok(RustTemplateContext {
         generator_version: model.generator_version.clone(),
         schema_fingerprint: model.schema_fingerprint.clone(),
+        datasource: datasource_binding,
         tables: model.tables.clone(),
         tables_view,
         uuid_fields,

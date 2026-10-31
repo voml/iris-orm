@@ -73,13 +73,20 @@ export type IrisNodeBindings = IrisBindings & {
     loadProject(configPath: string): LoadProjectResult;
     materializeRuntimeProject(projectDir: string, documentJson: string): string;
     readSchema(projectRoot: string, schemaGlob: string): string;
-    generate(source: string, target: string, outDir: string): GenerateResult;
+    /** `datasource` selects the adapter binding for the `rust` target and is ignored by `typescript`. */
+    generate(
+        source: string,
+        target: string,
+        outDir: string,
+        datasource?: string,
+    ): GenerateResult;
     /** Route B variant: generate from pre-resolved VOS artifacts instead of source text. */
     generateFromArtifacts(
         contractJson: string,
         operationsJson: string,
         target: string,
         outDir: string,
+        datasource?: string,
     ): GenerateResult;
     migratePlanCmd(configPath: string, source: string, outDir?: string | null): MigratePlanResult;
     migrateRunCmd ? (

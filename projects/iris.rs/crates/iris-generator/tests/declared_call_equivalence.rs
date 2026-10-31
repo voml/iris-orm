@@ -181,7 +181,7 @@ fn generated_calls_bind_parameters_positionally_in_declared_order() {
 
 #[test]
 fn rust_stubs_carry_the_same_declared_operation_identity() {
-    let files = emit_rust_files(&model()).expect("emit");
+    let files = emit_rust_files(&model(), "mysql").expect("emit");
     let ops = typescript_file(&files, "operations.rs");
 
     for (name, operation_id) in [("get_user", GET_USER), ("hash_password", HASH_PASSWORD), ("seed_user", SEED_USER), ("label_user", LABEL_USER)]

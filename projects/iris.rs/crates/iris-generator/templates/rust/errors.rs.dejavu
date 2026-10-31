@@ -1,1 +1,1 @@
-pub use iris_adapter_mysql::{Error, Result};
+pub use <% datasource.adapter_crate %>::{Error, Result};
