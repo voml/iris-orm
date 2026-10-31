@@ -45,7 +45,7 @@ fn typescript_emit_writes_ux_layout() {
         .join(format!("iris-ts-gen-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let paths = write_typescript_client(&model, &root).expect("write");
-    assert_eq!(paths.len(), 13);
+    assert_eq!(paths.len(), 12);
     assert!(root.join("index.ts").is_file());
     assert!(root.join("models.ts").is_file());
     assert!(root.join("operations.ts").is_file());
@@ -112,7 +112,7 @@ fn generate_dispatch_typescript_target() {
         .join(format!("iris-ts-dispatch-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
     let root = dir.join("generated/iris");
     let (_, paths) = iris_generator::generate_from_source(USER_SCHEMA, "typescript", &root, None).expect("generate");
-    assert_eq!(paths.len(), 13);
+    assert_eq!(paths.len(), 12);
     assert!(paths.iter().all(|path| path.starts_with(&root)));
     assert!(paths.iter().any(|path| path.file_name().is_some_and(|name| name == "metadata.ts")));
     let _ = std::fs::remove_dir_all(dir);
@@ -149,7 +149,7 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
 fn typescript_emit_compact_layout_for_all_files() {
     let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
     let files = iris_generator::emit_typescript_client(&model).expect("emit");
-    assert_eq!(files.len(), 13);
+    assert_eq!(files.len(), 12);
     for (name, content) in &files {
         assert_compact_ts_layout(name, content);
     }
@@ -272,11 +272,6 @@ fn typescript_emit_keeps_vos_types_distinct_through_carriers() {
     assert!(metadata.contains("payload: \"bytes\""), "{metadata}");
     assert!(metadata.contains("seenAt: \"datetimeUtc\""), "{metadata}");
     assert!(metadata.contains("scoredOn: \"date\""), "`date` must stay distinct from `datetime`: {metadata}");
-
-    let plans = file("_internal/d1-plans.ts");
-    assert!(plans.contains("\"Metric.findMany@p_seq\""), "`i64` filters need a D1 plan: {plans}");
-    assert!(plans.contains("\"Metric.findMany@p_counter\""), "`u64` filters need a D1 plan: {plans}");
-    assert!(plans.contains("\"Metric.findMany@p_payload\""), "`bytes` filters need a D1 plan: {plans}");
 }
 
 #[test]

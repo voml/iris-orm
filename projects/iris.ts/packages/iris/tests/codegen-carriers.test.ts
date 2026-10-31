@@ -45,7 +45,7 @@ async function loadCore(t: { skip: (msg?: string) => void }) {
     }
 }
 
-test("generated client carries `i64` and `bytes` through generation and D1 plans", async (t) => {
+test("generated client carries `i64` and `bytes` through generation", async (t) => {
     const core = await loadCore(t);
     if (!core) {
         return;
@@ -70,8 +70,4 @@ test("generated client carries `i64` and `bytes` through generation and D1 plans
     assert.match(metadata, /seq: "i64"/);
     assert.match(metadata, /payload: "bytes"/);
     assert.match(metadata, /IRIS_VALUE_CARRIERS/);
-
-    const plans = await readFile(join(root, "_internal", "d1-plans.ts"), "utf8");
-    assert.match(plans, /Metric\.findMany@p_seq/);
-    assert.match(plans, /Metric\.findMany@p_payload/);
 });

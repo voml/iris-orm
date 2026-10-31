@@ -59,7 +59,7 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const root = join(outDir, "generated", "iris");
     const result = core.generate(USER_SCHEMA, "typescript", root);
     assert.equal(result.ok, true);
-    assert.equal(result.files.length, 13);
+    assert.equal(result.files.length, 12);
 
     assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris$/);
 
@@ -104,35 +104,9 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
 
     const cloudflareEntry = await readFile(join(root, "cloudflare.ts"), "utf8");
-    assert.match(cloudflareEntry, /@yydb\/iris\/cloudflare/);
-    assert.match(cloudflareEntry, /IRIS_D1_PLANS/);
-    assert.match(cloudflareEntry, /IRIS_FIELD_WIRE_NAMES/);
-    assert.match(cloudflareEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
-
-    const d1Plans = await readFile(join(root, "_internal", "d1-plans.ts"), "utf8");
-    assert.match(d1Plans, /IRIS_D1_PLANS/);
-    assert.match(d1Plans, /User\.findMany/);
-    assert.match(d1Plans, /User\.findMany@p_active/);
-    assert.match(d1Plans, /User\.findMany@p_user_name/);
-    assert.match(d1Plans, /User\.findMany@take/);
-    assert.match(d1Plans, /User\.findMany@p_active,take/);
-    assert.match(d1Plans, /User\.findUnique@p_user_id/);
-    assert.match(d1Plans, /paramOrder: \["p_active"\]/);
-    assert.match(d1Plans, /paramOrder: \["take"\]/);
-    assert.match(d1Plans, /WHERE user_name = \?/);
-    assert.match(d1Plans, /SELECT .* FROM User/);
-    assert.match(d1Plans, /User\.create@data_active,data_user_id,data_user_name/);
-    assert.match(d1Plans, /INSERT INTO User/);
-    assert.match(d1Plans, /RETURNING user_id, user_name, active/);
-    assert.match(d1Plans, /mode: "write-returning"/);
-    assert.match(d1Plans, /paramOrder: \["data_user_id", "data_user_name", "data_active"\]/);
-    assert.match(d1Plans, /User\.create@data_user_id/);
-    assert.match(d1Plans, /User\.delete@p_user_id/);
-    assert.match(d1Plans, /DELETE FROM User WHERE user_id = \?/);
-    assert.match(d1Plans, /mode: "write"/);
-    assert.match(d1Plans, /User\.update@p_user_id,patch_user_name/);
-    assert.match(d1Plans, /UPDATE User SET user_name = \? WHERE user_id = \?/);
-    assert.match(d1Plans, /paramOrder: \["patch_user_name", "p_user_id"\]/);
+    assert.doesNotMatch(cloudflareEntry, /@yydb\/iris/, "edge entry must stay host neutral until the D1 artifact lands");
+    assert.match(cloudflareEntry, /IRIS-D1-EDGE-ARTIFACT-PENDING/);
+    await assert.rejects(readFile(join(root, "_internal", "d1-plans.ts"), "utf8"), "TS-side D1 plan artifact must not be emitted");
 
     const inputs = await readFile(join(root, "inputs.ts"), "utf8");
     assert.match(inputs, /export type StringFilter/);
@@ -316,7 +290,6 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
                 exclude: [
                     "./src/generated/iris/consumer-negative.ts",
                     "./src/generated/iris/node.ts",
-                    "./src/generated/iris/cloudflare.ts",
                 ],
             },
             null,

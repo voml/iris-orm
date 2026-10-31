@@ -60,7 +60,7 @@ test("declared `vector` and `file` operations generate native carriers in `opera
 
     const { root, result } = await generateInto(core, OPERATION_SCHEMA, "ops");
     assert.equal(result.ok, true, result.error);
-    assert.equal(result.files.length, 13);
+    assert.equal(result.files.length, 12);
 
     const operations = await readFile(join(root, "operations.ts"), "utf8");
     assert.match(operations, /export class GeneratedOperations/);

@@ -1,20 +1,16 @@
-import { createIrisOperationExecutor } from "@yydb/iris/cloudflare";
-import type { CreateIrisCloudflareExecutorOptions } from "@yydb/iris/cloudflare";
-import { createClient, type DbClient } from "./operations.js";
-import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
-import { IRIS_D1_PLANS } from "./_internal/d1-plans.js";
-
-/** Cloudflare Worker host: D1-backed operation executor with build-time read plans. */
+/**
+ * Cloudflare Worker host entry.
+ *
+ * D1 lowering (SQL, parameter binding and RETURNING projection) is owned by
+ * the Rust adapter and reached through the WASM `d1-wasm-bridge` export of the
+ * web language package. The generated edge plan artifact is not emitted yet,
+ * so this entry fails closed instead of falling back to a TypeScript-side or
+ * in-memory executor.
+ */
 export class Database {
-    static async create(options: CreateIrisCloudflareExecutorOptions): Promise<DbClient> {
-        return createClient(
-            await createIrisOperationExecutor({
-                ...options,
-                plans: IRIS_D1_PLANS,
-                wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
-                valueCarriersByEntity: IRIS_VALUE_CARRIERS,
-                contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
-            }),
+    static async create(): Promise<never> {
+        throw new Error(
+            "IRIS-D1-EDGE-ARTIFACT-PENDING: the generated D1 edge artifact is not emitted yet. Bridge `env.DB` through the WASM `d1-wasm-bridge` instead of a generated `Database.create`.",
         );
     }
 }

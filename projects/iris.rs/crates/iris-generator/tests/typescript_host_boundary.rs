@@ -22,17 +22,17 @@ table Post {
 
 /// Host package specifiers each generated file is allowed to import.
 ///
-/// Only the three host entry points may reach a host package: `node.ts` owns the
-/// desktop `@yydb/iris` surface, `browser.ts` owns `@yydb/iris-language`, and
-/// `cloudflare.ts` owns `@yydb/iris/cloudflare`. Everything else is shared
-/// generated code and must stay host neutral.
+/// Only the two live host entry points may reach a host package: `node.ts` owns
+/// the desktop `@yydb/iris` surface and `browser.ts` owns `@yydb/iris-language`.
+/// `cloudflare.ts` is a fail-closed edge entry with no host import until the
+/// generated D1 artifact lands. Everything else is shared generated code and
+/// must stay host neutral.
 const HOST_IMPORT_WHITELIST: &[(&str, &[&str])] = &[
     ("metadata.ts", &[]),
     ("index.ts", &[]),
     ("node.ts", &["@yydb/iris/node", "@yydb/iris/types"]),
     ("browser.ts", &["@yydb/iris-language"]),
-    ("cloudflare.ts", &["@yydb/iris/cloudflare"]),
-    ("_internal/d1-plans.ts", &[]),
+    ("cloudflare.ts", &[]),
     ("_internal/contract-types.ts", &[]),
     ("_internal/synthesize.ts", &[]),
     ("references.ts", &[]),
@@ -103,7 +103,7 @@ fn shared_generated_layer_never_reaches_a_desktop_entry() {
     let files = emit_typescript_client(&model).expect("emit");
 
     for (name, content) in &files {
-        if name == "node.ts" || name == "cloudflare.ts" {
+        if name == "node.ts" {
             continue;
         }
         for specifier in module_specifiers(content) {

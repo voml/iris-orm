@@ -66,7 +66,6 @@ struct TsTemplateContext {
     wire_map_lines: String,
     value_carrier_lines: String,
     reference_target_lines: String,
-    d1_plan_lines: String,
     tables_view: Vec<TsTableView>,
     macros_view: Vec<TsMacroView>,
     has_macros: bool,
@@ -156,63 +155,6 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("    {}: {{ {} }},", table.name, fields)
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    let d1_plan_lines = model
-        .tables
-        .iter()
-        .flat_map(|table| {
-            let cols = table.fields.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
-            let entity = table.name.as_str();
-            let insert_fields = d1_insert_fields(table, &entity_names);
-            let mut lines = vec![
-                format!("    \"{entity}.findMany\": {{ sql: \"SELECT {cols} FROM {entity}\", mode: \"read\" }},"),
-                format!(
-                    "    \"{entity}.findMany@take\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT ?\", mode: \"read\", paramOrder: [\"take\"] }},"
-                ),
-                format!("    \"{entity}.findFirst\": {{ sql: \"SELECT {cols} FROM {entity} LIMIT 1\", mode: \"read\" }},"),
-            ];
-            for field in table.fields.iter().filter(|field| field.primary) {
-                let wire = field.name.as_str();
-                let param_key = format!("p_{wire}");
-                lines.push(format!(
-                    "    \"{entity}.findUnique@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT 1\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
-                ));
-                lines.push(format!(
-                    "    \"{entity}.delete@{param_key}\": {{ sql: \"DELETE FROM {entity} WHERE {wire} = ?\", mode: \"write\", paramOrder: [\"{param_key}\"] }},"
-                ));
-            }
-            for field in &table.fields {
-                let wire = field.name.as_str();
-                let param_key = format!("p_{wire}");
-                let base = carrier::base_vos_type(&field.vos_type);
-                if matches!(
-                    base,
-                    "bool"
-                        | "utf8"
-                        | "utf16"
-                        | "uuid"
-                        | "decimal"
-                        | "date"
-                        | "time"
-                        | "datetimeUtc"
-                        | "i64"
-                        | "u64"
-                        | "bytes"
-                ) {
-                    lines.push(format!(
-                        "    \"{entity}.findMany@{param_key}\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ?\", mode: \"read\", paramOrder: [\"{param_key}\"] }},"
-                    ));
-                    lines.push(format!(
-                        "    \"{entity}.findMany@{param_key},take\": {{ sql: \"SELECT {cols} FROM {entity} WHERE {wire} = ? LIMIT ?\", mode: \"read\", paramOrder: [\"{param_key}\", \"take\"] }},"
-                    ));
-                }
-            }
-            push_d1_create_plans(&mut lines, entity, &insert_fields);
-            push_d1_update_plans(&mut lines, entity, table, &cols, &entity_names);
-            lines
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -320,7 +262,6 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         wire_map_lines,
         value_carrier_lines,
         reference_target_lines,
-        d1_plan_lines,
         tables_view,
         macros_view,
         has_macros,
@@ -532,86 +473,6 @@ fn snake_to_camel(name: &str) -> String {
         }
     }
     out
-}
-
-const MAX_D1_CREATE_SUBSET_FIELDS: usize = 8;
-
-fn d1_insert_field_in_schema(field: &FieldModel, entity_names: &HashSet<&str>) -> bool {
-    match &field.reference_target {
-        Some(target) => entity_names.contains(target.as_str()),
-        None => true,
-    }
-}
-
-fn d1_insert_fields<'a>(table: &'a TableModel, entity_names: &HashSet<&str>) -> Vec<&'a FieldModel> {
-    table.fields.iter().filter(|field| d1_insert_field_in_schema(field, entity_names)).collect()
-}
-
-fn push_d1_create_plans(lines: &mut Vec<String>, entity: &str, insert_fields: &[&FieldModel]) {
-    if insert_fields.is_empty() || insert_fields.len() > MAX_D1_CREATE_SUBSET_FIELDS {
-        return;
-    }
-    let field_count = insert_fields.len();
-    for mask in 1..(1usize << field_count) {
-        let subset: Vec<_> =
-            insert_fields.iter().enumerate().filter(|(index, _)| mask & (1usize << index) != 0).map(|(_, field)| *field).collect();
-        let insert_cols = subset.iter().map(|field| field.name.as_str()).collect::<Vec<_>>().join(", ");
-        let placeholders = subset.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
-        let data_param_keys = subset.iter().map(|field| format!("data_{}", field.name)).collect::<Vec<_>>();
-        let mut sorted_data_keys = data_param_keys.clone();
-        sorted_data_keys.sort();
-        let variant_suffix = sorted_data_keys.join(",");
-        let param_order = data_param_keys.iter().map(|key| format!("\"{key}\"")).collect::<Vec<_>>().join(", ");
-        lines.push(format!(
-            "    \"{entity}.create@{variant_suffix}\": {{ sql: \"INSERT INTO {entity} ({insert_cols}) VALUES ({placeholders}) RETURNING {insert_cols}\", mode: \"write-returning\", paramOrder: [{param_order}] }},"
-        ));
-    }
-}
-
-fn d1_patch_field_eligible(field: &FieldModel, entity_names: &HashSet<&str>) -> bool {
-    if field.primary {
-        return false;
-    }
-    match &field.reference_target {
-        Some(target) => entity_names.contains(target.as_str()),
-        None => true,
-    }
-}
-
-fn d1_patch_fields<'a>(table: &'a TableModel, entity_names: &HashSet<&str>) -> Vec<&'a FieldModel> {
-    table.fields.iter().filter(|field| d1_patch_field_eligible(field, entity_names)).collect()
-}
-
-fn push_d1_update_plans(lines: &mut Vec<String>, entity: &str, table: &TableModel, returning_cols: &str, entity_names: &HashSet<&str>) {
-    let patch_fields = d1_patch_fields(table, entity_names);
-    if patch_fields.is_empty() || patch_fields.len() > MAX_D1_CREATE_SUBSET_FIELDS {
-        return;
-    }
-    let primary_fields: Vec<_> = table.fields.iter().filter(|field| field.primary).collect();
-    if primary_fields.is_empty() {
-        return;
-    }
-    let patch_count = patch_fields.len();
-    for pk in primary_fields {
-        let pk_wire = pk.name.as_str();
-        let pk_param = format!("p_{pk_wire}");
-        for mask in 1..(1usize << patch_count) {
-            let subset: Vec<_> =
-                patch_fields.iter().enumerate().filter(|(index, _)| mask & (1usize << index) != 0).map(|(_, field)| *field).collect();
-            let set_clause = subset.iter().map(|field| format!("{} = ?", field.name)).collect::<Vec<_>>().join(", ");
-            let patch_param_keys = subset.iter().map(|field| format!("patch_{}", field.name)).collect::<Vec<_>>();
-            let mut sorted_keys = patch_param_keys.clone();
-            sorted_keys.push(pk_param.clone());
-            sorted_keys.sort();
-            let variant_suffix = sorted_keys.join(",");
-            let mut param_order = patch_param_keys.iter().map(|key| format!("\"{key}\"")).collect::<Vec<_>>();
-            param_order.push(format!("\"{pk_param}\""));
-            let param_order_json = param_order.join(", ");
-            lines.push(format!(
-                "    \"{entity}.update@{variant_suffix}\": {{ sql: \"UPDATE {entity} SET {set_clause} WHERE {pk_wire} = ? RETURNING {returning_cols}\", mode: \"write-returning\", paramOrder: [{param_order_json}] }},"
-            ));
-        }
-    }
 }
 
 fn validate_ts_naming(model: &GenerationModel) -> Result<()> {
