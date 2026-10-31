@@ -14,6 +14,8 @@ enum OwnedSql {
     Null,
     Bool(bool),
     Int(i64),
+    UInt(u64),
+    Float(f64),
     Text(String),
     Bytes(Vec<u8>),
 }
@@ -24,6 +26,18 @@ impl ToSql for OwnedSql {
             Self::Null => Ok(IsNull::Yes),
             Self::Bool(v) => v.to_sql(ty, out),
             Self::Int(v) => v.to_sql(ty, out),
+            Self::UInt(v) => {
+                let value = i64::try_from(*v).map_err(|_| -> Box<dyn std::error::Error + Sync + Send> {
+                    format!("VOS `u64` value {v} is outside the PostgreSQL BIGINT range").into()
+                })?;
+                value.to_sql(ty, out)
+            }
+            Self::Float(v) => {
+                if !v.is_finite() {
+                    return Err(format!("VOS `f64` value {v} must be finite").into());
+                }
+                v.to_sql(ty, out)
+            }
             Self::Text(v) => v.to_sql(ty, out),
             Self::Bytes(v) => v.to_sql(ty, out),
         }
@@ -32,6 +46,7 @@ impl ToSql for OwnedSql {
     fn accepts(ty: &Type) -> bool {
         <bool as ToSql>::accepts(ty)
             || <i64 as ToSql>::accepts(ty)
+            || <f64 as ToSql>::accepts(ty)
             || <String as ToSql>::accepts(ty)
             || <Vec<u8> as ToSql>::accepts(ty)
             || matches!(*ty, Type::UNKNOWN | Type::TEXT | Type::VARCHAR | Type::BPCHAR)
@@ -45,6 +60,8 @@ fn to_owned(value: &Value) -> OwnedSql {
         Value::Null => OwnedSql::Null,
         Value::Bool(b) => OwnedSql::Bool(*b),
         Value::Int(i) => OwnedSql::Int(*i),
+        Value::UInt(u) => OwnedSql::UInt(*u),
+        Value::Float(f) => OwnedSql::Float(*f),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => OwnedSql::Text(s.clone()),
         Value::Bytes(octets) => OwnedSql::Bytes(octets.clone()),
         // No typed vector/file carrier exists for Postgres; surface as NULL so
@@ -127,7 +144,7 @@ fn execute_read_plan(client: &mut Client, plan: &PhysicalPlan) -> Result<Vec<Row
     for row in rows {
         let mut r = Row::new();
         for (idx, col) in row.columns().iter().enumerate() {
-            r.insert(col.name().to_string(), from_pg_row(&row, idx));
+            r.insert(col.name().to_string(), from_pg_row(&row, idx)?);
         }
         out.push(r);
     }
@@ -198,7 +215,7 @@ fn query_rows(client: &mut Client, sql: &str, param_refs: &[&(dyn ToSql + Sync)]
     for row in rows {
         let mut r = Row::new();
         for (idx, col) in row.columns().iter().enumerate() {
-            r.insert(col.name().to_string(), from_pg_row(&row, idx));
+            r.insert(col.name().to_string(), from_pg_row(&row, idx)?);
         }
         out.push(r);
     }
@@ -310,6 +327,8 @@ fn literal_to_owned(text: &str, kind: LiteralKind) -> OwnedSql {
         LiteralKind::Null => OwnedSql::Null,
         LiteralKind::Bool => OwnedSql::Bool(text == "true"),
         LiteralKind::Int => OwnedSql::Int(text.parse().unwrap_or(0)),
+        LiteralKind::UInt => OwnedSql::UInt(text.parse().unwrap_or(0)),
+        LiteralKind::Float => OwnedSql::Float(text.parse().unwrap_or(0.0)),
         LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
             OwnedSql::Text(text.to_string())
         }
@@ -320,27 +339,39 @@ fn literal_to_owned(text: &str, kind: LiteralKind) -> OwnedSql {
     }
 }
 
-fn from_pg_row(row: &postgres::Row, idx: usize) -> Value {
+fn from_pg_row(row: &postgres::Row, idx: usize) -> Result<Value> {
     if let Ok(v) = row.try_get::<_, bool>(idx) {
-        return Value::Bool(v);
+        return Ok(Value::Bool(v));
     }
     if let Ok(v) = row.try_get::<_, i64>(idx) {
-        return Value::Int(v);
+        return Ok(Value::Int(v));
     }
     if let Ok(v) = row.try_get::<_, i32>(idx) {
-        return Value::Int(i64::from(v));
+        return Ok(Value::Int(i64::from(v)));
+    }
+    if let Ok(v) = row.try_get::<_, f64>(idx) {
+        if !v.is_finite() {
+            return Err(crate::Error::Policy("PostgreSQL returned a non-finite VOS `f64`".into()));
+        }
+        return Ok(Value::Float(v));
+    }
+    if let Ok(v) = row.try_get::<_, f32>(idx) {
+        if !v.is_finite() {
+            return Err(crate::Error::Policy("PostgreSQL returned a non-finite VOS `f32`".into()));
+        }
+        return Ok(Value::Float(f64::from(v)));
     }
     if let Ok(v) = row.try_get::<_, String>(idx) {
-        return Value::Str(v);
+        return Ok(Value::Str(v));
     }
     if let Ok(Some(v)) = row.try_get::<_, Option<String>>(idx) {
-        return Value::Str(v);
+        return Ok(Value::Str(v));
     }
     if let Ok(v) = row.try_get::<_, Vec<u8>>(idx) {
-        return Value::Bytes(v);
+        return Ok(Value::Bytes(v));
     }
     if let Ok(Some(v)) = row.try_get::<_, Option<Vec<u8>>>(idx) {
-        return Value::Bytes(v);
+        return Ok(Value::Bytes(v));
     }
-    Value::Null
+    Ok(Value::Null)
 }

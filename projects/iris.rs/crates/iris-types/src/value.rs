@@ -11,14 +11,22 @@ use serde_json::{Value as JsonValue, json};
 pub const TAGGED_JSON_KEY: &str = "$yydb";
 
 /// Phase 1 value model (VOS-aligned subset, not a SQL value).
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+///
+/// `PartialEq` / `Eq` / `Ord` are hand-written because the VOS `f64` carries a
+/// native IEEE-754 double while the model still needs a total, hash-free
+/// ordering: floats compare by [`f64::total_cmp`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Value {
     /// Null.
     Null,
     /// Boolean.
     Bool(bool),
-    /// Integer.
+    /// Signed integer.
     Int(i64),
+    /// Unsigned 64-bit integer (VOS `u64`); the full range is preserved.
+    UInt(u64),
+    /// Finite IEEE-754 double (VOS `f64`); never silently degraded to text.
+    Float(f64),
     /// UTF-8 string.
     Str(String),
     /// Exact decimal value in canonical text form.
@@ -39,6 +47,65 @@ pub enum Value {
     File(FileDescriptor),
     /// Nested object row (query projection).
     Object(BTreeMap<String, Value>),
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == std::cmp::Ordering::Equal
+    }
+}
+
+impl Eq for Value {}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        match (self, other) {
+            (Self::Null, Self::Null) => Ordering::Equal,
+            (Self::Bool(a), Self::Bool(b)) => a.cmp(b),
+            (Self::Int(a), Self::Int(b)) => a.cmp(b),
+            (Self::UInt(a), Self::UInt(b)) => a.cmp(b),
+            (Self::Float(a), Self::Float(b)) => a.total_cmp(b),
+            (Self::Str(a), Self::Str(b))
+            | (Self::Decimal(a), Self::Decimal(b))
+            | (Self::Date(a), Self::Date(b))
+            | (Self::Time(a), Self::Time(b))
+            | (Self::DateTime(a), Self::DateTime(b)) => a.cmp(b),
+            (Self::Bytes(a), Self::Bytes(b)) => a.cmp(b),
+            (Self::Vector(a), Self::Vector(b)) => a.cmp(b),
+            (Self::File(a), Self::File(b)) => a.cmp(b),
+            (Self::Object(a), Self::Object(b)) => a.cmp(b),
+            _ => Self::rank(self).cmp(&Self::rank(other)),
+        }
+    }
+}
+
+impl Value {
+    /// Position of the variant in the model, used as the primary `Ord` key.
+    fn rank(&self) -> u8 {
+        match self {
+            Self::Null => 0,
+            Self::Bool(_) => 1,
+            Self::Int(_) => 2,
+            Self::UInt(_) => 3,
+            Self::Float(_) => 4,
+            Self::Str(_) => 5,
+            Self::Decimal(_) => 6,
+            Self::Date(_) => 7,
+            Self::Time(_) => 8,
+            Self::DateTime(_) => 9,
+            Self::Bytes(_) => 10,
+            Self::Vector(_) => 11,
+            Self::File(_) => 12,
+            Self::Object(_) => 13,
+        }
+    }
 }
 
 /// Fixed-dimension vector of finite `f32` components (VOS `vector`).
@@ -220,6 +287,13 @@ impl Value {
             Self::Null => ("null".into(), iris_ir::LiteralKind::Null),
             Self::Bool(b) => (b.to_string(), iris_ir::LiteralKind::Bool),
             Self::Int(i) => (i.to_string(), iris_ir::LiteralKind::Int),
+            Self::UInt(u) => (u.to_string(), iris_ir::LiteralKind::UInt),
+            Self::Float(f) => {
+                // The VOS `f64` value model only carries finite numbers; a
+                // non-finite float has no canonical literal text.
+                debug_assert!(f.is_finite(), "VOS `f64` values must be finite");
+                (float_to_text(*f), iris_ir::LiteralKind::Float)
+            }
             Self::Str(s) => (s.clone(), iris_ir::LiteralKind::Str),
             Self::Decimal(s) => (s.clone(), iris_ir::LiteralKind::Decimal),
             Self::Date(s) => (s.clone(), iris_ir::LiteralKind::Date),
@@ -234,6 +308,15 @@ impl Value {
             Self::Object(_) => ("null".into(), iris_ir::LiteralKind::Null),
         }
     }
+}
+
+/// Round-trip-exact decimal text of a finite `f64`.
+///
+/// Rust's `Display` implementation for `f64` prints the shortest decimal that
+/// parses back to the same bit pattern, so a literal produced here never
+/// loses precision when a backend binds or compares it.
+pub fn float_to_text(value: f64) -> String {
+    value.to_string()
 }
 
 /// Encodes octets as the lowercase hex text of the VOS `bytes` wire form.
@@ -471,5 +554,27 @@ mod tests {
         let legal = serde_json::to_value(Value::File(valid_file())).expect("serialize");
         let decoded = serde_json::from_value::<Value>(legal).expect("deserialize");
         assert!(matches!(decoded, Value::File(_)));
+    }
+
+    #[test]
+    fn uint_and_float_pred_literals_keep_full_precision() {
+        let (text, kind) = Value::UInt(u64::MAX).as_pred_literal();
+        assert_eq!(text, "18446744073709551615");
+        assert_eq!(kind, iris_ir::LiteralKind::UInt);
+
+        for float in [0.1_f64, -0.0, f64::MIN_POSITIVE / 2.0] {
+            let (text, kind) = Value::Float(float).as_pred_literal();
+            assert_eq!(kind, iris_ir::LiteralKind::Float);
+            let reparsed: f64 = text.parse().expect("canonical float text parses");
+            assert_eq!(reparsed.to_bits(), float.to_bits(), "`{text}` must round-trip the exact bit pattern");
+        }
+    }
+
+    #[test]
+    fn float_equality_matches_total_order() {
+        assert_eq!(Value::Float(0.5), Value::Float(0.5));
+        assert_ne!(Value::Float(0.0), Value::Float(-0.0));
+        assert_eq!(Value::UInt(1), Value::UInt(1));
+        assert_ne!(Value::UInt(1), Value::Int(1));
     }
 }

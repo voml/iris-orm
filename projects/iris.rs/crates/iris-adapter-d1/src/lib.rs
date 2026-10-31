@@ -46,11 +46,23 @@ impl WireValue {
     /// text form (same as the VOS value's string payload).  Nested objects
     /// are not valid SQL parameters and surface as NULL so callers get a
     /// clearer error later.
-    pub fn from_iris(value: &iris_types::Value) -> Self {
-        match value {
+    ///
+    /// D1's SQLite integer carrier is `i64`, so a `u64` outside that range and
+    /// a non-finite `f64` are rejected here instead of being truncated.
+    pub fn from_iris(value: &iris_types::Value) -> Result<Self> {
+        Ok(match value {
             iris_types::Value::Null => Self::Null,
             iris_types::Value::Bool(b) => Self::Bool(*b),
             iris_types::Value::Int(i) => Self::Int(*i),
+            iris_types::Value::UInt(u) => Self::Int(i64::try_from(*u).map_err(|_| {
+                D1Error::ValueRejected(format!("VOS `u64` value {u} is outside the D1 INTEGER range"))
+            })?),
+            iris_types::Value::Float(f) => {
+                if !f.is_finite() {
+                    return Err(D1Error::ValueRejected("VOS `f64` values must be finite".into()));
+                }
+                Self::F64(*f)
+            }
             iris_types::Value::Str(s) => Self::Str(s.clone()),
             iris_types::Value::Decimal(s) | iris_types::Value::Date(s) | iris_types::Value::Time(s) | iris_types::Value::DateTime(s) => {
                 Self::Str(s.clone())
@@ -60,28 +72,29 @@ impl WireValue {
             // NULL so the write fails loudly downstream instead of guessing a
             // text form.
             iris_types::Value::Vector(_) | iris_types::Value::File(_) | iris_types::Value::Object(_) => Self::Null,
-        }
+        })
     }
 
     /// Convert a [`WireValue`] back into the canonical [`iris_types::Value`].
     ///
     /// The reverse of [`WireValue::from_iris`]; used by `decode_d1_result`
     /// when the WASM bridge hands raw D1 rows back to the Iris runtime.
-    /// `f64` rounds to `Int` when integral, otherwise surfaces as `Str`
-    /// (Iris canonical value has no float carrier); Blob keeps its octets as
-    /// `Value::Bytes`.
-    pub fn to_iris(&self) -> iris_types::Value {
-        match self {
+    /// `f64` keeps its native double carrier (a non-finite value is rejected)
+    /// and `Blob` keeps its octets as `Value::Bytes`.
+    pub fn to_iris(&self) -> Result<iris_types::Value> {
+        Ok(match self {
             Self::Null => iris_types::Value::Null,
             Self::Bool(b) => iris_types::Value::Bool(*b),
             Self::Int(i) => iris_types::Value::Int(*i),
             Self::F64(f) => {
-                // Integral f64 → Int, otherwise text lossless representation.
-                if f.fract() == 0.0 && f.is_finite() { iris_types::Value::Int(*f as i64) } else { iris_types::Value::Str(f.to_string()) }
+                if !f.is_finite() {
+                    return Err(D1Error::ValueRejected("D1 returned a non-finite VOS `f64`".into()));
+                }
+                iris_types::Value::Float(*f)
             }
             Self::Str(s) => iris_types::Value::Str(s.clone()),
             Self::Blob(octets) => iris_types::Value::Bytes(octets.clone()),
-        }
+        })
     }
 }
 
@@ -538,6 +551,8 @@ pub enum D1Error {
     },
     /// SQL text failed adapter-side preflight before being handed to host.
     SqlPreflight(String),
+    /// An Iris value cannot be carried faithfully by the D1 wire.
+    ValueRejected(String),
 }
 
 impl std::fmt::Display for D1Error {
@@ -559,6 +574,7 @@ impl std::fmt::Display for D1Error {
                 write!(f, "D1 contract fingerprint mismatch: expected {}, observed {}", expected.0, observed.0)
             }
             Self::SqlPreflight(m) => write!(f, "D1 SQL preflight: {m}"),
+            Self::ValueRejected(m) => write!(f, "D1 value rejected: {m}"),
         }
     }
 }
@@ -584,10 +600,24 @@ mod tests {
 
     #[test]
     fn wire_value_from_iris_round_trip() {
-        assert_eq!(WireValue::from_iris(&iris_types::Value::Null), WireValue::Null);
-        assert_eq!(WireValue::from_iris(&iris_types::Value::Bool(true)), WireValue::Bool(true));
-        assert_eq!(WireValue::from_iris(&iris_types::Value::Int(42)), WireValue::Int(42));
-        assert_eq!(WireValue::from_iris(&iris_types::Value::Str("x".into())), WireValue::Str("x".into()));
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Null).unwrap(), WireValue::Null);
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Bool(true)).unwrap(), WireValue::Bool(true));
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Int(42)).unwrap(), WireValue::Int(42));
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Str("x".into())).unwrap(), WireValue::Str("x".into()));
+    }
+
+    #[test]
+    fn wire_value_f64_and_u64_keep_native_carriers() {
+        assert_eq!(WireValue::from_iris(&iris_types::Value::Float(-0.0)).unwrap(), WireValue::F64(-0.0));
+        assert_eq!(WireValue::F64(f64::MIN_POSITIVE / 2.0).to_iris().unwrap(), iris_types::Value::Float(f64::MIN_POSITIVE / 2.0));
+        assert_eq!(WireValue::from_iris(&iris_types::Value::UInt(7)).unwrap(), WireValue::Int(7));
+    }
+
+    #[test]
+    fn wire_value_rejects_values_d1_cannot_carry_faithfully() {
+        assert!(WireValue::from_iris(&iris_types::Value::UInt(u64::MAX)).is_err());
+        assert!(WireValue::from_iris(&iris_types::Value::Float(f64::NAN)).is_err());
+        assert!(WireValue::F64(f64::INFINITY).to_iris().is_err());
     }
 
     #[test]

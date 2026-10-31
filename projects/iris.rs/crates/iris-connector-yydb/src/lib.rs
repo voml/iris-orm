@@ -479,6 +479,13 @@ pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Resu
             iris_types::Value::Null => YydbValue::Null,
             iris_types::Value::Bool(b) => YydbValue::Bool(*b),
             iris_types::Value::Int(i) => YydbValue::I64(*i),
+            iris_types::Value::UInt(u) => YydbValue::U64(*u),
+            iris_types::Value::Float(f) => {
+                if !f.is_finite() {
+                    return Err(Error::Runtime(format!("typed parameter `${name}` is a non-finite VOS `f64`")));
+                }
+                YydbValue::F64(*f)
+            }
             iris_types::Value::Str(s) => YydbValue::Text(s.clone()),
             iris_types::Value::Decimal(s) | iris_types::Value::Date(s) | iris_types::Value::Time(s) | iris_types::Value::DateTime(s) => {
                 YydbValue::Text(s.clone())
@@ -523,8 +530,15 @@ pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
         YydbValue::Bool(b) => Ok(iris_types::Value::Bool(b)),
         YydbValue::Text(s) => Ok(iris_types::Value::Str(s)),
         YydbValue::I64(i) => Ok(iris_types::Value::Int(i)),
-        YydbValue::U64(u) => Ok(iris_types::Value::Int(u as i64)),
-        YydbValue::F64(f) => Ok(iris_types::Value::Str(f.to_string())),
+        YydbValue::U64(u) => Ok(iris_types::Value::UInt(u)),
+        YydbValue::F64(f) => {
+            if f.is_finite() {
+                Ok(iris_types::Value::Float(f))
+            }
+            else {
+                Err(Error::Runtime("YYDB returned a non-finite VOS `f64`".into()))
+            }
+        }
         YydbValue::Bytes(octets) => Ok(iris_types::Value::Bytes(octets)),
         YydbValue::Uuid(u) => Ok(iris_types::Value::Str(u.to_string())),
         YydbValue::Date(d) => Ok(iris_types::Value::Date(d.to_iso())),

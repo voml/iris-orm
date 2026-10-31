@@ -50,6 +50,20 @@ pub fn value_to_json(value: &Value) -> JsonValue {
                 JsonValue::String(i.to_string())
             }
         }
+        Value::UInt(u) => {
+            if *u <= JS_MAX_SAFE_INTEGER as u64 {
+                json!(*u)
+            }
+            else {
+                JsonValue::String(u.to_string())
+            }
+        }
+        Value::Float(f) => {
+            // The value model only carries finite `f64`; a non-finite float has
+            // no JSON number form and must have been rejected at ingress.
+            debug_assert!(f.is_finite(), "VOS `f64` values must be finite");
+            json!(*f)
+        }
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => json!(s),
         Value::Bytes(octets) => iris_types::tagged_bytes_json(octets),
         Value::Vector(vector) => iris_types::tagged_vector_json(vector),

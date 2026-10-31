@@ -53,6 +53,10 @@ pub enum LiteralKind {
     Bool,
     /// Integer text.
     Int,
+    /// Unsigned 64-bit integer text (independent of the `i64` range).
+    UInt,
+    /// Round-trip-exact decimal text of a finite IEEE-754 `f64`.
+    Float,
     /// UTF-8 string.
     Str,
     /// Exact decimal text.

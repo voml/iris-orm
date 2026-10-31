@@ -119,7 +119,7 @@ fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Resul
         let cols: Vec<String> = fields.iter().map(|f| format!("\"{}\"", f.name)).collect();
         let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
         let sql = format!("INSERT INTO \"{table}\" ({}) VALUES ({}) RETURNING {returning}", cols.join(", "), placeholders.join(", "));
-        let params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
+        let params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect::<Result<Vec<_>>>()?;
         let mut rows = query_rows(provider, &sql, &params, None)?;
         if let Some(fields) = projection.as_ref() {
             rows = apply_projection(rows, fields);
@@ -132,7 +132,7 @@ fn execute_write_plan(provider: &RusqliteProvider, plan: &PhysicalPlan) -> Resul
         let (where_sql, mut where_params) = filter_to_sql(filter.as_ref())?;
         let returning = returning_sql(projection.as_deref());
         let sql = format!("UPDATE \"{table}\" SET {} WHERE {where_sql} RETURNING {returning}", sets.join(", "));
-        let mut params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect();
+        let mut params: Vec<SqliteValue> = fields.iter().map(write_field_to_sql).collect::<Result<Vec<_>>>()?;
         params.append(&mut where_params);
         let mut rows = query_rows(provider, &sql, &params, None)?;
         if let Some(fields) = projection.as_ref() {
@@ -165,7 +165,7 @@ fn statement_to_rows(result: &StatementResult, expected: Option<&[TypedColumn]>)
         for (idx, name) in result.columns.iter().enumerate() {
             let value = match expected {
                 Some(expected) => from_sql_value_typed(row_values[idx].clone(), &expected[idx].canonical_type)?,
-                None => from_sql_value(row_values[idx].clone()),
+                None => from_sql_value(row_values[idx].clone())?,
             };
             out.insert(name.clone(), value);
         }
@@ -210,7 +210,7 @@ fn filter_to_sql(filter: Option<&Pred>) -> Result<(String, Vec<SqliteValue>)> {
     }
 }
 
-fn write_field_to_sql(field: &WriteField) -> SqliteValue {
+fn write_field_to_sql(field: &WriteField) -> Result<SqliteValue> {
     literal_to_sql_value(&field.literal, field.kind)
 }
 
@@ -255,7 +255,7 @@ fn pred_to_sql(pred: &Pred) -> Result<(String, Vec<SqliteValue>)> {
                 CmpOp::Gt => ">",
                 CmpOp::Ge => ">=",
             };
-            Ok((format!("\"{field}\" {op_sql} ?"), vec![literal_to_sql_value(literal, *kind)]))
+            Ok((format!("\"{field}\" {op_sql} ?"), vec![literal_to_sql_value(literal, *kind)?]))
         }
         Pred::And(a, b) => {
             let (sa, mut pa) = pred_to_sql(a)?;

@@ -188,9 +188,12 @@ fn value_extract_expr(field: &FieldModel) -> String {
     let base = scalar_base(&field.rust_ty);
     match base {
         "bool" => format!("__iris_value_bool(row, \"{}\")", field.name),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+        "u64" => format!("__iris_value_u64(row, \"{}\")", field.name),
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => {
             format!("__iris_value_i64(row, \"{}\").map(|v| v as {base})", field.name)
         }
+        "f64" => format!("__iris_value_f64(row, \"{}\")", field.name),
+        "f32" => format!("__iris_value_f64(row, \"{}\").map(|v| v as f32)", field.name),
         "Vec<u8>" => format!("__iris_value_bytes(row, \"{}\")", field.name),
         "Vec<f32>" => format!("__iris_value_vector(row, \"{}\")", field.name),
         "iris::FileDescriptor" => format!("__iris_value_file(row, \"{}\")", field.name),
@@ -201,7 +204,9 @@ fn value_extract_expr(field: &FieldModel) -> String {
 fn where_field_ty(field: &FieldModel) -> &'static str {
     match scalar_base(&field.rust_ty) {
         "bool" => "Option<bool>",
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => "Option<i64>",
+        "u64" => "Option<u64>",
+        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => "Option<i64>",
+        "f32" | "f64" => "Option<f64>",
         _ => "Option<String>",
     }
 }
@@ -226,7 +231,7 @@ fn emit_pred_build(table: &TableModel) -> String {
                     fname = field.name,
                 ));
             }
-            "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+            "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" | "f32" | "f64" => {
                 pred_build.push_str(&format!(
                     r#"        if let Some(v) = where_.{fname} {{
             preds.push(format!("x.{fname} == {{v}}"));
@@ -340,7 +345,27 @@ fn row_write_fn(table: &TableModel, pk: &str) -> Result<String> {
                 None => Value::Null,
             }}),"#,
                         ),
-                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => format!(
+                        "u64" => format!(
+                            r#"            ("{fname}".into(), match &row.{fname} {{
+                Some(v) => Value::UInt(*v),
+                None => Value::Null,
+            }}),"#,
+                        ),
+                        base @ ("f32" | "f64") => {
+                            let convert = if base == "f32" { "f64::from(*v)" } else { "*v" };
+                            format!(
+                                r#"            ("{fname}".into(), match &row.{fname} {{
+                Some(v) => {{
+                    if !v.is_finite() {{
+                        return Err(super::errors::Error::Policy("field `{fname}` is a non-finite VOS `{base}`".into()));
+                    }}
+                    Value::Float({convert})
+                }}
+                None => Value::Null,
+            }}),"#,
+                            )
+                        }
+                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => format!(
                             r#"            ("{fname}".into(), match &row.{fname} {{
                 Some(v) => Value::Int((*v) as i64),
                 None => Value::Null,
@@ -357,7 +382,19 @@ fn row_write_fn(table: &TableModel, pk: &str) -> Result<String> {
                 else {
                     match base {
                         "bool" => format!(r#"            ("{fname}".into(), Value::Bool(row.{fname})),"#),
-                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+                        "u64" => format!(r#"            ("{fname}".into(), Value::UInt(row.{fname})),"#),
+                        base @ ("f32" | "f64") => {
+                            let convert = if base == "f32" { format!("f64::from(row.{fname})") } else { format!("row.{fname}") };
+                            format!(
+                                r#"            ("{fname}".into(), {{
+                if !row.{fname}.is_finite() {{
+                    return Err(super::errors::Error::Policy("field `{fname}` is a non-finite VOS `{base}`".into()));
+                }}
+                Value::Float({convert})
+            }}),"#,
+                            )
+                        }
+                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => {
                             format!(r#"            ("{fname}".into(), Value::Int(row.{fname} as i64)),"#)
                         }
                         _ => format!(r#"            ("{fname}".into(), Value::Str(row.{fname}.clone())),"#),

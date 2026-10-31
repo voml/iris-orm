@@ -310,7 +310,19 @@ fn canonical_literal(name: &str, value: &Value, scalar: CanonicalScalar, optiona
         (CanonicalScalar::U8, Value::Int(value)) => int_in_range(name, *value, 0, u8::MAX as i64),
         (CanonicalScalar::U16, Value::Int(value)) => int_in_range(name, *value, 0, u16::MAX as i64),
         (CanonicalScalar::U32, Value::Int(value)) => int_in_range(name, *value, 0, u32::MAX as i64),
-        (CanonicalScalar::U64, Value::Int(value)) if *value >= 0 => Ok((value.to_string(), LiteralKind::Int)),
+        (CanonicalScalar::U64, Value::UInt(value)) => Ok((value.to_string(), LiteralKind::UInt)),
+        (CanonicalScalar::U64, Value::Int(value)) if *value >= 0 => Ok((value.to_string(), LiteralKind::UInt)),
+        (CanonicalScalar::F64, Value::Float(value)) if value.is_finite() => Ok((crate::float_to_text(*value), LiteralKind::Float)),
+        (CanonicalScalar::F64, Value::Float(_)) => {
+            Err(TypedPlanError::new(CODE_ARGUMENT_TYPE, format!("parameter `{name}` is a non-finite VOS `f64`")))
+        }
+        (CanonicalScalar::F32, Value::Float(value)) if value.is_finite() && f64::from(*value as f32) == *value => {
+            Ok((crate::float_to_text(*value), LiteralKind::Float))
+        }
+        (CanonicalScalar::F32, Value::Float(_)) => Err(TypedPlanError::new(
+            CODE_ARGUMENT_TYPE,
+            format!("parameter `{name}` is not an IEEE-754 single-precision VOS `f32`"),
+        )),
         (CanonicalScalar::Utf8 | CanonicalScalar::Utf16, Value::Str(value)) => Ok((value.clone(), LiteralKind::Str)),
         (CanonicalScalar::Uuid, Value::Str(value)) if is_canonical_uuid(value) => Ok((value.clone(), LiteralKind::Str)),
         (CanonicalScalar::Uuid, Value::Str(_)) => {
@@ -357,6 +369,8 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Null => "null",
         Value::Bool(_) => "bool",
         Value::Int(_) => "int",
+        Value::UInt(_) => "uint",
+        Value::Float(_) => "float",
         Value::Str(_) => "text",
         Value::Decimal(_) => "decimal",
         Value::Date(_) => "date",

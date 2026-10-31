@@ -215,7 +215,7 @@ fn lower_write_field(expr: &Expr, span: Range<usize>) -> Result<WriteField> {
         Expr::Literal(Literal::Int(t)) => Ok(WriteField { name: String::new(), literal: t.clone(), kind: LiteralKind::Int }),
         Expr::Literal(Literal::String(s)) => Ok(WriteField { name: String::new(), literal: s.clone(), kind: LiteralKind::Str }),
         Expr::Literal(Literal::Null) => Ok(WriteField { name: String::new(), literal: "null".into(), kind: LiteralKind::Null }),
-        Expr::Literal(Literal::Float(t)) => Ok(WriteField { name: String::new(), literal: t.clone(), kind: LiteralKind::Str }),
+        Expr::Literal(Literal::Float(t)) => Ok(WriteField { name: String::new(), literal: t.clone(), kind: LiteralKind::Float }),
         Expr::Name { name, .. } => Ok(WriteField { name: String::new(), literal: name.clone(), kind: LiteralKind::Str }),
         _ => Err(Error::diagnostic(Diagnostic::plan_rejected("write field values must be literals after parameter binding", span, None))),
     }
@@ -369,7 +369,7 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
                 Expr::Literal(Literal::Int(t)) => (t.clone(), LiteralKind::Int),
                 Expr::Literal(Literal::String(s)) => (s.clone(), LiteralKind::Str),
                 Expr::Literal(Literal::Null) => ("null".into(), LiteralKind::Null),
-                Expr::Literal(Literal::Float(t)) => (t.clone(), LiteralKind::Str),
+                Expr::Literal(Literal::Float(t)) => (t.clone(), LiteralKind::Float),
                 Expr::Name { name, .. } => (name.clone(), LiteralKind::Str),
                 _ => {
                     return Err(Error::diagnostic(Diagnostic::plan_rejected("Phase 1 filters require a literal right-hand side", *span, None)));

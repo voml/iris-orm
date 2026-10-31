@@ -266,24 +266,24 @@ pub(crate) fn decode_d1_result_inner(raw_json: &str) -> Result<String, String> {
         D1Response { rows: raw.results, row_count: raw.changes, last_insert_rowid: raw.last_row_id };
 
     let col_names = raw.column_names.unwrap_or_default();
-    let canonical_rows = canonicalise_rows(&rows, &col_names);
+    let canonical_rows = canonicalise_rows(&rows, &col_names)?;
 
     let envelope = CanonicalResult { rows: canonical_rows, row_count, last_insert_rowid };
 
     serde_json::to_string(&envelope).map_err(|e| e.to_string())
 }
 
-fn canonicalise_rows(rows: &[D1WireRow], col_names: &[String]) -> Vec<CanonicalRow> {
+fn canonicalise_rows(rows: &[D1WireRow], col_names: &[String]) -> Result<Vec<CanonicalRow>, String> {
     let mut out = Vec::with_capacity(rows.len());
     for row in rows {
         let mut map = BTreeMap::new();
         for (idx, wire) in row.iter().enumerate() {
             let key = col_names.get(idx).cloned().unwrap_or_else(|| format!("col_{idx}"));
-            map.insert(key, wire.to_iris());
+            map.insert(key, wire.to_iris().map_err(|err| err.to_string())?);
         }
         out.push(CanonicalRow { values: map });
     }
-    out
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -525,16 +525,18 @@ mod tests {
     }
 
     #[test]
-    fn wire_value_f64_integral_round_trips_as_int() {
+    fn wire_value_f64_keeps_the_native_float_carrier() {
         let wire = WireValue::F64(42.0);
-        let iris = wire.to_iris();
-        assert_eq!(iris, iris_types::Value::Int(42));
+        let iris = wire.to_iris().unwrap();
+        assert_eq!(iris, iris_types::Value::Float(42.0));
+        let wire = WireValue::F64(3.14);
+        let iris = wire.to_iris().unwrap();
+        assert_eq!(iris, iris_types::Value::Float(3.14));
     }
 
     #[test]
-    fn wire_value_f64_fractional_becomes_str() {
-        let wire = WireValue::F64(3.14);
-        let iris = wire.to_iris();
-        assert!(matches!(iris, iris_types::Value::Str(_)));
+    fn wire_value_f64_rejects_non_finite() {
+        assert!(WireValue::F64(f64::NAN).to_iris().is_err());
+        assert!(WireValue::F64(f64::INFINITY).to_iris().is_err());
     }
 }

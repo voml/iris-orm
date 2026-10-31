@@ -88,7 +88,7 @@ fn execute_read_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &H
             let raw: MysqlValue = row.get(idx).unwrap_or(MysqlValue::NULL);
             let col_name = col.name_str();
             let field = col_name.as_ref();
-            r.insert(field.to_string(), from_mysql(raw, &table, field, uuid_fields));
+            r.insert(field.to_string(), from_mysql(raw, &table, field, uuid_fields)?);
         }
         out.push(r);
     }
@@ -125,7 +125,7 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let cols: Vec<String> = fields.iter().map(|f| format!("`{}`", f.name)).collect();
         let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
         let sql = format!("INSERT INTO `{table}` ({}) VALUES ({})", cols.join(", "), placeholders.join(", "));
-        let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect();
+        let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect::<Result<Vec<_>>>()?;
         conn.exec_drop(sql, Params::Positional(params.clone()))?;
         let (where_sql, _) = inserted_fields_to_sql(&fields, &table, uuid_fields)?;
         let select = format!("SELECT {returning} FROM `{table}` WHERE {where_sql} LIMIT 1");
@@ -136,7 +136,7 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let sets: Vec<String> = fields.iter().map(|f| format!("`{}` = ?", f.name)).collect();
         let (where_sql, mut where_params) = filter_to_sql(filter.as_ref(), &table, uuid_fields)?;
         let sql = format!("UPDATE `{table}` SET {} WHERE {where_sql}", sets.join(", "));
-        let mut params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect();
+        let mut params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect::<Result<Vec<_>>>()?;
         params.append(&mut where_params);
         conn.exec_drop(sql, Params::Positional(params))?;
         let returning = returning_sql(projection.as_deref());
@@ -166,7 +166,7 @@ fn query_rows(
             let raw: MysqlValue = row.get(idx).unwrap_or(MysqlValue::NULL);
             let col_name = col.name_str();
             let field = col_name.as_ref();
-            r.insert(field.to_string(), from_mysql(raw, table, field, uuid_fields));
+            r.insert(field.to_string(), from_mysql(raw, table, field, uuid_fields)?);
         }
         out.push(r);
     }
@@ -212,11 +212,22 @@ fn filter_to_sql(filter: Option<&Pred>, table: &str, uuid_fields: &HashSet<(Stri
     }
 }
 
-fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(String, String)>) -> MysqlValue {
+fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(String, String)>) -> Result<MysqlValue> {
     let value = match field.kind {
         LiteralKind::Null => Value::Null,
         LiteralKind::Bool => Value::Bool(field.literal == "true"),
         LiteralKind::Int => Value::Int(field.literal.parse().unwrap_or(0)),
+        LiteralKind::UInt => Value::UInt(
+            field.literal.parse().map_err(|_| crate::Error::Policy(format!("`{}` is not a VOS `u64` literal", field.literal)))?,
+        ),
+        LiteralKind::Float => Value::Float(
+            field
+                .literal
+                .parse::<f64>()
+                .ok()
+                .filter(|value| value.is_finite())
+                .ok_or_else(|| crate::Error::Policy(format!("`{}` is not a finite VOS `f64` literal", field.literal)))?,
+        ),
         LiteralKind::Str => Value::Str(field.literal.clone()),
         LiteralKind::Decimal => Value::Decimal(field.literal.clone()),
         LiteralKind::Date => Value::Date(field.literal.clone()),
@@ -232,7 +243,7 @@ fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(
 
 fn inserted_fields_to_sql(fields: &[WriteField], table: &str, uuid_fields: &HashSet<(String, String)>) -> Result<(String, Vec<MysqlValue>)> {
     let parts: Vec<String> = fields.iter().map(|field| format!("`{}` = ?", field.name)).collect();
-    let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, table, uuid_fields)).collect();
+    let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, table, uuid_fields)).collect::<Result<Vec<_>>>()?;
     Ok((parts.join(" AND "), params))
 }
 
@@ -240,7 +251,7 @@ pub(crate) fn insert_row(conn: &mut PooledConn, write: &RowWrite, uuid_fields: &
     let cols: Vec<String> = write.fields.keys().map(|k| format!("`{k}`")).collect();
     let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
     let sql = format!("INSERT INTO `{}` ({}) VALUES ({})", write.table, cols.join(", "), placeholders.join(", "));
-    let params: Vec<MysqlValue> = write.fields.iter().map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields)).collect();
+    let params: Vec<MysqlValue> = write.fields.iter().map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields)).collect::<Result<Vec<_>>>()?;
     conn.exec_drop(sql, Params::Positional(params))?;
     Ok(())
 }
@@ -253,8 +264,8 @@ pub(crate) fn update_row(conn: &mut PooledConn, write: &RowWrite, uuid_fields: &
     }
     let sql = format!("UPDATE `{}` SET {} WHERE `{}` = ?", write.table, sets.join(", "), write.primary_key);
     let mut params: Vec<MysqlValue> =
-        write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields)).collect();
-    params.push(to_mysql(key, &write.table, &write.primary_key, uuid_fields));
+        write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields)).collect::<Result<Vec<_>>>()?;
+    params.push(to_mysql(key, &write.table, &write.primary_key, uuid_fields)?);
     conn.exec_drop(sql, Params::Positional(params))?;
     Ok(conn.affected_rows())
 }
@@ -267,7 +278,7 @@ pub(crate) fn delete_row(
     uuid_fields: &HashSet<(String, String)>,
 ) -> Result<u64> {
     let sql = format!("DELETE FROM `{table}` WHERE `{primary_key}` = ?");
-    conn.exec_drop(sql, Params::Positional(vec![to_mysql(key, table, primary_key, uuid_fields)]))?;
+    conn.exec_drop(sql, Params::Positional(vec![to_mysql(key, table, primary_key, uuid_fields)?]))?;
     Ok(conn.affected_rows())
 }
 
@@ -283,7 +294,7 @@ fn pred_to_sql(pred: &Pred, table: &str, uuid_fields: &HashSet<(String, String)>
                 CmpOp::Gt => ">",
                 CmpOp::Ge => ">=",
             };
-            Ok((format!("`{field}` {op_sql} ?"), vec![literal_to_mysql(literal, *kind, table, field, uuid_fields)]))
+            Ok((format!("`{field}` {op_sql} ?"), vec![literal_to_mysql(literal, *kind, table, field, uuid_fields)?]))
         }
         Pred::And(a, b) => {
             let (sa, mut pa) = pred_to_sql(a, table, uuid_fields)?;
@@ -300,11 +311,20 @@ fn pred_to_sql(pred: &Pred, table: &str, uuid_fields: &HashSet<(String, String)>
     }
 }
 
-fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> MysqlValue {
-    match kind {
+fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> Result<MysqlValue> {
+    Ok(match kind {
         LiteralKind::Null => MysqlValue::NULL,
         LiteralKind::Bool => MysqlValue::Int(i64::from(text == "true")),
         LiteralKind::Int => MysqlValue::Int(text.parse().unwrap_or(0)),
+        LiteralKind::UInt => MysqlValue::UInt(
+            text.parse().map_err(|_| crate::Error::Policy(format!("`{text}` is not a VOS `u64` literal")))?,
+        ),
+        LiteralKind::Float => MysqlValue::Double(
+            text.parse::<f64>()
+                .ok()
+                .filter(|value| value.is_finite())
+                .ok_or_else(|| crate::Error::Policy(format!("`{text}` is not a finite VOS `f64` literal")))?,
+        ),
         LiteralKind::Str | LiteralKind::Decimal | LiteralKind::Date | LiteralKind::Time | LiteralKind::DateTime => {
             encode_str(text, table, field, uuid_fields)
         }
@@ -312,20 +332,27 @@ fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uui
         // Payload literals never reach a relational predicate (the typed plan
         // rejects them at plan time); they encode as SQL NULL.
         LiteralKind::Vector | LiteralKind::File => MysqlValue::NULL,
-    }
+    })
 }
 
-fn to_mysql(value: &Value, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> MysqlValue {
-    match value {
+fn to_mysql(value: &Value, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> Result<MysqlValue> {
+    Ok(match value {
         Value::Null => MysqlValue::NULL,
         Value::Bool(b) => MysqlValue::Int(i64::from(*b)),
         Value::Int(i) => MysqlValue::Int(*i),
+        Value::UInt(u) => MysqlValue::UInt(*u),
+        Value::Float(f) => {
+            if !f.is_finite() {
+                return Err(crate::Error::Policy("VOS `f64` values must be finite".into()));
+            }
+            MysqlValue::Double(*f)
+        }
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => encode_str(s, table, field, uuid_fields),
         Value::Bytes(octets) => MysqlValue::Bytes(octets.clone()),
         // No typed vector/file carrier exists for MySQL; surface as NULL so the
         // write fails loudly downstream instead of guessing a text form.
         Value::Vector(_) | Value::File(_) | Value::Object(_) => MysqlValue::NULL,
-    }
+    })
 }
 
 fn encode_str(text: &str, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> MysqlValue {
@@ -337,21 +364,31 @@ fn encode_str(text: &str, table: &str, field: &str, uuid_fields: &HashSet<(Strin
     MysqlValue::Bytes(text.as_bytes().to_vec())
 }
 
-fn from_mysql(value: MysqlValue, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> Value {
-    match value {
+fn from_mysql(value: MysqlValue, table: &str, field: &str, uuid_fields: &HashSet<(String, String)>) -> Result<Value> {
+    Ok(match value {
         MysqlValue::NULL => Value::Null,
         MysqlValue::Int(i) => Value::Int(i),
-        MysqlValue::UInt(i) => Value::Int(i as i64),
+        MysqlValue::UInt(i) => Value::UInt(i),
         MysqlValue::Bytes(b) => {
             if uuid_fields.contains(&(table.to_string(), field.to_string()))
                 && let Some(text) = uuid_bytes_to_str(&b)
             {
-                return Value::Str(text);
+                return Ok(Value::Str(text));
             }
             Value::Str(String::from_utf8_lossy(&b).into_owned())
         }
-        MysqlValue::Float(f) => Value::Str(f.to_string()),
-        MysqlValue::Double(f) => Value::Str(f.to_string()),
-        other => Value::Str(format!("{other:?}")),
-    }
+        MysqlValue::Float(f) => {
+            if !f.is_finite() {
+                return Err(crate::Error::Policy("MySQL returned a non-finite VOS `f32`".into()));
+            }
+            Value::Float(f64::from(f))
+        }
+        MysqlValue::Double(f) => {
+            if !f.is_finite() {
+                return Err(crate::Error::Policy("MySQL returned a non-finite VOS `f64`".into()));
+            }
+            Value::Float(f)
+        }
+        other => return Err(crate::Error::Policy(format!("MySQL returned an unsupported value `{other:?}` for a VOS scalar"))),
+    })
 }

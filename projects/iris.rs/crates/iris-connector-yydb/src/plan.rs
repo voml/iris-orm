@@ -192,6 +192,8 @@ pub(crate) fn decode_literal(literal: &str, kind: LiteralKind, context: &str) ->
             _ => None,
         },
         LiteralKind::Int => literal.parse::<i64>().ok().map(Value::Int),
+        LiteralKind::UInt => literal.parse::<u64>().ok().map(Value::UInt),
+        LiteralKind::Float => literal.parse::<f64>().ok().filter(|value| value.is_finite()).map(Value::Float),
         LiteralKind::Str => Some(Value::Str(literal.to_owned())),
         LiteralKind::Decimal => Some(Value::Decimal(literal.to_owned())),
         LiteralKind::Date => Some(Value::Date(literal.to_owned())),

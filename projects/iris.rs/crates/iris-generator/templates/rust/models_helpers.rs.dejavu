@@ -36,6 +36,21 @@ fn __iris_value_i64(row: &Row, key: &str) -> Option<i64> {
     }
 }
 
+fn __iris_value_u64(row: &Row, key: &str) -> Option<u64> {
+    match row.get(key)? {
+        Value::UInt(u) => Some(*u),
+        Value::Int(i) if *i >= 0 => Some(*i as u64),
+        _ => None,
+    }
+}
+
+fn __iris_value_f64(row: &Row, key: &str) -> Option<f64> {
+    match row.get(key)? {
+        Value::Float(f) => Some(*f),
+        _ => None,
+    }
+}
+
 fn __iris_value_bytes(row: &Row, key: &str) -> Option<Vec<u8>> {
     match row.get(key)? {
         Value::Bytes(octets) => Some(octets.clone()),

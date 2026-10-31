@@ -159,6 +159,8 @@ fn decode_literal(text: &str, kind: LiteralKind) -> Value {
         LiteralKind::Null => Value::Null,
         LiteralKind::Bool => Value::Bool(text == "true"),
         LiteralKind::Int => Value::Int(text.parse().unwrap_or(0)),
+        LiteralKind::UInt => Value::UInt(text.parse().unwrap_or(0)),
+        LiteralKind::Float => Value::Float(text.parse().unwrap_or(0.0)),
         LiteralKind::Str => Value::Str(text.to_string()),
         LiteralKind::Decimal => Value::Decimal(text.to_string()),
         LiteralKind::Date => Value::Date(text.to_string()),

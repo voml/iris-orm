@@ -309,6 +309,49 @@ fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
 }
 
 #[test]
+fn yydb_u64_and_f64_keep_their_native_carriers() {
+    // `u64` beyond `i64::MAX` must not wrap into a negative `Int`, and `f64`
+    // must not degrade into text.
+    assert_eq!(value_from_yydb(yydb::Value::U64(u64::MAX)).expect("u64"), iris_types::Value::UInt(u64::MAX));
+
+    let float = value_from_yydb(yydb::Value::F64(0.1)).expect("f64");
+    assert_eq!(float, iris_types::Value::Float(0.1));
+    let negative_zero = value_from_yydb(yydb::Value::F64(-0.0)).expect("negative zero");
+    match negative_zero {
+        iris_types::Value::Float(value) => assert_eq!(value.to_bits(), (-0.0_f64).to_bits()),
+        other => panic!("expected `Value::Float`, got {other:?}"),
+    }
+    let subnormal = value_from_yydb(yydb::Value::F64(f64::MIN_POSITIVE / 2.0)).expect("subnormal f64");
+    match subnormal {
+        iris_types::Value::Float(value) => assert_eq!(value.to_bits(), (f64::MIN_POSITIVE / 2.0).to_bits()),
+        other => panic!("expected `Value::Float`, got {other:?}"),
+    }
+}
+
+#[test]
+fn yydb_non_finite_f64_is_rejected_instead_of_stringified() {
+    assert!(value_from_yydb(yydb::Value::F64(f64::NAN)).is_err());
+    assert!(value_from_yydb(yydb::Value::F64(f64::INFINITY)).is_err());
+}
+
+#[test]
+fn iris_uint_and_float_bind_back_to_native_yydb_values() {
+    let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
+    named.insert("u".into(), iris_types::Value::UInt(u64::MAX));
+    named.insert("f".into(), iris_types::Value::Float(-0.0));
+    named.insert("sub".into(), iris_types::Value::Float(f64::MIN_POSITIVE / 2.0));
+
+    let bound = value_params_to_yydb(&named).expect("Iris params bind to native YYDB values");
+    assert!(matches!(bound.get("u"), Some(yydb::Value::U64(value)) if *value == u64::MAX));
+    assert!(matches!(bound.get("f"), Some(yydb::Value::F64(value)) if value.to_bits() == (-0.0_f64).to_bits()));
+    assert!(matches!(bound.get("sub"), Some(yydb::Value::F64(value)) if value.to_bits() == (f64::MIN_POSITIVE / 2.0).to_bits()));
+
+    let mut non_finite: BTreeMap<String, iris_types::Value> = BTreeMap::new();
+    non_finite.insert("bad".into(), iris_types::Value::Float(f64::INFINITY));
+    assert!(value_params_to_yydb(&non_finite).is_err());
+}
+
+#[test]
 fn yydb_object_still_fail_closed() {
     // The CAS `object` handle still has no Iris carrier and must not silently
     // degrade to Null. `vector` and `file` round-trip as native typed values,
