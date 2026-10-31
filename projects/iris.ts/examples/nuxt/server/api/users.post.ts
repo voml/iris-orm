@@ -12,8 +12,8 @@ export default defineEventHandler(async (event) => {
     const db = await Database.open({ config: process.cwd(), source: "default" });
     return await db.user.create({
         data: {
-            user_id: randomUUID() as UserId,
-            user_name: userName,
+            userId: randomUUID() as UserId,
+            userName: userName,
             active: body.active ?? true,
         },
     });

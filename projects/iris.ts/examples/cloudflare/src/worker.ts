@@ -6,10 +6,10 @@ import { d1InsertPost, d1InsertUser, d1ListActiveUsers, d1ListPublishedPosts } f
 import { openIrisDatabase } from "./iris-session.ts";
 
 const postListSelect = {
-    post_id: true,
+    postId: true,
     title: true,
     published: true,
-    author: { select: { user_name: true } },
+    author: { select: { userName: true } },
 } as const;
 
 const app = new Hono<{ Bindings: Env }>();
@@ -99,7 +99,7 @@ app.get("/iris/posts", async (c) => {
     const author = c.req.query("author")?.trim();
     const db = await openIrisDatabase();
     const where = author
-        ? { published: true, author: { user_name: author } }
+        ? { published: true, author: { userName: author } }
         : { published: true };
     return c.json(await db.post.findMany({ where, select: postListSelect }));
 });
@@ -112,8 +112,8 @@ app.post("/iris/users", async (c) => {
     const db = await openIrisDatabase();
     const user = await db.user.create({
         data: {
-            user_id: crypto.randomUUID() as UserId,
-            user_name: body.user_name.trim(),
+            userId: crypto.randomUUID() as UserId,
+            userName: body.user_name.trim(),
             active: body.active ?? true,
         },
     });
@@ -130,7 +130,7 @@ app.post("/iris/posts", async (c) => {
     const db = await openIrisDatabase();
     const post = await db.post.create({
         data: {
-            post_id: crypto.randomUUID() as PostId,
+            postId: crypto.randomUUID() as PostId,
             author: authorUserId as UserId,
             title,
             published: body.published ?? true,

@@ -19,8 +19,8 @@ export async function POST(request: Request) {
     const db = await Database.create({ config: process.cwd(), source: "default" });
     const user = await db.user.create({
         data: {
-            user_id: randomUUID() as UserId,
-            user_name: userName,
+            userId: randomUUID() as UserId,
+            userName: userName,
             active: body.active ?? true,
         },
     });

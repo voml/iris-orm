@@ -14,10 +14,10 @@ const db = await Database.open({ config: projectRoot, source: "default" });
 await db.$macros.seed_blog();
 
 const postListSelect = {
-    post_id: true,
+    postId: true,
     title: true,
     published: true,
-    author: { select: { user_name: true } },
+    author: { select: { userName: true } },
 } as const;
 
 app.get("/users", async (_req, res) => {
@@ -32,7 +32,7 @@ app.post("/users", async (req, res) => {
     }
     const active = typeof req.body?.active === "boolean" ? req.body.active : true;
     const user = await db.user.create({
-        data: { user_id: randomUUID() as UserId, user_name: userName, active },
+        data: { userId: randomUUID() as UserId, userName, active },
     });
     res.status(201).json(user);
 });
@@ -40,7 +40,7 @@ app.post("/users", async (req, res) => {
 app.get("/posts", async (req, res) => {
     const author = typeof req.query.author === "string" ? req.query.author.trim() : "";
     const where = author
-        ? { published: true, author: { user_name: author } }
+        ? { published: true, author: { userName: author } }
         : { published: true };
     res.json(await db.post.findMany({ where, select: postListSelect }));
 });
@@ -55,7 +55,7 @@ app.post("/posts", async (req, res) => {
     const published = typeof req.body?.published === "boolean" ? req.body.published : true;
     const post = await db.post.create({
         data: {
-            post_id: randomUUID() as PostId,
+            postId: randomUUID() as PostId,
             author: authorUserId as UserId,
             title,
             published,

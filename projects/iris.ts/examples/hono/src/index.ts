@@ -13,10 +13,10 @@ const db = await Database.open({ config: projectRoot, source: "default" });
 await db.$macros.seed_blog();
 
 const postListSelect = {
-    post_id: true,
+    postId: true,
     title: true,
     published: true,
-    author: { select: { user_name: true } },
+    author: { select: { userName: true } },
 } as const;
 
 app.get("/users", async (c) => {
@@ -30,8 +30,8 @@ app.post("/users", async (c) => {
     }
     const user = await db.user.create({
         data: {
-            user_id: randomUUID() as UserId,
-            user_name: body.user_name.trim(),
+            userId: randomUUID() as UserId,
+            userName: body.user_name.trim(),
             active: body.active ?? true,
         },
     });
@@ -41,7 +41,7 @@ app.post("/users", async (c) => {
 app.get("/posts", async (c) => {
     const author = c.req.query("author")?.trim();
     const where = author
-        ? { published: true, author: { user_name: author } }
+        ? { published: true, author: { userName: author } }
         : { published: true };
     return c.json(await db.post.findMany({ where, select: postListSelect }));
 });
@@ -55,7 +55,7 @@ app.post("/posts", async (c) => {
     }
     const post = await db.post.create({
         data: {
-            post_id: randomUUID() as PostId,
+            postId: randomUUID() as PostId,
             author: authorUserId as UserId,
             title,
             published: body.published ?? true,

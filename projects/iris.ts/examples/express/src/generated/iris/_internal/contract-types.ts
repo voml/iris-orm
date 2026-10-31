@@ -1,0 +1,67 @@
+/**
+ * Host-neutral generated-client operation ABI.
+ *
+ * Node and browser generated entries share these structural types, so neither
+ * generated file imports a host package. The real host executors must satisfy
+ * these shapes structurally.
+ */
+/** Delivered VOS `file` descriptor on the generated client wire. */
+export type GeneratedFileCarrier = {
+    readonly digest: string;
+    readonly octets: bigint;
+    readonly name?: string;
+    readonly mediaType?: string;
+    readonly manifest: { readonly hash: string; readonly size: bigint };
+};
+/** One delivered field value on the generated client wire. */
+export type GeneratedExecutionRow = Record<
+    string,
+    string | number | boolean | bigint | Uint8Array | Float32Array | GeneratedFileCarrier | null
+>;
+/** Structured diagnostic carried on a failed result envelope. */
+export type GeneratedIrisDiagnostic = {
+    readonly code: string;
+    readonly message: string;
+    readonly severity: "error" | "warning";
+    readonly retryable?: boolean;
+    readonly unknownCommit?: boolean;
+};
+/** Typed execution envelope for generated delegates. */
+export type ResultEnvelope<T = unknown> =
+    | { ok: true; value: T; diagnostics?: readonly GeneratedIrisDiagnostic[] }
+    | { ok: false; diagnostics: readonly GeneratedIrisDiagnostic[] };
+/** Stable operation identity within a resolved contract. */
+export type OperationIdentity = {
+    readonly operationId: string;
+    readonly contractFingerprint: string;
+};
+/** Structured operation passed from a generated client to a host executor. */
+export type IrisOperation =
+    | {
+          kind: "find-many";
+          entity: string;
+          where?: { field: string; value: string | number | boolean | null };
+          take?: number;
+      }
+    | {
+          kind: "find-unique";
+          entity: string;
+          where: { field: string; value: string | number | boolean | null };
+      }
+    | {
+          kind: "declared-vos";
+          source: string;
+      };
+/** Host-neutral operation request. */
+export type OperationRequest = {
+    readonly identity: OperationIdentity;
+    readonly operation: IrisOperation;
+    readonly parameters?: Readonly<Record<string, unknown>>;
+    readonly deadlineMs?: number;
+};
+/** Async operation execution contract shared by generated delegates. */
+export interface OperationExecutor {
+    execute(request: OperationRequest): Promise<ResultEnvelope<readonly GeneratedExecutionRow[]>>;
+    executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
+    close(): Promise<void>;
+}

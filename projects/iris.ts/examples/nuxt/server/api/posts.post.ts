@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
     const db = await Database.open({ config: process.cwd(), source: "default" });
     return await db.post.create({
         data: {
-            post_id: randomUUID() as PostId,
+            postId: randomUUID() as PostId,
             author: authorUserId as UserId,
             title,
             published: body.published ?? true,

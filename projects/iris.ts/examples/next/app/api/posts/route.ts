@@ -6,17 +6,17 @@ import { Database } from "@iris/node.ts";
 export const runtime = "nodejs";
 
 const postListSelect = {
-    post_id: true,
+    postId: true,
     title: true,
     published: true,
-    author: { select: { user_name: true } },
+    author: { select: { userName: true } },
 } as const;
 
 export async function GET(request: Request) {
     const author = new URL(request.url).searchParams.get("author")?.trim();
     const db = await Database.create({ config: process.cwd(), source: "default" });
     const where = author
-        ? { published: true, author: { user_name: author } }
+        ? { published: true, author: { userName: author } }
         : { published: true };
     return Response.json(await db.post.findMany({ where, select: postListSelect }));
 }
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const db = await Database.create({ config: process.cwd(), source: "default" });
     const post = await db.post.create({
         data: {
-            post_id: randomUUID() as PostId,
+            postId: randomUUID() as PostId,
             author: authorUserId as UserId,
             title,
             published: body.published ?? true,

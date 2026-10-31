@@ -33,7 +33,7 @@ const created = await db.user.create({
         active: true,
     },
 });
-const createdName = created?.userName ?? created?.user_name;
+const createdName = created?.userName;
 if (createdName !== "smoke") {
     throw new Error(`unexpected created user: ${JSON.stringify(created)}`);
 }
