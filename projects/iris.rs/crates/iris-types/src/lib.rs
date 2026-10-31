@@ -78,7 +78,8 @@ pub use typed_plan::{
 };
 pub use uuid_v7::{is_v7, uuid};
 pub use value::{
-    Row, TAGGED_JSON_KEY, Value, bytes_from_tagged_json, bytes_to_hex, hex_to_bytes, is_tagged_bytes_json, tagged_bytes_json,
+    FileDescriptor, FileManifestRef, Row, TAGGED_JSON_KEY, Value, VectorValue, bytes_from_tagged_json, bytes_to_hex, file_from_tagged_json,
+    hex_to_bytes, tagged_bytes_json, tagged_file_json, tagged_json_kind, tagged_vector_json, vector_from_tagged_json,
 };
 
 use iris_ir::{IrVersion, PhysicalPlan, RealizationClass};

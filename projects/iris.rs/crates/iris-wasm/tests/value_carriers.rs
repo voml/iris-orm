@@ -18,8 +18,7 @@ use serde_json::{Value as JsonValue, json};
 const INSERT: &str = "Metric::insert({ metric_id: $data_metric_id, seq: $data_seq, payload: $data_payload })";
 
 /// `i64::MAX` with bytes `[1, 2, 3]` as the tagged `bytes` carrier.
-const PARAMS: &str =
-    r#"{"data_metric_id":"m1","data_seq":9223372036854775807,"data_payload":{"$yydb":"bytes","hex":"010203"}}"#;
+const PARAMS: &str = r#"{"data_metric_id":"m1","data_seq":9223372036854775807,"data_payload":{"$yydb":"bytes","hex":"010203"}}"#;
 
 fn metric_row() -> BTreeMap<String, Value> {
     let mut row = BTreeMap::new();

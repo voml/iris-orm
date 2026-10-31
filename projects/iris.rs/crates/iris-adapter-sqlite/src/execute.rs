@@ -218,7 +218,7 @@ pub(crate) fn insert_row(provider: &RusqliteProvider, write: &RowWrite) -> Resul
     let cols: Vec<String> = write.fields.keys().map(|k| format!("\"{k}\"")).collect();
     let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
     let sql = format!("INSERT INTO \"{}\" ({}) VALUES ({})", write.table, cols.join(", "), placeholders.join(", "));
-    let params: Vec<SqliteValue> = write.fields.values().map(to_sql_value).collect();
+    let params: Vec<SqliteValue> = write.fields.values().map(to_sql_value).collect::<Result<Vec<_>>>()?;
     provider.execute_one(&sql, &params)?;
     Ok(())
 }
@@ -230,15 +230,16 @@ pub(crate) fn update_row(provider: &RusqliteProvider, write: &RowWrite) -> Resul
         return Ok(0);
     }
     let sql = format!("UPDATE \"{}\" SET {} WHERE \"{}\" = ?", write.table, sets.join(", "), write.primary_key);
-    let mut params: Vec<SqliteValue> = write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(_, v)| to_sql_value(v)).collect();
-    params.push(to_sql_value(key));
+    let mut params: Vec<SqliteValue> =
+        write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(_, v)| to_sql_value(v)).collect::<Result<Vec<_>>>()?;
+    params.push(to_sql_value(key)?);
     let result = provider.execute_one(&sql, &params)?;
     Ok(result.changes as usize)
 }
 
 pub(crate) fn delete_row(provider: &RusqliteProvider, table: &str, primary_key: &str, key: &Value) -> Result<usize> {
     let sql = format!("DELETE FROM \"{table}\" WHERE \"{primary_key}\" = ?");
-    let result = provider.execute_one(&sql, &[to_sql_value(key)])?;
+    let result = provider.execute_one(&sql, &[to_sql_value(key)?])?;
     Ok(result.changes as usize)
 }
 

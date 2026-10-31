@@ -65,6 +65,10 @@ pub enum LiteralKind {
     DateTime,
     /// Octets as the lowercase hex text of the VOS `bytes` wire form.
     Bytes,
+    /// `vector` payload as the canonical `$yydb` tagged JSON text.
+    Vector,
+    /// `file` descriptor as the canonical `$yydb` tagged JSON text.
+    File,
     /// Null.
     Null,
 }

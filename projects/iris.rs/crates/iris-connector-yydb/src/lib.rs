@@ -11,156 +11,18 @@
 mod error;
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
 use iris_ir::IrVersion;
-use iris_types::{CapabilitySet, QueryCaps, WriteCaps};
+use iris_types::{CapabilitySet, FileDescriptor, FileManifestRef, QueryCaps, VectorValue, WriteCaps};
 use serde::{Deserialize, Serialize};
 use yydb::{Connection, SchemaVersion, query::PreparedStatement};
 
 pub use error::{Error, Result};
 
 use yydb::Value as YydbValue;
-
-// ---------------------------------------------------------------------------
-// Tagged payload JSON — Iris::Value Phase 1 没有 File / Vector 变体，这两类
-// VOS 载荷都通过带单一 tag key 的 string carrier 往返。普通文本不会被
-// 误判：每个转换入口都先用 `contains(tag)` 做 fast-path。
-// ---------------------------------------------------------------------------
-
-/// Top-level discriminating key for every tagged file descriptor string.
-const IRIS_FILE_TAG: &str = "__iris_file__";
-
-/// Top-level discriminating key for every tagged vector string.
-const IRIS_VECTOR_TAG: &str = "__iris_vector__";
-
-/// Compact tagged-JSON form of `yydb::ChunkManifest` for Iris Value round-trip.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct TaggedObjectRef {
-    algo: String,
-    hash: String,
-    size: u64,
-    kind: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct TaggedChunkManifest {
-    chunk_size: u32,
-    total_size: u64,
-    chunks: Vec<TaggedObjectRef>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct TaggedFileEnvelope {
-    #[serde(rename = "__iris_file__")]
-    iris_file: TaggedChunkManifest,
-}
-
-fn object_ref_to_tagged(r: &yydb::ObjectRef) -> TaggedObjectRef {
-    TaggedObjectRef {
-        algo: r.algo.as_str().to_owned(),
-        hash: hex::encode(r.hash),
-        size: r.size,
-        kind: r.kind.as_str().to_owned(),
-    }
-}
-
-fn object_ref_from_tagged(t: TaggedObjectRef) -> Result<yydb::ObjectRef> {
-    use yydb::{HashAlgo, ObjectKind};
-    let algo = HashAlgo::from_name(&t.algo)
-        .ok_or_else(|| Error::Runtime(format!("unknown object ref algo `{}` in file descriptor", t.algo)))?;
-    let kind = ObjectKind::from_name(&t.kind)
-        .ok_or_else(|| Error::Runtime(format!("unknown object ref kind `{}` in file descriptor", t.kind)))?;
-    let hash = hex::decode(&t.hash)
-        .map_err(|e| Error::Runtime(format!("invalid hash hex in file descriptor: {e}")))?;
-    let hash = <[u8; 32]>::try_from(hash)
-        .map_err(|_| Error::Runtime("hash in file descriptor is not 32 bytes".into()))?;
-    Ok(yydb::ObjectRef { algo, hash, size: t.size, kind })
-}
-
-fn chunk_manifest_to_string(cm: &yydb::ChunkManifest) -> Result<String> {
-    let tagged = TaggedFileEnvelope {
-        iris_file: TaggedChunkManifest {
-            chunk_size: cm.chunk_size,
-            total_size: cm.total_size,
-            chunks: cm.chunks.iter().map(object_ref_to_tagged).collect(),
-        },
-    };
-    serde_json::to_string(&tagged).map_err(|e| Error::Runtime(format!("serialize file descriptor: {e}")))
-}
-
-fn chunk_manifest_from_string(s: &str) -> Option<Result<yydb::ChunkManifest>> {
-    // Fast-path: bail on strings that do not start with our envelope key
-    // so plain text columns never pay a JSON parse cost.
-    if !s.contains(IRIS_FILE_TAG) {
-        return None;
-    }
-    let envelope: TaggedFileEnvelope = serde_json::from_str(s).ok()?;
-    Some(
-        envelope
-            .iris_file
-            .chunks
-            .into_iter()
-            .map(object_ref_from_tagged)
-            .collect::<Result<Vec<_>>>()
-            .map(|chunks| yydb::ChunkManifest {
-                chunk_size: envelope.iris_file.chunk_size,
-                total_size: envelope.iris_file.total_size,
-                chunks,
-            }),
-    )
-}
-
-// ---------------------------------------------------------------------------
-// Tagged vector JSON — same path as file: hex LE f32 payload inside a single
-// discriminating key, so Iris::Value::Str carries vector through Phase 1.
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct TaggedVectorEnvelope {
-    dimension: u32,
-    components: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct TaggedVectorOuter {
-    #[serde(rename = "__iris_vector__")]
-    iris_vector: TaggedVectorEnvelope,
-}
-
-fn vector_to_string(v: &yydb::Vector) -> Result<String> {
-    let envelope = TaggedVectorOuter {
-        iris_vector: TaggedVectorEnvelope {
-            dimension: v.dim,
-            components: hex::encode(v.to_le_bytes()),
-        },
-    };
-    serde_json::to_string(&envelope).map_err(|e| Error::Runtime(format!("serialize vector: {e}")))
-}
-
-fn vector_from_string(s: &str) -> Option<Result<yydb::Vector>> {
-    if !s.contains(IRIS_VECTOR_TAG) {
-        return None;
-    }
-    let envelope: TaggedVectorOuter = serde_json::from_str(s).ok()?;
-    let bytes = match hex::decode(&envelope.iris_vector.components) {
-        Ok(b) => b,
-        Err(e) => return Some(Err(Error::Runtime(format!("invalid vector hex: {e}")))),
-    };
-    let vector = match yydb::Vector::from_le_bytes(&bytes) {
-        Ok(v) => v,
-        Err(e) => return Some(Err(Error::Runtime(format!("invalid vector payload: {e}")))),
-    };
-    if vector.dim != envelope.iris_vector.dimension {
-        return Some(Err(Error::Runtime(format!(
-            "vector dimension mismatch: envelope says {} but payload says {}",
-            envelope.iris_vector.dimension, vector.dim
-        ))));
-    }
-    Some(Ok(vector))
-}
 
 // ---------------------------------------------------------------------------
 // Readiness probe
@@ -465,14 +327,41 @@ impl PreparedVos {
 // Row / value conversion — yydb types → iris_types
 // ---------------------------------------------------------------------------
 
+/// Convert a typed Iris `FileDescriptor` into the backend file descriptor.
+///
+/// The manifest digest crosses as raw 32 bytes; a hex spelling that is not
+/// canonical fails the bind instead of writing a corrupt identity.
+fn descriptor_to_yydb(f: &FileDescriptor) -> Result<yydb::FileDescriptor> {
+    let hash = iris_types::hex_to_bytes(&f.manifest.hash)
+        .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok())
+        .ok_or_else(|| Error::Runtime("file descriptor manifest hash is not 64 lowercase hex digits".into()))?;
+    Ok(yydb::FileDescriptor {
+        digest: f.digest.clone(),
+        octets: f.octets,
+        name: f.name.clone(),
+        media_type: f.media_type.clone(),
+        manifest: yydb::FileManifestRef { hash, size: f.manifest.size },
+    })
+}
+
+/// Convert a backend file descriptor into the typed Iris `FileDescriptor`.
+fn descriptor_from_yydb(file: yydb::FileDescriptor) -> Result<FileDescriptor> {
+    FileDescriptor::new(
+        file.digest,
+        file.octets,
+        file.name,
+        file.media_type,
+        FileManifestRef { hash: file.manifest.hash_hex(), size: file.manifest.size },
+    )
+    .ok_or_else(|| Error::Runtime("YYDB returned a file descriptor with a non-canonical digest or blank label".into()))
+}
+
 /// Convert Iris typed parameter values into the YYDB binding map.
 ///
-/// `bytes` stays octets end to end. `vector` and `file` payloads arrive as a
-/// tagged JSON string inside `Iris::Value::Str` — the discriminant key is
-/// stripped here and the original YYDB variant reconstructed. Plain text that
-/// does not carry our envelope keys keeps flowing as `YydbValue::Text`.
-/// Nested objects are rejected: YYDB binds a scalar per `$name` slot and
-/// has no text form for one.
+/// `bytes` stays octets, `vector` binds the native `yydb::Vector` and `file`
+/// binds the native `yydb::FileDescriptor` — every VOS payload keeps its typed
+/// variant end to end, never text. Nested objects are rejected: YYDB binds a
+/// scalar per `$name` slot and has no text form for one.
 pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Result<BTreeMap<String, YydbValue>> {
     let mut out = BTreeMap::new();
     for (name, value) in named {
@@ -480,22 +369,19 @@ pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Resu
             iris_types::Value::Null => YydbValue::Null,
             iris_types::Value::Bool(b) => YydbValue::Bool(*b),
             iris_types::Value::Int(i) => YydbValue::I64(*i),
-            iris_types::Value::Str(s) => {
-                if let Some(Ok(cm)) = chunk_manifest_from_string(s) {
-                    YydbValue::File(cm)
-                }
-                else if let Some(Ok(vec)) = vector_from_string(s) {
-                    YydbValue::Vector(vec)
-                }
-                else {
-                    YydbValue::Text(s.clone())
-                }
+            iris_types::Value::Str(s) => YydbValue::Text(s.clone()),
+            iris_types::Value::Decimal(s) | iris_types::Value::Date(s) | iris_types::Value::Time(s) | iris_types::Value::DateTime(s) => {
+                YydbValue::Text(s.clone())
             }
-            iris_types::Value::Decimal(s)
-            | iris_types::Value::Date(s)
-            | iris_types::Value::Time(s)
-            | iris_types::Value::DateTime(s) => YydbValue::Text(s.clone()),
             iris_types::Value::Bytes(octets) => YydbValue::Bytes(octets.clone()),
+            iris_types::Value::Vector(v) => {
+                let components: Vec<f32> = v.components.clone();
+                YydbValue::Vector(
+                    yydb::Vector::new(components)
+                        .map_err(|e| Error::Runtime(format!("typed parameter `${name}` is not a bindable vector: {e}")))?,
+                )
+            }
+            iris_types::Value::File(f) => YydbValue::File(descriptor_to_yydb(f)?),
             iris_types::Value::Object(_) => {
                 return Err(Error::Runtime(format!("typed parameter `${name}` is an object, not a scalar VOS value")));
             }
@@ -512,12 +398,12 @@ pub fn value_params_to_yydb(named: &BTreeMap<String, iris_types::Value>) -> Resu
 /// round-trip through their canonical ISO text form, matching the reverse
 /// mapping in [`value_params_to_yydb`].
 ///
-/// `file` and `vector` payloads serialise into their tagged JSON form and
-/// ride inside `Iris::Value::Str` — Iris Phase 1 has no dedicated variant
-/// for either, but callers that need full fidelity can still reconstruct the
-/// original YYDB value via the same tag keys.
+/// `vector` and `file` payloads land in their typed Iris variants
+/// (`Value::Vector` / `Value::File`), preserving dimension, components and
+/// the full descriptor (digest, octets, metadata, manifest) exactly as the
+/// backend produced them.
 ///
-/// Returns `Err` for variants Iris Phase 1 does not model — the CAS `Object`
+/// Returns `Err` for variants Iris does not model — the CAS `Object`
 /// handle — so callers cannot silently read a column as `Null`. Code that
 /// needs full fidelity should work directly with the YYDB `yydb::Value` via
 /// the `connection()` escape hatch.
@@ -542,13 +428,15 @@ pub fn value_from_yydb(v: YydbValue) -> Result<iris_types::Value> {
             }
             Ok(iris_types::Value::Object(out))
         }
-        YydbValue::Vector(vec) => Ok(iris_types::Value::Str(vector_to_string(&vec)?)),
+        YydbValue::Vector(vec) => VectorValue::new(vec.dim, vec.data.to_vec())
+            .map(iris_types::Value::Vector)
+            .ok_or_else(|| Error::Runtime(format!("YYDB returned a `vector` with dimension {} outside the VOS contract", vec.dim))),
         YydbValue::Object(_) => Err(Error::Runtime(
-            "YYDB returned a CAS `object` handle which Iris Phase 1 does not model. \
+            "YYDB returned a CAS `object` handle which Iris does not model. \
              Use the `connection()` escape hatch for full fidelity access."
                 .into(),
         )),
-        YydbValue::File(cm) => Ok(iris_types::Value::Str(chunk_manifest_to_string(&cm)?)),
+        YydbValue::File(file) => descriptor_from_yydb(file).map(iris_types::Value::File),
         #[allow(unreachable_patterns)]
         other => Err(Error::Runtime(format!(
             "YYDB returned an unrecognised `Value` variant that Iris cannot represent: {other:?}. \
@@ -568,36 +456,4 @@ pub fn row_from_yydb(row: BTreeMap<String, YydbValue>) -> Result<iris_types::Row
         out.insert(k, value_from_yydb(v)?);
     }
     Ok(out)
-}
-
-// ---------------------------------------------------------------------------
-// Deprecated shims — kept for backwards compat
-// ---------------------------------------------------------------------------
-
-impl PreparedVos {
-    /// Execute if the database DDL revision still matches.
-    #[deprecated(note = "renamed to PreparedVos::execute")]
-    pub fn execute_stale_checked(&self, source: &YydbSource) -> Result<Vec<iris_types::Row>> {
-        self.execute(source)
-    }
-
-    /// Execute with named parameters, stale-checked.
-    #[deprecated(note = "renamed to PreparedVos::execute_with_params")]
-    pub fn execute_params_stale_checked(&self, source: &YydbSource, named: BTreeMap<String, yydb::Value>) -> Result<Vec<iris_types::Row>> {
-        self.execute_with_params(source, named)
-    }
-}
-
-impl YydbSource {
-    /// Execute a VOS operation program on the native YYDB executor.
-    #[deprecated(note = "renamed to YydbSource::query (aligns with Session::query / db.$query)")]
-    pub fn execute_vos(&self, program: &str) -> Result<Vec<iris_types::Row>> {
-        self.query(program)
-    }
-}
-
-// Silence unused imports when deprecated shims compile.
-#[allow(dead_code)]
-fn _unreferenced() {
-    let _ = BTreeSet::<()>::new();
 }

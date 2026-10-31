@@ -363,6 +363,8 @@ fn value_kind(value: &Value) -> &'static str {
         Value::Time(_) => "time",
         Value::DateTime(_) => "datetime",
         Value::Bytes(_) => "bytes",
+        Value::Vector(_) => "vector",
+        Value::File(_) => "file",
         Value::Object(_) => "object",
     }
 }

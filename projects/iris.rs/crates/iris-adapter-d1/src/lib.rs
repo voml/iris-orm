@@ -56,7 +56,10 @@ impl WireValue {
                 Self::Str(s.clone())
             }
             iris_types::Value::Bytes(octets) => Self::Blob(octets.clone()),
-            iris_types::Value::Object(_) => Self::Null,
+            // No typed vector/file carrier exists on the D1 wire; surface as
+            // NULL so the write fails loudly downstream instead of guessing a
+            // text form.
+            iris_types::Value::Vector(_) | iris_types::Value::File(_) | iris_types::Value::Object(_) => Self::Null,
         }
     }
 

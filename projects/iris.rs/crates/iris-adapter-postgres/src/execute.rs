@@ -47,7 +47,9 @@ fn to_owned(value: &Value) -> OwnedSql {
         Value::Int(i) => OwnedSql::Int(*i),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => OwnedSql::Text(s.clone()),
         Value::Bytes(octets) => OwnedSql::Bytes(octets.clone()),
-        Value::Object(_) => OwnedSql::Null,
+        // No typed vector/file carrier exists for Postgres; surface as NULL so
+        // the write fails loudly downstream instead of guessing a text form.
+        Value::Vector(_) | Value::File(_) | Value::Object(_) => OwnedSql::Null,
     }
 }
 
@@ -312,6 +314,9 @@ fn literal_to_owned(text: &str, kind: LiteralKind) -> OwnedSql {
             OwnedSql::Text(text.to_string())
         }
         LiteralKind::Bytes => OwnedSql::Bytes(hex_to_bytes(text).unwrap_or_default()),
+        // Payload literals never reach a relational predicate (the typed plan
+        // rejects them at plan time); they encode as SQL NULL.
+        LiteralKind::Vector | LiteralKind::File => OwnedSql::Null,
     }
 }
 

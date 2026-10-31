@@ -223,6 +223,9 @@ fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(
         LiteralKind::Time => Value::Time(field.literal.clone()),
         LiteralKind::DateTime => Value::DateTime(field.literal.clone()),
         LiteralKind::Bytes => Value::Bytes(iris_types::hex_to_bytes(&field.literal).unwrap_or_default()),
+        // Payload literals only cross typed-binding backends (yydb); the
+        // relational write path rejects them at plan time, so they land as NULL.
+        LiteralKind::Vector | LiteralKind::File => Value::Null,
     };
     to_mysql(&value, table, &field.name, uuid_fields)
 }
@@ -306,6 +309,9 @@ fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uui
             encode_str(text, table, field, uuid_fields)
         }
         LiteralKind::Bytes => MysqlValue::Bytes(iris_types::hex_to_bytes(text).unwrap_or_default()),
+        // Payload literals never reach a relational predicate (the typed plan
+        // rejects them at plan time); they encode as SQL NULL.
+        LiteralKind::Vector | LiteralKind::File => MysqlValue::NULL,
     }
 }
 
@@ -316,7 +322,9 @@ fn to_mysql(value: &Value, table: &str, field: &str, uuid_fields: &HashSet<(Stri
         Value::Int(i) => MysqlValue::Int(*i),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => encode_str(s, table, field, uuid_fields),
         Value::Bytes(octets) => MysqlValue::Bytes(octets.clone()),
-        Value::Object(_) => MysqlValue::NULL,
+        // No typed vector/file carrier exists for MySQL; surface as NULL so the
+        // write fails loudly downstream instead of guessing a text form.
+        Value::Vector(_) | Value::File(_) | Value::Object(_) => MysqlValue::NULL,
     }
 }
 

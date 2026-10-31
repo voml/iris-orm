@@ -9,6 +9,13 @@
 //! `{"$yydb":"bytes","hex":"<lowercase hex>"}`, the shape YYDB's N-API value
 //! wire uses. The generated runtime decodes the same shape back into
 //! `Uint8Array`, so octets round trip without an intermediate text guess.
+//!
+//! `vector` values leave as `{"$yydb":"vector","dimension":<u32>,
+//! "components":"<lowercase little-endian f32 hex>"}` and `file` values as
+//! `{"$yydb":"file","digest":"<64 lowercase hex>","octets":<u64>[,"name":…]
+//! [,"mediaType":…],"manifest":{"hash":"<64 lowercase hex>","size":<u64>}}` —
+//! the canonical YYDB tagged shapes, byte-for-byte what YYDB itself writes on
+//! its tagged value wire.
 
 use iris_types::{Row, Value};
 use serde_json::{Map, Value as JsonValue, json};
@@ -29,7 +36,8 @@ pub fn rows_to_json(rows: Vec<Row>) -> Vec<JsonValue> {
         .collect()
 }
 
-/// Encode one value: large `i64` becomes an exact decimal string, `bytes` keeps the tagged carrier.
+/// Encode one value: large `i64` becomes an exact decimal string, payload
+/// variants (`bytes` / `vector` / `file`) keep their tagged-object carrier.
 pub fn value_to_json(value: &Value) -> JsonValue {
     match value {
         Value::Null => JsonValue::Null,
@@ -44,6 +52,8 @@ pub fn value_to_json(value: &Value) -> JsonValue {
         }
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => json!(s),
         Value::Bytes(octets) => iris_types::tagged_bytes_json(octets),
+        Value::Vector(vector) => iris_types::tagged_vector_json(vector),
+        Value::File(file) => iris_types::tagged_file_json(file),
         Value::Object(fields) => {
             let mut obj = Map::new();
             for (key, value) in fields {

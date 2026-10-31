@@ -17,7 +17,7 @@ homepage = "https://iris-orm.pages.dev/"
 # Public VOS/VON/YYDB — git `rev` pinned (CI / Docker; no sibling path checkouts).
 vos = { git = "https://github.com/voml/vos-language.git", rev = "387d9fc3c9a556ddb8a433c627a866a2918d0186" }
 von = { git = "https://github.com/voml/von-language.git", rev = "ccc58c90c8f94c0be3dfcacb3b0caec98a6ae3e4", features = ["serde"] }
-yydb = { git = "https://github.com/yy-database/yydb.rs.git", rev = "79a71cd3ccae728da6985734bebeb16b9328e88a" }
+yydb = { git = "https://github.com/yy-database/yydb.rs.git", rev = "12bb8632302c7709bd0b53284bbfd92e5ff11049" }
 dejavu = { git = "https://github.com/doki-land/dejavu-engine.git", rev = "8aba1a0a61ac9d7f2112123a57faec649cf67427" }
 
 once_cell = "1"

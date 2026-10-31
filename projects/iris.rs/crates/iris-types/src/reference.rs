@@ -165,6 +165,20 @@ fn decode_literal(text: &str, kind: LiteralKind) -> Value {
         LiteralKind::Time => Value::Time(text.to_string()),
         LiteralKind::DateTime => Value::DateTime(text.to_string()),
         LiteralKind::Bytes => Value::Bytes(hex_to_bytes(text).unwrap_or_default()),
+        // Payload literals carry the canonical `$yydb` tagged JSON text; a
+        // text outside that form decodes to `Null`, never to a guessed value.
+        LiteralKind::Vector => serde_json::from_str::<serde_json::Value>(text)
+            .ok()
+            .as_ref()
+            .and_then(crate::value::vector_from_tagged_json)
+            .map(Value::Vector)
+            .unwrap_or(Value::Null),
+        LiteralKind::File => serde_json::from_str::<serde_json::Value>(text)
+            .ok()
+            .as_ref()
+            .and_then(crate::value::file_from_tagged_json)
+            .map(Value::File)
+            .unwrap_or(Value::Null),
     }
 }
 

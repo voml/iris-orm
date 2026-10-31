@@ -29,5 +29,7 @@ fn release_wasm32_artifact_exists_with_sane_size() {
     let bytes = std::fs::metadata(&wasm).expect("stat wasm").len();
     assert!(bytes > 8_192, "wasm artifact suspiciously small: {bytes} bytes");
     // Browser bundle budget (Route B artifacts + upcoming dependency slimming).
-    assert!(bytes < 2_200_000, "wasm artifact too large for browser target: {bytes} bytes");
+    // Raised from 2.2 MB when the yydb rev carrying native `vector`/`file`
+    // descriptors grew the artifact to 2,219,055 bytes (baseline 2,197,498).
+    assert!(bytes < 2_400_000, "wasm artifact too large for browser target: {bytes} bytes");
 }

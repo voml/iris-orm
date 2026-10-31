@@ -6,15 +6,20 @@ use vos::types::{CanonicalScalar, ResolvedCanonicalType};
 
 use crate::{Error, Result, provider::SqliteValue};
 
-pub(crate) fn to_sql_value(value: &Value) -> SqliteValue {
-    match value {
+pub(crate) fn to_sql_value(value: &Value) -> Result<SqliteValue> {
+    Ok(match value {
         Value::Null => SqliteValue::Null,
         Value::Bool(b) => SqliteValue::Integer(i64::from(*b)),
         Value::Int(i) => SqliteValue::Integer(*i),
         Value::Str(s) | Value::Decimal(s) | Value::Date(s) | Value::Time(s) | Value::DateTime(s) => SqliteValue::Text(s.as_bytes().to_vec()),
         Value::Bytes(octets) => SqliteValue::Blob(octets.clone()),
+        Value::Vector(_) | Value::File(_) => {
+            return Err(Error::Policy(
+                "VOS `vector`/`file` payloads need a datasource that binds typed values (yydb); SQLite has no carrier for them".to_owned(),
+            ));
+        }
         Value::Object(_) => SqliteValue::Null,
-    }
+    })
 }
 
 pub(crate) fn literal_to_sql_value(text: &str, kind: LiteralKind) -> SqliteValue {
@@ -26,6 +31,9 @@ pub(crate) fn literal_to_sql_value(text: &str, kind: LiteralKind) -> SqliteValue
             SqliteValue::Text(text.as_bytes().to_vec())
         }
         LiteralKind::Bytes => SqliteValue::Blob(iris_types::hex_to_bytes(text).unwrap_or_default()),
+        // Payload literals never reach a relational predicate (the typed plan
+        // rejects them at plan time); they encode as SQL NULL.
+        LiteralKind::Vector | LiteralKind::File => SqliteValue::Null,
     }
 }
 

@@ -3,9 +3,11 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
+use serde_json::{Value as JsonValue, json};
 
-/// Tagged JSON key of the shared `bytes` wire shape (`$yydb`).
+/// Tagged JSON key of the shared binary-payload wire shapes (`$yydb`).
+///
+/// The tag name selects the carrier: `bytes`, `vector` or `file`.
 pub const TAGGED_JSON_KEY: &str = "$yydb";
 
 /// Phase 1 value model (VOS-aligned subset, not a SQL value).
@@ -29,8 +31,136 @@ pub enum Value {
     DateTime(String),
     /// Octets of the VOS `bytes` scalar, exactly as the backend produced them.
     Bytes(Vec<u8>),
+    /// Fixed-dimension `f32` vector of the VOS `vector` scalar.
+    Vector(VectorValue),
+    /// File descriptor of the VOS `file` scalar: content identity, metadata
+    /// and the immutable chunk manifest reference, as the backend's CAS
+    /// object store produced it.
+    File(FileDescriptor),
     /// Nested object row (query projection).
     Object(BTreeMap<String, Value>),
+}
+
+/// Fixed-dimension vector of finite `f32` components (VOS `vector`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VectorValue {
+    /// Dimension fixed by the contract; equals `components.len()`.
+    pub dimension: u32,
+    /// Components in ascending index order.
+    pub components: Vec<f32>,
+}
+
+impl VectorValue {
+    /// Builds a vector, rejecting a zero dimension, a dimension/component-count
+    /// mismatch and any non-finite component (the VOS contract only carries
+    /// finite, non-empty embeddings).
+    pub fn new(dimension: u32, components: Vec<f32>) -> Option<Self> {
+        if dimension == 0 || dimension as usize != components.len() || components.iter().any(|c| !c.is_finite()) {
+            return None;
+        }
+        Some(Self { dimension, components })
+    }
+
+    /// Little-endian `f32` octets — the canonical binary form shared with the
+    /// YYDB `vector` payload and the tagged wire hex.
+    pub fn to_le_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.components.len() * 4);
+        for component in &self.components {
+            out.extend_from_slice(&component.to_le_bytes());
+        }
+        out
+    }
+
+    /// Decodes little-endian `f32` octets into a vector; `dimension` must match
+    /// the payload length and every component must be finite.
+    pub fn from_le_bytes(dimension: u32, octets: &[u8]) -> Option<Self> {
+        if octets.len() != dimension as usize * 4 {
+            return None;
+        }
+        let components = octets.as_chunks::<4>().0.iter().map(|chunk| f32::from_le_bytes(*chunk)).collect::<Vec<_>>();
+        Self::new(dimension, components)
+    }
+}
+
+// `f32` has no reflexive `Eq`/`Ord`, so equality and the total ordering both
+// compare IEEE-754 bit patterns. `VectorValue::new` rejects non-finite
+// components, which keeps bit equality in agreement with `==` for every value
+// this type can hold.
+impl PartialEq for VectorValue {
+    fn eq(&self, other: &Self) -> bool {
+        self.dimension == other.dimension
+            && self.components.len() == other.components.len()
+            && self.components.iter().zip(&other.components).all(|(a, b)| a.to_bits() == b.to_bits())
+    }
+}
+
+impl Eq for VectorValue {}
+
+impl PartialOrd for VectorValue {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for VectorValue {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.dimension
+            .cmp(&other.dimension)
+            .then_with(|| self.components.iter().map(|c| c.to_bits()).cmp(other.components.iter().map(|c| c.to_bits())))
+    }
+}
+
+/// Whether a text is exactly 64 lowercase hex digits (a 32-byte digest).
+fn is_lower_hex64(text: &str) -> bool {
+    text.len() == 64 && text.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Reference to the immutable manifest object that lists a file's chunks.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileManifestRef {
+    /// Lowercase hex digest of the manifest payload (64 hex digits).
+    pub hash: String,
+    /// Manifest payload size in bytes.
+    pub size: u64,
+}
+
+/// Row value of the VOS `file` scalar: content identity, metadata and manifest.
+///
+/// Mirrors the YYDB `file` descriptor: identity is the SHA-256 digest over the
+/// complete octets, while `name` / `media_type` are labelling metadata that
+/// never take part in the identity.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDescriptor {
+    /// Lowercase hex SHA-256 over the complete file octets (64 hex digits).
+    pub digest: String,
+    /// Total octet count of the complete file.
+    pub octets: u64,
+    /// Original file name; never part of the identity.
+    pub name: Option<String>,
+    /// Declared media type; never part of the identity.
+    pub media_type: Option<String>,
+    /// Immutable chunk manifest reference.
+    pub manifest: FileManifestRef,
+}
+
+impl FileDescriptor {
+    /// Builds a descriptor, rejecting digests that are not 64 lowercase hex
+    /// digits and metadata labels that are blank (the YYDB `file` contract
+    /// accepts a label only when it carries a non-blank value).
+    pub fn new(digest: String, octets: u64, name: Option<String>, media_type: Option<String>, manifest: FileManifestRef) -> Option<Self> {
+        if !is_lower_hex64(&digest) || !is_lower_hex64(&manifest.hash) {
+            return None;
+        }
+        let clean = |label: Option<String>| match &label {
+            Some(text) if text.trim().is_empty() => None,
+            _ => Some(label),
+        };
+        let name = clean(name)?;
+        let media_type = clean(media_type)?;
+        Some(Self { digest, octets, name, media_type, manifest })
+    }
 }
 
 impl Value {
@@ -46,6 +176,11 @@ impl Value {
             Self::Time(s) => (s.clone(), iris_ir::LiteralKind::Time),
             Self::DateTime(s) => (s.clone(), iris_ir::LiteralKind::DateTime),
             Self::Bytes(octets) => (bytes_to_hex(octets), iris_ir::LiteralKind::Bytes),
+            // `vector` / `file` payloads have no VOS source literal; their
+            // predicate text is the canonical YYDB tagged JSON, which only a
+            // typed-binding backend round-trips.
+            Self::Vector(vector) => (tagged_vector_json(vector).to_string(), iris_ir::LiteralKind::Vector),
+            Self::File(file) => (tagged_file_json(file).to_string(), iris_ir::LiteralKind::File),
             Self::Object(_) => ("null".into(), iris_ir::LiteralKind::Null),
         }
     }
@@ -95,13 +230,96 @@ pub fn bytes_from_tagged_json(value: &JsonValue) -> Option<Vec<u8>> {
     hex_to_bytes(object.get("hex")?.as_str()?)
 }
 
-/// True when the JSON value claims the tagged `bytes` shape, even if its hex is malformed.
-pub fn is_tagged_bytes_json(value: &JsonValue) -> bool {
-    value
-        .as_object()
-        .and_then(|object| object.get(TAGGED_JSON_KEY))
-        .and_then(JsonValue::as_str)
-        == Some("bytes")
+/// Tag name of a tagged carrier (`"bytes"`, `"vector"` or `"file"`), or `None`
+/// for any JSON shape that is not one of ours.
+///
+/// The claim is reported even when the payload is malformed, so hosts can
+/// refuse a broken carrier instead of guessing a text value.
+pub fn tagged_json_kind(value: &JsonValue) -> Option<&str> {
+    value.as_object()?.get(TAGGED_JSON_KEY)?.as_str()
+}
+
+/// JSON value of a tagged `vector` carrier in the canonical YYDB shape:
+/// `{"$yydb":"vector","dimension":<u32>,"components":"<lowercase little-endian f32 hex>"}`.
+///
+/// The hex payload is the canonical `f32` binary form, so components cross the
+/// JSON boundary without ever riding through a text guess.
+pub fn tagged_vector_json(vector: &VectorValue) -> JsonValue {
+    let mut object = serde_json::Map::new();
+    object.insert(TAGGED_JSON_KEY.to_owned(), JsonValue::String("vector".to_owned()));
+    object.insert("dimension".to_owned(), JsonValue::from(vector.dimension));
+    object.insert("components".to_owned(), JsonValue::String(bytes_to_hex(&vector.to_le_bytes())));
+    JsonValue::Object(object)
+}
+
+/// Vector of a tagged `vector` carrier, or `None` for any other JSON shape or a
+/// payload whose member set, dimension, hex, length or finiteness does not
+/// match the canonical YYDB form.
+pub fn vector_from_tagged_json(value: &JsonValue) -> Option<VectorValue> {
+    let object = value.as_object()?;
+    if object.get(TAGGED_JSON_KEY)?.as_str()? != "vector" {
+        return None;
+    }
+    if object.len() != 3 || !object.contains_key("dimension") || !object.contains_key("components") {
+        return None;
+    }
+    let dimension = u32::try_from(object.get("dimension")?.as_u64()?).ok().filter(|dimension| *dimension > 0)?;
+    let octets = hex_to_bytes(object.get("components")?.as_str()?)?;
+    VectorValue::from_le_bytes(dimension, &octets)
+}
+
+/// JSON value of a tagged `file` carrier in the canonical YYDB shape:
+/// `{"$yydb":"file","digest":"<64 lowercase hex>","octets":<u64>[,"name":…][,"mediaType":…],"manifest":{"hash":"<64 lowercase hex>","size":<u64>}}`.
+///
+/// Optional metadata members are omitted entirely when absent, matching the
+/// encoding YYDB itself writes on its tagged value wire.
+pub fn tagged_file_json(file: &FileDescriptor) -> JsonValue {
+    let mut object = serde_json::Map::new();
+    object.insert(TAGGED_JSON_KEY.to_owned(), JsonValue::String("file".to_owned()));
+    object.insert("digest".to_owned(), JsonValue::String(file.digest.clone()));
+    object.insert("octets".to_owned(), JsonValue::from(file.octets));
+    if let Some(name) = &file.name {
+        object.insert("name".to_owned(), JsonValue::String(name.clone()));
+    }
+    if let Some(media_type) = &file.media_type {
+        object.insert("mediaType".to_owned(), JsonValue::String(media_type.clone()));
+    }
+    object.insert("manifest".to_owned(), json!({ "hash": file.manifest.hash, "size": file.manifest.size }));
+    JsonValue::Object(object)
+}
+
+/// File descriptor of a tagged `file` carrier, or `None` for any other JSON
+/// shape or a payload that does not match the canonical YYDB file form: the
+/// member set, the digest spellings, the label values and the manifest shape
+/// are all part of the stored value, so a truncated or padded descriptor is
+/// rejected instead of decoding into a file that claims another identity.
+pub fn file_from_tagged_json(value: &JsonValue) -> Option<FileDescriptor> {
+    let object = value.as_object()?;
+    if object.get(TAGGED_JSON_KEY)?.as_str()? != "file" {
+        return None;
+    }
+    const ALLOWED: [&str; 6] = [TAGGED_JSON_KEY, "digest", "octets", "name", "mediaType", "manifest"];
+    if object.keys().any(|member| !ALLOWED.contains(&member.as_str())) {
+        return None;
+    }
+    let digest = object.get("digest")?.as_str()?.to_owned();
+    let octets = object.get("octets")?.as_u64()?;
+    let label = |member: &str| -> Option<Option<String>> {
+        match object.get(member) {
+            None | Some(JsonValue::Null) => Some(None),
+            Some(JsonValue::String(text)) if !text.trim().is_empty() => Some(Some(text.to_owned())),
+            Some(_) => None,
+        }
+    };
+    let name = label("name")?;
+    let media_type = label("mediaType")?;
+    let manifest = object.get("manifest")?.as_object()?;
+    if manifest.len() != 2 || !manifest.contains_key("hash") || !manifest.contains_key("size") {
+        return None;
+    }
+    let hash = manifest.get("hash")?.as_str()?.to_owned();
+    let size = manifest.get("size")?.as_u64()?;
+    FileDescriptor::new(digest, octets, name, media_type, FileManifestRef { hash, size })
 }
 
 /// One logical row: ordered field map.

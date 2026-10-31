@@ -292,7 +292,7 @@ fn connector_does_not_depend_on_foreign_adapters() {
 // value_from_yydb — non-lossy conversion
 // ---------------------------------------------------------------------------
 
-use iris_connector_yydb::{row_from_yydb};
+use iris_connector_yydb::row_from_yydb;
 
 #[test]
 fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
@@ -302,53 +302,36 @@ fn yydb_date_time_timestamp_decimal_round_trip_to_iris() {
     let ts = yydb::Timestamp::from_parts(date, time).expect("valid timestamp");
     let dec = yydb::Decimal::new(12345, 5, 2).expect("valid decimal");
 
-    assert!(matches!(
-        value_from_yydb(yydb::Value::Date(date)),
-        Ok(iris_types::Value::Date(_))
-    ));
-    assert!(matches!(
-        value_from_yydb(yydb::Value::Time(time)),
-        Ok(iris_types::Value::Time(_))
-    ));
-    assert!(matches!(
-        value_from_yydb(yydb::Value::Timestamp(ts)),
-        Ok(iris_types::Value::DateTime(_))
-    ));
-    assert!(matches!(
-        value_from_yydb(yydb::Value::Decimal(dec)),
-        Ok(iris_types::Value::Decimal(_))
-    ));
+    assert!(matches!(value_from_yydb(yydb::Value::Date(date)), Ok(iris_types::Value::Date(_))));
+    assert!(matches!(value_from_yydb(yydb::Value::Time(time)), Ok(iris_types::Value::Time(_))));
+    assert!(matches!(value_from_yydb(yydb::Value::Timestamp(ts)), Ok(iris_types::Value::DateTime(_))));
+    assert!(matches!(value_from_yydb(yydb::Value::Decimal(dec)), Ok(iris_types::Value::Decimal(_))));
 }
 
 #[test]
 fn yydb_object_still_fail_closed() {
-    // The CAS `object` handle still has no Iris Phase 1 carrier and must not
-    // silently degrade to Null. `vector` and `file` now round-trip through
-    // a tagged JSON string, but the raw CAS handle remains fail-closed.
-    let obj = yydb::ObjectRef {
-        algo: yydb::HashAlgo::Blake3,
-        hash: [0u8; 32],
-        size: 0,
-        kind: yydb::ObjectKind::VectorPayload,
-    };
+    // The CAS `object` handle still has no Iris carrier and must not silently
+    // degrade to Null. `vector` and `file` round-trip as native typed values,
+    // but the raw CAS handle remains fail-closed.
+    let obj = yydb::ObjectRef { algo: yydb::HashAlgo::Blake3, hash: [0u8; 32], size: 0, kind: yydb::ObjectKind::VectorPayload };
 
-    let err = value_from_yydb(yydb::Value::Object(obj))
-        .expect_err("CAS `object` must not silently map to Null");
+    let err = value_from_yydb(yydb::Value::Object(obj)).expect_err("CAS `object` must not silently map to Null");
     assert!(err.to_string().contains("object"));
 }
 
 #[test]
-fn yydb_vector_round_trips_through_tagged_json_string() {
-    // Iris has no Vector Value variant, so vector dimensions + components
-    // round-trip through a single tagged JSON string inside Iris::Value::Str.
+fn yydb_vector_round_trips_as_native_typed_value() {
+    // `vector` keeps its native identity end to end: dimension and component
+    // bit patterns survive both conversion directions, never a text form.
     let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![1.0_f32, 2.0, 3.0])).expect("vector");
 
-    let iris_value = value_from_yydb(yydb::Value::Vector(vec.clone())).expect("Vector → Iris::Str");
+    let iris_value = value_from_yydb(yydb::Value::Vector(vec.clone())).expect("Vector → Iris::Vector");
     match &iris_value {
-        iris_types::Value::Str(s) => {
-            assert!(s.contains("__iris_vector__"), "serialized form must carry discriminating key: {s}");
+        iris_types::Value::Vector(v) => {
+            assert_eq!(v.dimension, vec.dim, "dimension must survive conversion");
+            assert_eq!(v.components, vec.data.to_vec(), "components must survive conversion");
         }
-        other => panic!("expected Iris::Value::Str, got {other:?}"),
+        other => panic!("expected Iris::Value::Vector, got {other:?}"),
     }
 
     let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
@@ -367,73 +350,64 @@ fn yydb_vector_round_trips_through_tagged_json_string() {
 }
 
 #[test]
-fn tagged_vector_json_does_not_fool_plain_text_params() {
-    // A plain Iris::Value::Str that does not carry our envelope key must stay
-    // as YydbValue::Text — no accidental reinterpretation of existing code.
+fn plain_text_params_are_never_reinterpreted_as_payloads() {
+    // `Value::Str` always binds as `YydbValue::Text`, even when the text
+    // spells a legacy envelope key or a canonical tagged JSON payload: the
+    // typed variants carry payloads, text never gets reinterpreted.
+    let cases = [
+        "hello world",
+        "__iris_vector__{\"dimension\":2}",
+        "__iris_file__{\"chunkSize\":4096}",
+        r#"{"$yydb":"vector","dimension":2,"components":"0000803f00000040"}"#,
+        r#"{"$yydb":"file","digest":"a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3","octets":10,"manifest":{"hash":"b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4","size":128}}"#,
+    ];
     let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
-    named.insert("s".into(), iris_types::Value::Str("hello world".to_string()));
-    let out = value_params_to_yydb(&named).expect("plain string → YYDB binding");
-    assert_eq!(out.get("s"), Some(&yydb::Value::Text("hello world".to_string())));
+    for case in cases {
+        named.insert("s".into(), iris_types::Value::Str(case.to_string()));
+        let out = value_params_to_yydb(&named).expect("plain string → YYDB binding");
+        assert_eq!(out.get("s"), Some(&yydb::Value::Text(case.to_string())), "text `{case}` must bind as text");
+    }
 }
 
 #[test]
-fn yydb_file_round_trips_through_tagged_json_string() {
-    // Iris has no File Value variant yet, so chunk manifests round-trip as a
-    // single tagged JSON string via Iris::Value::Str.
-    let file = yydb::ChunkManifest {
-        chunk_size: 4096,
-        total_size: 12345,
-        chunks: vec![yydb::ObjectRef {
-            algo: yydb::HashAlgo::Blake3,
-            hash: [0xAB; 32],
-            size: 12345,
-            kind: yydb::ObjectKind::Blob,
-        }],
+fn yydb_file_round_trips_as_native_typed_value() {
+    // `file` keeps its native descriptor identity end to end: digest, octets,
+    // metadata and the manifest reference survive both conversion directions.
+    let file = yydb::FileDescriptor {
+        digest: "a3".repeat(32),
+        octets: 12345,
+        name: Some("note.bin".into()),
+        media_type: Some("application/octet-stream".into()),
+        manifest: yydb::FileManifestRef { hash: [0xAB; 32], size: 128 },
     };
 
-    let iris_value = value_from_yydb(yydb::Value::File(file.clone())).expect("File → Iris::Str");
+    let iris_value = value_from_yydb(yydb::Value::File(file.clone())).expect("File → Iris::File");
     match &iris_value {
-        iris_types::Value::Str(s) => {
-            assert!(s.contains("__iris_file__"), "serialized form must carry discriminating key: {s}");
+        iris_types::Value::File(f) => {
+            assert_eq!(f.digest, file.digest, "digest must survive conversion");
+            assert_eq!(f.octets, file.octets, "octets must survive conversion");
+            assert_eq!(f.name, file.name, "name must survive conversion");
+            assert_eq!(f.media_type, file.media_type, "media type must survive conversion");
+            assert_eq!(f.manifest.hash, file.manifest.hash_hex(), "manifest hash must survive as canonical lowercase hex");
+            assert_eq!(f.manifest.size, file.manifest.size, "manifest size must survive conversion");
         }
-        other => panic!("expected Iris::Value::Str, got {other:?}"),
+        other => panic!("expected Iris::Value::File, got {other:?}"),
     }
 
     let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
     named.insert("f".into(), iris_value);
     let out = value_params_to_yydb(&named).expect("Iris params → YYDB binding");
     match out.get("f") {
-        Some(yydb::Value::File(cm)) => {
-            assert_eq!(cm.chunk_size, file.chunk_size);
-            assert_eq!(cm.total_size, file.total_size);
-            assert_eq!(cm.chunks.len(), file.chunks.len());
-            assert_eq!(cm.chunks[0].hash, file.chunks[0].hash);
-            assert_eq!(cm.chunks[0].size, file.chunks[0].size);
-        }
+        Some(yydb::Value::File(got)) => assert_eq!(got, &file, "descriptor must survive round-trip"),
         other => panic!("expected YydbValue::File, got {other:?}"),
     }
-}
-
-#[test]
-fn tagged_file_json_does_not_fool_plain_text_params() {
-    // A plain Iris::Value::Str that does not carry our envelope key must stay
-    // as YydbValue::Text — no accidental reinterpretation of existing code.
-    let mut named: BTreeMap<String, iris_types::Value> = BTreeMap::new();
-    named.insert("s".into(), iris_types::Value::Str("hello world".to_string()));
-    let out = value_params_to_yydb(&named).expect("plain string → YYDB binding");
-    assert_eq!(out.get("s"), Some(&yydb::Value::Text("hello world".to_string())));
 }
 
 #[test]
 fn row_from_yydb_propagates_unsupported_cell_error() {
     // BTreeMap<String, YydbValue> containing a CAS Object cell must fail the
     // row conversion instead of silently dropping the cell to Null.
-    let obj = yydb::ObjectRef {
-        algo: yydb::HashAlgo::Blake3,
-        hash: [0u8; 32],
-        size: 0,
-        kind: yydb::ObjectKind::Blob,
-    };
+    let obj = yydb::ObjectRef { algo: yydb::HashAlgo::Blake3, hash: [0u8; 32], size: 0, kind: yydb::ObjectKind::Blob };
     let mut row: BTreeMap<String, yydb::Value> = BTreeMap::new();
     row.insert("id".to_string(), yydb::Value::I64(1));
     row.insert("payload".to_string(), yydb::Value::Object(obj));
@@ -444,21 +418,22 @@ fn row_from_yydb_propagates_unsupported_cell_error() {
 }
 
 #[test]
-fn row_from_yydb_vector_cell_round_trips_via_tagged_string() {
-    // A row cell containing a Vector now round-trips as a tagged JSON string
-    // inside Iris::Value::Str instead of failing.
+fn row_from_yydb_vector_cell_round_trips_as_native_value() {
+    // A row cell containing a Vector lands in Iris::Value::Vector with its
+    // dimension and components intact, never as a tagged string.
     let vec = yydb::Vector::new(std::sync::Arc::<[f32]>::from(vec![0.5_f32, -1.5, 2.0])).expect("vector");
     let mut row: BTreeMap<String, yydb::Value> = BTreeMap::new();
     row.insert("id".to_string(), yydb::Value::I64(1));
-    row.insert("embedding".to_string(), yydb::Value::Vector(vec));
+    row.insert("embedding".to_string(), yydb::Value::Vector(vec.clone()));
 
     let iris_row = row_from_yydb(row).expect("vector cell must convert");
     assert_eq!(iris_row.get("id"), Some(&iris_types::Value::Int(1)));
     match iris_row.get("embedding") {
-        Some(iris_types::Value::Str(s)) => {
-            assert!(s.contains("__iris_vector__"), "must be tagged vector string: {s}");
+        Some(iris_types::Value::Vector(v)) => {
+            assert_eq!(v.dimension, vec.dim);
+            assert_eq!(v.components, vec.data.to_vec());
         }
-        other => panic!("expected tagged string, got {other:?}"),
+        other => panic!("expected native vector, got {other:?}"),
     }
 }
 

@@ -144,10 +144,7 @@ fn bytes_operation_types_cross_as_the_vos_carrier() {
 
     let rust = emit_target_files(&model, "rust").expect("rust target");
     let operations = target_file(&rust, "operations.rs");
-    assert!(
-        operations.contains("fn store_blob(payload: Vec<u8>) -> Vec<u8>"),
-        "`bytes` must cross as raw octets, never text:\n{operations}"
-    );
+    assert!(operations.contains("fn store_blob(payload: Vec<u8>) -> Vec<u8>"), "`bytes` must cross as raw octets, never text:\n{operations}");
 
     let typescript = emit_target_files(&model, "typescript").expect("typescript target");
     let operations = target_file(&typescript, "operations.ts");
