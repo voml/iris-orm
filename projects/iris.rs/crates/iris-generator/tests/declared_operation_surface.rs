@@ -313,6 +313,44 @@ table Doc {
     );
 }
 
+/// Payload filters need a design ruling (digest equality for `file`,
+/// similarity ops for `vector`); until then the TypeScript surface stays
+/// fail-closed instead of guessing an operator set.
+#[test]
+fn file_field_without_filter_surface_is_rejected() {
+    const FILE_FIELD_SCHEMA: &str = r#"
+table Doc {
+    @@id: uuid,
+    attachment: file,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(FILE_FIELD_SCHEMA).expect("model");
+    let error = emit_target_files(&model, "typescript", None).expect_err("a `file` field must not gain a guessed filter type");
+    assert!(
+        matches!(
+            error,
+            Error::UnsupportedFilterType { ref entity, ref field, ref vos_type }
+                if entity == "Doc" && field == "attachment" && vos_type == "file"
+        ),
+        "{error}"
+    );
+}
+
+/// `vector<N>` has no TypeScript carrier yet: the carrier table keys on the
+/// bare `vector` label while the field text keeps the declared dimension.
+#[test]
+fn vector_field_without_carrier_is_rejected() {
+    const VECTOR_FIELD_SCHEMA: &str = r#"
+table Doc {
+    @@id: uuid,
+    embedding: vector<3>,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(VECTOR_FIELD_SCHEMA).expect("model");
+    let error = emit_target_files(&model, "typescript", None).expect_err("a `vector<3>` label has no TypeScript carrier");
+    assert!(matches!(error, Error::UnknownVosLabel(ref label) if label == "vector<3>"), "{error}");
+}
+
 #[test]
 fn source_operations_carry_durable_identity() {
     const SCHEMA: &str = r#"
