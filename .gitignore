@@ -18,6 +18,7 @@ Cargo.lock
 # Node
 node_modules/
 .astro/
+.nuxt/
 dist/
 *.node
 *.wasm

@@ -1,17 +1,18 @@
 {
+    "extends": "./.nuxt/tsconfig.server.json",
     "compilerOptions": {
-        "target": "ES2022",
-        "module": "ESNext",
-        "moduleResolution": "bundler",
         "strict": true,
         "noEmit": true,
         "skipLibCheck": true,
         "allowImportingTsExtensions": true,
-        "baseUrl": ".",
-        "paths": {
-            "@iris/*": ["server/generated/iris/*"]
-        },
         "types": ["node"]
     },
-    "include": ["server/**/*.ts", "nuxt.config.ts", "app.vue", "iris.config.ts"]
+    "include": [
+        "./.nuxt/types/nitro.d.ts",
+        "./.nuxt/types/nitro-nuxt.d.ts",
+        "server/**/*.ts",
+        "nuxt.config.ts",
+        "app.vue",
+        "iris.config.ts"
+    ]
 }
