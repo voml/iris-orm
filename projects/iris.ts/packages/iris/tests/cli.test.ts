@@ -82,6 +82,59 @@ test("invalid option exits with code 2", () => {
     assert.equal(result.status, 2);
 });
 
+test("iris capabilities prints the default negotiated matrix", () => {
+    const result = runCli(["capabilities"]);
+    assert.equal(result.status, 0, result.stderr);
+    const matrix = JSON.parse(result.stdout) as {
+        host: string;
+        storage: string;
+        durability: string;
+        bindingReady: boolean;
+        execution: Record<string, boolean>;
+        storageBackends: Record<string, boolean>;
+        transaction: Record<string, boolean>;
+    };
+    assert.equal(matrix.host, "node");
+    assert.equal(matrix.storage, "memory");
+    assert.equal(matrix.durability, "ephemeral");
+    assert.equal(matrix.bindingReady, false);
+    assert.equal(matrix.execution.native, true);
+    assert.equal(matrix.storageBackends.memory, true);
+    assert.equal(matrix.transaction.local, true);
+});
+
+test("iris capabilities normalizes the legacy `web` host alias", () => {
+    const result = runCli(["capabilities", "--host", "web"]);
+    assert.equal(result.status, 0, result.stderr);
+    const matrix = JSON.parse(result.stdout) as { host: string; execution: Record<string, boolean> };
+    assert.equal(matrix.host, "browser");
+    assert.equal(matrix.execution.wasm, true);
+});
+
+test("iris capabilities honors an explicit host and storage pair", () => {
+    const result = runCli(["capabilities", "--host", "node", "--storage", "sqlite"]);
+    assert.equal(result.status, 0, result.stderr);
+    const matrix = JSON.parse(result.stdout) as { durability: string; storageBackends: Record<string, boolean> };
+    assert.equal(matrix.durability, "local-durable");
+    assert.equal(matrix.storageBackends.sqlite, true);
+});
+
+test("iris capabilities rejects unknown hosts and storages", () => {
+    const badHost = runCli(["capabilities", "--host", "deno"]);
+    assert.equal(badHost.status, 1);
+    assert.match(badHost.stderr, /unknown host `deno`/);
+
+    const badStorage = runCli(["capabilities", "--storage", "mongo"]);
+    assert.equal(badStorage.status, 1);
+    assert.match(badStorage.stderr, /unknown storage `mongo`/);
+});
+
+test("iris capabilities rejects an incompatible host and storage pair", () => {
+    const result = runCli(["capabilities", "--host", "browser", "--storage", "d1"]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /does not support storage `d1`/);
+});
+
 test("config execution failure exits 1 with one structured diagnostic", async () => {
     const dir = await mkdtemp(join(tmpdir(), "iris-cli-bad-config-"));
     const marker = await writeThrowingConfig(dir);
