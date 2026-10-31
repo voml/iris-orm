@@ -20,6 +20,7 @@ pub(crate) struct RustTableView {
     snake_name: String,
     primary_key: String,
     scalar_fields: Vec<RustFieldView>,
+    where_fields: Vec<RustFieldView>,
     synthesize_fns: String,
     row_write_fn: String,
 }
@@ -42,9 +43,9 @@ struct RustDatasourceBindingView {
 
 /// Resolve the Rust client adapter binding for a datasource kind.
 ///
-/// Only `mysql` has a converged adapter surface (checkout pools, `_on` variants,
-/// `with_rollback`). `sqlite` / `postgres` / `redis` / `yydb` / `yyds` / `reference`
-/// fail closed until their adapter surfaces converge on the same shape.
+/// `mysql` and `yydb` have converged adapter surfaces (connection handoff,
+/// `_on` variants, `with_rollback`). `sqlite` / `postgres` / `redis` / `yyds` /
+/// `reference` fail closed until their adapter surfaces converge on the same shape.
 fn rust_datasource_binding(kind: &str) -> Result<RustDatasourceBindingView> {
     match kind {
         "mysql" => Ok(RustDatasourceBindingView {
@@ -53,6 +54,13 @@ fn rust_datasource_binding(kind: &str) -> Result<RustDatasourceBindingView> {
             source_type: "MysqlSource",
             conn_type: "PooledConn",
             result_alias: "MysqlResult",
+        }),
+        "yydb" => Ok(RustDatasourceBindingView {
+            kind: kind.to_owned(),
+            adapter_crate: "iris_connector_yydb",
+            source_type: "YydbSource",
+            conn_type: "Connection",
+            result_alias: "YydbResult",
         }),
         other => Err(Error::UnsupportedDatasource(other.to_owned())),
     }
@@ -125,13 +133,16 @@ fn build_rust_table_view(table: &TableModel) -> Result<RustTableView> {
         }
     }
 
+    let where_fields = scalar_fields.iter().filter(|f| !is_payload_base(scalar_base(&f.rust_ty))).cloned().collect();
+
     Ok(RustTableView {
         name: table.name.clone(),
         snake_name: to_snake(&table.name),
         primary_key: pk.to_string(),
         scalar_fields,
+        where_fields,
         synthesize_fns: synthesize_fns(table),
-        row_write_fn: row_write_fn(table, pk),
+        row_write_fn: row_write_fn(table, pk)?,
     })
 }
 
@@ -145,7 +156,32 @@ fn primary_key(table: &TableModel) -> Result<&str> {
 }
 
 fn scalar_base(rust_ty: &str) -> &str {
-    rust_ty.trim_start_matches("Option<").trim_end_matches('>')
+    rust_ty
+        .strip_prefix("Option<")
+        .and_then(|rest| rest.strip_suffix('>'))
+        .unwrap_or(rust_ty)
+}
+
+/// Payload carriers (`bytes` / `vector` / `file`) have no VOS literal text form,
+/// so they never join the synthesized `Where` equality predicates.
+fn is_payload_base(base: &str) -> bool {
+    matches!(base, "Vec<u8>" | "Vec<f32>" | "iris::FileDescriptor")
+}
+
+/// Dimension parsed from the field's `vector<N>` / `vector<N>?` VOS label.
+fn vector_dimension(field: &FieldModel) -> Result<u32> {
+    let label = field.vos_type.strip_suffix('?').unwrap_or(&field.vos_type);
+    let inner = label
+        .strip_prefix("vector<")
+        .and_then(|rest| rest.strip_suffix('>'))
+        .ok_or_else(|| Error::UnsupportedType(format!("field `{}` has malformed vector type `{}`", field.name, field.vos_type)))?;
+    let dimension: u32 = inner
+        .parse()
+        .map_err(|_| Error::UnsupportedType(format!("vector dimension `{inner}` is not a positive integer")))?;
+    if dimension == 0 {
+        return Err(Error::UnsupportedType("vector dimension must be greater than zero".into()));
+    }
+    Ok(dimension)
 }
 
 fn value_extract_expr(field: &FieldModel) -> String {
@@ -155,6 +191,9 @@ fn value_extract_expr(field: &FieldModel) -> String {
         "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
             format!("__iris_value_i64(row, \"{}\").map(|v| v as {base})", field.name)
         }
+        "Vec<u8>" => format!("__iris_value_bytes(row, \"{}\")", field.name),
+        "Vec<f32>" => format!("__iris_value_vector(row, \"{}\")", field.name),
+        "iris::FileDescriptor" => format!("__iris_value_file(row, \"{}\")", field.name),
         _ => format!("__iris_value_str(row, \"{}\")", field.name),
     }
 }
@@ -170,7 +209,7 @@ fn where_field_ty(field: &FieldModel) -> &'static str {
 fn emit_pred_build(table: &TableModel) -> String {
     let mut pred_build = String::new();
     for field in &table.fields {
-        if field.reference_target.is_some() {
+        if field.reference_target.is_some() || is_payload_base(scalar_base(&field.rust_ty)) {
             continue;
         }
         match scalar_base(&field.rust_ty) {
@@ -240,64 +279,109 @@ fn synthesize_fns(table: &TableModel) -> String {
     )
 }
 
-fn row_write_fn(table: &TableModel, pk: &str) -> String {
+fn row_write_fn(table: &TableModel, pk: &str) -> Result<String> {
     let mut fields = String::new();
     for field in &table.fields {
         if field.reference_target.is_some() {
             continue;
         }
         let base = scalar_base(&field.rust_ty);
-        let value_expr = if field.optional {
-            match base {
-                "bool" => format!(
-                    r#"            ("{fname}".into(), match &row.{fname} {{
+        let fname = field.name.as_str();
+        let value_expr = match base {
+            "Vec<u8>" => {
+                if field.optional {
+                    format!(
+                        r#"            ("{fname}".into(), match &row.{fname} {{
+                Some(v) => Value::Bytes(v.clone()),
+                None => Value::Null,
+            }}),"#,
+                    )
+                }
+                else {
+                    format!(r#"            ("{fname}".into(), Value::Bytes(row.{fname}.clone())),"#)
+                }
+            }
+            "Vec<f32>" => {
+                let dimension = vector_dimension(field)?;
+                let policy = format!("vector `{fname}` does not match the declared dimension {dimension}");
+                if field.optional {
+                    format!(
+                        r#"            ("{fname}".into(), match &row.{fname} {{
+                Some(v) => Value::Vector(iris::VectorValue::new({dimension}u32, v.clone()).ok_or_else(|| super::errors::Error::Policy("{policy}".into()))?),
+                None => Value::Null,
+            }}),"#,
+                    )
+                }
+                else {
+                    format!(
+                        r#"            ("{fname}".into(), Value::Vector(iris::VectorValue::new({dimension}u32, row.{fname}.clone()).ok_or_else(|| super::errors::Error::Policy("{policy}".into()))?)),"#,
+                    )
+                }
+            }
+            "iris::FileDescriptor" => {
+                if field.optional {
+                    format!(
+                        r#"            ("{fname}".into(), match &row.{fname} {{
+                Some(v) => Value::File(v.clone()),
+                None => Value::Null,
+            }}),"#,
+                    )
+                }
+                else {
+                    format!(r#"            ("{fname}".into(), Value::File(row.{fname}.clone())),"#)
+                }
+            }
+            _ => {
+                if field.optional {
+                    match base {
+                        "bool" => format!(
+                            r#"            ("{fname}".into(), match &row.{fname} {{
                 Some(v) => Value::Bool(*v),
                 None => Value::Null,
             }}),"#,
-                    fname = field.name,
-                ),
-                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => format!(
-                    r#"            ("{fname}".into(), match &row.{fname} {{
+                        ),
+                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => format!(
+                            r#"            ("{fname}".into(), match &row.{fname} {{
                 Some(v) => Value::Int((*v) as i64),
                 None => Value::Null,
             }}),"#,
-                    fname = field.name,
-                ),
-                _ => format!(
-                    r#"            ("{fname}".into(), match &row.{fname} {{
+                        ),
+                        _ => format!(
+                            r#"            ("{fname}".into(), match &row.{fname} {{
                 Some(v) => Value::Str(v.clone()),
                 None => Value::Null,
             }}),"#,
-                    fname = field.name,
-                ),
-            }
-        }
-        else {
-            match base {
-                "bool" => format!(r#"            ("{fname}".into(), Value::Bool(row.{fname})),"#, fname = field.name,),
-                "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
-                    format!(r#"            ("{fname}".into(), Value::Int(row.{fname} as i64)),"#, fname = field.name,)
+                        ),
+                    }
                 }
-                _ => format!(r#"            ("{fname}".into(), Value::Str(row.{fname}.clone())),"#, fname = field.name,),
+                else {
+                    match base {
+                        "bool" => format!(r#"            ("{fname}".into(), Value::Bool(row.{fname})),"#),
+                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+                            format!(r#"            ("{fname}".into(), Value::Int(row.{fname} as i64)),"#)
+                        }
+                        _ => format!(r#"            ("{fname}".into(), Value::Str(row.{fname}.clone())),"#),
+                    }
+                }
             }
         };
         fields.push_str(&value_expr);
         fields.push('\n');
     }
-    format!(
-        r#"    fn to_row_write(row: &{name}) -> RowWrite {{
-        RowWrite {{
+    Ok(format!(
+        r#"    fn to_row_write(row: &{name}) -> super::errors::Result<RowWrite> {{
+        Ok(RowWrite {{
             table: "{name}".into(),
             primary_key: "{pk}".into(),
             fields: BTreeMap::from([
 {fields}            ]),
-        }}
+        }})
     }}
 "#,
         name = table.name,
         pk = pk,
         fields = fields,
-    )
+    ))
 }
 
 fn to_snake(name: &str) -> String {

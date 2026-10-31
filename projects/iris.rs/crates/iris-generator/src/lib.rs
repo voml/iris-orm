@@ -97,7 +97,7 @@ pub enum Error {
     #[error("rust client generation requires a datasource kind (the adapter binding is chosen per datasource)")]
     MissingDatasource,
     /// Datasource kind whose adapter surface has not converged for a Rust client binding.
-    #[error("datasource `{0}` has no converged Rust adapter binding (only `mysql` is bound; sqlite/postgres/redis/yydb/yyds/reference adapter surfaces have not converged)")]
+    #[error("datasource `{0}` has no converged Rust adapter binding (only `mysql` and `yydb` are bound; sqlite/postgres/redis/yyds/reference adapter surfaces have not converged)")]
     UnsupportedDatasource(String),
     /// Two VOS fields map to the same TypeScript author name.
     #[error("TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`")]
@@ -756,6 +756,20 @@ fn map_resolved_field_type(ty: &vos::ResolvedCanonicalType) -> Result<MappedFiel
             let name = path.join("::");
             Ok(MappedFieldType { rust_ty: name.clone(), vos_type: name, optional: false, is_uuid: false, reference_target: None })
         }
+        ResolvedCanonicalType::Vector { dimension, .. } => Ok(MappedFieldType {
+            rust_ty: "Vec<f32>".into(),
+            vos_type: format!("vector<{dimension}>"),
+            optional: false,
+            is_uuid: false,
+            reference_target: None,
+        }),
+        ResolvedCanonicalType::File => Ok(MappedFieldType {
+            rust_ty: "iris::FileDescriptor".into(),
+            vos_type: "file".into(),
+            optional: false,
+            is_uuid: false,
+            reference_target: None,
+        }),
         other => Err(Error::UnsupportedType(format!("resolved type {other:?}"))),
     }
 }
@@ -815,6 +829,22 @@ fn map_field_type(ty: &CanonicalType) -> Result<MappedFieldType> {
         }
         CanonicalType::Named(path) => {
             Ok(MappedFieldType { rust_ty: path.join("::"), vos_type: path.join("::"), optional: false, is_uuid: false, reference_target: None })
+        }
+        CanonicalType::Generic { path, arguments } if path.len() == 1 && path[0] == "vector" => {
+            let [CanonicalTypeArgument::Literal(text)] = arguments.as_slice() else {
+                return Err(Error::UnsupportedType(format!("{ty:?}")));
+            };
+            let dimension: u32 = text.parse().map_err(|_| Error::UnsupportedType(format!("vector dimension `{text}` is not a positive integer")))?;
+            if dimension == 0 {
+                return Err(Error::UnsupportedType("vector dimension must be greater than zero".into()));
+            }
+            Ok(MappedFieldType {
+                rust_ty: "Vec<f32>".into(),
+                vos_type: format!("vector<{dimension}>"),
+                optional: false,
+                is_uuid: false,
+                reference_target: None,
+            })
         }
         other => Err(Error::UnsupportedType(format!("{other:?}"))),
     }

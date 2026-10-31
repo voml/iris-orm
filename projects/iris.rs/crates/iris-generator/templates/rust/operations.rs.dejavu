@@ -134,12 +134,12 @@ impl <% table.name %>Delegate<'_> {
 
     /// Insert a row.
     pub fn insert(&self, row: &<% table.name %>) -> <% datasource.result_alias %><()> {
-        self.db.source.insert(&Self::to_row_write(row))
+        self.db.source.insert(&Self::to_row_write(row)?)
     }
 
     /// Update by primary key.
     pub fn update(&self, row: &<% table.name %>) -> <% datasource.result_alias %><u64> {
-        self.db.source.update(&Self::to_row_write(row))
+        self.db.source.update(&Self::to_row_write(row)?)
     }
 
     /// Delete by primary key.
@@ -181,13 +181,13 @@ impl <% table.name %>TxnDelegate<'_> {
     /// Insert a row.
     pub fn insert(&mut self, row: &<% table.name %>) -> <% datasource.result_alias %><()> {
         self.source
-            .insert_on(self.conn, &<% table.name %>Delegate::to_row_write(row))
+            .insert_on(self.conn, &<% table.name %>Delegate::to_row_write(row)?)
     }
 
     /// Update by primary key.
     pub fn update(&mut self, row: &<% table.name %>) -> <% datasource.result_alias %><u64> {
         self.source
-            .update_on(self.conn, &<% table.name %>Delegate::to_row_write(row))
+            .update_on(self.conn, &<% table.name %>Delegate::to_row_write(row)?)
     }
 
     /// Delete by primary key.

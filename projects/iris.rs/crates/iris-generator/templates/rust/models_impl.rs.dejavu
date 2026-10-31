@@ -10,6 +10,6 @@
 /// Flat equality / bool filter for `<% table.name %>` (omit fields with `None`).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct <% table.name %>Where {
-<% loop field in table.scalar_fields %>    pub <% field.name %>: <% field.where_ty %>,
+<% loop field in table.where_fields %>    pub <% field.name %>: <% field.where_ty %>,
 <% end loop %>}
 <% end loop %>

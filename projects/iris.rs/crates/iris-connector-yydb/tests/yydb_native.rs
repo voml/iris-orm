@@ -623,3 +623,109 @@ fn file_descriptor_and_content_survive_close_and_reopen() {
         let _ = fs::remove_dir_all(dir);
     }
 }
+
+// ---------------------------------------------------------------------------
+// Converged adapter surface — `execute_plan` / `insert` / transactions
+// ---------------------------------------------------------------------------
+
+fn blob_row_write(blob_id: i64, octets: Vec<u8>) -> iris_types::RowWrite {
+    iris_types::RowWrite {
+        table: "Blob".into(),
+        primary_key: "blob_id".into(),
+        fields: BTreeMap::from([
+            ("blob_id".to_string(), iris_types::Value::Int(blob_id)),
+            ("label".to_string(), iris_types::Value::Str(format!("surface-{blob_id}"))),
+            ("body".to_string(), iris_types::Value::Bytes(octets)),
+        ]),
+    }
+}
+
+#[test]
+fn adapter_execute_plan_runs_planned_reads() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
+    db.execute(r#"User { user_id: "11111111-1111-1111-1111-111111111111", user_name: "ada", active: true }.insert()"#).unwrap();
+    db.execute(r#"User { user_id: "22222222-2222-2222-2222-222222222222", user_name: "bob", active: false }.insert()"#).unwrap();
+
+    let planner = iris_types::Planner::new(YydbSource::capabilities());
+
+    let plan = planner.plan_source(r#"User.filter(x => x.active == true).collect()"#).unwrap();
+    let rows = db.execute_plan(&plan).expect("planned `FieldBool` read");
+    assert_eq!(rows.len(), 1);
+
+    let plan = planner.plan_source(r#"User.filter(x => x.user_name == "bob").collect()"#).unwrap();
+    let rows = db.execute_plan(&plan).expect("planned string compare binds a typed `$param`");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].get("user_name"), Some(&iris_types::Value::Str("bob".into())));
+
+    let plan = planner
+        .plan_source(r#"User.filter(x => x.active == true && x.user_name == "ada").sort_by(x => x.user_name).skip(0).take(5).map(x => x.{ user_name, }).collect()"#)
+        .expect("plan compound read");
+    let rows = db.execute_plan(&plan).expect("planned and/sort/skip/take/project read");
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].get("user_name"), Some(&iris_types::Value::Str("ada".into())));
+}
+
+#[test]
+fn adapter_execute_plan_runs_planned_insert() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
+    let planner = iris_types::Planner::new(YydbSource::capabilities());
+    let plan = planner
+        .plan_source(r#"User::insert({ user_id: "33333333-3333-3333-3333-333333333333", user_name: "charlie", active: true })"#)
+        .expect("plan insert");
+    let rows = db.execute_plan(&plan).expect("planned insert");
+    assert!(rows.is_empty(), "writes return no rows");
+    let found = db.query(r#"User.filter(x => x.user_name == "charlie").collect()"#).unwrap();
+    assert_eq!(found.len(), 1);
+}
+
+#[test]
+fn adapter_insert_row_write_carries_typed_payloads() {
+    let path = temp_layout_path("row-write", "yydx");
+    let db = YydbSource::open(&path).unwrap();
+    db.ensure_schema(BLOB_SCHEMA).unwrap();
+    db.insert(&blob_row_write(1, vec![0x00, 0xff, 0x41])).expect("typed `RowWrite` insert");
+    assert_eq!(read_body(&db, 1), vec![0x00, 0xff, 0x41]);
+    drop(db);
+    if let Some(dir) = path.parent() {
+        let _ = fs::remove_dir_all(dir);
+    }
+}
+
+#[test]
+fn adapter_update_and_delete_fail_closed() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(BLOB_SCHEMA).unwrap();
+    let err = db.update(&blob_row_write(1, vec![0x01])).expect_err("VOS writes are insert-only");
+    assert!(err.to_string().contains("insert-only"), "{err}");
+    let err = db.delete("Blob", "blob_id", &iris_types::Value::Int(1)).expect_err("VOS writes are insert-only");
+    assert!(err.to_string().contains("insert-only"), "{err}");
+}
+
+#[test]
+fn adapter_transaction_commits_and_with_rollback_leaves_no_residue() {
+    let path = temp_layout_path("txn-surface", "yydx");
+    let db = YydbSource::open(&path).unwrap();
+    db.ensure_schema(BLOB_SCHEMA).unwrap();
+
+    db.transaction(|conn| db.insert_on(conn, &blob_row_write(1, vec![0xAA]))).expect("commit");
+    assert_eq!(read_body(&db, 1), vec![0xAA]);
+
+    let err = db
+        .with_rollback(|conn| {
+            db.insert_on(conn, &blob_row_write(2, vec![0xBB]))?;
+            Err::<(), _>(iris_connector_yydb::Error::Runtime("rollback probe".into()))
+        })
+        .expect_err("closure error must propagate");
+    assert!(err.to_string().contains("rollback probe"), "{err}");
+
+    let named = BTreeMap::from([("blob_id".to_string(), iris_types::Value::Int(2))]);
+    let rows = db.query_with_params(BLOB_QUERY, &named).expect("query after rollback");
+    assert_eq!(rows.len(), 0, "rolled-back insert must leave no residue");
+
+    drop(db);
+    if let Some(dir) = path.parent() {
+        let _ = fs::remove_dir_all(dir);
+    }
+}

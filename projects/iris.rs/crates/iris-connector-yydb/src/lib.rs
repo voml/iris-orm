@@ -9,18 +9,21 @@
 #![warn(missing_docs)]
 
 mod error;
+mod plan;
 
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     path::{Path, PathBuf},
 };
 
-use iris_ir::IrVersion;
-use iris_types::{CapabilitySet, FileDescriptor, FileManifestRef, QueryCaps, VectorValue, WriteCaps};
+use iris_ir::{IrVersion, PhysicalPlan};
+use iris_types::{CapabilitySet, FileDescriptor, FileManifestRef, QueryCaps, RowWrite, VectorValue, WriteCaps};
 use serde::{Deserialize, Serialize};
-use yydb::{Connection, SchemaVersion, query::PreparedStatement};
+use yydb::{SchemaVersion, query::PreparedStatement};
 
 pub use error::{Error, Result};
+pub use yydb::Connection;
 
 use yydb::Value as YydbValue;
 
@@ -108,8 +111,12 @@ pub struct SchemaHandshake {
 // ---------------------------------------------------------------------------
 
 /// Native YYDB datasource handle.
+///
+/// The connection lives behind a [`RefCell`] so the adapter surface can hand
+/// out `&mut Connection` for transactions (matching the converged adapter
+/// shape) while every other method keeps the shared `&self` style.
 pub struct YydbSource {
-    conn: Connection,
+    conn: RefCell<Connection>,
     path: Option<PathBuf>,
 }
 
@@ -146,13 +153,13 @@ impl YydbSource {
 
     /// Open an in-memory YYDB (tests / ephemeral).
     pub fn open_in_memory() -> Result<Self> {
-        Ok(Self { conn: Connection::open_in_memory()?, path: None })
+        Ok(Self { conn: RefCell::new(Connection::open_in_memory()?), path: None })
     }
 
     /// Open or create a file-backed `.yydb`.
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
-        Ok(Self { conn: Connection::open(&path)?, path: Some(path) })
+        Ok(Self { conn: RefCell::new(Connection::open(&path)?), path: Some(path) })
     }
 
     /// On-disk path when file-backed.
@@ -161,19 +168,19 @@ impl YydbSource {
     }
 
     /// Borrow the underlying YYDB connection (escape hatch for advanced ops).
-    pub fn connection(&self) -> &Connection {
-        &self.conn
+    pub fn connection(&self) -> std::cell::Ref<'_, Connection> {
+        self.conn.borrow()
     }
 
     /// Install / verify schema (Native Pull handshake input).
     pub fn ensure_schema(&self, document: &str) -> Result<()> {
-        self.conn.ensure_schema(document)?;
+        self.conn.borrow().ensure_schema(document)?;
         Ok(())
     }
 
     /// Read schema handshake data available on the current YYDB facade.
     pub fn schema_handshake(&self) -> Result<SchemaHandshake> {
-        let schema: Option<SchemaVersion> = self.conn.schema()?;
+        let schema: Option<SchemaVersion> = self.conn.borrow().schema()?;
         let has_document = schema.is_some();
         Ok(SchemaHandshake {
             backend_id: BACKEND_ID,
@@ -201,7 +208,7 @@ impl YydbSource {
     pub fn query_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<Vec<iris_types::Row>> {
         self.require_vos_executor()?;
         let named = value_params_to_yydb(named)?;
-        let rows = self.conn.query_vos_with_params(program, &named)?;
+        let rows = self.conn.borrow().query_vos_with_params(program, &named)?;
         rows.into_iter().map(row_from_yydb).collect()
     }
 
@@ -214,7 +221,7 @@ impl YydbSource {
     pub fn execute_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<()> {
         self.require_vos_executor()?;
         let named = value_params_to_yydb(named)?;
-        self.conn.execute_vos_write_with_params(program, &named)?;
+        self.conn.borrow().execute_vos_write_with_params(program, &named)?;
         Ok(())
     }
 
@@ -225,31 +232,31 @@ impl YydbSource {
     pub fn prepare(&self, program: &str) -> Result<PreparedVos> {
         self.require_vos_executor()?;
         let handshake = self.schema_handshake()?;
-        let stmt = self.conn.prepare_vos(program)?;
+        let stmt = self.conn.borrow().prepare_vos(program)?;
         Ok(PreparedVos { program: program.to_owned(), ddl_revision: handshake.ddl_revision, stmt })
     }
 
     /// Begin a data transaction.
     pub fn begin(&self) -> Result<()> {
         self.require_vos_executor()?;
-        self.conn.begin().map_err(Error::from)
+        self.conn.borrow().begin().map_err(Error::from)
     }
 
     /// Commit the open data transaction.
     pub fn commit(&self) -> Result<()> {
         self.require_vos_executor()?;
-        self.conn.commit().map_err(Error::from)
+        self.conn.borrow().commit().map_err(Error::from)
     }
 
     /// Roll back the open data transaction.
     pub fn rollback(&self) -> Result<()> {
         self.require_vos_executor()?;
-        self.conn.rollback().map_err(Error::from)
+        self.conn.borrow().rollback().map_err(Error::from)
     }
 
     /// Whether a data transaction is open.
     pub fn in_transaction(&self) -> bool {
-        self.conn.in_transaction()
+        self.conn.borrow().in_transaction()
     }
 
     /// Reject use when the database DDL revision drifted since session open.
@@ -263,6 +270,109 @@ impl YydbSource {
             )));
         }
         Ok(())
+    }
+
+    // -----------------------------------------------------------------------
+    // Converged adapter surface (shared shape with `iris-adapter-mysql`)
+    // -----------------------------------------------------------------------
+
+    /// Execute a planned read pipeline or insert on a fresh checkout.
+    pub fn execute_plan(&self, plan: &PhysicalPlan) -> Result<Vec<iris_types::Row>> {
+        let mut conn = self.conn.borrow_mut();
+        self.execute_plan_on(&mut conn, plan)
+    }
+
+    /// Execute a plan on an existing connection (same session / transaction).
+    pub fn execute_plan_on(&self, conn: &mut Connection, plan: &PhysicalPlan) -> Result<Vec<iris_types::Row>> {
+        self.require_vos_executor()?;
+        if plan.is_rejected() {
+            return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
+        }
+        let rendered = plan::render_plan(plan)?;
+        let named = value_params_to_yydb(&rendered.params)?;
+        if rendered.is_write {
+            conn.execute_vos_write_with_params(&rendered.source, &named)?;
+            return Ok(Vec::new());
+        }
+        let rows = conn.query_vos_with_params(&rendered.source, &named)?;
+        rows.into_iter().map(row_from_yydb).collect()
+    }
+
+    /// Insert a full row on a fresh checkout.
+    pub fn insert(&self, write: &RowWrite) -> Result<()> {
+        let mut conn = self.conn.borrow_mut();
+        self.insert_on(&mut conn, write)
+    }
+
+    /// Insert on an existing connection (same session / transaction).
+    pub fn insert_on(&self, conn: &mut Connection, write: &RowWrite) -> Result<()> {
+        self.require_vos_executor()?;
+        let rendered = plan::render_row_write(write)?;
+        let named = value_params_to_yydb(&rendered.params)?;
+        conn.execute_vos_write_with_params(&rendered.source, &named)?;
+        Ok(())
+    }
+
+    /// YYDB VOS writes are insert-only — update fails closed.
+    pub fn update(&self, write: &RowWrite) -> Result<u64> {
+        let _ = write;
+        Err(Self::insert_only_write("update"))
+    }
+
+    /// YYDB VOS writes are insert-only — update fails closed.
+    pub fn update_on(&self, conn: &mut Connection, write: &RowWrite) -> Result<u64> {
+        let _ = (conn, write);
+        Err(Self::insert_only_write("update"))
+    }
+
+    /// YYDB VOS writes are insert-only — delete fails closed.
+    pub fn delete(&self, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<u64> {
+        let _ = (table, primary_key, key);
+        Err(Self::insert_only_write("delete"))
+    }
+
+    /// YYDB VOS writes are insert-only — delete fails closed.
+    pub fn delete_on(&self, conn: &mut Connection, table: &str, primary_key: &str, key: &iris_types::Value) -> Result<u64> {
+        let _ = (conn, table, primary_key, key);
+        Err(Self::insert_only_write("delete"))
+    }
+
+    /// Run `f` inside a transaction, committing on success and rolling back on error.
+    ///
+    /// The connection is checked out for the closure — calling the `&self`
+    /// facades (`query` / `execute` / `execute_plan`) inside `f` panics on the
+    /// borrow; use the `*_on` helpers with the handed-in `conn`.
+    pub fn transaction<R>(&self, f: impl FnOnce(&mut Connection) -> Result<R>) -> Result<R> {
+        self.require_vos_executor()?;
+        let mut conn = self.conn.borrow_mut();
+        conn.begin()?;
+        match f(&mut conn) {
+            Ok(value) => match conn.commit() {
+                Ok(()) => Ok(value),
+                Err(error) => {
+                    let _ = conn.rollback();
+                    Err(Error::from(error))
+                }
+            },
+            Err(error) => {
+                let _ = conn.rollback();
+                Err(error)
+            }
+        }
+    }
+
+    /// Always roll back — shared-database integration tests leave no residue.
+    pub fn with_rollback<R>(&self, f: impl FnOnce(&mut Connection) -> Result<R>) -> Result<R> {
+        self.require_vos_executor()?;
+        let mut conn = self.conn.borrow_mut();
+        conn.begin()?;
+        let result = f(&mut conn);
+        let _ = conn.rollback();
+        result
+    }
+
+    fn insert_only_write(operation: &str) -> Error {
+        Error::Policy(format!("YYDB VOS writes are insert-only; `{operation}` has no native form on this connector"))
     }
 
     /// Re-open the same file path (drop + open). In-memory sources error.

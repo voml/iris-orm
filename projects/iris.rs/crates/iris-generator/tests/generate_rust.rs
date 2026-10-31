@@ -480,9 +480,89 @@ fn rust_client_binds_the_declared_datasource_adapter() {
 }
 
 #[test]
+fn rust_client_binds_the_yydb_adapter_surface() {
+    let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
+    let files = iris_generator::emit_rust_files(&model, "yydb").unwrap();
+    let (_, ops) = files.iter().find(|(name, _)| name == "operations.rs").expect("operations.rs");
+    assert!(ops.contains("use iris_connector_yydb::YydbSource;"), "operations.rs must bind the yydb connector crate");
+    assert!(ops.contains("use super::errors::Result as YydbResult;"), "operations.rs must alias the bound yydb result type");
+    assert!(ops.contains("&'a mut iris_connector_yydb::Connection"), "the transaction connection type must come from the binding");
+    let (_, errors) = files.iter().find(|(name, _)| name == "errors.rs").expect("errors.rs");
+    assert!(errors.contains("pub use iris_connector_yydb::{Error, Result};"), "errors.rs must re-export the bound yydb error surface");
+}
+
+const PAYLOAD_SCHEMA: &str = r#"
+table Asset {
+    @@asset_id: i64,
+    label: utf8,
+    body: bytes,
+    embedding: vector<3>,
+    doc: file,
+    note: utf8?,
+    maybe_body: bytes?,
+    maybe_embedding: vector<4>?,
+    maybe_doc: file?,
+}
+"#;
+
+#[test]
+fn rust_payload_fields_map_to_typed_carriers() {
+    let model = GenerationModel::from_vos_schema(PAYLOAD_SCHEMA).unwrap();
+    let fields = &model.tables[0].fields;
+    let find = |name: &str| fields.iter().find(|f| f.name == name).unwrap_or_else(|| panic!("field `{name}`"));
+    assert_eq!(find("body").rust_ty, "Vec<u8>");
+    assert_eq!(find("embedding").rust_ty, "Vec<f32>");
+    assert_eq!(find("embedding").vos_type, "vector<3>");
+    assert_eq!(find("doc").rust_ty, "iris::FileDescriptor");
+    assert_eq!(find("maybe_body").rust_ty, "Option<Vec<u8>>");
+    assert_eq!(find("maybe_embedding").vos_type, "vector<4>?");
+    assert_eq!(find("maybe_doc").rust_ty, "Option<iris::FileDescriptor>");
+}
+
+#[test]
+fn rust_where_excludes_payload_fields_and_writes_typed_values() {
+    let model = GenerationModel::from_vos_schema(PAYLOAD_SCHEMA).unwrap();
+    let files = iris_generator::emit_rust_files(&model, "yydb").unwrap();
+    let (_, models) = files.iter().find(|(name, _)| name == "models.rs").expect("models.rs");
+    let (_, ops) = files.iter().find(|(name, _)| name == "operations.rs").expect("operations.rs");
+
+    let where_start = models.find("pub struct AssetWhere {").expect("AssetWhere");
+    let where_block = &models[where_start..where_start + models[where_start..].find("\n}").expect("where close")];
+    assert!(where_block.contains("pub asset_id: Option<i64>"), "scalars keep their where slot");
+    assert!(where_block.contains("pub label: Option<String>"));
+    for payload in ["body", "embedding", "doc", "maybe_body", "maybe_embedding", "maybe_doc"] {
+        assert!(!where_block.contains(payload), "payload `{payload}` must not join `AssetWhere`");
+    }
+
+    assert!(models.contains("__iris_value_bytes(row, \"body\")?"), "`bytes` decodes through the octets helper");
+    assert!(models.contains("__iris_value_vector(row, \"embedding\")?"), "`vector` decodes through the components helper");
+    assert!(models.contains("__iris_value_file(row, \"doc\")?"), "`file` decodes through the descriptor helper");
+    assert!(models.contains("__iris_value_bytes(row, \"maybe_body\")"));
+
+    assert!(ops.contains("fn to_row_write(row: &Asset) -> super::errors::Result<RowWrite>"), "payload validation needs a fallible row write");
+    assert!(ops.contains("Value::Bytes(row.body.clone())"));
+    assert!(ops.contains("iris::VectorValue::new(3u32, row.embedding.clone())"));
+    assert!(ops.contains("Value::File(row.doc.clone())"));
+    assert!(ops.contains("Value::Bytes(v.clone())"));
+    assert!(ops.contains("iris::VectorValue::new(4u32, v.clone())"));
+    assert!(ops.contains("Value::File(v.clone())"));
+    assert!(ops.contains("Self::to_row_write(row)?"));
+
+    for payload in ["x.body", "x.embedding", "x.doc"] {
+        assert!(!ops.contains(payload), "synthesized predicates must not reference payload `{payload}`");
+    }
+}
+
+#[test]
+fn rust_generation_rejects_zero_dimension_vector() {
+    let error = GenerationModel::from_vos_schema("table V {\n @@vid: i64,\n e: vector<0>,\n}").expect_err("zero dimension must fail");
+    assert!(matches!(error, iris_generator::Error::UnsupportedType(ref detail) if detail.contains("dimension")), "{error}");
+}
+
+#[test]
 fn rust_client_fails_closed_for_unconverged_datasource_adapters() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
-    for kind in ["sqlite", "postgres", "redis", "yydb", "yyds", "reference"] {
+    for kind in ["sqlite", "postgres", "redis", "yyds", "reference"] {
         let error = iris_generator::emit_rust_files(&model, kind).expect_err("{kind} has no converged adapter binding");
         assert!(matches!(error, iris_generator::Error::UnsupportedDatasource(ref bound) if bound == kind), "{kind}: {error}");
         assert!(error.to_string().contains("adapter binding"), "{kind}: {error}");
