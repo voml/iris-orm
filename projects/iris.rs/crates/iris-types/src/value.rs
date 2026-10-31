@@ -42,7 +42,11 @@ pub enum Value {
 }
 
 /// Fixed-dimension vector of finite `f32` components (VOS `vector`).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// `Deserialize` is hand-written so that JSON input cannot construct a vector
+/// that [`VectorValue::new`] would reject: every deserialized value goes
+/// through that single validation entry point.
+#[derive(Debug, Clone, Serialize)]
 pub struct VectorValue {
     /// Dimension fixed by the contract; equals `components.len()`.
     pub dimension: u32,
@@ -79,6 +83,25 @@ impl VectorValue {
         }
         let components = octets.as_chunks::<4>().0.iter().map(|chunk| f32::from_le_bytes(*chunk)).collect::<Vec<_>>();
         Self::new(dimension, components)
+    }
+}
+
+/// Wire shape of [`VectorValue`]; deserialized only to feed [`VectorValue::new`].
+#[derive(Deserialize)]
+struct VectorValueFields {
+    dimension: u32,
+    components: Vec<f32>,
+}
+
+impl<'de> Deserialize<'de> for VectorValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let fields = VectorValueFields::deserialize(deserializer)?;
+        Self::new(fields.dimension, fields.components).ok_or_else(|| {
+            serde::de::Error::custom("`vector` dimension must be non-empty, match the component count and every component must be finite")
+        })
     }
 }
 
@@ -130,7 +153,10 @@ pub struct FileManifestRef {
 /// Mirrors the YYDB `file` descriptor: identity is the SHA-256 digest over the
 /// complete octets, while `name` / `media_type` are labelling metadata that
 /// never take part in the identity.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+///
+/// `Deserialize` is hand-written so that JSON input cannot construct a
+/// descriptor that [`FileDescriptor::new`] would reject.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileDescriptor {
     /// Lowercase hex SHA-256 over the complete file octets (64 hex digits).
@@ -160,6 +186,30 @@ impl FileDescriptor {
         let name = clean(name)?;
         let media_type = clean(media_type)?;
         Some(Self { digest, octets, name, media_type, manifest })
+    }
+}
+
+/// Wire shape of [`FileDescriptor`]; deserialized only to feed
+/// [`FileDescriptor::new`].
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FileDescriptorFields {
+    digest: String,
+    octets: u64,
+    name: Option<String>,
+    media_type: Option<String>,
+    manifest: FileManifestRef,
+}
+
+impl<'de> Deserialize<'de> for FileDescriptor {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let fields = FileDescriptorFields::deserialize(deserializer)?;
+        Self::new(fields.digest, fields.octets, fields.name, fields.media_type, fields.manifest).ok_or_else(|| {
+            serde::de::Error::custom("`file` digest / manifest hash must be 64 lowercase hex digits and metadata labels must be non-blank")
+        })
     }
 }
 
@@ -324,3 +374,102 @@ pub fn file_from_tagged_json(value: &JsonValue) -> Option<FileDescriptor> {
 
 /// One logical row: ordered field map.
 pub type Row = BTreeMap<String, Value>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_digest(seed: u8) -> String {
+        let mut text = String::with_capacity(64);
+        for i in 0..32 {
+            let byte = seed.wrapping_add(i);
+            text.push_str(&format!("{byte:02x}"));
+        }
+        text
+    }
+
+    fn valid_file() -> FileDescriptor {
+        FileDescriptor::new(
+            valid_digest(0),
+            32,
+            Some("report.bin".into()),
+            Some("application/octet-stream".into()),
+            FileManifestRef { hash: valid_digest(1), size: 32 },
+        )
+        .expect("canonical descriptor")
+    }
+
+    #[test]
+    fn vector_deserialize_rejects_illegal_shapes() {
+        for wire in [
+            // zero dimension
+            r#"{"dimension":0,"components":[]}"#.to_owned(),
+            // dimension / component-count mismatch
+            r#"{"dimension":2,"components":[1.0]}"#.to_owned(),
+            // non-finite (1e40 overflows f32 into infinity)
+            format!(r#"{{"dimension":1,"components":[{}]}}"#, 1e40_f64),
+        ] {
+            let parsed = serde_json::from_str::<VectorValue>(&wire);
+            assert!(parsed.is_err(), "`VectorValue` accepted `{wire}`");
+        }
+        assert!(VectorValue::new(1, vec![f32::NAN]).is_none());
+        assert!(VectorValue::new(1, vec![f32::INFINITY]).is_none());
+    }
+
+    #[test]
+    fn vector_deserialize_round_trips_valid_values() {
+        let vector = VectorValue::new(3, vec![0.5, -0.0, 2.0]).expect("canonical vector");
+        let wire = serde_json::to_string(&vector).expect("serialize");
+        let decoded = serde_json::from_str::<VectorValue>(&wire).expect("deserialize");
+        assert_eq!(decoded, vector);
+        assert_eq!(decoded.components[1].to_bits(), (-0.0_f32).to_bits());
+    }
+
+    #[test]
+    fn vector_inside_value_deserialize_is_checked() {
+        let illegal = serde_json::json!({"Vector": {"dimension": 0, "components": []}});
+        assert!(serde_json::from_value::<Value>(illegal).is_err());
+        let legal = serde_json::json!({"Vector": {"dimension": 1, "components": [1.0]}});
+        let decoded = serde_json::from_value::<Value>(legal).expect("deserialize");
+        assert!(matches!(decoded, Value::Vector(_)));
+    }
+
+    #[test]
+    fn file_deserialize_rejects_illegal_shapes() {
+        let base = valid_file();
+        let name = base.name.clone();
+        let media_type = base.media_type.clone();
+        let illegal = [
+            // uppercase digest
+            serde_json::json!({"digest": valid_digest(0).to_uppercase(), "octets": 32, "name": name, "mediaType": media_type, "manifest": {"hash": valid_digest(1), "size": 32}}),
+            // short digest
+            serde_json::json!({"digest": valid_digest(0)[..63], "octets": 32, "name": name, "mediaType": media_type, "manifest": {"hash": valid_digest(1), "size": 32}}),
+            // uppercase manifest hash
+            serde_json::json!({"digest": valid_digest(0), "octets": 32, "name": name, "mediaType": media_type, "manifest": {"hash": valid_digest(1).to_uppercase(), "size": 32}}),
+            // blank labels
+            serde_json::json!({"digest": valid_digest(0), "octets": 32, "name": "   ", "mediaType": media_type, "manifest": {"hash": valid_digest(1), "size": 32}}),
+            serde_json::json!({"digest": valid_digest(0), "octets": 32, "name": name, "mediaType": "", "manifest": {"hash": valid_digest(1), "size": 32}}),
+        ];
+        for wire in illegal {
+            let parsed = serde_json::from_value::<FileDescriptor>(wire.clone());
+            assert!(parsed.is_err(), "`FileDescriptor` accepted `{wire}`");
+        }
+    }
+
+    #[test]
+    fn file_deserialize_round_trips_valid_values() {
+        let file = valid_file();
+        let wire = serde_json::to_string(&file).expect("serialize");
+        let decoded = serde_json::from_str::<FileDescriptor>(&wire).expect("deserialize");
+        assert_eq!(decoded, file);
+    }
+
+    #[test]
+    fn file_inside_value_deserialize_is_checked() {
+        let illegal = serde_json::json!({"File": {"digest": valid_digest(0)[..63], "octets": 1, "manifest": {"hash": valid_digest(1), "size": 1}}});
+        assert!(serde_json::from_value::<Value>(illegal).is_err());
+        let legal = serde_json::to_value(Value::File(valid_file())).expect("serialize");
+        let decoded = serde_json::from_value::<Value>(legal).expect("deserialize");
+        assert!(matches!(decoded, Value::File(_)));
+    }
+}
