@@ -456,3 +456,170 @@ fn row_from_yydb_nested_row_is_still_ok() {
         other => panic!("expected Object, got {other:?}"),
     }
 }
+
+// ---------------------------------------------------------------------------
+// `vector` / `file`: typed payloads survive a real `.yydx` close and reopen
+// ---------------------------------------------------------------------------
+
+/// Inline row-codec vector (≤ 120 components), plus a CAS-spilled column
+/// beyond the inline threshold that only the `.yydx` layout persists.
+const EMB_SCHEMA: &str = r#"
+table Emb {
+    @@emb_id: i64,
+    label: utf8,
+    embedding: vector<3>,
+}
+
+table BigEmb {
+    @@big_emb_id: i64,
+    embedding: vector<121>,
+}
+"#;
+
+const EMB_INSERT: &str = "Emb::insert({ emb_id: $emb_id, label: $label, embedding: $embedding })";
+
+const EMB_QUERY: &str = "Emb.filter(x => x.emb_id == $emb_id).collect()";
+
+const BIG_EMB_INSERT: &str = "BigEmb::insert({ big_emb_id: $big_emb_id, embedding: $embedding })";
+
+const BIG_EMB_QUERY: &str = "BigEmb.filter(x => x.big_emb_id == $big_emb_id).collect()";
+
+const ASSET_SCHEMA: &str = r#"
+table Asset {
+    @@asset_id: i64,
+    payload: file,
+}
+"#;
+
+const ASSET_INSERT: &str = "Asset::insert({ asset_id: $asset_id, payload: $payload })";
+
+const ASSET_QUERY: &str = "Asset.filter(x => x.asset_id == $asset_id).collect()";
+
+fn read_embedding(db: &YydbSource, emb_id: i64) -> iris_types::VectorValue {
+    let named = BTreeMap::from([("emb_id".to_string(), iris_types::Value::Int(emb_id))]);
+    let rows = db.query_with_params(EMB_QUERY, &named).expect("read `embedding` back");
+    assert_eq!(rows.len(), 1, "`emb_id` {emb_id} must read back exactly one row");
+    match rows[0].get("embedding") {
+        Some(iris_types::Value::Vector(v)) => v.clone(),
+        other => panic!("`vector` must decode to a native typed value, got {other:?}"),
+    }
+}
+
+fn assert_components_exact(got: &iris_types::VectorValue, expected: &[f32], context: &str) {
+    assert_eq!(got.dimension as usize, expected.len(), "{context}: dimension must survive");
+    assert_eq!(got.components.len(), expected.len(), "{context}: component count must survive");
+    for (index, (a, b)) in got.components.iter().zip(expected.iter()).enumerate() {
+        assert_eq!(a.to_bits(), b.to_bits(), "{context}: component {index} bit pattern must survive exactly");
+    }
+}
+
+#[test]
+fn vector_round_trip_survives_close_and_reopen() {
+    // `.yydx` keeps the CAS object store persistent, so both the inline row
+    // codec (vector<3>) and the spilled payload (vector<121>) must reopen.
+    let path = temp_layout_path("vector", "yydx");
+    let db = YydbSource::open(&path).unwrap();
+    db.ensure_schema(EMB_SCHEMA).unwrap();
+
+    // Bit patterns a text path would corrupt: negative zero, the smallest
+    // subnormal, and the largest finite f32.
+    let small = vec![-0.0_f32, f32::from_bits(0x0000_0001), f32::MAX];
+    let large: Vec<f32> = (0..121).map(|index| index as f32 * 0.5 + 0.25).collect();
+
+    db.begin().unwrap();
+    db.execute_with_params(
+        EMB_INSERT,
+        &BTreeMap::from([
+            ("emb_id".to_string(), iris_types::Value::Int(1)),
+            ("label".to_string(), iris_types::Value::Str("exact-bits".into())),
+            ("embedding".to_string(), iris_types::Value::Vector(iris_types::VectorValue::new(3, small.clone()).unwrap())),
+        ]),
+    )
+    .unwrap();
+    db.execute_with_params(
+        BIG_EMB_INSERT,
+        &BTreeMap::from([
+            ("big_emb_id".to_string(), iris_types::Value::Int(1)),
+            ("embedding".to_string(), iris_types::Value::Vector(iris_types::VectorValue::new(121, large.clone()).unwrap())),
+        ]),
+    )
+    .unwrap();
+    db.commit().unwrap();
+
+    assert_components_exact(&read_embedding(&db, 1), &small, "inline `vector<3>` before reopen");
+    let named = BTreeMap::from([("big_emb_id".to_string(), iris_types::Value::Int(1))]);
+    let rows = db.query_with_params(BIG_EMB_QUERY, &named).expect("read spilled `embedding` back");
+    match rows[0].get("embedding") {
+        Some(iris_types::Value::Vector(v)) => assert_components_exact(v, &large, "CAS-spilled `vector<121>` before reopen"),
+        other => panic!("`vector` must decode to a native typed value, got {other:?}"),
+    }
+
+    let db = db.reopen().expect("reopen");
+    assert_components_exact(&read_embedding(&db, 1), &small, "inline `vector<3>` after reopen");
+    let named = BTreeMap::from([("big_emb_id".to_string(), iris_types::Value::Int(1))]);
+    let rows = db.query_with_params(BIG_EMB_QUERY, &named).expect("read spilled `embedding` after reopen");
+    match rows[0].get("embedding") {
+        Some(iris_types::Value::Vector(v)) => assert_components_exact(v, &large, "CAS-spilled `vector<121>` after reopen"),
+        other => panic!("`vector` must decode to a native typed value, got {other:?}"),
+    }
+
+    drop(db);
+    if let Some(dir) = path.parent() {
+        let _ = fs::remove_dir_all(dir);
+    }
+}
+
+#[test]
+fn file_descriptor_and_content_survive_close_and_reopen() {
+    let path = temp_layout_path("file", "yydx");
+    let db = YydbSource::open(&path).unwrap();
+    db.ensure_schema(ASSET_SCHEMA).unwrap();
+
+    // Chunked content with bytes a text carrier could never carry.
+    let octets: Vec<u8> = (0..700u32).map(|index| (index % 256) as u8).collect();
+    let stored = db
+        .connection()
+        .put_file(std::io::Cursor::new(octets.clone()), 256, Some("note.bin".into()), Some("application/octet-stream".into()))
+        .expect("put_file");
+
+    let descriptor = match iris_connector_yydb::value_from_yydb(yydb::Value::File(stored.clone())).expect("typed `file`") {
+        iris_types::Value::File(f) => f,
+        other => panic!("expected `Value::File`, got {other:?}"),
+    };
+
+    db.execute_with_params(
+        ASSET_INSERT,
+        &BTreeMap::from([
+            ("asset_id".to_string(), iris_types::Value::Int(1)),
+            ("payload".to_string(), iris_types::Value::File(descriptor.clone())),
+        ]),
+    )
+    .unwrap();
+
+    let read_asset = |db: &YydbSource, context: &str| -> iris_types::FileDescriptor {
+        let named = BTreeMap::from([("asset_id".to_string(), iris_types::Value::Int(1))]);
+        let rows = db.query_with_params(ASSET_QUERY, &named).unwrap_or_else(|e| panic!("{context}: query: {e}"));
+        assert_eq!(rows.len(), 1, "{context}: exactly one row");
+        match rows[0].get("payload") {
+            Some(iris_types::Value::File(f)) => f.clone(),
+            other => panic!("{context}: `file` must decode to a native descriptor, got {other:?}"),
+        }
+    };
+
+    for (context, got) in [("before reopen", read_asset(&db, "before reopen")), ("after reopen", {
+        let db = db.reopen().expect("reopen");
+        let got = read_asset(&db, "after reopen");
+        // Content bytes must still read through the reopened object store.
+        assert_eq!(db.connection().read_file(&stored).expect("read_file after reopen"), octets, "file content after reopen");
+        drop(db);
+        got
+    })] {
+        assert_eq!(got, descriptor, "{context}: descriptor fields must survive verbatim");
+        assert_eq!(got.digest, stored.digest, "{context}: digest must survive");
+        assert_eq!(got.octets, octets.len() as u64, "{context}: octet count must survive");
+    }
+
+    if let Some(dir) = path.parent() {
+        let _ = fs::remove_dir_all(dir);
+    }
+}
