@@ -13,6 +13,10 @@ type EntityByName = {
 
 type EntityName = <% entity_union %>;
 
+type WhereInputByName = {
+<% where_map_lines %>
+};
+
 type SelectShape<S> = S extends { readonly select: infer Nested } ? Nested : S;
 
 /** Scalar filter operators for utf8 fields. */
@@ -97,28 +101,17 @@ export type SelectPathFor<E extends EntityName> = {
               : never);
 };
 
-/** Nested where path for a reference target (use-site filter navigation). */
+/**
+ * Nested where path for a reference target (use-site filter navigation).
+ *
+ * Every field keeps the filter surface its faithful VOS label declared in the
+ * generated `<Entity>WhereInput` — never an approximation of the TS carrier,
+ * so a `uuid` / `decimal` / `datetime` field can not accept `StringFilter`
+ * operators just because the carrier is `string`.
+ */
 export type WherePathFor<E extends EntityName> = {
-    [K in keyof EntityByName[E]]?:
-        | WhereValueForField<EntityByName[E][K]>
-        | (EntityByName[E][K] extends { readonly __irisRef: infer T extends EntityName }
-              ? WherePathFor<T> | { readonly is: WherePathFor<T> }
-              : never);
+    [K in keyof EntityByName[E] as K extends keyof WhereInputByName[E] ? K : never]?: WhereInputByName[E][K];
 };
-
-type WhereValueForField<V> = V extends { readonly __irisRef: EntityName }
-    ? never
-    : V extends boolean
-      ? boolean | BooleanFilter | { readonly isNull: true } | { readonly isNotNull: true }
-      : V extends bigint
-        ? bigint | BigIntFilter | { readonly isNull: true } | { readonly isNotNull: true }
-        : V extends number
-          ? number | NumberFilter | { readonly isNull: true } | { readonly isNotNull: true }
-          : V extends Uint8Array
-            ? Uint8Array | BytesFilter | { readonly isNull: true } | { readonly isNotNull: true }
-            : V extends string
-              ? string | StringFilter | UuidFilter | DecimalFilter | DateTimeFilter | BytesFilter | { readonly isNull: true } | { readonly isNotNull: true }
-              : never;
 
 /**
  * Resolve a select shape against an entity — nested object on &T becomes

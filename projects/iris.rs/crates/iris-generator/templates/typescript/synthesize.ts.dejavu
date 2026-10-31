@@ -14,6 +14,15 @@ const SYNTHESIZE_WIRE_NAMES: Record<string, Readonly<Record<string, string>>> = 
 const SYNTHESIZE_REF_TARGETS: Record<string, Readonly<Record<string, string>>> = {
 <% synthesize_reference_target_lines %>
 };
+/**
+ * Field → operator allow-list declared by each field's faithful VOS label at
+ * codegen time. The runtime lowers filters strictly inside this surface, so
+ * an untyped caller cannot widen a `uuid` field to `contains` the way the
+ * old carrier approximation let a plain object pretend to be any filter.
+ */
+const SYNTHESIZE_FILTER_OPS: Record<string, Readonly<Record<string, readonly string[]>>> = {
+<% synthesize_filter_ops_lines %>
+};
 
 export type VosParameters = Record<string, unknown>;
 
@@ -89,11 +98,22 @@ function pathExpr(root: string, path: readonly string[]): string {
 function compileLeafPredicate(
     root: string,
     path: readonly string[],
+    entity: string,
+    tsKey: string,
     value: unknown,
     parameters: VosParameters,
 ): string {
     const target = pathExpr(root, path);
     const hint = `p_${path.join("_") || "value"}`;
+
+    const allowed = SYNTHESIZE_FILTER_OPS[entity]?.[tsKey];
+    if (!allowed) {
+        const error: IrisGeneratedError = {
+            code: "IRIS-FILTER-FIELD-UNKNOWN",
+            message: `filter field \`${entity}.${tsKey}\` declares no filter surface`,
+        };
+        throw error;
+    }
 
     if (value === true && path.length > 0) {
         return target;
@@ -103,6 +123,15 @@ function compileLeafPredicate(
     }
 
     if (isPlainObject(value) && isFilterOperatorObject(value)) {
+        for (const operator of Object.keys(value)) {
+            if (!allowed.includes(operator)) {
+                const error: IrisGeneratedError = {
+                    code: "IRIS-FILTER-OPERATOR-NOT-SUPPORTED",
+                    message: `operator \`${operator}\` is outside the \`${entity}.${tsKey}\` filter surface [${allowed.join(", ")}]`,
+                };
+                throw error;
+            }
+        }
         const clauses: string[] = [];
         if ("eq" in value) {
             const param = nextParam(parameters, hint, value.eq);
@@ -180,7 +209,7 @@ export function compileWherePredicates(
             predicates.push(...compileWherePredicates(nextEntity, value, parameters, root, [...path, wireKey]));
             continue;
         }
-        predicates.push(compileLeafPredicate(root, [...path, wireKey], value, parameters));
+        predicates.push(compileLeafPredicate(root, [...path, wireKey], entity, key, value, parameters));
     }
     return predicates;
 }

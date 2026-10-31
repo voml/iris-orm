@@ -56,6 +56,9 @@ struct TsTemplateContext {
     macros: Vec<MacroModel>,
     entity_union: String,
     entity_map_lines: String,
+    /// Per-entity map onto the generated `<Entity>WhereInput`, so nested
+    /// `WherePathFor` reuses each field's faithful label-dispatched surface.
+    where_map_lines: String,
     models_import_lines: String,
     refs_import_lines: String,
     input_import_names: String,
@@ -73,6 +76,10 @@ struct TsTemplateContext {
     /// Pre-computed per-entity reference-target map inlined into synthesize.ts
     /// so the runtime no longer imports IRIS_REFERENCE_TARGETS from metadata.
     synthesize_reference_target_lines: String,
+    /// Per-entity field → operator allow-list inlined into synthesize.ts, so
+    /// the runtime lowers filters by the faithful VOS label instead of
+    /// accepting any operator key a generic object happens to carry.
+    synthesize_filter_ops_lines: String,
 }
 
 impl GenerationModel {
@@ -94,6 +101,8 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         model.tables.iter().map(|t| format!("\"{}\"", t.name)).collect::<Vec<_>>().join(" | ")
     };
     let entity_map_lines = model.tables.iter().map(|t| format!("    {}: {};", t.name, t.name)).collect::<Vec<_>>().join("\n");
+    let where_map_lines =
+        model.tables.iter().map(|t| format!("    {}: {}WhereInput;", t.name, t.name)).collect::<Vec<_>>().join("\n");
     let models_import_lines = model.tables.iter().map(|t| format!("    {},", t.name)).collect::<Vec<_>>().join("\n");
     let refs_import_lines =
         model.tables.iter().flat_map(|t| [format!("    {}Id,", t.name), format!("    {}RefInput,", t.name)]).collect::<Vec<_>>().join("\n");
@@ -267,6 +276,33 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
     // template, keeping metadata.ts's copies for node/browser/cloudflare.
     let synthesize_wire_map_lines = wire_map_lines.clone();
     let synthesize_reference_target_lines = reference_target_lines.clone();
+    let synthesize_filter_ops_lines = model
+        .tables
+        .iter()
+        .map(|table| {
+            let fields = table
+                .fields
+                .iter()
+                .filter(|field| field.reference_target.is_none())
+                .map(|field| {
+                    let (_name, ops) = vos_filter_surface(&field.vos_type).ok_or_else(|| Error::UnsupportedFilterType {
+                        entity: table.name.clone(),
+                        field: field.name.clone(),
+                        vos_type: field.vos_type.clone(),
+                    })?;
+                    let mut allowed: Vec<&str> = ops.to_vec();
+                    if field.optional {
+                        allowed.extend(["isNull", "isNotNull"]);
+                    }
+                    let ops = allowed.iter().map(|op| format!("\"{op}\"")).collect::<Vec<_>>().join(", ");
+                    Ok(format!("{}: [{ops}]", field_ts_name(field)))
+                })
+                .collect::<Result<Vec<_>>>()?
+                .join(", ");
+            Ok(format!("    {}: {{ {fields} }},", table.name))
+        })
+        .collect::<Result<Vec<_>>>()?
+        .join("\n");
     let has_macros = !macros_view.is_empty();
 
     Ok(TsTemplateContext {
@@ -276,6 +312,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         macros: model.macros.clone(),
         entity_union,
         entity_map_lines,
+        where_map_lines,
         models_import_lines,
         refs_import_lines,
         input_import_names,
@@ -289,6 +326,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         has_macros,
         synthesize_wire_map_lines,
         synthesize_reference_target_lines,
+        synthesize_filter_ops_lines,
     })
 }
 
@@ -339,22 +377,26 @@ fn camel_case(name: &str) -> String {
     }
 }
 
-/// Typed filter surface of one VOS label (`None` = the label has no filter).
+/// Typed filter surface of one VOS label: the generated filter type name and
+/// the operator allow-list the runtime lowers for fields carrying that label
+/// (`None` = the label has no filter).
 ///
 /// Returning `Option` keeps generation honest: a label with no declared filter
 /// type hard-fails in `emit_where_field` instead of silently becoming
-/// `StringFilter`.
-fn vos_filter_name(vos_type: &str) -> Option<&'static str> {
+/// `StringFilter`. The operator list is the single source for the runtime map
+/// inlined into `_internal/synthesize.ts`, so the lowered surface and the
+/// authored surface can never drift apart.
+fn vos_filter_surface(vos_type: &str) -> Option<(&'static str, &'static [&'static str])> {
     let base = carrier::base_vos_type(vos_type);
     Some(match base {
-        "bool" => "BooleanFilter",
-        "i64" | "u64" => "BigIntFilter",
-        "i8" | "i16" | "i32" | "u8" | "u16" | "u32" | "f32" | "f64" => "NumberFilter",
-        "utf8" | "utf16" => "StringFilter",
-        "uuid" => "UuidFilter",
-        "decimal" => "DecimalFilter",
-        "date" | "time" | "datetimeUtc" => "DateTimeFilter",
-        "bytes" => "BytesFilter",
+        "bool" => ("BooleanFilter", &["eq", "not"]),
+        "i64" | "u64" => ("BigIntFilter", &["eq", "not", "gt", "gte", "lt", "lte"]),
+        "i8" | "i16" | "i32" | "u8" | "u16" | "u32" | "f32" | "f64" => ("NumberFilter", &["eq", "not", "gt", "gte", "lt", "lte"]),
+        "utf8" | "utf16" => ("StringFilter", &["eq", "not", "contains", "startsWith", "endsWith"]),
+        "uuid" => ("UuidFilter", &["eq", "not"]),
+        "decimal" => ("DecimalFilter", &["eq", "not", "gt", "gte", "lt", "lte"]),
+        "date" | "time" | "datetimeUtc" => ("DateTimeFilter", &["eq", "not", "gt", "gte", "lt", "lte"]),
+        "bytes" => ("BytesFilter", &["eq", "not"]),
         _ => return None,
     })
 }
@@ -430,7 +472,7 @@ fn emit_where_field(table: &TableModel, field: &FieldModel, entity_names: &HashS
         return Ok(None);
     }
     let scalar = scalar_filter_type(table, field)?;
-    let filter = vos_filter_name(&field.vos_type).ok_or_else(|| Error::UnsupportedFilterType {
+    let (filter, _ops) = vos_filter_surface(&field.vos_type).ok_or_else(|| Error::UnsupportedFilterType {
         entity: table.name.clone(),
         field: field.name.clone(),
         vos_type: field.vos_type.clone(),

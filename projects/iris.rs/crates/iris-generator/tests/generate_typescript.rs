@@ -67,6 +67,45 @@ fn typescript_emit_writes_ux_layout() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+const LABEL_FILTER_SCHEMA: &str = r#"
+table Doc {
+    @@doc_id: uuid,
+    title: utf8,
+    note: utf8?,
+    score: decimal,
+    views: i64,
+    thumb: bytes,
+    published: bool,
+}
+"#;
+
+#[test]
+fn filters_dispatch_by_faithful_label_in_types_and_runtime() {
+    let model = GenerationModel::from_vos_schema(LABEL_FILTER_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let file = |name: &str| files.iter().find(|(path, _)| path == name).map(|(_, content)| content.as_str()).expect(name);
+
+    let inputs = file("inputs.ts");
+    assert!(inputs.contains("type WhereInputByName"), "{inputs}");
+    assert!(inputs.contains("    Doc: DocWhereInput;"), "{inputs}");
+    assert!(!inputs.contains("WhereValueForField"), "carrier-approximation `WhereValueForField` must be gone: {inputs}");
+
+    let synthesize = file("_internal/synthesize.ts");
+    assert!(synthesize.contains("const SYNTHESIZE_FILTER_OPS"), "{synthesize}");
+    // `utf8` gets the string surface only, never uuid/decimal/datetime operators.
+    assert!(synthesize.contains("title: [\"eq\", \"not\", \"contains\", \"startsWith\", \"endsWith\"]"), "{synthesize}");
+    // `uuid` stays eq/not even though its carrier is also a string.
+    assert!(synthesize.contains("docId: [\"eq\", \"not\"]"), "{synthesize}");
+    assert!(synthesize.contains("thumb: [\"eq\", \"not\"]"), "{synthesize}");
+    assert!(synthesize.contains("views: [\"eq\", \"not\", \"gt\", \"gte\", \"lt\", \"lte\"]"), "{synthesize}");
+    assert!(synthesize.contains("published: [\"eq\", \"not\"]"), "{synthesize}");
+    // Optional fields additionally allow nullity operators.
+    assert!(synthesize.contains("isNull"), "{synthesize}");
+    assert!(synthesize.contains("isNotNull"), "{synthesize}");
+    assert!(synthesize.contains("IRIS-FILTER-FIELD-UNKNOWN"), "{synthesize}");
+    assert!(synthesize.contains("IRIS-FILTER-OPERATOR-NOT-SUPPORTED"), "{synthesize}");
+}
+
 #[test]
 fn generate_dispatch_typescript_target() {
     let dir = std::env::temp_dir()
