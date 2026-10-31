@@ -180,12 +180,10 @@ fn optional_bytes_operation_type_keeps_the_declared_optionality() {
 }
 
 #[test]
-fn vector_parameter_and_return_use_string_carrier() {
-    // `vector` payloads round-trip through tagged JSON string via
-    // Iris::Value::Str — the generator must accept `vector` as a faithful
-    // VOS label and emit `string` / `String` carriers on both sides of the
-    // declared-vos delegate. The dimension lives inside the tagged string,
-    // not in the generated host types.
+fn vector_parameter_and_return_use_native_carrier() {
+    // `vector` stays a typed payload end to end: the generator must emit the
+    // `Vec<f32>` / `Float32Array` carriers on both sides of the declared-vos
+    // delegate, never a string disguise.
     let model = project_model(vec![operation(
         "query",
         "search",
@@ -197,19 +195,17 @@ fn vector_parameter_and_return_use_string_carrier() {
     assert_eq!(op.return_type.as_deref(), Some("vector"));
     assert_eq!(op.params.len(), 1);
     assert_eq!(op.params[0].vos_type, "vector");
-    assert_eq!(op.params[0].ts_type, "string");
+    assert_eq!(op.params[0].ts_type, "Float32Array");
 
-    // Rust emits String carrier for both param and return.
     let rust_files = emit_target_files(&model, "rust").expect("rust must generate");
     let rust_ops = target_file(&rust_files, "operations.rs");
-    assert!(rust_ops.contains("embedding: String"), "Rust param carrier must be String:\n{rust_ops}");
-    assert!(rust_ops.contains("-> String"), "Rust return carrier must be String:\n{rust_ops}");
+    assert!(rust_ops.contains("embedding: Vec<f32>"), "Rust param carrier must be `Vec<f32>`:\n{rust_ops}");
+    assert!(rust_ops.contains("-> Vec<f32>"), "Rust return carrier must be `Vec<f32>`:\n{rust_ops}");
 
-    // TypeScript emits string carrier on both sides.
     let ts_files = emit_target_files(&model, "typescript").expect("typescript must generate");
     let ts_ops = target_file(&ts_files, "operations.ts");
-    assert!(ts_ops.contains("embedding: string"), "TS param carrier must be string:\n{ts_ops}");
-    assert!(ts_ops.contains("Promise<string>"), "TS return carrier must be Promise<string>:\n{ts_ops}");
+    assert!(ts_ops.contains("embedding: Float32Array"), "TS param carrier must be `Float32Array`:\n{ts_ops}");
+    assert!(ts_ops.contains("Promise<Float32Array>"), "TS return carrier must be `Promise<Float32Array>`:\n{ts_ops}");
 }
 
 #[test]
@@ -225,10 +221,10 @@ fn dimensioned_vector_parameter_is_still_rejected() {
 }
 
 #[test]
-fn file_parameter_and_return_use_string_carrier() {
-    // file descriptors round-trip as a tagged JSON string via Iris::Value::Str.
-    // The generator must accept file as a valid VOS label and emit `string` /
-    // `String` carriers on both sides of the declared-vos delegate.
+fn file_parameter_and_return_use_native_carrier() {
+    // `file` descriptors stay typed end to end: the Rust side carries
+    // `iris::FileDescriptor` and the TypeScript side carries the inline
+    // descriptor shape, never a string disguise.
     let model = project_model(vec![operation(
         "query",
         "download",
@@ -240,19 +236,22 @@ fn file_parameter_and_return_use_string_carrier() {
     assert_eq!(op.return_type.as_deref(), Some("file"));
     assert_eq!(op.params.len(), 1);
     assert_eq!(op.params[0].vos_type, "file");
-    assert_eq!(op.params[0].ts_type, "string");
+    assert!(op.params[0].ts_type.contains("readonly digest: string"), "{}", op.params[0].ts_type);
+    assert!(op.params[0].ts_type.contains("readonly octets: bigint"), "{}", op.params[0].ts_type);
+    assert!(op.params[0].ts_type.contains("readonly manifest: { readonly hash: string; readonly size: bigint }"), "{}", op.params[0].ts_type);
 
-    // Rust emits String carrier for both param and return.
     let rust_files = emit_target_files(&model, "rust").expect("rust must generate");
     let rust_ops = target_file(&rust_files, "operations.rs");
-    assert!(rust_ops.contains("photo: String"), "Rust param carrier must be String:\n{rust_ops}");
-    assert!(rust_ops.contains("-> String"), "Rust return carrier must be String:\n{rust_ops}");
+    assert!(rust_ops.contains("photo: iris::FileDescriptor"), "Rust param carrier must be `iris::FileDescriptor`:\n{rust_ops}");
+    assert!(rust_ops.contains("-> iris::FileDescriptor"), "Rust return carrier must be `iris::FileDescriptor`:\n{rust_ops}");
 
-    // TypeScript emits string carrier on both sides.
     let ts_files = emit_target_files(&model, "typescript").expect("typescript must generate");
     let ts_ops = target_file(&ts_files, "operations.ts");
-    assert!(ts_ops.contains("photo: string"), "TS param carrier must be string:\n{ts_ops}");
-    assert!(ts_ops.contains("Promise<string>"), "TS return carrier must be Promise<string>:\n{ts_ops}");
+    assert!(
+        ts_ops.contains("photo: { readonly digest: string; readonly octets: bigint;"),
+        "TS param carrier must be the inline descriptor:\n{ts_ops}"
+    );
+    assert!(ts_ops.contains("Promise<{ readonly digest: string;"), "TS return carrier must be the inline descriptor:\n{ts_ops}");
 }
 
 #[test]

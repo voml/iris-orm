@@ -470,11 +470,13 @@ struct OperationCarrier {
 /// Resolves one operation signature type to declared-vos host carriers.
 ///
 /// Only two shapes may cross a generated delegate: a VOS builtin label the
-/// faithful carrier table maps, or a type the schema itself declares. `bytes`
-/// crosses as its VOS carrier (`Vec<u8>` / `Uint8Array`) because the backend
-/// channel carries octets, never text. `vector` and `file` payloads,
-/// collection/generic shapes, undeclared models and unknown labels all
-/// hard-fail here so generation never guesses a carrier.
+/// faithful carrier table maps, or a type the schema itself declares.
+/// `bytes`, `vector` and `file` cross as their typed VOS carriers
+/// (`Vec<u8>` / `Uint8Array`, `Vec<f32>` / `Float32Array`,
+/// `iris::FileDescriptor` / the inline descriptor shape) because the backend
+/// channel carries payloads, never text. Collection/generic shapes,
+/// undeclared models and unknown labels all hard-fail here so generation
+/// never guesses a carrier.
 fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet<String>) -> Result<OperationCarrier> {
     let trimmed = vos_type.trim();
     let base = carrier::base_vos_type(trimmed);

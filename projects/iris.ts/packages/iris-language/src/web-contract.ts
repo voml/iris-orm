@@ -185,8 +185,24 @@ export interface WebIrisBindingHost {
  *
  * `bigint` and `Uint8Array` are carriers, not conveniences: VOS `i64` must not be
  * flattened into a lossy JS `number`, and VOS `bytes` stays binary.
+ * `Float32Array` carries VOS `vector` components, and the inline descriptor
+ * carries VOS `file` identity without degrading to a tagged JSON string.
  */
-export type WebWireCarrierValue = string | number | boolean | bigint | Uint8Array | null;
+export type WebWireCarrierValue =
+    | string
+    | number
+    | boolean
+    | bigint
+    | Uint8Array
+    | Float32Array
+    | {
+          readonly digest: string;
+          readonly octets: bigint;
+          readonly name?: string;
+          readonly mediaType?: string;
+          readonly manifest: { readonly hash: string; readonly size: bigint };
+      }
+    | null;
 
 /** Row payload from a successful VOS DML execution (binding wire shape). */
 export type WebExecutionRow = Record<string, WebWireCarrierValue>;

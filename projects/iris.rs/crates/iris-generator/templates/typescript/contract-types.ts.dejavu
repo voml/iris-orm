@@ -6,8 +6,20 @@
  * these shapes structurally.
  */
 
+/** Delivered VOS `file` descriptor on the generated client wire. */
+export type GeneratedFileCarrier = {
+    readonly digest: string;
+    readonly octets: bigint;
+    readonly name?: string;
+    readonly mediaType?: string;
+    readonly manifest: { readonly hash: string; readonly size: bigint };
+};
+
 /** One delivered field value on the generated client wire. */
-export type GeneratedExecutionRow = Record<string, string | number | boolean | bigint | Uint8Array | null>;
+export type GeneratedExecutionRow = Record<
+    string,
+    string | number | boolean | bigint | Uint8Array | Float32Array | GeneratedFileCarrier | null
+>;
 
 /** Structured diagnostic carried on a failed result envelope. */
 export type GeneratedIrisDiagnostic = {

@@ -18,12 +18,23 @@ pub(crate) fn ts_carrier_for_label(label: &str) -> Option<&'static str> {
         "bool" => "boolean",
         "i8" | "i16" | "i32" | "u8" | "u16" | "u32" | "f32" | "f64" => "number",
         "i64" | "u64" => "bigint",
-        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" | "file" | "vector" => "string",
+        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" => "string",
         "bytes" => "Uint8Array",
+        "vector" => "Float32Array",
+        "file" => TS_FILE_CARRIER,
         "unit" => "void",
         _ => return None,
     })
 }
+
+/// Inline structural carrier for the VOS `file` scalar.
+///
+/// The shape is spelled inline so generated files never import a host
+/// runtime symbol; the wire decoder in `value-carrier.ts` produces exactly
+/// this structure, mirroring the canonical YYDB file descriptor.
+pub(crate) const TS_FILE_CARRIER: &str = "{ readonly digest: string; readonly octets: bigint; \
+    readonly name?: string; readonly mediaType?: string; \
+    readonly manifest: { readonly hash: string; readonly size: bigint } }";
 
 /// Rust carrier of a faithful VOS label (`None` = not a mapped label).
 pub(crate) fn rust_carrier_for_label(label: &str) -> Option<&'static str> {
@@ -39,8 +50,10 @@ pub(crate) fn rust_carrier_for_label(label: &str) -> Option<&'static str> {
         "u64" => "u64",
         "f32" => "f32",
         "f64" => "f64",
-        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" | "file" | "vector" => "String",
+        "utf8" | "utf16" | "uuid" | "decimal" | "date" | "time" | "datetimeUtc" => "String",
         "bytes" => "Vec<u8>",
+        "vector" => "Vec<f32>",
+        "file" => "iris::FileDescriptor",
         _ => return None,
     })
 }

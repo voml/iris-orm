@@ -181,6 +181,105 @@ test("session executor reports an out-of-range bigint as a structured diagnostic
     assert.match(result.diagnostics[0]?.message ?? "", /outside the VOS `i64` range/);
 });
 
+const VECTOR_HEX = '{"$yydb":"vector","dimension":2,"components":"0000803f00000040"}';
+
+test("parameter encoding carries vector as the canonical tagged little-endian hex value", () => {
+    const encoded = stringifyOperationParameters({ p_embedding: new Float32Array([1, 2]) });
+    assert.equal(encoded, `{"p_embedding":${VECTOR_HEX}}`);
+});
+
+test("vector round trips through the tagged carrier with exact components", () => {
+    const decoded = decodeWireValueByCarrier("vector", JSON.parse(VECTOR_HEX), "embedding");
+    assert.ok(decoded instanceof Float32Array);
+    assert.deepEqual(Array.from(decoded as Float32Array), [1, 2]);
+    const reencoded = stringifyOperationParameters({ p_embedding: decoded });
+    assert.equal(reencoded, `{"p_embedding":${VECTOR_HEX}}`);
+});
+
+test("vector decoding refuses a dimension mismatch and a malformed hex payload", () => {
+    assert.throws(
+        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 3, components: "0000803f" }),
+        /octets for dimension 3/,
+    );
+    assert.throws(
+        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 0, components: "" }),
+        /non-positive `dimension`/,
+    );
+    assert.throws(
+        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 1, components: "0" }),
+        /canonical lowercase hex/,
+    );
+    assert.throws(() => decodeWireValueByCarrier("vector", { hex: "00" }), /not the tagged `vector` carrier/);
+});
+
+const DIGEST = "a".repeat(63) + "3";
+const MANIFEST_HASH = "b".repeat(63) + "4";
+const FILE_JSON = `{"$yydb":"file","digest":"${DIGEST}","octets":10,"name":"note.txt","mediaType":"text/plain","manifest":{"hash":"${MANIFEST_HASH}","size":128}}`;
+
+test("parameter encoding carries a file descriptor as the canonical tagged value", () => {
+    const encoded = stringifyOperationParameters({
+        p_photo: { digest: DIGEST, octets: 10n, name: "note.txt", mediaType: "text/plain", manifest: { hash: MANIFEST_HASH, size: 128n } },
+    });
+    assert.equal(encoded, `{"p_photo":${FILE_JSON}}`);
+    const minimal = stringifyOperationParameters({ p_photo: { digest: DIGEST, octets: 0, manifest: { hash: MANIFEST_HASH, size: 0 } } });
+    assert.equal(minimal, `{"p_photo":{"$yydb":"file","digest":"${DIGEST}","octets":0,"manifest":{"hash":"${MANIFEST_HASH}","size":0}}}`);
+});
+
+test("file descriptor round trips through the tagged carrier with exact identity", () => {
+    const decoded = decodeWireValueByCarrier("file", JSON.parse(FILE_JSON), "photo");
+    assert.equal(typeof decoded === "object" && decoded !== null && !ArrayBuffer.isView(decoded), true);
+    const descriptor = decoded as { digest: string; octets: bigint; name?: string; mediaType?: string; manifest: { hash: string; size: bigint } };
+    assert.equal(descriptor.digest, DIGEST);
+    assert.equal(descriptor.octets, 10n);
+    assert.equal(descriptor.name, "note.txt");
+    assert.equal(descriptor.mediaType, "text/plain");
+    assert.equal(descriptor.manifest.hash, MANIFEST_HASH);
+    assert.equal(descriptor.manifest.size, 128n);
+});
+
+test("file decoding refuses a broken descriptor instead of guessing", () => {
+    assert.throws(() => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 10 }), /without a `manifest` object/);
+    assert.throws(
+        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 10, name: "  ", manifest: { hash: MANIFEST_HASH, size: 1 } }),
+        /`name` is not a non-blank string/,
+    );
+    assert.throws(
+        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 10, manifest: { hash: MANIFEST_HASH } }),
+        /`manifest\.size` is missing/,
+    );
+    assert.throws(() => decodeWireValueByCarrier("file", "tagged"), /not the tagged `file` carrier/);
+});
+
+test("session executor keeps vector and file parameters and results on their typed carriers", async () => {
+    const rows = JSON.stringify([
+        { metric_id: "m1", embedding: JSON.parse(VECTOR_HEX), photo: JSON.parse(FILE_JSON) },
+    ]);
+    const { session, requests } = recordingSession(rows);
+    const executor = createOperationExecutorFromSession(session, {
+        wireNamesByEntity: { Metric: { metricId: "metric_id", embedding: "embedding", photo: "photo" } },
+        valueCarriersByEntity: { Metric: { embedding: "vector", photo: "file" } },
+    });
+
+    const result = await executor.execute(
+        request({ p_embedding: new Float32Array([1, 2]), p_photo: { digest: DIGEST, octets: 10n, name: "note.txt", mediaType: "text/plain", manifest: { hash: MANIFEST_HASH, size: 128n } } }),
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) {
+        return;
+    }
+    const row = result.value[0]!;
+    assert.ok(row.embedding instanceof Float32Array);
+    assert.deepEqual(Array.from(row.embedding as Float32Array), [1, 2]);
+    const photo = row.photo as { digest: string; octets: bigint; name?: string };
+    assert.equal(photo.digest, DIGEST);
+    assert.equal(photo.octets, 10n);
+    assert.equal(photo.name, "note.txt");
+
+    const sent = requests[0]!;
+    assert.match(sent, /"p_embedding":\{"\$yydb":"vector","dimension":2,"components":"0000803f00000040"\}/);
+    assert.match(sent, /"p_photo":\{"\$yydb":"file","digest":"/);
+});
+
 test("D1 binding sends i64 as exact text and bytes as ArrayBuffer", () => {
     const payload = new Uint8Array([1, 2, 3]);
     const bound = bindD1Parameters(
