@@ -8,7 +8,6 @@ import {
     stringifyOperationParameters,
     stringifyOperationRequest,
 } from "../src/runtime/operation-parameters.ts";
-import { bindD1Parameters, coerceD1BindValue } from "../src/cloudflare/d1-plan.ts";
 import { buildOperationRequest, declaredVosOperation } from "../src/runtime/build-operation-request.ts";
 import { decodeWireValueByCarrier } from "../src/runtime/value-carrier.ts";
 import type { MemorySessionBinding, SessionExecuteWire } from "../src/bindings.ts";
@@ -278,22 +277,4 @@ test("session executor keeps vector and file parameters and results on their typ
     const sent = requests[0]!;
     assert.match(sent, /"p_embedding":\{"\$yydb":"vector","dimension":2,"components":"0000803f00000040"\}/);
     assert.match(sent, /"p_photo":\{"\$yydb":"file","digest":"/);
-});
-
-test("D1 binding sends i64 as exact text and bytes as ArrayBuffer", () => {
-    const payload = new Uint8Array([1, 2, 3]);
-    const bound = bindD1Parameters(
-        {
-            sql: "SELECT seq, payload FROM Metric WHERE seq = ?",
-            mode: "read",
-            paramOrder: ["p_seq", "p_payload", "p_active"],
-        },
-        { p_seq: I64_MAX, p_payload: payload, p_active: true },
-    );
-    assert.equal(bound[0], "9223372036854775807");
-    assert.ok(bound[1] instanceof ArrayBuffer);
-    assert.deepEqual(Array.from(new Uint8Array(bound[1] as ArrayBuffer)), [1, 2, 3]);
-    assert.equal(bound[2], 1);
-    assert.equal(coerceD1BindValue("plain"), "plain");
-    assert.throws(() => coerceD1BindValue(I64_MAX + 1n, "p_seq"), IrisParameterEncodingError);
 });

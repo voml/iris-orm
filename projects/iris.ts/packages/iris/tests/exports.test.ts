@@ -53,9 +53,9 @@ test("/runtime export resolves to runtime helpers", () => {
     assert.match(path.replace(/\\/g, "/"), facadePath("runtime"));
 });
 
-test("/cloudflare export resolves to cloudflare facade", () => {
-    const path = resolveExportMap("./cloudflare", ["workerd", "import"]);
-    assert.match(path.replace(/\\/g, "/"), facadePath("cloudflare"));
+test("/cloudflare export is gone (D1 lowering lives in Rust/WASM, TS only bridges)", () => {
+    assert.equal(pkg.exports["./cloudflare"], undefined);
+    assert.equal(pkg.typesVersions["*"].cloudflare, undefined);
 });
 
 test("@yydb/iris exposes runtime helpers and no WASM entry", async () => {
