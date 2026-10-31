@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generate TypeScript clients for all `projects/examples/*` via `@yydb/iris` CLI.
+ * Generate TypeScript clients for all `projects/iris.ts/examples/*` via `@yydb/iris` CLI.
  *
  * Reads each project's `iris.config.ts`, loads schema **data** from the declared pointer,
  * and writes each project's `generate.out` path (same as `iris generate --config .` in each example).
@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const examplesRoot = join(root, "projects/examples");
+const examplesRoot = join(root, "projects/iris.ts/examples");
 const irisCli = join(root, "projects/iris.ts/packages/iris/bin/iris.mjs");
 const irisBuild = join(root, "projects/iris.ts/packages/iris/scripts/build-dist.mjs");
 
