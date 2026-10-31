@@ -13,3 +13,7 @@ iris-ir = { workspace = true }
 yydb = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+iris = { workspace = true }
+iris-generator = { workspace = true }

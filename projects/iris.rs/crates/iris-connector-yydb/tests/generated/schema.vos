@@ -1,0 +1,8 @@
+table Doc {
+    @@doc_id: i64,
+    title: utf8,
+    published: bool,
+    body: bytes,
+    embedding: vector<4>,
+    attachment: file,
+}
