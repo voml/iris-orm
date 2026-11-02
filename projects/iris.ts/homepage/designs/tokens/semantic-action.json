@@ -1,39 +1,132 @@
 {
     "entries": [
         {
-            "key": { "path": ["action", "primary", "background"] },
+            "key": {
+                "path": [
+                    "action",
+                    "primary",
+                    "background"
+                ]
+            },
             "value": "#B8860B"
         },
         {
-            "key": { "path": ["action", "primary", "foreground"] },
+            "key": {
+                "path": [
+                    "action",
+                    "primary",
+                    "foreground"
+                ]
+            },
             "value": "#fffdf8"
         },
         {
-            "key": { "path": ["action", "primary", "hover"] },
+            "key": {
+                "path": [
+                    "action",
+                    "primary",
+                    "hover"
+                ]
+            },
             "value": "#9a7209"
         },
         {
-            "key": { "path": ["action", "primary", "active"] },
+            "key": {
+                "path": [
+                    "action",
+                    "primary",
+                    "active"
+                ]
+            },
             "value": "#7a5a07"
         },
         {
-            "key": { "path": ["action", "secondary", "background"] },
+            "key": {
+                "path": [
+                    "action",
+                    "primary",
+                    "soft"
+                ]
+            },
+            "value": "#E6F4FF"
+        },
+        {
+            "key": {
+                "path": [
+                    "action",
+                    "secondary",
+                    "background"
+                ]
+            },
             "value": "#FFFFFF"
         },
         {
-            "key": { "path": ["action", "secondary", "foreground"] },
+            "key": {
+                "path": [
+                    "action",
+                    "secondary",
+                    "foreground"
+                ]
+            },
             "value": "#0F172A"
         },
         {
-            "key": { "path": ["action", "secondary", "border"] },
+            "key": {
+                "path": [
+                    "action",
+                    "secondary",
+                    "border"
+                ]
+            },
             "value": "#e2d5c0"
         },
         {
-            "key": { "path": ["action", "secondary", "hover"] },
+            "key": {
+                "path": [
+                    "action",
+                    "secondary",
+                    "hover"
+                ]
+            },
             "value": "#f8f4ec"
         },
         {
-            "key": { "path": ["focus", "ring"] },
+            "key": {
+                "path": [
+                    "action",
+                    "secondary",
+                    "active"
+                ]
+            },
+            "value": "#F0F1F3"
+        },
+        {
+            "key": {
+                "path": [
+                    "action",
+                    "link",
+                    "foreground"
+                ]
+            },
+            "value": "#0958D9"
+        },
+        {
+            "key": {
+                "path": [
+                    "action",
+                    "link",
+                    "hover"
+                ]
+            },
+            "value": "#1677FF"
+        },
+        {
+            "key": {
+                "path": [
+                    "focus",
+                    "ring"
+                ]
+            },
             "value": "color-mix(in srgb, #B8860B 24%, transparent)"
         }
     ]

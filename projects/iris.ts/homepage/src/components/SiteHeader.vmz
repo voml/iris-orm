@@ -1,31 +1,31 @@
 <template>
-  <header class="site-header" data-vmz-fixture="site-header" data-home={home ? 'true' : 'false'}>
+  <header class="site-header" data-vmz-fixture="site-header" :data-home="home ? 'true' : 'false'">
     <Link href="/">
-      <span class="site-brand">{brandLabel}</span>
+      <span class="site-brand">{{ brandLabel }}</span>
     </Link>
     <nav class="site-nav" aria-label="Primary">
-      <Link href="/">{navHomeLabel}</Link>
-      <Link href={docsRootHref}>{navDocsLabel}</Link>
-      <Link href="/playground">{navPlaygroundLabel}</Link>
-      <div class="locale-switch" role="group" aria-label={selectLanguageLabel}>
+      <Link href="/">{{ navHomeLabel }}</Link>
+      <Link :href="docsRootHref">{{ navDocsLabel }}</Link>
+      <Link href="/playground">{{ navPlaygroundLabel }}</Link>
+      <div class="locale-switch" role="group" :aria-label="selectLanguageLabel">
         <button
           type="button"
-          class={localeId === 'zh-hans' ? 'locale-switch__btn is-active' : 'locale-switch__btn'}
-          aria-current={localeId === 'zh-hans' ? 'true' : null}
-          onClick={() => this.switchLocale('zh-hans')}
+          :class="localeId === 'zh-hans' ? 'locale-switch__btn is-active' : 'locale-switch__btn'"
+          :aria-current="localeId === 'zh-hans' ? 'true' : null"
+          @click="() => this.switchLocale('zh-hans')"
         >
-          {langZhLabel}
+          {{ langZhLabel }}
         </button>
         <button
           type="button"
-          class={localeId === 'en-us' ? 'locale-switch__btn is-active' : 'locale-switch__btn'}
-          aria-current={localeId === 'en-us' ? 'true' : null}
-          onClick={() => this.switchLocale('en-us')}
+          :class="localeId === 'en-us' ? 'locale-switch__btn is-active' : 'locale-switch__btn'"
+          :aria-current="localeId === 'en-us' ? 'true' : null"
+          @click="() => this.switchLocale('en-us')"
         >
-          {langEnLabel}
+          {{ langEnLabel }}
         </button>
       </div>
-      <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</Link>
+      <Link :href="githubUrl" target="_blank" rel="noopener noreferrer">{{ navGithubLabel }}</Link>
     </nav>
   </header>
 </template>

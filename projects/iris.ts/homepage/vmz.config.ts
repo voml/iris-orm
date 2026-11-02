@@ -1,4 +1,4 @@
-import { defineConfig } from "@vmz/vmz";
+import { defineConfig } from "@vmz/plugin";
 import shiki from "@vmz/plugin-shiki";
 
 export default defineConfig({
@@ -7,7 +7,7 @@ export default defineConfig({
     delivery: {
         default: "static",
         profiles: {
-            static: { host: "browser", assembly: "static-cdn" },
+            static: { host: "browser", assembly: "web-static" },
         },
     },
 });

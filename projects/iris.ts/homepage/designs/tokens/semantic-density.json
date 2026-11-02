@@ -1,87 +1,268 @@
 {
     "entries": [
         {
-            "key": { "path": ["density", "control", "padding-y"] },
+            "key": {
+                "path": [
+                    "density",
+                    "control",
+                    "padding-y"
+                ]
+            },
             "value": "0.25rem"
         },
         {
-            "key": { "path": ["density", "control", "padding-x"] },
+            "key": {
+                "path": [
+                    "density",
+                    "control",
+                    "padding-x"
+                ]
+            },
             "value": "0.75rem"
         },
         {
-            "key": { "path": ["density", "control", "gap"] },
+            "key": {
+                "path": [
+                    "density",
+                    "control",
+                    "gap"
+                ]
+            },
             "value": "0.5rem"
         },
         {
-            "key": { "path": ["density", "compact", "padding-y"] },
+            "key": {
+                "path": [
+                    "density",
+                    "compact",
+                    "padding-y"
+                ]
+            },
             "value": "0.125rem"
         },
         {
-            "key": { "path": ["density", "compact", "padding-x"] },
+            "key": {
+                "path": [
+                    "density",
+                    "compact",
+                    "padding-x"
+                ]
+            },
             "value": "0.5rem"
         },
         {
-            "key": { "path": ["density", "compact", "gap"] },
+            "key": {
+                "path": [
+                    "density",
+                    "compact",
+                    "gap"
+                ]
+            },
             "value": "0.35rem"
         },
         {
-            "key": { "path": ["density", "dense", "padding-y"] },
+            "key": {
+                "path": [
+                    "density",
+                    "dense",
+                    "padding-y"
+                ]
+            },
             "value": "0"
         },
         {
-            "key": { "path": ["density", "dense", "padding-x"] },
+            "key": {
+                "path": [
+                    "density",
+                    "dense",
+                    "padding-x"
+                ]
+            },
             "value": "0.35rem"
         },
         {
-            "key": { "path": ["density", "dense", "gap"] },
+            "key": {
+                "path": [
+                    "density",
+                    "dense",
+                    "gap"
+                ]
+            },
             "value": "0.25rem"
         },
         {
-            "key": { "path": ["control", "height"] },
+            "key": {
+                "path": [
+                    "control",
+                    "height"
+                ]
+            },
             "value": "2rem"
         },
         {
-            "key": { "path": ["control", "height", "sm"] },
+            "key": {
+                "path": [
+                    "control",
+                    "height",
+                    "sm"
+                ]
+            },
             "value": "1.5rem"
         },
         {
-            "key": { "path": ["control", "height", "lg"] },
+            "key": {
+                "path": [
+                    "control",
+                    "height",
+                    "lg"
+                ]
+            },
             "value": "2.5rem"
         },
         {
-            "key": { "path": ["radius", "sm"] },
+            "key": {
+                "path": [
+                    "radius",
+                    "sm"
+                ]
+            },
             "value": "2px"
         },
         {
-            "key": { "path": ["radius", "md"] },
+            "key": {
+                "path": [
+                    "radius",
+                    "xs"
+                ]
+            },
+            "value": "2px"
+        },
+        {
+            "key": {
+                "path": [
+                    "radius",
+                    "pill"
+                ]
+            },
+            "value": "999px"
+        },
+        {
+            "key": {
+                "path": [
+                    "space",
+                    "1"
+                ]
+            },
+            "value": "0.25rem"
+        },
+        {
+            "key": {
+                "path": [
+                    "space",
+                    "2"
+                ]
+            },
+            "value": "0.5rem"
+        },
+        {
+            "key": {
+                "path": [
+                    "space",
+                    "3"
+                ]
+            },
+            "value": "0.75rem"
+        },
+        {
+            "key": {
+                "path": [
+                    "space",
+                    "4"
+                ]
+            },
+            "value": "1rem"
+        },
+        {
+            "key": {
+                "path": [
+                    "space",
+                    "5"
+                ]
+            },
+            "value": "1.5rem"
+        },
+        {
+            "key": {
+                "path": [
+                    "radius",
+                    "md"
+                ]
+            },
             "value": "6px"
         },
         {
-            "key": { "path": ["radius", "lg"] },
+            "key": {
+                "path": [
+                    "radius",
+                    "lg"
+                ]
+            },
             "value": "8px"
         },
         {
-            "key": { "path": ["shadow", "card"] },
+            "key": {
+                "path": [
+                    "shadow",
+                    "card"
+                ]
+            },
             "value": "none"
         },
         {
-            "key": { "path": ["shadow", "card", "hover"] },
+            "key": {
+                "path": [
+                    "shadow",
+                    "card",
+                    "hover"
+                ]
+            },
             "value": "0 1px 2px -2px rgba(0,0,0,.08), 0 3px 6px 0 rgba(0,0,0,.06), 0 5px 12px 4px rgba(0,0,0,.04)"
         },
         {
-            "key": { "path": ["shadow", "popup"] },
+            "key": {
+                "path": [
+                    "shadow",
+                    "popup"
+                ]
+            },
             "value": "0 6px 16px 0 rgba(0,0,0,.08), 0 3px 6px -4px rgba(0,0,0,.12), 0 9px 28px 8px rgba(0,0,0,.05)"
         },
         {
-            "key": { "path": ["layout", "max", "width"] },
+            "key": {
+                "path": [
+                    "layout",
+                    "max",
+                    "width"
+                ]
+            },
             "value": "75rem"
         },
         {
-            "key": { "path": ["surface", "page"] },
+            "key": {
+                "path": [
+                    "surface",
+                    "page"
+                ]
+            },
             "value": "#f6fbf8"
         },
         {
-            "key": { "path": ["line", "subtle"] },
+            "key": {
+                "path": [
+                    "line",
+                    "subtle"
+                ]
+            },
             "value": "#e8f5ef"
         }
     ]

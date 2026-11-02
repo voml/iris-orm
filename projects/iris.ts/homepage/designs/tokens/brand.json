@@ -21,13 +21,17 @@
         "mist": "#f8f4ec",
         "page": "#fbf7ef",
         "ink": "#0F172A",
-        "graphite": "#475569"
+        "graphite": "#475569",
+        "fill": "#FAFBFC",
+        "code": "#0F1115"
     },
     "text": {
         "ink": "#0F172A",
         "steel": "#475569",
         "on-brand": "#fffdf8",
-        "on-ink": "#f8fafc"
+        "on-ink": "#f8fafc",
+        "tertiary": "#646A73",
+        "muted": "#6B7178"
     },
     "line": {
         "default": "#e2d5c0",

@@ -3,24 +3,24 @@
     <div class="site-footer__accent" aria-hidden="true"></div>
     <div class="site-footer__inner">
       <div class="site-footer__brand">
-        <p class="site-footer__mark">{brandFullLabel}</p>
-        <p class="site-footer__tagline">{footerTagLabel}</p>
-        <p class="site-footer__scope">{footerScopeLabel}</p>
-        <p class="site-footer__copy">{footerCopyrightLabel}</p>
+        <p class="site-footer__mark">{{ brandFullLabel }}</p>
+        <p class="site-footer__tagline">{{ footerTagLabel }}</p>
+        <p class="site-footer__scope">{{ footerScopeLabel }}</p>
+        <p class="site-footer__copy">{{ footerCopyrightLabel }}</p>
       </div>
       <div class="site-footer__columns">
         <div class="site-footer__col">
-          <p class="site-footer__col-title">{footerColProductLabel}</p>
+          <p class="site-footer__col-title">{{ footerColProductLabel }}</p>
           <nav class="site-footer__nav" aria-label="Product">
-            <Link href="/playground">{navPlaygroundLabel}</Link>
-            <Link href={docsRootHref}>{navDocsLabel}</Link>
-            <Link href={guideHref}>{footerGuideLabel}</Link>
+            <Link href="/playground">{{ navPlaygroundLabel }}</Link>
+            <Link :href="docsRootHref">{{ navDocsLabel }}</Link>
+            <Link :href="guideHref">{{ footerGuideLabel }}</Link>
           </nav>
         </div>
         <div class="site-footer__col">
-          <p class="site-footer__col-title">{footerColProjectLabel}</p>
+          <p class="site-footer__col-title">{{ footerColProjectLabel }}</p>
           <nav class="site-footer__nav" aria-label="Project">
-            <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{navGithubLabel}</Link>
+            <Link :href="githubUrl" target="_blank" rel="noopener noreferrer">{{ navGithubLabel }}</Link>
           </nav>
         </div>
       </div>

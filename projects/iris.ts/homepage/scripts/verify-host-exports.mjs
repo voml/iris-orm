@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const homepageRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const irisPkgRoot = join(homepageRoot, "..", "iris");
+const irisPkgRoot = join(homepageRoot, "..", "packages", "iris");
 const irisPkg = JSON.parse(readFileSync(join(irisPkgRoot, "package.json"), "utf8"));
 
 function resolveExportMap(subpath, conditions) {

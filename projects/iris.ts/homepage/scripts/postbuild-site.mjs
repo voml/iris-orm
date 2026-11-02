@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Post-build for Iris homepage on @vmz/vmz 0.1.12+:
+ * Post-build for Iris homepage:
  * - Locale-neutral public URLs for strategy `none` (/d/…, not /d/zh-hans/…)
- * - entry-client duplicate Icon import guard (until upstream dedupe is universal)
  *
  * Document chrome is compiled via DocumentLayout + createRenderHost (no regex template surgery).
  */
@@ -11,7 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const homepageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const distDir = path.join(homepageRoot, "dist", "cdn");
+const distDir = path.join(homepageRoot, "dist", "cdn", "static");
 const DEFAULT_LOCALE = "zh-hans";
 const LOCALES = ["zh-hans", "en-us"];
 
@@ -21,7 +20,6 @@ export function runPostbuild(opts = {}) {
         console.warn("postbuild-site: skip — dist/cdn missing");
         return;
     }
-    patchEntryClient(path.join(distDir, "entry-client.js"));
     const manifestPath = path.join(distDir, "document.manifest.json");
     if (!fs.existsSync(manifestPath)) {
         console.warn("postbuild-site: no document.manifest.json");
@@ -35,22 +33,6 @@ export function runPostbuild(opts = {}) {
 
 function main() {
     runPostbuild();
-}
-
-/** @param {string} entryPath */
-function patchEntryClient(entryPath) {
-    if (!fs.existsSync(entryPath)) return;
-    let code = fs.readFileSync(entryPath, "utf8");
-    const before = code;
-    code = code.replace(
-        /import Icon from "\.\/components\/Icon\.client\.js[^"]*";\nimport Icon from "\.\/components\/Icon\.client\.js[^"]*";\n/,
-        'import Icon from "./components/Icon.client.js";\n',
-    );
-    code = code.replace(/(\tIcon,\n)\tIcon,/g, "$1");
-    if (code !== before) {
-        fs.writeFileSync(entryPath, code, "utf8");
-        console.log("postbuild-site: deduped Icon in entry-client.js");
-    }
 }
 
 /** @param {any} manifest */

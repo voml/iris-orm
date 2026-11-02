@@ -34,7 +34,7 @@ export function docsPaths(_localeId?: LocaleId) {
 
 /** Run fn while message modules resolve preferred LocaleId via __vmzLocaleIdHint. */
 export function withLocaleHint<T>(localeId: LocaleId, fn: () => T): T {
-    const g = typeof globalThis !== "undefined" ? (globalThis as Record<string, unknown>) : null;
+    const g = typeof globalThis !== "undefined" ? (globalThis as any) : null;
     const prev = g ? g.__vmzLocaleIdHint : undefined;
     if (g) g.__vmzLocaleIdHint = localeId;
     try {

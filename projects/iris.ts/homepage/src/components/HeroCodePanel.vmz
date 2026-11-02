@@ -1,10 +1,10 @@
 <template>
-  <aside class="hero-panel" aria-label={caption}>
+  <aside class="hero-panel" :aria-label="caption">
     <div class="hero-panel__head">
-      <p class="hero-panel__caption">{caption}</p>
-      <button type="button" class="hero-panel__copy" onClick={() => this.copy()}>{copyLabel}</button>
+      <p class="hero-panel__caption">{{ caption }}</p>
+      <button type="button" class="hero-panel__copy" @click="() => this.copy()">{{ copyLabel }}</button>
     </div>
-    <Code code={code} lang="typescript" theme="github-dark" />
+    <Code :code="code" lang="typescript" theme="github-dark" />
   </aside>
 </template>
 

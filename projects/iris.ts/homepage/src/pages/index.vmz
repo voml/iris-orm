@@ -5,32 +5,32 @@
       <section class="hero" aria-label="Introduction">
         <div class="hero-inner">
           <div class="hero-copy">
-            <Badge tone="brand">{heroKickerLabel}</Badge>
-            <h1>{heroTitleLabel}</h1>
-            <p class="lede">{heroLedeLabel}</p>
+            <Badge tone="brand">{{ heroKickerLabel }}</Badge>
+            <h1>{{ heroTitleLabel }}</h1>
+            <p class="lede">{{ heroLedeLabel }}</p>
             <div class="cta-row">
-              <Button type="button" onClick={() => this.go(guideHref)}>{ctaInstallLabel}</Button>
-              <Link href="/playground">{ctaPlaygroundLabel}</Link>
-              <Link href={docsRootHref}>{ctaDocsLabel}</Link>
-              <Link href={githubUrl} target="_blank" rel="noopener noreferrer">{ctaGithubLabel}</Link>
+              <Button type="button" @click="() => this.go(guideHref)">{{ ctaInstallLabel }}</Button>
+              <Link href="/playground">{{ ctaPlaygroundLabel }}</Link>
+              <Link :href="docsRootHref">{{ ctaDocsLabel }}</Link>
+              <Link :href="githubUrl" target="_blank" rel="noopener noreferrer">{{ ctaGithubLabel }}</Link>
             </div>
           </div>
-          <HeroCodePanel code={codeSample} caption={codeCaptionLabel} copyLabel={copyLabel} />
+          <HeroCodePanel :code="codeSample" :caption="codeCaptionLabel" :copyLabel="copyLabel" />
         </div>
       </section>
 
       <section class="hosts" aria-labelledby="hosts-title">
-        <h2 id="hosts-title">{hostsTitleLabel}</h2>
+        <h2 id="hosts-title">{{ hostsTitleLabel }}</h2>
         <div class="hosts-grid">
-          <Card title={hostsNodeLabel} description={hostsNodeDescLabel} hoverable={true} />
-          <Card title={hostsWebLabel} description={hostsWebDescLabel} hoverable={true} />
+          <Card :title="hostsNodeLabel" :description="hostsNodeDescLabel" :hoverable="true" />
+          <Card :title="hostsWebLabel" :description="hostsWebDescLabel" :hoverable="true" />
         </div>
       </section>
 
       <section class="pipeline" aria-labelledby="pipeline-title">
-        <h2 id="pipeline-title">{pipelineTitleLabel}</h2>
-        <Steps label={pipelineTitleLabel} current="core" items={pipelineSteps} />
-        <p class="pipeline-note">{pipelineNoteLabel}</p>
+        <h2 id="pipeline-title">{{ pipelineTitleLabel }}</h2>
+        <Steps :label="pipelineTitleLabel" current="core" :items="pipelineSteps" />
+        <p class="pipeline-note">{{ pipelineNoteLabel }}</p>
       </section>
     </main>
     <SiteFooter />
