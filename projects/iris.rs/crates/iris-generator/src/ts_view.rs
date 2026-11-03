@@ -285,7 +285,9 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
             let fields = table
                 .vector_fields
                 .iter()
-                .map(|field| format!("{}: {}", field.ts_name, field.dimension.map(|dimension| dimension.to_string()).unwrap_or_else(|| "null".into())))
+                .map(|field| {
+                    format!("{}: {}", field.ts_name, field.dimension.map(|dimension| dimension.to_string()).unwrap_or_else(|| "null".into()))
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("    {}: {{ {} }},", table.name, fields)
@@ -377,12 +379,11 @@ fn vector_field_views(table: &TableModel) -> Result<Vec<TsVectorFieldView>> {
 /// bare `vector`. Malformed or zero dimensions are generation errors.
 fn vector_dimension(field: &FieldModel) -> Result<Option<u32>> {
     let label = field.vos_type.strip_suffix('?').unwrap_or(&field.vos_type);
-    let Some(inner) = label.strip_prefix("vector<").and_then(|rest| rest.strip_suffix('>')) else {
+    let Some(inner) = label.strip_prefix("vector<").and_then(|rest| rest.strip_suffix('>'))
+    else {
         return Ok(None);
     };
-    let dimension: u32 = inner
-        .parse()
-        .map_err(|_| Error::UnsupportedType(format!("vector dimension `{inner}` is not a positive integer")))?;
+    let dimension: u32 = inner.parse().map_err(|_| Error::UnsupportedType(format!("vector dimension `{inner}` is not a positive integer")))?;
     if dimension == 0 {
         return Err(Error::UnsupportedType("vector dimension must be greater than zero".into()));
     }

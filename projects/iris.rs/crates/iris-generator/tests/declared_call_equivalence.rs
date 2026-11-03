@@ -66,7 +66,13 @@ fn artifact() -> String {
         operation("udf", "hash_password", HASH_PASSWORD, vec![param("raw", "utf8")], json!({ "named": ["utf8"] })),
         operation("macro", "seed_user", SEED_USER, vec![], Value::Null),
         operation("macro", "label_user", LABEL_USER, vec![param("id", "uuid"), param("prefix", "utf8")], Value::Null),
-        operation("macro", "touch_user", TOUCH_USER, vec![json!({ "name": "target", "typeExpr": { "reference": { "named": ["User"] } }, "span": { "start": 0, "end": 1 } })], Value::Null),
+        operation(
+            "macro",
+            "touch_user",
+            TOUCH_USER,
+            vec![json!({ "name": "target", "typeExpr": { "reference": { "named": ["User"] } }, "span": { "start": 0, "end": 1 } })],
+            Value::Null,
+        ),
     ];
     json!({
         "envelope": {

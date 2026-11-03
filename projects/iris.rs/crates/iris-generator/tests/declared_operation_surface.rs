@@ -361,10 +361,7 @@ table Doc {
     assert!(operations.contains("async findNear(args: DocFindNearArgs)"), "the delegate must expose `findNear`:\n{operations}");
 
     let synthesize = target_file(&files, "_internal/synthesize.ts");
-    assert!(
-        !synthesize.contains("embedding: ["),
-        "the vector field must not gain a filter operator allow-list:\n{synthesize}"
-    );
+    assert!(!synthesize.contains("embedding: ["), "the vector field must not gain a filter operator allow-list:\n{synthesize}");
     assert!(synthesize.contains("embedding: null"), "a bare `vector` field inlines a null declared dimension:\n{synthesize}");
 }
 

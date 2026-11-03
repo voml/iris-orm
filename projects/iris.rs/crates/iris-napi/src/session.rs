@@ -128,7 +128,8 @@ impl MemorySession {
     /// source through its own frontend so writes reach the write executor,
     /// while other adapters take text-only reads through the Iris planner.
     fn run_bound_query(&self, bound: &bind::BoundParameters) -> Result<ExecuteResult> {
-        let Some(store) = &self.store else {
+        let Some(store) = &self.store
+        else {
             return Err(Error::from_reason("session closed"));
         };
         if let SessionStore::Yydb(db) = store {
@@ -256,7 +257,8 @@ impl MemorySession {
             Ok(bound) => bound,
             Err(err) => return Ok(err_result(err.to_string())),
         };
-        let Some(store) = &self.store else {
+        let Some(store) = &self.store
+        else {
             return Err(Error::from_reason("session closed"));
         };
         if let SessionStore::Yydb(db) = store {
