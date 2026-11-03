@@ -28,6 +28,10 @@ pnpm-lock.yaml
 __pycache__/
 *.py[cod]
 .venv/
+.venv-python/
+
+# Local tool caches
+**/.cache/
 
 # Secrets / local env
 .env
