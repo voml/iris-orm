@@ -604,7 +604,8 @@ test("createIrisOperationExecutor returns ResultEnvelope for declared-vos", asyn
     );
     assert.equal(mismatch.ok, false);
     if (!mismatch.ok) {
-        assert.equal(mismatch.diagnostics[0]?.code, "IRIS-CONTRACT-MISMATCH");
+        assert.equal(mismatch.diagnostics[0]?.code, "IRIS-SCHEMA-MISMATCH");
+        assert.equal(mismatch.diagnostics[0]?.diagnosticCode, "IRIS-CONTRACT-MISMATCH");
     }
 
     await executor.close();

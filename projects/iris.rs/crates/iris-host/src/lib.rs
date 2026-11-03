@@ -44,6 +44,19 @@ pub const CODE_TRANSACTION_FAILED: &str = "IRIS-TRANSACTION-FAILED";
 /// An unclassified internal failure.
 pub const CODE_INTERNAL: &str = "IRIS-INTERNAL";
 
+/// The complete author-facing code table. Nothing outside this list may
+/// appear as `ErrorEnvelope::code`.
+pub const AUTHOR_CODES: &[&str] = &[
+    CODE_UNIQUE_CONFLICT,
+    CODE_NOT_FOUND,
+    CODE_VECTOR_DIMENSION,
+    CODE_SCHEMA_MISMATCH,
+    CODE_CONNECTION_FAILED,
+    CODE_INVALID_ARGUMENT,
+    CODE_TRANSACTION_FAILED,
+    CODE_INTERNAL,
+];
+
 /// Diagnostic only: the host session has been closed.
 pub const DIAG_SESSION_CLOSED: &str = "IRIS-SESSION-CLOSED";
 /// Diagnostic only: a parameter payload could not be bound.
@@ -805,6 +818,21 @@ table User {
     fn temp_path(label: &str) -> std::path::PathBuf {
         let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         std::env::temp_dir().join(format!("iris-host-{label}-{stamp}"))
+    }
+
+    #[test]
+    fn author_code_table_is_exactly_the_kind_table() {
+        let mut kinds = std::collections::BTreeSet::new();
+        for code in AUTHOR_CODES {
+            let kind = kind_for(code);
+            assert!(*code == CODE_INTERNAL || kind != "internal", "`{code}` must have an explicit kind instead of the fallback");
+            assert!(kinds.insert(kind), "`{code}` duplicates a semantic kind");
+        }
+        assert_eq!(AUTHOR_CODES.len(), 8, "the author code table must hold exactly eight codes");
+        assert_eq!(kinds.len(), 8, "every author code must own a distinct kind");
+        for code in AUTHOR_CODES {
+            assert_eq!(ErrorEnvelope::new(*code, "probe").code, *code);
+        }
     }
 
     #[test]

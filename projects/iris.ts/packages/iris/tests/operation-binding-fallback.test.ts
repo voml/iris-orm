@@ -132,7 +132,8 @@ test("parameter encoding failures are reported before the fallback session is to
     );
     assert.equal(result.ok, false);
     if (!result.ok) {
-        assert.equal(result.diagnostics[0]?.code, "IRIS-PARAM-ENCODING");
+        assert.equal(result.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+        assert.equal(result.diagnostics[0]?.diagnosticCode, "IRIS-PARAM-ENCODING");
         assert.match(result.diagnostics[0]?.message ?? "", /outside the VOS `i64` range/);
     }
     assert.equal(queries.length, 0);
@@ -147,7 +148,8 @@ test("escape hatches are refused on the fallback path without querying", async (
     );
     assert.equal(queryResult.ok, false);
     if (!queryResult.ok) {
-        assert.equal(queryResult.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+        assert.equal(queryResult.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+        assert.equal(queryResult.diagnostics[0]?.diagnosticCode, "IRIS-ESCAPE-HATCH-REMOVED");
     }
 
     const unitResult = await executor.executeUnit(
@@ -155,7 +157,8 @@ test("escape hatches are refused on the fallback path without querying", async (
     );
     assert.equal(unitResult.ok, false);
     if (!unitResult.ok) {
-        assert.equal(unitResult.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+        assert.equal(unitResult.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+        assert.equal(unitResult.diagnostics[0]?.diagnosticCode, "IRIS-ESCAPE-HATCH-REMOVED");
     }
     assert.equal(queries.length, 0);
 });

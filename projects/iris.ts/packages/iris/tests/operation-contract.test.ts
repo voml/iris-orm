@@ -21,7 +21,8 @@ test("validateContractFingerprint accepts matching fingerprint", () => {
 test("validateContractFingerprint rejects mismatch", () => {
     const diagnostic = validateContractFingerprint(sampleRequest("other-fp"), FINGERPRINT);
     assert.ok(diagnostic);
-    assert.equal(diagnostic!.code, "IRIS-CONTRACT-MISMATCH");
+    assert.equal(diagnostic!.code, "IRIS-SCHEMA-MISMATCH");
+    assert.equal(diagnostic!.diagnosticCode, "IRIS-CONTRACT-MISMATCH");
     assert.match(diagnostic!.message, /other-fp/);
 });
 
@@ -53,7 +54,8 @@ test("guardOperationExecutor rejects mismatched requests before delegate", async
     assert.equal(bad.ok, false);
     assert.equal(delegateCalls, 0);
     if (!bad.ok) {
-        assert.equal(bad.diagnostics[0]?.code, "IRIS-CONTRACT-MISMATCH");
+        assert.equal(bad.diagnostics[0]?.code, "IRIS-SCHEMA-MISMATCH");
+        assert.equal(bad.diagnostics[0]?.diagnosticCode, "IRIS-CONTRACT-MISMATCH");
     }
 
     const good = await guarded.execute(sampleRequest());

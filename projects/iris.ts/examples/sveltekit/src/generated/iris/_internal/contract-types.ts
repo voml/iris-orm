@@ -21,6 +21,8 @@ export type GeneratedExecutionRow = Record<
 /** Structured diagnostic carried on a failed result envelope. */
 export type GeneratedIrisDiagnostic = {
     readonly code: string;
+    readonly kind?: string;
+    readonly diagnosticCode?: string;
     readonly message: string;
     readonly severity: "error" | "warning";
     readonly retryable?: boolean;

@@ -7,7 +7,9 @@ export function validateContractFingerprint(
 ): IrisDiagnostic | null {
     if (request.identity.contractFingerprint !== expectedFingerprint) {
         return {
-            code: "IRIS-CONTRACT-MISMATCH",
+            code: "IRIS-SCHEMA-MISMATCH",
+            kind: "schema_mismatch",
+            diagnosticCode: "IRIS-CONTRACT-MISMATCH",
             message: `contract fingerprint mismatch (expected ${expectedFingerprint}, got ${request.identity.contractFingerprint})`,
             severity: "error",
         };

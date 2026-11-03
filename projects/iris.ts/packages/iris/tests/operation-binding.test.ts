@@ -68,7 +68,8 @@ test("escape hatch `$query` and `$execute` are rejected at runtime", async () =>
     const queryResult = await executor.execute(queryRequest);
     assert.equal(queryResult.ok, false);
     if (!queryResult.ok) {
-        assert.equal(queryResult.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+        assert.equal(queryResult.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+        assert.equal(queryResult.diagnostics[0]?.diagnosticCode, "IRIS-ESCAPE-HATCH-REMOVED");
     }
 
     const executeRequest = buildOperationRequest(
@@ -78,7 +79,8 @@ test("escape hatch `$query` and `$execute` are rejected at runtime", async () =>
     const executeResult = await executor.executeUnit(executeRequest);
     assert.equal(executeResult.ok, false);
     if (!executeResult.ok) {
-        assert.equal(executeResult.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+        assert.equal(executeResult.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+        assert.equal(executeResult.diagnostics[0]?.diagnosticCode, "IRIS-ESCAPE-HATCH-REMOVED");
     }
 });
 
@@ -122,7 +124,8 @@ test("createIrisOperationExecutor executeUnit runs declared-vos on sqlite", asyn
     );
     assert.equal(rejected.ok, false);
     if (!rejected.ok) {
-        assert.equal(rejected.diagnostics[0]?.code, "IRIS-ESCAPE-HATCH-REMOVED");
+        assert.equal(rejected.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+        assert.equal(rejected.diagnostics[0]?.diagnosticCode, "IRIS-ESCAPE-HATCH-REMOVED");
     }
 
     await executor.close();

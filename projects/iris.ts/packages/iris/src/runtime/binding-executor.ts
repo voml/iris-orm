@@ -12,7 +12,9 @@ export function createOperationExecutorFromBinding(binding: IrisDbBinding): Oper
                     ok: false,
                     diagnostics: [
                         {
-                            code: "IRIS-UNSUPPORTED-OPERATION",
+                            code: "IRIS-INVALID-ARGUMENT",
+                            kind: "invalid_argument",
+                            diagnosticCode: "IRIS-UNSUPPORTED-OPERATION",
                             message: "legacy binding adapter only supports declared-vos operations",
                             severity: "error",
                         },
@@ -28,7 +30,9 @@ export function createOperationExecutorFromBinding(binding: IrisDbBinding): Oper
                     ok: false,
                     diagnostics: [
                         {
-                            code: "IRIS-EXEC-FAILED",
+                            code: "IRIS-INTERNAL",
+                            kind: "internal",
+                            diagnosticCode: "IRIS-EXEC-FAILED",
                             message: error instanceof Error ? error.message : String(error),
                             severity: "error",
                         },
@@ -42,7 +46,9 @@ export function createOperationExecutorFromBinding(binding: IrisDbBinding): Oper
                     ok: false,
                     diagnostics: [
                         {
-                            code: "IRIS-UNSUPPORTED-OPERATION",
+                            code: "IRIS-INVALID-ARGUMENT",
+                            kind: "invalid_argument",
+                            diagnosticCode: "IRIS-UNSUPPORTED-OPERATION",
                             message: "legacy binding adapter only supports declared-vos operations",
                             severity: "error",
                         },
@@ -57,7 +63,9 @@ export function createOperationExecutorFromBinding(binding: IrisDbBinding): Oper
                     ok: false,
                     diagnostics: [
                         {
-                            code: "IRIS-EXEC-FAILED",
+                            code: "IRIS-INTERNAL",
+                            kind: "internal",
+                            diagnosticCode: "IRIS-EXEC-FAILED",
                             message: error instanceof Error ? error.message : String(error),
                             severity: "error",
                         },
@@ -85,7 +93,9 @@ function unsupportedTransaction(): ResultEnvelope<void> {
         ok: false,
         diagnostics: [
             {
-                code: "IRIS-TRANSACTION-UNSUPPORTED",
+                code: "IRIS-TRANSACTION-FAILED",
+                kind: "transaction_failed",
+                diagnosticCode: "IRIS-TRANSACTION-UNSUPPORTED",
                 message: "the legacy binding adapter has no transaction control",
                 severity: "error",
             },

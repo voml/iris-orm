@@ -17,7 +17,9 @@ function escapeHatchRejection(operationId: string): ResultEnvelope<never> {
         ok: false,
         diagnostics: [
             {
-                code: "IRIS-ESCAPE-HATCH-REMOVED",
+                code: "IRIS-INVALID-ARGUMENT",
+                kind: "invalid_argument",
+                diagnosticCode: "IRIS-ESCAPE-HATCH-REMOVED",
                 message: `\`${operationId}\` escape hatch has been removed. Use only generated typed delegates from your VOS schema.`,
                 severity: "error",
             },
@@ -30,7 +32,9 @@ function escapeHatchRejectionForUnit(operationId: string): ResultEnvelope<void> 
         ok: false,
         diagnostics: [
             {
-                code: "IRIS-ESCAPE-HATCH-REMOVED",
+                code: "IRIS-INVALID-ARGUMENT",
+                kind: "invalid_argument",
+                diagnosticCode: "IRIS-ESCAPE-HATCH-REMOVED",
                 message: `\`${operationId}\` escape hatch has been removed. Use only generated typed delegates from your VOS schema.`,
                 severity: "error",
             },
@@ -106,7 +110,9 @@ function encodingFailure(error: unknown): Extract<ResultEnvelope<never>, { ok: f
         ok: false,
         diagnostics: [
             {
-                code: error instanceof IrisParameterEncodingError ? error.code : "IRIS-PARAM-ENCODING",
+                code: "IRIS-INVALID-ARGUMENT",
+                kind: "invalid_argument",
+                diagnosticCode: error instanceof IrisParameterEncodingError ? error.diagnosticCode : "IRIS-PARAM-ENCODING",
                 message,
                 severity: "error",
             },

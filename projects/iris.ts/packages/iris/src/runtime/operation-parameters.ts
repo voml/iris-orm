@@ -32,7 +32,8 @@ const I64_MAX = 2n ** 63n - 1n;
 
 /** A parameter value the JSON transport cannot carry without losing its carrier type. */
 export class IrisParameterEncodingError extends Error {
-    readonly code = "IRIS-PARAM-ENCODING";
+    /** Internal diagnostic, never the author-facing `code`. */
+    readonly diagnosticCode = "IRIS-PARAM-ENCODING";
 
     constructor(detail: string) {
         super(`IRIS-PARAM-ENCODING: ${detail}`);

@@ -176,7 +176,8 @@ test("session executor reports an out-of-range bigint as a structured diagnostic
     if (result.ok) {
         return;
     }
-    assert.equal(result.diagnostics[0]?.code, "IRIS-PARAM-ENCODING");
+    assert.equal(result.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
+    assert.equal(result.diagnostics[0]?.diagnosticCode, "IRIS-PARAM-ENCODING");
     assert.match(result.diagnostics[0]?.message ?? "", /outside the VOS `i64` range/);
 });
 
