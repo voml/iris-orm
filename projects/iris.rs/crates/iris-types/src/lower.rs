@@ -2,7 +2,7 @@
 
 use core::range::Range;
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, Pred, ProjectField, SortKey, WriteField};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, Pred, ProjectField, SortKey, StringMatchOp, WriteField};
 use vos::syntax::{
     VosBinaryOp as BinaryOp, VosExpr as Expr, VosLiteral as Literal, VosPathSep as PathSep, VosProgram as Program, VosProjItem as ProjItem,
     VosStmt as Stmt,
@@ -391,6 +391,48 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
                 }
             };
             Ok(Pred::FieldCmp { field, op: cmp, literal, kind })
+        }
+        Expr::Call { callee, args, span } => {
+            let Expr::Member { object, name, .. } = callee.as_ref()
+            else {
+                return Err(Error::diagnostic(Diagnostic::plan_rejected(
+                    "Phase 1 filters only accept `contains`, `starts_with` and `ends_with` method calls",
+                    *span,
+                    None,
+                )));
+            };
+            let op = match name.as_str() {
+                "contains" => StringMatchOp::Contains,
+                "starts_with" => StringMatchOp::StartsWith,
+                "ends_with" => StringMatchOp::EndsWith,
+                _ => {
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected(
+                        format!("`{name}` is not a supported filter predicate"),
+                        *span,
+                        Some("supported text predicates are `contains`, `starts_with` and `ends_with`".into()),
+                    )));
+                }
+            };
+            let Expr::Member { name: field, .. } = object.as_ref()
+            else {
+                return Err(Error::diagnostic(Diagnostic::plan_rejected(
+                    format!("`.{name}` must be called on a field access such as `x.title`"),
+                    *span,
+                    None,
+                )));
+            };
+            let needle = match args.as_slice() {
+                [Expr::Literal(Literal::String(text))] => text.clone(),
+                [Expr::Name { name, .. }] => name.clone(),
+                _ => {
+                    return Err(Error::diagnostic(Diagnostic::plan_rejected(
+                        format!("`.{name}` requires exactly one text argument"),
+                        *span,
+                        Some("bind the needle as a `$name` string parameter or pass a string literal".into()),
+                    )));
+                }
+            };
+            Ok(Pred::StringMatch { field: field.clone(), op, needle })
         }
         Expr::Member { name, span, .. } | Expr::Name { name, span } => {
             let _ = span;

@@ -115,6 +115,33 @@ fn matching_is_case_sensitive_and_unicode_code_point_based() {
 }
 
 #[test]
+fn planner_lowers_text_predicates_instead_of_rejecting_them() {
+    let contains = store().interpret_source("Note.filter(x => x.title.contains(\"lph\")).collect()").expect("contains");
+    assert_eq!(ids(&contains), vec![1]);
+
+    let prefix = store().interpret_source("Note.filter(x => x.title.starts_with(\"be\")).collect()").expect("prefix");
+    assert_eq!(ids(&prefix), vec![2]);
+
+    let suffix = store().interpret_source("Note.filter(x => x.title.ends_with(\"ta\")).collect()").expect("suffix");
+    assert_eq!(ids(&suffix), vec![2]);
+
+    let combined =
+        store().interpret_source("Note.filter(x => x.title.contains(\"a\") && x.title.starts_with(\"al\")).collect()").expect("combined");
+    assert_eq!(ids(&combined), vec![1]);
+}
+
+#[test]
+fn unsupported_predicate_methods_are_plan_rejections() {
+    let error = store().interpret_source("Note.filter(x => x.title.matches(\"a\")).collect()").expect_err("matches is unsupported");
+    let Error::Diagnostic(diagnostic) = error
+    else {
+        panic!("expected a structured diagnostic, got {error}");
+    };
+    assert_eq!(diagnostic.code, "IRIS-PLAN-REJECTED");
+    assert!(diagnostic.message.contains("matches"), "message names the rejected method: {}", diagnostic.message);
+}
+
+#[test]
 fn non_text_fields_are_rejected_with_a_structured_code() {
     let error = poisoned_store().execute_plan(&plan(StringMatchOp::Contains, "a")).expect_err("numeric field must be rejected");
     let Error::Diagnostic(diagnostic) = error
