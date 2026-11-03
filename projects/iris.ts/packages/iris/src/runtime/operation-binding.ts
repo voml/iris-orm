@@ -51,34 +51,36 @@ export type OperationExecutorSessionOptions = {
     valueCarriersByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
 };
 
+function executionFailure(
+    code: string | null | undefined,
+    kind: string | null | undefined,
+    diagnosticCode: string | null | undefined,
+    message: string | null | undefined,
+): ResultEnvelope<never> {
+    return {
+        ok: false,
+        diagnostics: [
+            {
+                code: code ?? "IRIS-INTERNAL",
+                kind: kind ?? undefined,
+                diagnosticCode: diagnosticCode ?? undefined,
+                message: message ?? "iris execution failed",
+                severity: "error",
+            },
+        ],
+    };
+}
+
 function wireToEnvelope(raw: SessionExecuteWire): ResultEnvelope<readonly ExecutionRow[]> {
     if (typeof raw === "string") {
         const parsed = parseExecuteJson(raw);
         if (!parsed.ok) {
-            return {
-                ok: false,
-                diagnostics: [
-                    {
-                        code: "IRIS-EXEC-FAILED",
-                        message: parsed.error ?? "iris execution failed",
-                        severity: "error",
-                    },
-                ],
-            };
+            return executionFailure(parsed.errorCode, parsed.errorKind, parsed.errorDiagnosticCode, parsed.error);
         }
         return { ok: true, value: parsed.rows };
     }
     if (!raw.ok) {
-        return {
-            ok: false,
-            diagnostics: [
-                {
-                    code: "IRIS-EXEC-FAILED",
-                    message: raw.error ?? "iris execution failed",
-                    severity: "error",
-                },
-            ],
-        };
+        return executionFailure(raw.errorCode, raw.errorKind, raw.errorDiagnosticCode, raw.error);
     }
     return { ok: true, value: parseRowsJson(raw.rowsJson) };
 }
@@ -119,7 +121,13 @@ function declaredVosWire(
     mode: "query" | "execute",
 ): SessionExecuteWire {
     if (request.operation.kind !== "declared-vos") {
-        return { ok: false, rowsJson: "[]", error: "session fallback requires declared-vos operations" };
+        return {
+            ok: false,
+            rowsJson: "[]",
+            error: "session fallback requires declared-vos operations",
+            errorCode: "IRIS-INVALID-ARGUMENT",
+            errorKind: "invalid_argument",
+        };
     }
     const parametersJson =
         request.parameters === undefined ? null : stringifyOperationParameters(request.parameters);
@@ -129,13 +137,31 @@ function declaredVosWire(
     return runQuery(request.operation.source, parametersJson);
 }
 
-function transactionFailure(code: string, message: string): ResultEnvelope<never> {
-    return { ok: false, diagnostics: [{ code, message, severity: "error" }] };
+function transactionFailure(
+    code: string | null | undefined,
+    kind: string | null | undefined,
+    diagnosticCode: string | null | undefined,
+    message: string | null | undefined,
+): ResultEnvelope<never> {
+    return {
+        ok: false,
+        diagnostics: [
+            {
+                code: code ?? "IRIS-TRANSACTION-FAILED",
+                kind: kind ?? undefined,
+                diagnosticCode: diagnosticCode ?? undefined,
+                message: message ?? "transaction failed",
+                severity: "error",
+            },
+        ],
+    };
 }
 
 function transactionControl(run: (() => SessionExecuteWire) | undefined): ResultEnvelope<void> {
     if (!run) {
         return transactionFailure(
+            "IRIS-TRANSACTION-FAILED",
+            "transaction_failed",
             "IRIS-TRANSACTION-UNSUPPORTED",
             "the active session has no transaction control",
         );
@@ -146,6 +172,8 @@ function transactionControl(run: (() => SessionExecuteWire) | undefined): Result
     } catch (error) {
         return transactionFailure(
             "IRIS-TRANSACTION-FAILED",
+            "transaction_failed",
+            undefined,
             error instanceof Error ? error.message : String(error),
         );
     }
@@ -153,11 +181,11 @@ function transactionControl(run: (() => SessionExecuteWire) | undefined): Result
         const parsed = parseExecuteJson(raw);
         return parsed.ok
             ? { ok: true, value: undefined }
-            : transactionFailure("IRIS-TRANSACTION-FAILED", parsed.error ?? "transaction failed");
+            : transactionFailure(parsed.errorCode, parsed.errorKind, parsed.errorDiagnosticCode, parsed.error);
     }
     return raw.ok
         ? { ok: true, value: undefined }
-        : transactionFailure(raw.errorCode ?? "IRIS-TRANSACTION-FAILED", raw.error ?? "transaction failed");
+        : transactionFailure(raw.errorCode, raw.errorKind, raw.errorDiagnosticCode, raw.error);
 }
 
 /** Build the async operation executor from an open in-process session. */

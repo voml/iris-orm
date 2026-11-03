@@ -45,7 +45,7 @@ test("session fallback without `executeOperation` refuses non declared-vos opera
     );
     assert.equal(result.ok, false);
     if (!result.ok) {
-        assert.equal(result.diagnostics[0]?.code, "IRIS-EXEC-FAILED");
+        assert.equal(result.diagnostics[0]?.code, "IRIS-INVALID-ARGUMENT");
         assert.match(result.diagnostics[0]?.message ?? "", /session fallback requires declared-vos operations/);
     }
     assert.equal(queries.length, 0, "the session must not be touched for refused operations");
@@ -94,7 +94,7 @@ test("string wire results and failures become envelopes", async () => {
     );
     assert.equal(failed.ok, false);
     if (!failed.ok) {
-        assert.equal(failed.diagnostics[0]?.code, "IRIS-EXEC-FAILED");
+        assert.equal(failed.diagnostics[0]?.code, "IRIS-INTERNAL");
         assert.equal(failed.diagnostics[0]?.message, "boom");
     }
 
@@ -170,6 +170,92 @@ test("`executeUnit` falls back to the query surface when the session has no `exe
     assert.equal(result.ok, true);
     assert.equal(queries.length, 1);
     assert.equal(queries[0]?.source, "User.delete()");
+});
+
+test("wire failures forward the author code, semantic kind and diagnostic", async () => {
+    const objectSession: MemorySessionBinding = {
+        executeOperation() {
+            return {
+                ok: false,
+                rowsJson: "[]",
+                error: "duplicate user_name",
+                errorCode: "IRIS-UNIQUE-CONFLICT",
+                errorKind: "unique_conflict",
+                errorDiagnosticCode: "23505",
+            };
+        },
+        executeVos() {
+            return wire(true);
+        },
+        close() {},
+    };
+    const objectResult = await createOperationExecutorFromSession(objectSession).execute(
+        buildOperationRequest({ operationId: "User.create", contractFingerprint: "fp" }, declaredVosOperation("User::insert({})")),
+    );
+    assert.equal(objectResult.ok, false);
+    if (!objectResult.ok) {
+        assert.equal(objectResult.diagnostics[0]?.code, "IRIS-UNIQUE-CONFLICT");
+        assert.equal(objectResult.diagnostics[0]?.kind, "unique_conflict");
+        assert.equal(objectResult.diagnostics[0]?.diagnosticCode, "23505");
+    }
+
+    const stringSession: MemorySessionBinding = {
+        executeOperation() {
+            return '{"ok":false,"rows":[],"error":"duplicate user_name","errorCode":"IRIS-UNIQUE-CONFLICT","errorKind":"unique_conflict","errorDiagnosticCode":"23505"}';
+        },
+        executeVos() {
+            return wire(true);
+        },
+        close() {},
+    };
+    const stringResult = await createOperationExecutorFromSession(stringSession).execute(
+        buildOperationRequest({ operationId: "User.create", contractFingerprint: "fp" }, declaredVosOperation("User::insert({})")),
+    );
+    assert.equal(stringResult.ok, false);
+    if (!stringResult.ok) {
+        assert.equal(stringResult.diagnostics[0]?.code, "IRIS-UNIQUE-CONFLICT");
+        assert.equal(stringResult.diagnostics[0]?.kind, "unique_conflict");
+        assert.equal(stringResult.diagnostics[0]?.diagnosticCode, "23505");
+    }
+});
+
+test("transaction control reports `IRIS-TRANSACTION-FAILED` with the host diagnostic", async () => {
+    const unsupported: MemorySessionBinding = {
+        executeVos() {
+            return wire(true);
+        },
+        close() {},
+    };
+    const missing = await createOperationExecutorFromSession(unsupported).begin();
+    assert.equal(missing.ok, false);
+    if (!missing.ok) {
+        assert.equal(missing.diagnostics[0]?.code, "IRIS-TRANSACTION-FAILED");
+        assert.equal(missing.diagnostics[0]?.kind, "transaction_failed");
+        assert.equal(missing.diagnostics[0]?.diagnosticCode, "IRIS-TRANSACTION-UNSUPPORTED");
+    }
+
+    const alreadyOpen: MemorySessionBinding = {
+        executeVos() {
+            return wire(true);
+        },
+        begin() {
+            return {
+                ok: false,
+                rowsJson: "[]",
+                error: "a transaction is already open",
+                errorCode: "IRIS-TRANSACTION-FAILED",
+                errorKind: "transaction_failed",
+                errorDiagnosticCode: "IRIS-TRANSACTION-ALREADY-OPEN",
+            };
+        },
+        close() {},
+    };
+    const forward = await createOperationExecutorFromSession(alreadyOpen).begin();
+    assert.equal(forward.ok, false);
+    if (!forward.ok) {
+        assert.equal(forward.diagnostics[0]?.code, "IRIS-TRANSACTION-FAILED");
+        assert.equal(forward.diagnostics[0]?.diagnosticCode, "IRIS-TRANSACTION-ALREADY-OPEN");
+    }
 });
 
 test("durable `op_<hex>` identities keep wire rows outside the entity name map", async () => {

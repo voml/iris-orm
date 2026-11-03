@@ -6,11 +6,17 @@ export function parseExecuteJson(raw: string): ExecuteResult {
         ok?: boolean;
         rows?: IrisRow[];
         error?: string | null;
+        errorCode?: string | null;
+        errorKind?: string | null;
+        errorDiagnosticCode?: string | null;
     };
     return {
         ok: Boolean(parsed.ok),
         rows: Array.isArray(parsed.rows) ? parsed.rows : [],
         error: parsed.error ?? null,
+        errorCode: parsed.errorCode ?? null,
+        errorKind: parsed.errorKind ?? null,
+        errorDiagnosticCode: parsed.errorDiagnosticCode ?? null,
     };
 }
 

@@ -547,7 +547,9 @@ export function buildDeclaredOperationRequest(operationId: string, synthesis: Vo
 export function throwOperationEnvelopeError(envelope: Extract<ResultEnvelope<unknown>, { ok: false }>): never {
     const diagnostic = envelope.diagnostics[0];
     const error: IrisGeneratedError = {
-        code: diagnostic?.code ?? "IRIS-EXEC-FAILED",
+        code: diagnostic?.code ?? "IRIS-INTERNAL",
+        kind: diagnostic?.kind,
+        diagnosticCode: diagnostic?.diagnosticCode,
         message: diagnostic?.message ?? "iris operation failed",
     };
     throw error;
