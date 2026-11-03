@@ -4,7 +4,9 @@ Public surface: `IrisError`, `version` and `contract_version`. Everything else
 is generated per project from its VOS schema: `create_client(dsn)` and
 `client.tables.<Entity>`.
 
-Session plumbing, DSN parsing and adapter selection live in `iris._runtime`.
+Session plumbing, DSN parsing and adapter selection live in the Rust session
+core (`iris_pyo3`); generated clients use `iris._internal` and never import
+this runtime package.
 """
 
 from __future__ import annotations

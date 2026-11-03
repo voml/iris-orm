@@ -9,5 +9,5 @@ Install the wheel (or run `maturin develop` next to `pyproject.toml`), then:
 python examples/embedded/main.py
 ```
 
-The example does not touch a database. Schema authoring, generation, and
-runtime data access are not bound yet, so no CRUD example exists.
+The example does not touch a database. Data access comes from a generated
+client; see the generated examples under `projects/iris.py/examples`.

@@ -1,12 +1,13 @@
-"""Internal runtime plumbing behind generated Iris clients.
+"""Internal runtime plumbing kept next to the Python binding.
 
-This module is not part of the authoring surface: generated packages import it,
-authors do not. It owns DSN parsing, adapter selection, session lifetime and the
-operation channel onto the compiled ``iris_pyo3`` extension.
+This module is not part of the authoring surface and is not imported by
+generated packages: generated clients talk to the compiled ``iris_pyo3``
+extension directly, so a generated package named after the project cannot
+shadow the installed ``iris`` package. ``_runtime`` exists for the binding's
+own tests and for hosts that want the low-level profile entry points.
 
-Dropping to this layer is what keeps generated code host-neutral: the same
-generated module runs against any adapter the DSN selects, and the backend name
-never appears in a generated signature.
+``iris_pyo3`` owns DSN parsing, adapter selection and session lifetime in Rust,
+so no Python-side DSN parser can drift from the Node one.
 """
 
 from __future__ import annotations
@@ -40,7 +41,12 @@ def _decode(raw: str) -> dict[str, Any]:
 
 def _raise_native(error: Exception) -> NoReturn:
     """Re-raise a native failure as `IrisError` with its structured code."""
-    payload = _decode(error.args[0]) if error.args else {}
+    payload: dict[str, Any] = {}
+    if error.args and isinstance(error.args[0], str):
+        try:
+            payload = _decode(error.args[0])
+        except ValueError:
+            payload = {}
     raise IrisError(payload.get("message") or str(error), code=payload.get("code", "IRIS-INTERNAL")) from error
 
 
@@ -154,87 +160,3 @@ def open_mysql(url: str) -> Session:
 
 
 openMysql = open_mysql
-
-
-def _path_from_dsn(dsn: str) -> str:
-    return dsn.split(":", 1)[1]
-
-
-def open_session(dsn: str) -> Session:
-    """Open the adapter the DSN selects and return the session.
-
-    Accepted shapes:
-
-    - ``memory:`` — reference profile (generator conformance only)
-    - ``sqlite:<path>`` / ``sqlite::memory:``
-    - ``file:<path>.yydb`` / ``file:<path>.yydx``
-    - ``mysql://user@host:port``
-    - ``postgres://user@host:port/database?sslmode=disable``
-    """
-    if not isinstance(dsn, str) or not dsn.strip():
-        raise IrisError("`dsn` must be a non-empty string", code="IRIS-INVALID-ARGUMENT")
-    text = dsn.strip()
-    if text in ("memory:", "memory"):
-        return open_memory()
-    if text.startswith("sqlite:"):
-        return open_sqlite(_path_from_dsn(text) or ":memory:")
-    if text.startswith("file:"):
-        path = _path_from_dsn(text)
-        if not path:
-            raise IrisError("`file:` DSN requires a path", code="IRIS-INVALID-ARGUMENT")
-        return open_yydb(path)
-    if text.startswith("mysql://"):
-        return open_mysql(text)
-    if text.startswith(("postgres://", "postgresql://")):
-        return open_postgres(text)
-    raise IrisError(f"unrecognized DSN `{text}`", code="IRIS-INVALID-ARGUMENT")
-
-
-_MANAGED_SCHEMES: tuple[str, ...] = ("sqlite:", "file:")
-
-
-def open_managed_session(dsn: str, schema: str | None = None) -> Session:
-    """Open `dsn` and apply the generated schema on managed adapters."""
-    session = open_session(dsn)
-    if schema and dsn.strip().startswith(_MANAGED_SCHEMES):
-        try:
-            session.managedPush(schema)
-        except IrisError:
-            session.close()
-            raise
-    return session
-
-
-def execute_operation(session: Session, request_json: str) -> dict[str, Any]:
-    """Run one structured operation request and return its envelope."""
-    return session.executeOperation(request_json)
-
-
-def execute_unit(session: Session, request_json: str) -> dict[str, Any]:
-    """Run one unit-valued operation request and return its envelope."""
-    return session.executeOperation(request_json)
-
-
-def begin(session: Session) -> dict[str, Any]:
-    """Open a transaction on the bound adapter."""
-    return session.begin()
-
-
-def commit(session: Session) -> dict[str, Any]:
-    """Commit the active transaction."""
-    return session.commit()
-
-
-def rollback(session: Session) -> dict[str, Any]:
-    """Roll back the active transaction."""
-    return session.rollback()
-
-
-def close_session(session: Session) -> None:
-    """Release the bound datasource."""
-    session.close()
-
-
-def managed_push(session: Session, schema: str) -> dict[str, Any]:
-    """Apply a managed-push schema (integration fixtures only)."""
-    return session.managedPush(schema)

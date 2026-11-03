@@ -10,14 +10,14 @@ import iris
 
 iris.version()           # Rust facade version
 iris.contract_version()  # accepted contract envelope format
-iris.IrisError           # error type raised by generated clients
+iris.IrisError           # error type raised by this runtime package
 ```
 
 Data access comes from a **generated client**, one per project, produced from
 the project's VOS schema:
 
 ```python
-from generated.iris import create_client
+from generated.iris import IrisError, create_client
 
 db = create_client("sqlite:./app.sqlite")
 db.tables.User.find_many(where={"user_name": {"contains": "ali"}})
@@ -25,9 +25,12 @@ with db.transaction() as tx:
     tx.tables.User.create(data={"user_name": "ali"})
 ```
 
-Session plumbing, DSN parsing and adapter selection live in `iris._runtime` and
-are not part of the authoring surface. There is no query DSL, no SQL entry and
-no `.iris` parsing in this package.
+Session plumbing, DSN parsing and adapter selection stay behind the generated
+client's `_internal` modules and the Rust session core, and are not part of the
+authoring surface. Generated clients define their own `IrisError`, so a
+generated package named `iris` under `src/generated/` never shadows this
+runtime package. There is no query DSL, no SQL entry and no `.iris` parsing in
+this package.
 
 ## Development
 

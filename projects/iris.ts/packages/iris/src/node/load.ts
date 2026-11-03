@@ -19,6 +19,9 @@ type NativeMemorySession = {
     execute ? (source: string, parametersJson?: string | null) : NativeExecuteResult;
     executeVos(source: string, parametersJson?: string | null): NativeExecuteResult;
     executeOperation ? (operationJson: string) : NativeExecuteResult;
+    begin ? () : NativeExecuteResult;
+    commit ? () : NativeExecuteResult;
+    rollback ? () : NativeExecuteResult;
     close(): void;
     managedPush?: (schema: string) => void;
     sqliteEngineVersion?: () => string;
@@ -40,6 +43,15 @@ function wrapNativeSession(session: NativeMemorySession): MemorySessionBinding {
     };
     if (session.executeOperation) {
         binding.executeOperation = (operationJson: string) => session.executeOperation!(operationJson);
+    }
+    if (session.begin) {
+        binding.begin = () => session.begin!();
+    }
+    if (session.commit) {
+        binding.commit = () => session.commit!();
+    }
+    if (session.rollback) {
+        binding.rollback = () => session.rollback!();
     }
     if (session.managedPush) {
         binding.managedPush = (schema: string) => session.managedPush!(schema);
@@ -75,6 +87,10 @@ function loadModule(specifier: string): IrisNodeBindings {
             },
             openYydbSession: (endpoint) => {
                 const session = (module.openYydbSession as (e: string) => NativeMemorySession)(endpoint);
+                return wrapNativeSession(session);
+            },
+            openDsnSession: (dsn, schema) => {
+                const session = (module.openDsnSession as (d: string, s: string | null) => NativeMemorySession)(dsn, schema);
                 return wrapNativeSession(session);
             },
             openPostgresSession: (url) => {

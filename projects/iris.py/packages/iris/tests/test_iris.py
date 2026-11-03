@@ -71,6 +71,7 @@ class NativeTests(unittest.TestCase):
                 "open_yydb",
                 "open_postgres",
                 "open_mysql",
+                "open_dsn",
             ],
         )
 

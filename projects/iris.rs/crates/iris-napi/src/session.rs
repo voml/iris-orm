@@ -53,6 +53,10 @@ impl MemorySession {
         HostSession::open_postgres(&url).map(|inner| Self { inner: Some(inner) }).map_err(envelope_error)
     }
 
+    pub(crate) fn open_dsn(dsn: String, schema: Option<String>) -> std::result::Result<Self, ErrorEnvelope> {
+        HostSession::open_dsn(&dsn, schema.as_deref()).map(|inner| Self { inner: Some(inner) })
+    }
+
     pub(crate) fn open_yydb(endpoint: String) -> Result<Self> {
         HostSession::open_yydb(&endpoint).map(|inner| Self { inner: Some(inner) }).map_err(envelope_error)
     }

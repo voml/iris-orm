@@ -292,6 +292,15 @@ pub fn open_sqlite_session(path: String) -> Result<MemorySession> {
     MemorySession::open_sqlite(path)
 }
 
+/// Open the adapter a DSN selects, applying `schema` on managed adapters.
+///
+/// This is the construction path behind generated `createClient({ dsn })`:
+/// one DSN parser in `iris-host`, no backend name in an authoring signature.
+#[napi]
+pub fn open_dsn_session(dsn: String, schema: Option<String>) -> Result<MemorySession> {
+    MemorySession::open_dsn(dsn, schema).map_err(|err| napi::Error::new(napi::Status::GenericFailure, err.to_json()))
+}
+
 /// Open a YYDB session over a `.yydb` file or `.yydx` directory layout.
 #[napi]
 pub fn open_yydb_session(endpoint: String) -> Result<MemorySession> {

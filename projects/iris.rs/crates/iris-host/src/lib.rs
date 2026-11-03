@@ -37,6 +37,10 @@ pub const CODE_OPERATION_INVALID: &str = "IRIS-OPERATION-INVALID";
 pub const CODE_EXEC_FAILED: &str = "IRIS-EXEC-FAILED";
 /// The active profile has no transaction control.
 pub const CODE_TRANSACTION_UNSUPPORTED: &str = "IRIS-TRANSACTION-UNSUPPORTED";
+/// A DSN or argument has the wrong shape.
+pub const CODE_INVALID_ARGUMENT: &str = "IRIS-INVALID-ARGUMENT";
+/// A DSN could not open its adapter.
+pub const CODE_CONNECTION_FAILED: &str = "IRIS-CONNECTION-FAILED";
 
 /// Structured failure shared by every host binding.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -327,6 +331,48 @@ impl HostSession {
             }
         };
         Ok(Self::new_store(store, session_ddl_revision))
+    }
+
+    /// Session selected by a DSN, shared by every host binding.
+    ///
+    /// This is the single DSN parser: generated clients pass their DSN here
+    /// and the adapter never leaks into an authoring signature. Managed
+    /// adapters (`sqlite:` and `file:`) apply `schema` when it is supplied,
+    /// foreign servers get their DDL from migrations instead.
+    pub fn open_dsn(dsn: &str, schema: Option<&str>) -> Result<Self, ErrorEnvelope> {
+        let text = dsn.trim();
+        if text.is_empty() {
+            return Err(ErrorEnvelope::new(CODE_INVALID_ARGUMENT, "`dsn` must be a non-empty string"));
+        }
+        let (session, managed) = if text == "memory:" || text == "memory" {
+            (Self::open_memory(), false)
+        }
+        else if let Some(path) = text.strip_prefix("sqlite:") {
+            (Self::open_sqlite(if path.is_empty() { ":memory:" } else { path })?, true)
+        }
+        else if let Some(path) = text.strip_prefix("file:") {
+            if path.is_empty() {
+                return Err(ErrorEnvelope::new(CODE_INVALID_ARGUMENT, "`file:` DSN requires a path"));
+            }
+            (Self::open_yydb(path)?, true)
+        }
+        else if text.starts_with("mysql://") {
+            (Self::open_mysql(text)?, false)
+        }
+        else if text.starts_with("postgres://") || text.starts_with("postgresql://") {
+            (Self::open_postgres(text)?, false)
+        }
+        else {
+            return Err(ErrorEnvelope::new(CODE_INVALID_ARGUMENT, format!("unrecognized DSN `{text}`")));
+        };
+        if managed {
+            if let Some(schema) = schema {
+                if !schema.trim().is_empty() {
+                    session.managed_push(schema)?;
+                }
+            }
+        }
+        Ok(session)
     }
 
     /// Whether the session has been closed.

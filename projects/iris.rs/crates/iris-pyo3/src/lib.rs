@@ -19,8 +19,8 @@ use iris_host::{ErrorEnvelope, ExecuteOutcome, HostSession};
 use pyo3::{exceptions::PyRuntimeError, prelude::*};
 
 /// Capability ids exported by this binding.
-const CAPABILITIES: [&str; 8] =
-    ["version", "contract_version", "capabilities", "open_memory", "open_sqlite", "open_yydb", "open_postgres", "open_mysql"];
+const CAPABILITIES: [&str; 9] =
+    ["version", "contract_version", "capabilities", "open_memory", "open_sqlite", "open_yydb", "open_postgres", "open_mysql", "open_dsn"];
 
 fn raise_open(err: ErrorEnvelope) -> PyErr {
     PyRuntimeError::new_err(err.to_json().to_string())
@@ -170,6 +170,16 @@ fn open_mysql(url: &str) -> PyResult<Session> {
     Session::from_open(HostSession::open_mysql(url))
 }
 
+/// Open the adapter a DSN selects, applying `schema` on managed adapters.
+///
+/// This is the construction path behind generated `create_client(dsn)`: one
+/// DSN parser in `iris_host`, no backend name in an authoring signature.
+#[pyfunction]
+#[pyo3(signature = (dsn, schema = None))]
+fn open_dsn(dsn: &str, schema: Option<&str>) -> PyResult<Session> {
+    Session::from_open(HostSession::open_dsn(dsn, schema))
+}
+
 /// Native module entry point (`import iris_pyo3`).
 #[pymodule]
 fn iris_pyo3(module: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -181,6 +191,7 @@ fn iris_pyo3(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(open_yydb, module)?)?;
     module.add_function(wrap_pyfunction!(open_postgres, module)?)?;
     module.add_function(wrap_pyfunction!(open_mysql, module)?)?;
+    module.add_function(wrap_pyfunction!(open_dsn, module)?)?;
     module.add_class::<Session>()?;
     Ok(())
 }

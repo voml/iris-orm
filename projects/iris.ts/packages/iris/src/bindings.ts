@@ -44,6 +44,7 @@ export type IrisBindings = {
     openMemorySession(): MemorySessionBinding;
     openSession ? (options?: OpenSessionNapiOptions) : MemorySessionBinding;
     openSqliteSession ? (path: string) : MemorySessionBinding;
+    openDsnSession ? (dsn: string, schema: string | null) : MemorySessionBinding;
     openYydbSession ? (endpoint: string) : MemorySessionBinding;
     openPostgresSession ? (url: string) : MemorySessionBinding;
     openMysqlSession ? (url: string) : MemorySessionBinding;

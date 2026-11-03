@@ -21,7 +21,6 @@ from ._internal.synthesize import (
     synthesize_update,
     synthesize_vector_near,
 )
-from .errors import IrisError
 from .inputs import (
 <% loop table in tables_view %>
     <% table.name %>CreateInput,
@@ -84,14 +83,13 @@ class <% table.name %>Delegate:
         *,
         data: <% table.name %>CreateInput,
         select: <% table.name %>Select | None = None,
-    ) -> <% table.name %>:
+    ) -> <% table.name %> | None:
+        """Insert one row and return it when the adapter echoes the row back."""
         synthesis = synthesize_create("<% table.name %>", data, select)
         rows = self._executor.execute(
             build_declared_operation_request("<% table.name %>.create", synthesis)
         )
-        if not rows:
-            raise IrisError("`create` returned no row", code="IRIS-NOT-FOUND")
-        return rows[0]
+        return rows[0] if rows else None
 
     def update(
         self,
@@ -99,14 +97,13 @@ class <% table.name %>Delegate:
         where: <% table.name %>WhereInput,
         data: <% table.name %>UpdateInput,
         select: <% table.name %>Select | None = None,
-    ) -> <% table.name %>:
+    ) -> <% table.name %> | None:
+        """Update matching rows and return the first echoed row, if any."""
         synthesis = synthesize_update("<% table.name %>", where, data, select)
         rows = self._executor.execute(
             build_declared_operation_request("<% table.name %>.update", synthesis)
         )
-        if not rows:
-            raise IrisError("`update` matched no row", code="IRIS-NOT-FOUND")
-        return rows[0]
+        return rows[0] if rows else None
 
     def delete(self, *, where: <% table.name %>WhereInput) -> None:
         synthesis = synthesize_delete("<% table.name %>", where)
