@@ -36,6 +36,15 @@ test("guardOperationExecutor rejects mismatched requests before delegate", async
             delegateCalls += 1;
             return { ok: true, value: undefined };
         },
+        async begin() {
+            return { ok: true, value: undefined };
+        },
+        async commit() {
+            return { ok: true, value: undefined };
+        },
+        async rollback() {
+            return { ok: true, value: undefined };
+        },
         async close() {},
     };
 

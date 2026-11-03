@@ -52,8 +52,34 @@ _OPERATOR_KEYWORDS = {
 }
 
 
-def _near_error(code: str, message: str) -> IrisError:
-    return IrisError(message, code=code)
+def _invalid_argument(diagnostic: str, message: str) -> IrisError:
+    """Author-facing failure for a call shape or argument this client rejects itself."""
+    return IrisError(
+        message,
+        code="IRIS-INVALID-ARGUMENT",
+        kind="invalid_argument",
+        diagnostic_code=diagnostic,
+    )
+
+
+def _vector_dimension(diagnostic: str, message: str) -> IrisError:
+    """Author-facing failure for a vector whose size does not match the schema."""
+    return IrisError(
+        message,
+        code="IRIS-VECTOR-DIMENSION",
+        kind="vector_dimension_mismatch",
+        diagnostic_code=diagnostic,
+    )
+
+
+def _internal_error(diagnostic: str, message: str) -> IrisError:
+    """Author-facing failure for a decoded value this client cannot trust."""
+    return IrisError(
+        message,
+        code="IRIS-INTERNAL",
+        kind="internal",
+        diagnostic_code=diagnostic,
+    )
 
 
 def _is_filter_object(value: Mapping[str, Any]) -> bool:
@@ -87,9 +113,9 @@ def _encode_carrier(entity: str, field: str, value: Any) -> Any:
     vectors = VECTOR_FIELDS.get(entity, {})
     if field in vectors:
         if isinstance(value, (bytes, bytearray)) or not isinstance(value, Sequence):
-            raise IrisError(
+            raise _invalid_argument(
+                "IRIS-VECTOR-INPUT",
                 f"`{entity}.{field}` expects a sequence of floats",
-                code="IRIS-INVALID-ARGUMENT",
             )
         components = [float(component) for component in value]
         hex_components = struct.pack(f"<{len(components)}f", *components).hex()
@@ -122,9 +148,9 @@ def _compile_leaf_predicate(
     hint = f"p_{'_'.join(path) or 'value'}"
     allowed = FILTER_OPS.get(entity, {}).get(author_key)
     if allowed is None:
-        raise IrisError(
+        raise _invalid_argument(
+            "IRIS-FILTER-FIELD-UNKNOWN",
             f"filter field `{entity}.{author_key}` declares no filter surface",
-            code="IRIS-INVALID-ARGUMENT",
         )
 
     if value is True and path:
@@ -137,10 +163,10 @@ def _compile_leaf_predicate(
         for operator in value:
             lowered = _OPERATOR_ALIASES.get(operator, operator)
             if lowered not in allowed:
-                raise IrisError(
+                raise _invalid_argument(
+                    "IRIS-FILTER-OPERATOR-NOT-SUPPORTED",
                     f"operator `{operator}` is outside the `{entity}.{author_key}` filter surface "
                     f"[{', '.join(allowed)}]",
-                    code="IRIS-INVALID-ARGUMENT",
                 )
         if "eq" in value:
             param = _next_param(parameters, hint, value["eq"])
@@ -274,36 +300,36 @@ def _validate_near_args(
 ) -> tuple[list[float], str, float]:
     fields = VECTOR_FIELDS.get(entity)
     if not fields or field not in fields:
-        raise _near_error(
-            "IRIS-VECTOR-DIMENSION",
+        raise _invalid_argument(
+            "IRIS-VECTOR-NEAR-FIELD",
             f"entity `{entity}` declares no `vector` field `{field}`",
         )
     declared = fields[field]
     if metric not in ("cosine", "dot", "euclidean"):
-        raise _near_error(
-            "IRIS-INVALID-ARGUMENT",
+        raise _invalid_argument(
+            "IRIS-VECTOR-NEAR-METRIC",
             f"`{entity}.find_near` requires an explicit metric (cosine | dot | euclidean), got `{metric}`",
         )
     if not isinstance(vector, Sequence) or isinstance(vector, (str, bytes, bytearray)) or not vector:
-        raise _near_error(
-            "IRIS-INVALID-ARGUMENT",
+        raise _invalid_argument(
+            "IRIS-VECTOR-NEAR-VECTOR",
             f"`{entity}.{field}` near vector must be a non-empty sequence of floats",
         )
     components = [float(component) for component in vector]
     if not all(math.isfinite(component) for component in components):
-        raise _near_error(
-            "IRIS-INVALID-ARGUMENT",
+        raise _invalid_argument(
+            "IRIS-VECTOR-NEAR-VECTOR",
             f"`{entity}.{field}` near vector has a non-finite component",
         )
     if declared is not None and len(components) != declared:
-        raise _near_error(
-            "IRIS-VECTOR-DIMENSION",
+        raise _vector_dimension(
+            "IRIS-VECTOR-NEAR-DIMENSION",
             f"`{entity}.{field}` is declared `vector<{declared}>` but the near vector has "
             f"{len(components)} components",
         )
     if not isinstance(threshold, (int, float)) or not math.isfinite(float(threshold)):
-        raise _near_error(
-            "IRIS-INVALID-ARGUMENT",
+        raise _invalid_argument(
+            "IRIS-VECTOR-NEAR-THRESHOLD",
             f"`{entity}.find_near` threshold must be a finite number",
         )
     return components, metric, float(threshold)
@@ -317,16 +343,16 @@ def _decode_vector_cell(cell: Any, entity: str, field: str) -> list[float]:
             octets = bytes.fromhex(components)
             if len(octets) == dimension * 4:
                 return list(struct.unpack(f"<{dimension}f", octets))
-    raise _near_error(
-        "IRIS-VECTOR-DIMENSION",
+    raise _internal_error(
+        "IRIS-VECTOR-NEAR-CARRIER",
         f"`{entity}.{field}` row did not decode to a vector carrier",
     )
 
 
 def _vector_similarity(left: Sequence[float], right: Sequence[float], metric: str, field: str) -> float:
     if len(left) != len(right):
-        raise _near_error(
-            "IRIS-VECTOR-DIMENSION",
+        raise _vector_dimension(
+            "IRIS-VECTOR-NEAR-DIMENSION",
             f"`{field}` row has {len(left)} components but the near vector has {len(right)}",
         )
     if metric == "cosine":
@@ -334,8 +360,8 @@ def _vector_similarity(left: Sequence[float], right: Sequence[float], metric: st
         left_norm = sum(component * component for component in left)
         right_norm = sum(component * component for component in right)
         if left_norm == 0 or right_norm == 0:
-            raise _near_error(
-                "IRIS-VECTOR-DIMENSION",
+            raise _invalid_argument(
+                "IRIS-VECTOR-NEAR-ZERO-NORM",
                 f"cosine similarity is undefined for a zero-norm vector on `{field}`",
             )
         return dot / (left_norm ** 0.5 * right_norm ** 0.5)

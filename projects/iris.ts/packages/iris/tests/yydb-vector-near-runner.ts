@@ -33,7 +33,13 @@ const codes = async (fn) => {
         await fn();
         return null;
     } catch (error) {
-        return error && typeof error === "object" && "code" in error ? String(error.code) : "unknown";
+        if (!error || typeof error !== "object" || !("code" in error)) {
+            return { code: "unknown", diagnosticCode: null };
+        }
+        return {
+            code: String(error.code),
+            diagnosticCode: "diagnosticCode" in error && error.diagnosticCode ? String(error.diagnosticCode) : null,
+        };
     }
 };
 
@@ -91,12 +97,12 @@ const euclideanBoundary = evaluateVectorNearRows(
 );
 
 // Error paths: explicit structured rejections, never silent matching.
-const dimensionCode = await codes(() =>
+const dimensionFailure = await codes(() =>
     client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0]), metric: "cosine", threshold: 0.5 } }),
 );
-const metricCode = await codes(() => client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "manhattan", threshold: 0.5 } }));
-const fieldCode = await codes(() => client.tables.doc.findNear({ field: "label", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.5 } }));
-const zeroNormQueryCode = await codes(() =>
+const metricFailure = await codes(() => client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "manhattan", threshold: 0.5 } }));
+const fieldFailure = await codes(() => client.tables.doc.findNear({ field: "label", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.5 } }));
+const zeroNormQueryFailure = await codes(() =>
     client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([0, 0, 0]), metric: "cosine", threshold: 0.0 } }),
 );
 
@@ -112,7 +118,7 @@ await reopened.close();
 const poisoned = await createIrisOperationExecutor(executorOptions);
 const poisonedClient = new Client(poisoned);
 await poisonedClient.tables.doc.create({ data: { docId: 5n, label: "zero", embedding: new Float32Array([0, 0, 0]) } });
-const zeroNormRowCode = await codes(() =>
+const zeroNormRowFailure = await codes(() =>
     poisonedClient.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 } }),
 );
 await poisoned.close();
@@ -130,11 +136,11 @@ console.log(
         directIds: idsOf(directRows),
         dotBoundaryIds: idsOf(dotBoundary),
         euclideanBoundaryIds: idsOf(euclideanBoundary),
-        dimensionCode,
-        metricCode,
-        fieldCode,
-        zeroNormQueryCode,
-        zeroNormRowCode,
+        dimensionFailure,
+        metricFailure,
+        fieldFailure,
+        zeroNormQueryFailure,
+        zeroNormRowFailure,
         reopenCosineStrongIds: idsOf(reopenCosineStrong),
     }),
 );

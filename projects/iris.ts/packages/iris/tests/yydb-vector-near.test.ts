@@ -6,6 +6,9 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+/** Author-facing failure captured from a generated client call. */
+type Failure = { code: string; diagnosticCode: string | null };
+
 const SCHEMA = `
 table Doc {
     @@doc_id: i64,
@@ -93,11 +96,11 @@ test("vector `findNear` retrieves by explicit metric on a real database file", a
         directIds: string[];
         dotBoundaryIds: string[];
         euclideanBoundaryIds: string[];
-        dimensionCode: string | null;
-        metricCode: string | null;
-        fieldCode: string | null;
-        zeroNormQueryCode: string | null;
-        zeroNormRowCode: string | null;
+        dimensionFailure: Failure | null;
+        metricFailure: Failure | null;
+        fieldFailure: Failure | null;
+        zeroNormQueryFailure: Failure | null;
+        zeroNormRowFailure: Failure | null;
         reopenCosineStrongIds: string[];
     };
 
@@ -123,12 +126,28 @@ test("vector `findNear` retrieves by explicit metric on a real database file", a
     assert.deepEqual(payload.dotBoundaryIds, ["2"], "dot score 11 meets threshold 11 inclusively");
     assert.deepEqual(payload.euclideanBoundaryIds, ["1"], "distance 5 meets threshold 5 inclusively, 5.00001 fails");
 
-    // Error paths: every rejection is a structured failure with a stable code.
-    assert.equal(payload.dimensionCode, "IRIS-VECTOR-NEAR-DIMENSION");
-    assert.equal(payload.metricCode, "IRIS-VECTOR-NEAR-METRIC");
-    assert.equal(payload.fieldCode, "IRIS-VECTOR-NEAR-FIELD");
-    assert.equal(payload.zeroNormQueryCode, "IRIS-VECTOR-NEAR-ZERO-NORM");
-    assert.equal(payload.zeroNormRowCode, "IRIS-VECTOR-NEAR-ZERO-NORM");
+    // Error paths: every rejection carries the author-facing code plus the
+    // generation-time diagnostic that names the exact rejected argument.
+    assert.deepEqual(payload.dimensionFailure, {
+        code: "IRIS-VECTOR-DIMENSION",
+        diagnosticCode: "IRIS-VECTOR-NEAR-DIMENSION",
+    });
+    assert.deepEqual(payload.metricFailure, {
+        code: "IRIS-INVALID-ARGUMENT",
+        diagnosticCode: "IRIS-VECTOR-NEAR-METRIC",
+    });
+    assert.deepEqual(payload.fieldFailure, {
+        code: "IRIS-INVALID-ARGUMENT",
+        diagnosticCode: "IRIS-VECTOR-NEAR-FIELD",
+    });
+    assert.deepEqual(payload.zeroNormQueryFailure, {
+        code: "IRIS-INVALID-ARGUMENT",
+        diagnosticCode: "IRIS-VECTOR-NEAR-ZERO-NORM",
+    });
+    assert.deepEqual(payload.zeroNormRowFailure, {
+        code: "IRIS-INVALID-ARGUMENT",
+        diagnosticCode: "IRIS-VECTOR-NEAR-ZERO-NORM",
+    });
 
     // A fresh session over the same file ranks the same rows.
     assert.deepEqual(payload.reopenCosineStrongIds, ["1", "3"]);

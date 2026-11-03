@@ -120,11 +120,7 @@ function compileLeafPredicate(
 
     const allowed = SYNTHESIZE_FILTER_OPS[entity]?.[tsKey];
     if (!allowed) {
-        const error: IrisGeneratedError = {
-            code: "IRIS-FILTER-FIELD-UNKNOWN",
-            message: `filter field \`${entity}.${tsKey}\` declares no filter surface`,
-        };
-        throw error;
+        throw invalidArgument("IRIS-FILTER-FIELD-UNKNOWN", `filter field \`${entity}.${tsKey}\` declares no filter surface`);
     }
 
     if (value === true && path.length > 0) {
@@ -137,11 +133,10 @@ function compileLeafPredicate(
     if (isPlainObject(value) && isFilterOperatorObject(value)) {
         for (const operator of Object.keys(value)) {
             if (!allowed.includes(operator)) {
-                const error: IrisGeneratedError = {
-                    code: "IRIS-FILTER-OPERATOR-NOT-SUPPORTED",
-                    message: `operator \`${operator}\` is outside the \`${entity}.${tsKey}\` filter surface [${allowed.join(", ")}]`,
-                };
-                throw error;
+                throw invalidArgument(
+                    "IRIS-FILTER-OPERATOR-NOT-SUPPORTED",
+                    `operator \`${operator}\` is outside the \`${entity}.${tsKey}\` filter surface [${allowed.join(", ")}]`,
+                );
             }
         }
         const clauses: string[] = [];
@@ -350,8 +345,19 @@ const METRIC_DIRECTION: Readonly<Record<NearMetric, { readonly higherIsCloser: b
     euclidean: { higherIsCloser: false },
 };
 
-function nearError(code: string, message: string): IrisGeneratedError {
-    return { code, message };
+/** Author-facing failure for a call shape or argument the client rejects itself. */
+function invalidArgument(diagnostic: string, message: string): IrisGeneratedError {
+    return { code: "IRIS-INVALID-ARGUMENT", kind: "invalid_argument", message, diagnosticCode: diagnostic };
+}
+
+/** Author-facing failure for a vector whose size does not match the schema. */
+function vectorDimension(diagnostic: string, message: string): IrisGeneratedError {
+    return { code: "IRIS-VECTOR-DIMENSION", kind: "vector_dimension_mismatch", message, diagnosticCode: diagnostic };
+}
+
+/** Author-facing failure for a decoded value the generated client cannot trust. */
+function internalError(diagnostic: string, message: string): IrisGeneratedError {
+    return { code: "IRIS-INTERNAL", kind: "internal", message, diagnosticCode: diagnostic };
 }
 
 /** Validate the `findNear` input and return it narrowed to a checked shape. */
@@ -361,34 +367,34 @@ function validateVectorNearArgs(
 ): { readonly vector: Float32Array; readonly metric: NearMetric; readonly threshold: number } {
     const fields = SYNTHESIZE_VECTOR_FIELDS[entity];
     if (!fields || !Object.prototype.hasOwnProperty.call(fields, args.field)) {
-        throw nearError("IRIS-VECTOR-NEAR-FIELD", `entity \`${entity}\` declares no \`vector\` field \`${args.field}\``);
+        throw invalidArgument("IRIS-VECTOR-NEAR-FIELD", `entity \`${entity}\` declares no \`vector\` field \`${args.field}\``);
     }
     const declared = fields[args.field] ?? null;
     const near = args.near;
     if (!near || typeof near !== "object") {
-        throw nearError("IRIS-VECTOR-NEAR-INPUT", `\`${entity}.findNear\` requires a \`near\` input`);
+        throw invalidArgument("IRIS-VECTOR-NEAR-INPUT", `\`${entity}.findNear\` requires a \`near\` input`);
     }
     const metric = near.metric as NearMetric;
     if (!(metric in METRIC_DIRECTION)) {
-        throw nearError("IRIS-VECTOR-NEAR-METRIC", `\`${entity}.findNear\` requires an explicit metric (cosine | dot | euclidean), got \`${String(near.metric)}\``);
+        throw invalidArgument("IRIS-VECTOR-NEAR-METRIC", `\`${entity}.findNear\` requires an explicit metric (cosine | dot | euclidean), got \`${String(near.metric)}\``);
     }
     const vector = near.vector;
     if (!(vector instanceof Float32Array) || vector.length === 0) {
-        throw nearError("IRIS-VECTOR-NEAR-VECTOR", `\`${entity}.${args.field}\` near vector must be a non-empty \`Float32Array\``);
+        throw invalidArgument("IRIS-VECTOR-NEAR-VECTOR", `\`${entity}.${args.field}\` near vector must be a non-empty \`Float32Array\``);
     }
     for (const component of vector) {
         if (!Number.isFinite(component)) {
-            throw nearError("IRIS-VECTOR-NEAR-VECTOR", `\`${entity}.${args.field}\` near vector has a non-finite component`);
+            throw invalidArgument("IRIS-VECTOR-NEAR-VECTOR", `\`${entity}.${args.field}\` near vector has a non-finite component`);
         }
     }
     if (declared !== null && vector.length !== declared) {
-        throw nearError(
+        throw vectorDimension(
             "IRIS-VECTOR-NEAR-DIMENSION",
             `\`${entity}.${args.field}\` is declared \`vector<${declared}>\` but the near vector has ${vector.length} components`,
         );
     }
     if (typeof near.threshold !== "number" || !Number.isFinite(near.threshold)) {
-        throw nearError("IRIS-VECTOR-NEAR-THRESHOLD", `\`${entity}.findNear\` threshold must be a finite number`);
+        throw invalidArgument("IRIS-VECTOR-NEAR-THRESHOLD", `\`${entity}.findNear\` threshold must be a finite number`);
     }
     return { vector, metric, threshold: near.threshold };
 }
@@ -396,7 +402,7 @@ function validateVectorNearArgs(
 /** Similarity or distance of one row vector against the near vector under the explicit metric. */
 function vectorSimilarity(left: Float32Array, right: Float32Array, metric: NearMetric, field: string): number {
     if (left.length !== right.length) {
-        throw nearError("IRIS-VECTOR-NEAR-DIMENSION", `\`${field}\` row has ${left.length} components but the near vector has ${right.length}`);
+        throw vectorDimension("IRIS-VECTOR-NEAR-DIMENSION", `\`${field}\` row has ${left.length} components but the near vector has ${right.length}`);
     }
     if (metric === "cosine") {
         let dot = 0;
@@ -410,7 +416,7 @@ function vectorSimilarity(left: Float32Array, right: Float32Array, metric: NearM
             rightNorm += r * r;
         }
         if (leftNorm === 0 || rightNorm === 0) {
-            throw nearError("IRIS-VECTOR-NEAR-ZERO-NORM", `cosine similarity is undefined for a zero-norm vector on \`${field}\``);
+            throw invalidArgument("IRIS-VECTOR-NEAR-ZERO-NORM", `cosine similarity is undefined for a zero-norm vector on \`${field}\``);
         }
         return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
     }
@@ -450,7 +456,7 @@ export function evaluateVectorNearRows(entity: string, args: VectorNearArgs, row
             continue;
         }
         if (!(cell instanceof Float32Array)) {
-            throw nearError("IRIS-VECTOR-NEAR-CARRIER", `\`${entity}.${args.field}\` row did not decode to a \`Float32Array\``);
+            throw internalError("IRIS-VECTOR-NEAR-CARRIER", `\`${entity}.${args.field}\` row did not decode to a \`Float32Array\``);
         }
         const value = vectorSimilarity(cell, vector, metric, `${entity}.${args.field}`);
         const passes = higherIsCloser ? value >= threshold : value <= threshold;

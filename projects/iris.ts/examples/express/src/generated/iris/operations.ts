@@ -15,6 +15,14 @@ import {
 import type {
     UserFindManyArgs, UserFindFirstArgs, UserFindUniqueArgs, UserCreateArgs, UserDeleteArgs, UserUpdateArgs, UserGetPayload, PostFindManyArgs, PostFindFirstArgs, PostFindUniqueArgs, PostCreateArgs, PostDeleteArgs, PostUpdateArgs, PostGetPayload
 } from "./inputs.js";
+/** Raise the author `not_found` failure when a unique `where` matched nothing. */
+function throwNotFound(entity: string, operation: string): never {
+    throw {
+        code: "IRIS-NOT-FOUND",
+        kind: "not_found",
+        message: `\`${entity}.${operation}\` matched no row`,
+    };
+}
 /** Generated macro bindings from schema truth (not backend capability intersection). */
 export class GeneratedMacros {
     private readonly executor: OperationExecutor;
@@ -88,6 +96,18 @@ export class UserDelegate {
     async update<const A extends UserUpdateArgs>(
         args: A,
     ): Promise<UserGetPayload<A>> {
+        const matched = await this.executor.execute(
+            buildDeclaredOperationRequest(
+                "User.findMany",
+                synthesizeFindMany("User", { where: args.where, take: 1 }),
+            ),
+        );
+        if (!matched.ok) {
+            throwOperationEnvelopeError(matched);
+        }
+        if (matched.value.length === 0) {
+            throwNotFound("User", "update");
+        }
         const synthesis = synthesizeUpdate("User", args);
         const envelope = await this.executor.execute(
             buildDeclaredOperationRequest("User.update", synthesis),
@@ -98,6 +118,18 @@ export class UserDelegate {
         return envelope.value[0] as UserGetPayload<A>;
     }
     async delete(args: UserDeleteArgs): Promise<void> {
+        const matched = await this.executor.execute(
+            buildDeclaredOperationRequest(
+                "User.findMany",
+                synthesizeFindMany("User", { where: args.where, take: 1 }),
+            ),
+        );
+        if (!matched.ok) {
+            throwOperationEnvelopeError(matched);
+        }
+        if (matched.value.length === 0) {
+            throwNotFound("User", "delete");
+        }
         const synthesis = synthesizeDelete("User", args);
         const envelope = await this.executor.executeUnit(
             buildDeclaredOperationRequest("User.delete", synthesis),
@@ -165,6 +197,18 @@ export class PostDelegate {
     async update<const A extends PostUpdateArgs>(
         args: A,
     ): Promise<PostGetPayload<A>> {
+        const matched = await this.executor.execute(
+            buildDeclaredOperationRequest(
+                "Post.findMany",
+                synthesizeFindMany("Post", { where: args.where, take: 1 }),
+            ),
+        );
+        if (!matched.ok) {
+            throwOperationEnvelopeError(matched);
+        }
+        if (matched.value.length === 0) {
+            throwNotFound("Post", "update");
+        }
         const synthesis = synthesizeUpdate("Post", args);
         const envelope = await this.executor.execute(
             buildDeclaredOperationRequest("Post.update", synthesis),
@@ -175,6 +219,18 @@ export class PostDelegate {
         return envelope.value[0] as PostGetPayload<A>;
     }
     async delete(args: PostDeleteArgs): Promise<void> {
+        const matched = await this.executor.execute(
+            buildDeclaredOperationRequest(
+                "Post.findMany",
+                synthesizeFindMany("Post", { where: args.where, take: 1 }),
+            ),
+        );
+        if (!matched.ok) {
+            throwOperationEnvelopeError(matched);
+        }
+        if (matched.value.length === 0) {
+            throwNotFound("Post", "delete");
+        }
         const synthesis = synthesizeDelete("Post", args);
         const envelope = await this.executor.executeUnit(
             buildDeclaredOperationRequest("Post.delete", synthesis),
