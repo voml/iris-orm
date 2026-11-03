@@ -5,10 +5,12 @@
 
 use std::collections::BTreeMap;
 
+use super::{
+    errors::Result as YydbResult,
+    models::{escape_vos_str, *},
+};
 use iris::{Planner, Row, RowWrite, Value};
 use iris_connector_yydb::YydbSource;
-use super::errors::Result as YydbResult;
-use super::models::{escape_vos_str, *};
 
 // --- Thin generated client (TS-parity shim; not knife-B GeneratedCall) ---------
 // Prefer these delegates over hand-written VOS strings / RowWrite. Escape hatch:
@@ -25,18 +27,12 @@ pub struct Db<'a> {
 impl<'a> Db<'a> {
     /// Bind to an open [`YydbSource`].
     pub fn new(source: &'a YydbSource) -> Self {
-        Self {
-            source,
-            planner: Planner::new(YydbSource::capabilities()),
-        }
+        Self { source, planner: Planner::new(YydbSource::capabilities()) }
     }
 
     /// Escape hatch: plan + execute VOS DML (returns rows). Prefer typed delegates.
     pub fn query(&self, source: &str) -> YydbResult<Vec<Row>> {
-        let plan = self
-            .planner
-            .plan_source(source)
-            .map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
+        let plan = self.planner.plan_source(source).map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
         self.source.execute_plan(&plan)
     }
 
@@ -47,31 +43,17 @@ impl<'a> Db<'a> {
     }
 
     /// Commit-on-success transaction. Use [`Txn`] inside `f` (same CRUD names as [`Db`]).
-    pub fn transaction<R>(
-        &self,
-        f: impl FnOnce(&mut Txn<'_>) -> YydbResult<R>,
-    ) -> YydbResult<R> {
+    pub fn transaction<R>(&self, f: impl FnOnce(&mut Txn<'_>) -> YydbResult<R>) -> YydbResult<R> {
         self.source.transaction(|conn| {
-            let mut txn = Txn {
-                source: self.source,
-                planner: &self.planner,
-                conn,
-            };
+            let mut txn = Txn { source: self.source, planner: &self.planner, conn };
             f(&mut txn)
         })
     }
 
     /// Always `ROLLBACK` — shared-DB integration tests (fixtures leave no residue).
-    pub fn with_rollback<R>(
-        &self,
-        f: impl FnOnce(&mut Txn<'_>) -> YydbResult<R>,
-    ) -> YydbResult<R> {
+    pub fn with_rollback<R>(&self, f: impl FnOnce(&mut Txn<'_>) -> YydbResult<R>) -> YydbResult<R> {
         self.source.with_rollback(|conn| {
-            let mut txn = Txn {
-                source: self.source,
-                planner: &self.planner,
-                conn,
-            };
+            let mut txn = Txn { source: self.source, planner: &self.planner, conn };
             f(&mut txn)
         })
     }
@@ -92,10 +74,7 @@ pub struct Txn<'a> {
 impl Txn<'_> {
     /// Escape hatch while the transaction connection is held.
     pub fn query(&mut self, source: &str) -> YydbResult<Vec<Row>> {
-        let plan = self
-            .planner
-            .plan_source(source)
-            .map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
+        let plan = self.planner.plan_source(source).map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
         self.source.execute_plan_on(self.conn, &plan)
     }
 
@@ -107,11 +86,7 @@ impl Txn<'_> {
 
     /// Table delegate for `Doc` on this transaction.
     pub fn doc(&mut self) -> DocTxnDelegate<'_> {
-        DocTxnDelegate {
-            source: self.source,
-            planner: self.planner,
-            conn: self.conn,
-        }
+        DocTxnDelegate { source: self.source, planner: self.planner, conn: self.conn }
     }
 }
 
@@ -132,15 +107,12 @@ impl DocDelegate<'_> {
         if let Some(v) = where_.published {
             if v {
                 preds.push("x.published".to_string());
-            } else {
+            }
+            else {
                 preds.push("x.published == false".to_string());
             }
         }
-        if preds.is_empty() {
-            format!("Doc.collect()")
-        } else {
-            format!("Doc.filter(x => {}).collect()", preds.join(" && "))
-        }
+        if preds.is_empty() { format!("Doc.collect()") } else { format!("Doc.filter(x => {}).collect()", preds.join(" && ")) }
     }
 
     fn synthesize_find_unique(where_: &DocWhere) -> String {
@@ -154,18 +126,12 @@ impl DocDelegate<'_> {
         if let Some(v) = where_.published {
             if v {
                 preds.push("x.published".to_string());
-            } else {
+            }
+            else {
                 preds.push("x.published == false".to_string());
             }
         }
-        if preds.is_empty() {
-            format!("Doc.take(1).collect()")
-        } else {
-            format!(
-                "Doc.filter(x => {}).take(1).collect()",
-                preds.join(" && ")
-            )
-        }
+        if preds.is_empty() { format!("Doc.take(1).collect()") } else { format!("Doc.filter(x => {}).take(1).collect()", preds.join(" && ")) }
     }
 
     fn to_row_write(row: &Doc) -> super::errors::Result<RowWrite> {
@@ -173,12 +139,18 @@ impl DocDelegate<'_> {
             table: "Doc".into(),
             primary_key: "doc_id".into(),
             fields: BTreeMap::from([
-            ("doc_id".into(), Value::Int(row.doc_id as i64)),
-            ("title".into(), Value::Str(row.title.clone())),
-            ("published".into(), Value::Bool(row.published)),
-            ("body".into(), Value::Bytes(row.body.clone())),
-            ("embedding".into(), Value::Vector(iris::VectorValue::new(4u32, row.embedding.clone()).ok_or_else(|| super::errors::Error::Policy("vector `embedding` does not match the declared dimension 4".into()))?)),
-            ("attachment".into(), Value::File(row.attachment.clone())),
+                ("doc_id".into(), Value::Int(row.doc_id as i64)),
+                ("title".into(), Value::Str(row.title.clone())),
+                ("published".into(), Value::Bool(row.published)),
+                ("body".into(), Value::Bytes(row.body.clone())),
+                (
+                    "embedding".into(),
+                    Value::Vector(
+                        iris::VectorValue::new(4u32, row.embedding.clone())
+                            .ok_or_else(|| super::errors::Error::Policy("vector `embedding` does not match the declared dimension 4".into()))?,
+                    ),
+                ),
+                ("attachment".into(), Value::File(row.attachment.clone())),
             ]),
         })
     }
@@ -224,10 +196,7 @@ impl DocTxnDelegate<'_> {
     /// Find many rows matching a flat where.
     pub fn find_many(&mut self, where_: &DocWhere) -> YydbResult<Vec<Doc>> {
         let source = DocDelegate::synthesize_find_many(where_);
-        let plan = self
-            .planner
-            .plan_source(&source)
-            .map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
+        let plan = self.planner.plan_source(&source).map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
         let rows = self.source.execute_plan_on(self.conn, &plan)?;
         Ok(rows.iter().filter_map(Doc::from_row).collect())
     }
@@ -235,24 +204,19 @@ impl DocTxnDelegate<'_> {
     /// Find at most one row (adds `.take(1)`).
     pub fn find_unique(&mut self, where_: &DocWhere) -> YydbResult<Option<Doc>> {
         let source = DocDelegate::synthesize_find_unique(where_);
-        let plan = self
-            .planner
-            .plan_source(&source)
-            .map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
+        let plan = self.planner.plan_source(&source).map_err(|e| iris_connector_yydb::Error::Policy(e.to_string()))?;
         let rows = self.source.execute_plan_on(self.conn, &plan)?;
         Ok(rows.first().and_then(Doc::from_row))
     }
 
     /// Insert a row.
     pub fn insert(&mut self, row: &Doc) -> YydbResult<()> {
-        self.source
-            .insert_on(self.conn, &DocDelegate::to_row_write(row)?)
+        self.source.insert_on(self.conn, &DocDelegate::to_row_write(row)?)
     }
 
     /// Update by primary key.
     pub fn update(&mut self, row: &Doc) -> YydbResult<u64> {
-        self.source
-            .update_on(self.conn, &DocDelegate::to_row_write(row)?)
+        self.source.update_on(self.conn, &DocDelegate::to_row_write(row)?)
     }
 
     /// Delete by primary key.
@@ -260,5 +224,3 @@ impl DocTxnDelegate<'_> {
         self.source.delete_on(self.conn, "Doc", "doc_id", key)
     }
 }
-
-

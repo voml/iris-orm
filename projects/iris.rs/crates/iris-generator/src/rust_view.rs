@@ -156,10 +156,7 @@ fn primary_key(table: &TableModel) -> Result<&str> {
 }
 
 fn scalar_base(rust_ty: &str) -> &str {
-    rust_ty
-        .strip_prefix("Option<")
-        .and_then(|rest| rest.strip_suffix('>'))
-        .unwrap_or(rust_ty)
+    rust_ty.strip_prefix("Option<").and_then(|rest| rest.strip_suffix('>')).unwrap_or(rust_ty)
 }
 
 /// Payload carriers (`bytes` / `vector` / `file`) have no VOS literal text form,
@@ -175,9 +172,7 @@ fn vector_dimension(field: &FieldModel) -> Result<u32> {
         .strip_prefix("vector<")
         .and_then(|rest| rest.strip_suffix('>'))
         .ok_or_else(|| Error::UnsupportedType(format!("field `{}` has malformed vector type `{}`", field.name, field.vos_type)))?;
-    let dimension: u32 = inner
-        .parse()
-        .map_err(|_| Error::UnsupportedType(format!("vector dimension `{inner}` is not a positive integer")))?;
+    let dimension: u32 = inner.parse().map_err(|_| Error::UnsupportedType(format!("vector dimension `{inner}` is not a positive integer")))?;
     if dimension == 0 {
         return Err(Error::UnsupportedType("vector dimension must be greater than zero".into()));
     }

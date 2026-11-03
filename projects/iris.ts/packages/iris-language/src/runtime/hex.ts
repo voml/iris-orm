@@ -19,7 +19,7 @@ export function encodeHex(bytes: Uint8Array): string {
 
 /** Decode canonical lowercase hex, or `null` when the text is not canonical. */
 export function decodeHex(text: string): Uint8Array | null {
-    if (text.length % 2 !== 0 || !/^[0-9a-f]*$/.test(text)) {
+    if (text.length % 2 !== 0 || ! /^[0-9a-f]*$/.test(text)) {
         return null;
     }
     const bytes = new Uint8Array(text.length / 2);

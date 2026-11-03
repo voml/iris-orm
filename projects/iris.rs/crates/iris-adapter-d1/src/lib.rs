@@ -54,9 +54,9 @@ impl WireValue {
             iris_types::Value::Null => Self::Null,
             iris_types::Value::Bool(b) => Self::Bool(*b),
             iris_types::Value::Int(i) => Self::Int(*i),
-            iris_types::Value::UInt(u) => Self::Int(i64::try_from(*u).map_err(|_| {
-                D1Error::ValueRejected(format!("VOS `u64` value {u} is outside the D1 INTEGER range"))
-            })?),
+            iris_types::Value::UInt(u) => Self::Int(
+                i64::try_from(*u).map_err(|_| D1Error::ValueRejected(format!("VOS `u64` value {u} is outside the D1 INTEGER range")))?,
+            ),
             iris_types::Value::Float(f) => {
                 if !f.is_finite() {
                     return Err(D1Error::ValueRejected("VOS `f64` values must be finite".into()));

@@ -10,6 +10,4 @@ pub const SCHEMA_FINGERPRINT: &str = "038b1847215e5c42b29d006ce8a14f13abee19d937
 pub const GENERATOR_VERSION: &str = "0.1.0";
 
 /// `(table, field)` pairs whose VOS type is `uuid` / `uuid?` (MySQL `BINARY(16)`).
-pub const UUID_FIELDS: &[(&str, &str)] = &[
-];
-
+pub const UUID_FIELDS: &[(&str, &str)] = &[];

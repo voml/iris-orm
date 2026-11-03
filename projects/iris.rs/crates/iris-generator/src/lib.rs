@@ -97,7 +97,9 @@ pub enum Error {
     #[error("rust client generation requires a datasource kind (the adapter binding is chosen per datasource)")]
     MissingDatasource,
     /// Datasource kind whose adapter surface has not converged for a Rust client binding.
-    #[error("datasource `{0}` has no converged Rust adapter binding (only `mysql` and `yydb` are bound; sqlite/postgres/redis/yyds/reference adapter surfaces have not converged)")]
+    #[error(
+        "datasource `{0}` has no converged Rust adapter binding (only `mysql` and `yydb` are bound; sqlite/postgres/redis/yyds/reference adapter surfaces have not converged)"
+    )]
     UnsupportedDatasource(String),
     /// Two VOS fields map to the same TypeScript author name.
     #[error("TypeScript field naming collision on `{entity}`: `{wire_a}` and `{wire_b}` map to `{ts_name}`")]
@@ -634,7 +636,12 @@ pub fn write_rust_domain(model: &GenerationModel, datasource: &str, generate_roo
 ///
 /// The `rust` target binds the generated client to one datasource kind; the
 /// binding table only covers adapter surfaces that have converged.
-pub fn generate(model: &GenerationModel, target: &str, generate_root: &std::path::Path, datasource: Option<&str>) -> Result<Vec<std::path::PathBuf>> {
+pub fn generate(
+    model: &GenerationModel,
+    target: &str,
+    generate_root: &std::path::Path,
+    datasource: Option<&str>,
+) -> Result<Vec<std::path::PathBuf>> {
     match target {
         "rust" => write_rust_domain(model, datasource.ok_or(Error::MissingDatasource)?, generate_root),
         "typescript" | "ts" => write_typescript_client(model, generate_root),
@@ -653,7 +660,12 @@ pub fn emit_target_files(model: &GenerationModel, target: &str, datasource: Opti
 }
 
 /// Parse schema source and generate bindings for `target`.
-pub fn generate_from_source(source: &str, target: &str, generate_root: &std::path::Path, datasource: Option<&str>) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
+pub fn generate_from_source(
+    source: &str,
+    target: &str,
+    generate_root: &std::path::Path,
+    datasource: Option<&str>,
+) -> Result<(GenerationModel, Vec<std::path::PathBuf>)> {
     let model = GenerationModel::from_vos_schema(source)?;
     let paths = generate(&model, target, generate_root, datasource)?;
     Ok((model, paths))
@@ -682,7 +694,12 @@ pub fn generate_from_artifacts(
 ///
 /// Returns `(model, files)` where each `(filename, content)` pair is one
 /// generated artifact.
-pub fn emit_from_artifacts(contract_json: &str, operations_json: &str, target: &str, datasource: Option<&str>) -> Result<(GenerationModel, Vec<(String, String)>)> {
+pub fn emit_from_artifacts(
+    contract_json: &str,
+    operations_json: &str,
+    target: &str,
+    datasource: Option<&str>,
+) -> Result<(GenerationModel, Vec<(String, String)>)> {
     let model = GenerationModel::from_artifacts(contract_json, operations_json)?;
     let files = emit_target_files(&model, target, datasource)?;
     Ok((model, files))
@@ -831,10 +848,12 @@ fn map_field_type(ty: &CanonicalType) -> Result<MappedFieldType> {
             Ok(MappedFieldType { rust_ty: path.join("::"), vos_type: path.join("::"), optional: false, is_uuid: false, reference_target: None })
         }
         CanonicalType::Generic { path, arguments } if path.len() == 1 && path[0] == "vector" => {
-            let [CanonicalTypeArgument::Literal(text)] = arguments.as_slice() else {
+            let [CanonicalTypeArgument::Literal(text)] = arguments.as_slice()
+            else {
                 return Err(Error::UnsupportedType(format!("{ty:?}")));
             };
-            let dimension: u32 = text.parse().map_err(|_| Error::UnsupportedType(format!("vector dimension `{text}` is not a positive integer")))?;
+            let dimension: u32 =
+                text.parse().map_err(|_| Error::UnsupportedType(format!("vector dimension `{text}` is not a positive integer")))?;
             if dimension == 0 {
                 return Err(Error::UnsupportedType("vector dimension must be greater than zero".into()));
             }

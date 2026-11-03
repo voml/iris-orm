@@ -125,7 +125,8 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let cols: Vec<String> = fields.iter().map(|f| format!("`{}`", f.name)).collect();
         let placeholders: Vec<&str> = cols.iter().map(|_| "?").collect();
         let sql = format!("INSERT INTO `{table}` ({}) VALUES ({})", cols.join(", "), placeholders.join(", "));
-        let params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect::<Result<Vec<_>>>()?;
+        let params: Vec<MysqlValue> =
+            fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect::<Result<Vec<_>>>()?;
         conn.exec_drop(sql, Params::Positional(params.clone()))?;
         let (where_sql, _) = inserted_fields_to_sql(&fields, &table, uuid_fields)?;
         let select = format!("SELECT {returning} FROM `{table}` WHERE {where_sql} LIMIT 1");
@@ -136,7 +137,8 @@ fn execute_write_plan(conn: &mut PooledConn, plan: &PhysicalPlan, uuid_fields: &
         let sets: Vec<String> = fields.iter().map(|f| format!("`{}` = ?", f.name)).collect();
         let (where_sql, mut where_params) = filter_to_sql(filter.as_ref(), &table, uuid_fields)?;
         let sql = format!("UPDATE `{table}` SET {} WHERE {where_sql}", sets.join(", "));
-        let mut params: Vec<MysqlValue> = fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect::<Result<Vec<_>>>()?;
+        let mut params: Vec<MysqlValue> =
+            fields.iter().map(|field| write_field_to_mysql(field, &table, uuid_fields)).collect::<Result<Vec<_>>>()?;
         params.append(&mut where_params);
         conn.exec_drop(sql, Params::Positional(params))?;
         let returning = returning_sql(projection.as_deref());
@@ -217,9 +219,9 @@ fn write_field_to_mysql(field: &WriteField, table: &str, uuid_fields: &HashSet<(
         LiteralKind::Null => Value::Null,
         LiteralKind::Bool => Value::Bool(field.literal == "true"),
         LiteralKind::Int => Value::Int(field.literal.parse().unwrap_or(0)),
-        LiteralKind::UInt => Value::UInt(
-            field.literal.parse().map_err(|_| crate::Error::Policy(format!("`{}` is not a VOS `u64` literal", field.literal)))?,
-        ),
+        LiteralKind::UInt => {
+            Value::UInt(field.literal.parse().map_err(|_| crate::Error::Policy(format!("`{}` is not a VOS `u64` literal", field.literal)))?)
+        }
         LiteralKind::Float => Value::Float(
             field
                 .literal
@@ -263,8 +265,12 @@ pub(crate) fn update_row(conn: &mut PooledConn, write: &RowWrite, uuid_fields: &
         return Ok(0);
     }
     let sql = format!("UPDATE `{}` SET {} WHERE `{}` = ?", write.table, sets.join(", "), write.primary_key);
-    let mut params: Vec<MysqlValue> =
-        write.fields.iter().filter(|(k, _)| *k != &write.primary_key).map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields)).collect::<Result<Vec<_>>>()?;
+    let mut params: Vec<MysqlValue> = write
+        .fields
+        .iter()
+        .filter(|(k, _)| *k != &write.primary_key)
+        .map(|(k, v)| to_mysql(v, &write.table, k, uuid_fields))
+        .collect::<Result<Vec<_>>>()?;
     params.push(to_mysql(key, &write.table, &write.primary_key, uuid_fields)?);
     conn.exec_drop(sql, Params::Positional(params))?;
     Ok(conn.affected_rows())
@@ -316,9 +322,7 @@ fn literal_to_mysql(text: &str, kind: LiteralKind, table: &str, field: &str, uui
         LiteralKind::Null => MysqlValue::NULL,
         LiteralKind::Bool => MysqlValue::Int(i64::from(text == "true")),
         LiteralKind::Int => MysqlValue::Int(text.parse().unwrap_or(0)),
-        LiteralKind::UInt => MysqlValue::UInt(
-            text.parse().map_err(|_| crate::Error::Policy(format!("`{text}` is not a VOS `u64` literal")))?,
-        ),
+        LiteralKind::UInt => MysqlValue::UInt(text.parse().map_err(|_| crate::Error::Policy(format!("`{text}` is not a VOS `u64` literal")))?),
         LiteralKind::Float => MysqlValue::Double(
             text.parse::<f64>()
                 .ok()

@@ -87,15 +87,17 @@ fn generated_client_and_direct_calls_close_the_loop_on_a_real_database() {
     };
     client.doc().insert(&row).expect("generated insert");
 
-    let found = client
-        .doc()
-        .find_unique(&DocWhere { doc_id: Some(1), ..Default::default() })
-        .expect("find_unique")
-        .expect("row");
+    let found = client.doc().find_unique(&DocWhere { doc_id: Some(1), ..Default::default() }).expect("find_unique").expect("row");
     assert_eq!(found, row, "generated read-back must reproduce the typed payload row");
 
-    let row2 =
-        Doc { doc_id: 2, title: "beta".into(), published: false, body: vec![0x01], embedding: embedding.clone(), attachment: attachment.clone() };
+    let row2 = Doc {
+        doc_id: 2,
+        title: "beta".into(),
+        published: false,
+        body: vec![0x01],
+        embedding: embedding.clone(),
+        attachment: attachment.clone(),
+    };
     client
         .transaction(|txn| {
             txn.doc().insert(&row2)?;
@@ -120,11 +122,8 @@ fn generated_client_and_direct_calls_close_the_loop_on_a_real_database() {
     drop(client);
     let db = db.reopen().expect("reopen");
     let client = Db::new(&db);
-    let found = client
-        .doc()
-        .find_unique(&DocWhere { doc_id: Some(1), ..Default::default() })
-        .expect("read after reopen")
-        .expect("row after reopen");
+    let found =
+        client.doc().find_unique(&DocWhere { doc_id: Some(1), ..Default::default() }).expect("read after reopen").expect("row after reopen");
     assert_eq!(found.body, row.body, "`bytes` must survive the reopen byte for byte");
     for (index, (got, want)) in found.embedding.iter().zip(row.embedding.iter()).enumerate() {
         assert_eq!(got.to_bits(), want.to_bits(), "component {index} bit pattern must survive the reopen");

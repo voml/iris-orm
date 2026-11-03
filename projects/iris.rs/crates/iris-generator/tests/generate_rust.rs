@@ -572,6 +572,7 @@ fn rust_client_fails_closed_for_unconverged_datasource_adapters() {
 #[test]
 fn rust_target_requires_a_datasource_kind() {
     let model = GenerationModel::from_vos_schema(USER_SCHEMA).unwrap();
-    let error = iris_generator::generate(&model, "rust", std::path::Path::new("."), None).expect_err("rust target without a datasource must fail");
+    let error =
+        iris_generator::generate(&model, "rust", std::path::Path::new("."), None).expect_err("rust target without a datasource must fail");
     assert!(matches!(error, iris_generator::Error::MissingDatasource), "{error}");
 }

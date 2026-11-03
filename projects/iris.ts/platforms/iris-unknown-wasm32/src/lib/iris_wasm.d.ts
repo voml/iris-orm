@@ -103,10 +103,15 @@ export function introspectSchema(source: string): string;
 export function irisVersion(): string;
 
 /**
- * Accept a serialised [`D1Request`] and emit the lightweight prepared
- * op envelope that the TS host bridge hands to `env.DB.prepare()`.
+ * Accept a serialised [`D1Request`] and emit the prepared op envelope that
+ * the TS host bridge hands to `env.DB.prepare()`.
  *
- * The envelope shape:
+ * 当输入的 `D1Request` 带有 `operation_hint` 时，这个函数会调用
+ * `lower_operation` 把 canonical CRUD operation 真正 lower 成
+ * D1 SQL + positional params，覆盖输入里原有的 `sql` 字段。
+ * 没有 hint 时走纯 serde round-trip（向后兼容）。
+ *
+ * 输出 envelope shape 不变:
  * ```json
  * {
  *   "sql": "SELECT * FROM users WHERE id = ?",
@@ -115,10 +120,6 @@ export function irisVersion(): string;
  *   "returning": "none"
  * }
  * ```
- *
- * This is deliberately a pure serde round-trip -- the heavy lifting
- * (SQL lowering, capability checks) happens on the Rust build side
- * before [`D1Request`] ever reaches this function.
  */
 export function prepareD1Operation(request_json: string): string;
 
@@ -181,4 +182,4 @@ export function initSync(module: { module: SyncInitInput } | SyncInitInput): Ini
  *
  * @returns {Promise<InitOutput>}
  */
-export default function __wbg_init (module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;
+export default function __wbg_init(module_or_path?: { module_or_path: InitInput | Promise<InitInput> } | InitInput | Promise<InitInput>): Promise<InitOutput>;

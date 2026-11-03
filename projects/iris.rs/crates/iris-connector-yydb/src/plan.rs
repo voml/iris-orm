@@ -141,12 +141,7 @@ fn render_insert<'a>(table: &str, fields: impl Iterator<Item = (&'a str, &'a str
 }
 
 fn require_scan(saw_scan: bool, stage: &str) -> Result<()> {
-    if saw_scan {
-        Ok(())
-    }
-    else {
-        Err(Error::Policy(format!("plan applies `{stage}` before scanning a table")))
-    }
+    if saw_scan { Ok(()) } else { Err(Error::Policy(format!("plan applies `{stage}` before scanning a table"))) }
 }
 
 fn render_pred(pred: &Pred, params: &mut BTreeMap<String, Value>, slot: &mut u32) -> Result<String> {
@@ -208,16 +203,12 @@ pub(crate) fn decode_literal(literal: &str, kind: LiteralKind, context: &str) ->
             }
         }
         LiteralKind::Bytes => iris_types::hex_to_bytes(literal).map(Value::Bytes),
-        LiteralKind::Vector => serde_json::from_str::<serde_json::Value>(literal)
-            .ok()
-            .as_ref()
-            .and_then(iris_types::vector_from_tagged_json)
-            .map(Value::Vector),
-        LiteralKind::File => serde_json::from_str::<serde_json::Value>(literal)
-            .ok()
-            .as_ref()
-            .and_then(iris_types::file_from_tagged_json)
-            .map(Value::File),
+        LiteralKind::Vector => {
+            serde_json::from_str::<serde_json::Value>(literal).ok().as_ref().and_then(iris_types::vector_from_tagged_json).map(Value::Vector)
+        }
+        LiteralKind::File => {
+            serde_json::from_str::<serde_json::Value>(literal).ok().as_ref().and_then(iris_types::file_from_tagged_json).map(Value::File)
+        }
     };
     decoded.ok_or_else(|| Error::Policy(format!("{context} carries a `{kind:?}` literal that is not in its canonical wire form")))
 }

@@ -145,7 +145,13 @@ pub fn generate(source: String, target: String, out_dir: String, datasource: Opt
 /// `datasource` is required for the `rust` target and selects the adapter
 /// binding for the generated client; the `typescript` target ignores it.
 #[napi]
-pub fn generate_from_artifacts(contract_json: String, operations_json: String, target: String, out_dir: String, datasource: Option<String>) -> Result<GenerateResult> {
+pub fn generate_from_artifacts(
+    contract_json: String,
+    operations_json: String,
+    target: String,
+    out_dir: String,
+    datasource: Option<String>,
+) -> Result<GenerateResult> {
     match iris_generator::generate_from_artifacts(&contract_json, &operations_json, &target, Path::new(&out_dir), datasource.as_deref()) {
         Ok((model, paths)) => {
             let output_path = match target.as_str() {

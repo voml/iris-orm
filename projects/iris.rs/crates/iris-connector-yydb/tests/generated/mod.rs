@@ -15,4 +15,3 @@ pub use errors::{Error, Result};
 pub use metadata::{GENERATOR_VERSION, SCHEMA_FINGERPRINT, UUID_FIELDS};
 pub use models::*;
 pub use operations::{Db, Txn};
-

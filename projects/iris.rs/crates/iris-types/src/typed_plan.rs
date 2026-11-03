@@ -319,10 +319,9 @@ fn canonical_literal(name: &str, value: &Value, scalar: CanonicalScalar, optiona
         (CanonicalScalar::F32, Value::Float(value)) if value.is_finite() && f64::from(*value as f32) == *value => {
             Ok((crate::float_to_text(*value), LiteralKind::Float))
         }
-        (CanonicalScalar::F32, Value::Float(_)) => Err(TypedPlanError::new(
-            CODE_ARGUMENT_TYPE,
-            format!("parameter `{name}` is not an IEEE-754 single-precision VOS `f32`"),
-        )),
+        (CanonicalScalar::F32, Value::Float(_)) => {
+            Err(TypedPlanError::new(CODE_ARGUMENT_TYPE, format!("parameter `{name}` is not an IEEE-754 single-precision VOS `f32`")))
+        }
         (CanonicalScalar::Utf8 | CanonicalScalar::Utf16, Value::Str(value)) => Ok((value.clone(), LiteralKind::Str)),
         (CanonicalScalar::Uuid, Value::Str(value)) if is_canonical_uuid(value) => Ok((value.clone(), LiteralKind::Str)),
         (CanonicalScalar::Uuid, Value::Str(_)) => {

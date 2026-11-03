@@ -374,10 +374,15 @@ export function irisVersion() {
 }
 
 /**
- * Accept a serialised [`D1Request`] and emit the lightweight prepared
- * op envelope that the TS host bridge hands to `env.DB.prepare()`.
+ * Accept a serialised [`D1Request`] and emit the prepared op envelope that
+ * the TS host bridge hands to `env.DB.prepare()`.
  *
- * The envelope shape:
+ * 当输入的 `D1Request` 带有 `operation_hint` 时，这个函数会调用
+ * `lower_operation` 把 canonical CRUD operation 真正 lower 成
+ * D1 SQL + positional params，覆盖输入里原有的 `sql` 字段。
+ * 没有 hint 时走纯 serde round-trip（向后兼容）。
+ *
+ * 输出 envelope shape 不变:
  * ```json
  * {
  *   "sql": "SELECT * FROM users WHERE id = ?",
@@ -386,10 +391,6 @@ export function irisVersion() {
  *   "returning": "none"
  * }
  * ```
- *
- * This is deliberately a pure serde round-trip -- the heavy lifting
- * (SQL lowering, capability checks) happens on the Rust build side
- * before [`D1Request`] ever reaches this function.
  * @param {string} request_json
  * @returns {string}
  */
@@ -436,15 +437,15 @@ export function queryMemory(source) {
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,
-        __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
+        __wbg___wbindgen_throw_41e9ee4f547fc59a: function (arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbindgen_generic_0000000000000001: function(arg0, arg1) {
+        __wbindgen_generic_0000000000000001: function (arg0, arg1) {
             // Cast intrinsic for `Ref(String) -> Externref`.
             const ret = getStringFromWasm0(arg0, arg1);
             return ret;
         },
-        __wbindgen_init_externref_table: function() {
+        __wbindgen_init_externref_table: function () {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
             table.set(0, undefined);
@@ -610,7 +611,7 @@ function initSync(module) {
 
     if (module !== undefined) {
         if (Object.getPrototypeOf(module) === Object.prototype) {
-            ({module} = module)
+            ({ module } = module)
         } else {
             console.warn('using deprecated parameters for `initSync()`; pass a single object instead')
         }
@@ -630,7 +631,7 @@ async function __wbg_init(module_or_path) {
 
     if (module_or_path !== undefined) {
         if (Object.getPrototypeOf(module_or_path) === Object.prototype) {
-            ({module_or_path} = module_or_path)
+            ({ module_or_path } = module_or_path)
         } else {
             console.warn('using deprecated parameters for the initialization function; pass a single object instead')
         }

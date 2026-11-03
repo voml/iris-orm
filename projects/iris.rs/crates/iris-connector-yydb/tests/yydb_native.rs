@@ -649,14 +649,17 @@ fn file_descriptor_and_content_survive_close_and_reopen() {
         }
     };
 
-    for (context, got) in [("before reopen", read_asset(&db, "before reopen")), ("after reopen", {
-        let db = db.reopen().expect("reopen");
-        let got = read_asset(&db, "after reopen");
-        // Content bytes must still read through the reopened object store.
-        assert_eq!(db.connection().read_file(&stored).expect("read_file after reopen"), octets, "file content after reopen");
-        drop(db);
-        got
-    })] {
+    for (context, got) in [
+        ("before reopen", read_asset(&db, "before reopen")),
+        ("after reopen", {
+            let db = db.reopen().expect("reopen");
+            let got = read_asset(&db, "after reopen");
+            // Content bytes must still read through the reopened object store.
+            assert_eq!(db.connection().read_file(&stored).expect("read_file after reopen"), octets, "file content after reopen");
+            drop(db);
+            got
+        }),
+    ] {
         assert_eq!(got, descriptor, "{context}: descriptor fields must survive verbatim");
         assert_eq!(got.digest, stored.digest, "{context}: digest must survive");
         assert_eq!(got.octets, octets.len() as u64, "{context}: octet count must survive");

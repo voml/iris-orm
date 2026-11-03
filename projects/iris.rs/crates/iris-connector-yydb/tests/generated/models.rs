@@ -13,7 +13,6 @@ pub struct Doc {
     pub attachment: iris::FileDescriptor,
 }
 
-
 use iris::{Row, Value};
 
 pub(crate) fn escape_vos_str(value: &str) -> String {
@@ -109,4 +108,3 @@ pub struct DocWhere {
     pub title: Option<String>,
     pub published: Option<bool>,
 }
-
