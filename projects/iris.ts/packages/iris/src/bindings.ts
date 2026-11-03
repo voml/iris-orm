@@ -3,7 +3,14 @@ import type { CheckSourceResult } from "./types/check-source.ts";
 /** Wire execute payload from Node N-API or browser WASM session methods. */
 export type SessionExecuteWire =
     | string
-    | { ok: boolean; rowsJson: string; error?: string | null; errorCode?: string | null };
+    | {
+          ok: boolean;
+          rowsJson: string;
+          error?: string | null;
+          errorCode?: string | null;
+          errorKind?: string | null;
+          errorDiagnosticCode?: string | null;
+      };
 
 /** Wire session surface shared by Node N-API and browser WASM hosts. */
 export type MemorySessionBinding = {

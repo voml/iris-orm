@@ -47,15 +47,21 @@ def _raise_native(error: Exception) -> NoReturn:
             payload = _decode(error.args[0])
         except ValueError:
             payload = {}
-    raise IrisError(payload.get("message") or str(error), code=payload.get("code", "IRIS-INTERNAL")) from error
+    raise IrisError(
+        payload.get("message") or str(error),
+        code=payload.get("code", "IRIS-INTERNAL"),
+        kind=payload.get("kind", "internal"),
+        diagnostic_code=payload.get("diagnosticCode"),
+    ) from error
 
 
 class Session:
     """Session bound to a reference or foreign adapter.
 
     Every fallible call returns the structured envelope
-    ``{"ok": bool, "rows": list, "error": {"code": str, "message": str} | None}``
-    so internal callers branch on the code instead of display text.
+    ``{"ok": bool, "rows": list, "error": {"kind": str, "code": str,
+    "message": str, "diagnosticCode": str | None} | None}``
+    so internal callers branch on the kind / code pair instead of display text.
     """
 
     def __init__(self, native_session: Any) -> None:

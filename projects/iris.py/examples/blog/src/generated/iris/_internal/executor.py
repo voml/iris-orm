@@ -47,6 +47,8 @@ def _raise_native(error: Exception) -> NoReturn:
     raise IrisError(
         payload.get("message") or str(error),
         code=payload.get("code") or "IRIS-INTERNAL",
+        kind=payload.get("kind") or "internal",
+        diagnostic_code=payload.get("diagnosticCode"),
     ) from error
 
 
@@ -55,6 +57,8 @@ def _raise_envelope(envelope: dict[str, Any]) -> None:
     raise IrisError(
         error.get("message") or "iris operation failed",
         code=error.get("code") or "IRIS-INTERNAL",
+        kind=error.get("kind") or "internal",
+        diagnostic_code=error.get("diagnosticCode"),
     )
 
 

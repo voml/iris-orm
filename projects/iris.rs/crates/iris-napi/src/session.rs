@@ -19,12 +19,23 @@ pub struct ExecuteResult {
     /// JSON array of row objects.
     pub rows_json: String,
     pub error: Option<String>,
-    /// Stable diagnostic code when `ok` is false.
+    /// Stable author-facing code when `ok` is false.
     pub error_code: Option<String>,
+    /// Semantic class (`unique_conflict`, `not_found`, …) when `ok` is false.
+    pub error_kind: Option<String>,
+    /// Internal diagnostic code (backend code / host marker) when `ok` is false.
+    pub error_diagnostic_code: Option<String>,
 }
 
 fn to_result(outcome: ExecuteOutcome) -> ExecuteResult {
-    ExecuteResult { ok: outcome.ok, rows_json: outcome.rows_json(), error: outcome.error_message(), error_code: outcome.error_code() }
+    ExecuteResult {
+        ok: outcome.ok,
+        rows_json: outcome.rows_json(),
+        error: outcome.error_message(),
+        error_code: outcome.error_code(),
+        error_kind: outcome.error_kind(),
+        error_diagnostic_code: outcome.error_diagnostic_code(),
+    }
 }
 
 /// Iris session bound to a reference or foreign adapter.

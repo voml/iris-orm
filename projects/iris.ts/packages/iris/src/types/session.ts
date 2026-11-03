@@ -25,6 +25,12 @@ export interface ExecuteResult {
     ok: boolean;
     rows: IrisRow[];
     error?: string | null;
+    /** Stable author-facing code (`IRIS-UNIQUE-CONFLICT`, …). */
+    errorCode?: string | null;
+    /** Semantic class (`unique_conflict`, `not_found`, …). */
+    errorKind?: string | null;
+    /** Internal backend / host code, for diagnostics only. */
+    errorDiagnosticCode?: string | null;
 }
 
 /** Symmetric session contract (browser + Node). */

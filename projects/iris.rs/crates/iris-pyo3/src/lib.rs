@@ -27,7 +27,7 @@ fn raise_open(err: ErrorEnvelope) -> PyErr {
 }
 
 fn closed_envelope() -> String {
-    ExecuteOutcome::failure(ErrorEnvelope::new(iris_host::CODE_SESSION_CLOSED, "session closed")).to_json()
+    ExecuteOutcome::failure(ErrorEnvelope::invalid_argument(iris_host::DIAG_SESSION_CLOSED, "session closed")).to_json()
 }
 
 /// Iris facade version (`iris::version()`).
@@ -117,7 +117,7 @@ impl Session {
     fn sqlite_engine_version(&self) -> PyResult<String> {
         match &self.inner {
             Some(session) => session.sqlite_engine_version().map_err(raise_open),
-            None => Err(raise_open(ErrorEnvelope::new(iris_host::CODE_SESSION_CLOSED, "session closed"))),
+            None => Err(raise_open(ErrorEnvelope::invalid_argument(iris_host::DIAG_SESSION_CLOSED, "session closed"))),
         }
     }
 
@@ -126,7 +126,7 @@ impl Session {
     fn sqlite_source_id(&self) -> PyResult<String> {
         match &self.inner {
             Some(session) => session.sqlite_source_id().map_err(raise_open),
-            None => Err(raise_open(ErrorEnvelope::new(iris_host::CODE_SESSION_CLOSED, "session closed"))),
+            None => Err(raise_open(ErrorEnvelope::invalid_argument(iris_host::DIAG_SESSION_CLOSED, "session closed"))),
         }
     }
 

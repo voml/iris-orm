@@ -140,10 +140,18 @@ impl PostgresSource {
         execute::delete_row(&mut *client, table, primary_key, key)
     }
 
-    /// Begin a transaction on a pooled connection held for the session helpers below.
+    /// Begin a transaction that owns its checked-out connection.
     ///
-    /// Phase 4 slice: commit/rollback use explicit SQL on a checked-out connection
-    /// via [`with_connection`]. Prefer that for multi-statement transactions.
+    /// The returned [`PostgresTransaction`] keeps the connection for every
+    /// statement it runs, so read-then-write sequences stay inside the same
+    /// transaction instead of silently checking out another pooled connection.
+    pub fn begin_transaction(&self) -> Result<PostgresTransaction> {
+        let mut client = self.pool.get().map_err(|e| Error::Pool(e.to_string()))?;
+        client.batch_execute("BEGIN")?;
+        Ok(PostgresTransaction { client, open: true })
+    }
+
+    /// Run `f` on a checked-out connection.
     pub fn with_connection<R>(&self, f: impl FnOnce(&mut postgres::Client) -> Result<R>) -> Result<R> {
         let mut client = self.pool.get().map_err(|e| Error::Pool(e.to_string()))?;
         f(&mut client)
@@ -189,6 +197,47 @@ impl PostgresSource {
     /// Outbox backlog size.
     pub fn outbox_backlog(&self) -> Result<u64> {
         self.with_connection(outbox::outbox_backlog)
+    }
+}
+
+/// Open transaction that owns one PostgreSQL connection.
+///
+/// Statements executed through this handle share the connection and therefore
+/// the transaction. Dropping it without [`Self::commit`] rolls back.
+pub struct PostgresTransaction {
+    client: r2d2::PooledConnection<PostgresConnectionManager<NoTls>>,
+    open: bool,
+}
+
+impl PostgresTransaction {
+    /// Execute a physical plan inside this transaction.
+    pub fn execute_plan(&mut self, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+        if plan.is_rejected() {
+            return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
+        }
+        execute::execute_plan(&mut self.client, plan)
+    }
+
+    /// Commit and release the connection.
+    pub fn commit(&mut self) -> Result<()> {
+        self.client.batch_execute("COMMIT")?;
+        self.open = false;
+        Ok(())
+    }
+
+    /// Roll back and release the connection.
+    pub fn rollback(&mut self) -> Result<()> {
+        self.client.batch_execute("ROLLBACK")?;
+        self.open = false;
+        Ok(())
+    }
+}
+
+impl Drop for PostgresTransaction {
+    fn drop(&mut self) {
+        if self.open {
+            let _ = self.client.batch_execute("ROLLBACK");
+        }
     }
 }
 

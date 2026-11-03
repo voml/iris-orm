@@ -20,7 +20,14 @@ export interface CheckSourceResult {
 /** Wire execute payload from a WASM memory session. */
 export type WebSessionExecuteWire =
     | string
-    | { ok: boolean; rowsJson: string; error?: string | null; errorCode?: string | null };
+    | {
+          ok: boolean;
+          rowsJson: string;
+          error?: string | null;
+          errorCode?: string | null;
+          errorKind?: string | null;
+          errorDiagnosticCode?: string | null;
+      };
 
 /** In-memory VOS session exposed by the WASM semantic core. */
 export interface WebMemorySessionBinding {
@@ -158,6 +165,12 @@ export interface WebExecuteResult {
     ok: boolean;
     rows: WebIrisRow[];
     error?: string | null;
+    /** Stable author-facing code (`IRIS-UNIQUE-CONFLICT`, …). */
+    errorCode?: string | null;
+    /** Semantic class (`unique_conflict`, `not_found`, …). */
+    errorKind?: string | null;
+    /** Internal backend / host code, for diagnostics only. */
+    errorDiagnosticCode?: string | null;
 }
 
 /** Symmetric session contract for the browser / Worker host. */
@@ -280,7 +293,12 @@ export type WebIrisDiagnosticSeverity = "error" | "warning";
 
 /** Structured diagnostic returned with results or failures. */
 export interface WebIrisDiagnostic {
+    /** Stable author-facing code (`IRIS-UNIQUE-CONFLICT`, …). */
     readonly code: string;
+    /** Semantic class (`unique_conflict`, `not_found`, …). */
+    readonly kind?: string;
+    /** Internal backend / host code, for diagnostics only. */
+    readonly diagnosticCode?: string;
     readonly message: string;
     readonly severity: WebIrisDiagnosticSeverity;
     readonly retryable?: boolean;

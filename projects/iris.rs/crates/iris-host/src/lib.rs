@@ -11,15 +11,15 @@
 
 #![deny(clippy::all)]
 
-use std::path::Path;
+use std::{path::Path, sync::Mutex};
 
 use iris::{
     CapabilitySet, DatasourceKind, Iris, Planner, ReferenceStore, Row,
     project::{expand_endpoint, load_project, read_schema},
     resolve_path,
 };
-use iris_adapter_mysql::MysqlSource;
-use iris_adapter_postgres::PostgresSource;
+use iris_adapter_mysql::{MysqlSource, MysqlTransaction};
+use iris_adapter_postgres::{PostgresSource, PostgresTransaction};
 use iris_adapter_sqlite::SqliteSource;
 use iris_connector_yydb::YydbSource;
 use iris_wasm::{bind, wire::rows_to_json};
@@ -27,39 +27,103 @@ use serde_json::{Value as JsonValue, json};
 
 pub mod operation;
 
-/// The host session has been closed.
-pub const CODE_SESSION_CLOSED: &str = "IRIS-SESSION-CLOSED";
-/// A parameter payload could not be bound into the VOS source.
-pub const CODE_PARAM_ENCODING: &str = "IRIS-PARAM-ENCODING";
-/// The structured operation JSON payload is not a valid Iris operation.
-pub const CODE_OPERATION_INVALID: &str = "IRIS-OPERATION-INVALID";
-/// The bound backend (or the reference runtime) rejected the execution.
-pub const CODE_EXEC_FAILED: &str = "IRIS-EXEC-FAILED";
-/// The active profile has no transaction control.
-pub const CODE_TRANSACTION_UNSUPPORTED: &str = "IRIS-TRANSACTION-UNSUPPORTED";
-/// A DSN or argument has the wrong shape.
-pub const CODE_INVALID_ARGUMENT: &str = "IRIS-INVALID-ARGUMENT";
-/// A DSN could not open its adapter.
+/// A unique key or primary key already exists.
+pub const CODE_UNIQUE_CONFLICT: &str = "IRIS-UNIQUE-CONFLICT";
+/// A unique `where` matched no row.
+pub const CODE_NOT_FOUND: &str = "IRIS-NOT-FOUND";
+/// A vector value does not match the schema dimension.
+pub const CODE_VECTOR_DIMENSION: &str = "IRIS-VECTOR-DIMENSION";
+/// Generated artifacts and the bound catalog disagree.
+pub const CODE_SCHEMA_MISMATCH: &str = "IRIS-SCHEMA-MISMATCH";
+/// The DSN could not be parsed, authenticated or connected.
 pub const CODE_CONNECTION_FAILED: &str = "IRIS-CONNECTION-FAILED";
+/// An argument, condition object or DSN shape is wrong.
+pub const CODE_INVALID_ARGUMENT: &str = "IRIS-INVALID-ARGUMENT";
+/// Begin, commit or rollback failed, including unsupported profiles.
+pub const CODE_TRANSACTION_FAILED: &str = "IRIS-TRANSACTION-FAILED";
+/// An unclassified internal failure.
+pub const CODE_INTERNAL: &str = "IRIS-INTERNAL";
+
+/// Diagnostic only: the host session has been closed.
+pub const DIAG_SESSION_CLOSED: &str = "IRIS-SESSION-CLOSED";
+/// Diagnostic only: a parameter payload could not be bound.
+pub const DIAG_PARAM_ENCODING: &str = "IRIS-PARAM-ENCODING";
+/// Diagnostic only: the structured operation payload is invalid.
+pub const DIAG_OPERATION_INVALID: &str = "IRIS-OPERATION-INVALID";
+/// Diagnostic only: the bound backend rejected the execution.
+pub const DIAG_EXEC_FAILED: &str = "IRIS-EXEC-FAILED";
+/// Diagnostic only: the active profile has no transaction control.
+pub const DIAG_TRANSACTION_UNSUPPORTED: &str = "IRIS-TRANSACTION-UNSUPPORTED";
+/// Diagnostic only: a transaction is already open on this session.
+pub const DIAG_TRANSACTION_ALREADY_OPEN: &str = "IRIS-TRANSACTION-ALREADY-OPEN";
+/// Diagnostic only: no transaction is open on this session.
+pub const DIAG_TRANSACTION_NOT_OPEN: &str = "IRIS-TRANSACTION-NOT-OPEN";
+/// Diagnostic only: managed push is not available on this profile.
+pub const DIAG_MANAGED_PUSH_UNSUPPORTED: &str = "IRIS-MANAGED-PUSH-UNSUPPORTED";
 
 /// Structured failure shared by every host binding.
+///
+/// `kind` and `code` are the author-facing contract: both language bindings
+/// pass them through unchanged and authors branch on them. `diagnostic_code`
+/// carries the internal code (`IRIS-PLAN-REJECTED`, `23505`, `yydb.*`) for
+/// logs and tests and is not part of that contract.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ErrorEnvelope {
-    /// Stable machine-readable code.
+    /// Semantic class (`unique_conflict`, `not_found`, `invalid_argument`, …).
+    pub kind: String,
+    /// Stable author-facing code.
     pub code: String,
     /// Human-readable explanation.
     pub message: String,
+    /// Internal diagnostic code, if any.
+    pub diagnostic_code: Option<String>,
+}
+
+fn kind_for(code: &str) -> &'static str {
+    match code {
+        CODE_UNIQUE_CONFLICT => "unique_conflict",
+        CODE_NOT_FOUND => "not_found",
+        CODE_VECTOR_DIMENSION => "vector_dimension_mismatch",
+        CODE_SCHEMA_MISMATCH => "schema_mismatch",
+        CODE_CONNECTION_FAILED => "connection_failed",
+        CODE_INVALID_ARGUMENT => "invalid_argument",
+        CODE_TRANSACTION_FAILED => "transaction_failed",
+        _ => "internal",
+    }
 }
 
 impl ErrorEnvelope {
-    /// Build an envelope from a stable code and a display message.
+    /// Build an envelope from an author-facing code and a display message.
     pub fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
-        Self { code: code.into(), message: message.into() }
+        let code = code.into();
+        let kind = kind_for(&code).to_string();
+        Self { kind, code, message: message.into(), diagnostic_code: None }
     }
 
-    /// JSON form used on the wire: `{"code": …, "message": …}`.
+    /// Attach the internal diagnostic code that produced this failure.
+    pub fn with_diagnostic(mut self, diagnostic: impl Into<String>) -> Self {
+        self.diagnostic_code = Some(diagnostic.into());
+        self
+    }
+
+    /// Unclassified failure with the original internal code as diagnostic.
+    pub fn internal(diagnostic: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::new(CODE_INTERNAL, message).with_diagnostic(diagnostic)
+    }
+
+    /// Author-argument failure with the original internal code as diagnostic.
+    pub fn invalid_argument(diagnostic: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::new(CODE_INVALID_ARGUMENT, message).with_diagnostic(diagnostic)
+    }
+
+    /// JSON form used on the wire.
     pub fn to_json(&self) -> JsonValue {
-        json!({ "code": self.code, "message": self.message })
+        json!({
+            "kind": self.kind,
+            "code": self.code,
+            "message": self.message,
+            "diagnosticCode": self.diagnostic_code,
+        })
     }
 }
 
@@ -111,52 +175,174 @@ impl ExecuteOutcome {
     pub fn error_code(&self) -> Option<String> {
         self.error.as_ref().map(|err| err.code.clone())
     }
+
+    /// Semantic class of the failure, if any.
+    pub fn error_kind(&self) -> Option<String> {
+        self.error.as_ref().map(|err| err.kind.clone())
+    }
+
+    /// Internal diagnostic code of the failure, if any.
+    pub fn error_diagnostic_code(&self) -> Option<String> {
+        self.error.as_ref().and_then(|err| err.diagnostic_code.clone())
+    }
 }
 
 fn from_iris_error(err: iris_types::Error) -> ErrorEnvelope {
     match err {
-        iris_types::Error::Diagnostic(diag) => ErrorEnvelope::new(diag.code, diag.message),
-        iris_types::Error::Ir(inner) => ErrorEnvelope::new(CODE_EXEC_FAILED, inner.to_string()),
-        iris_types::Error::Runtime(message) => ErrorEnvelope::new(CODE_EXEC_FAILED, message),
+        // A rejected plan means the requested shape does not fit the schema or
+        // the bound catalog; the original code stays as a diagnostic.
+        iris_types::Error::Diagnostic(diag) => ErrorEnvelope::invalid_argument(diag.code, diag.message),
+        iris_types::Error::Ir(inner) => ErrorEnvelope::internal(DIAG_EXEC_FAILED, inner.to_string()),
+        iris_types::Error::Runtime(message) => ErrorEnvelope::internal(DIAG_EXEC_FAILED, message),
+    }
+}
+
+fn classify_yydb_code(code: &str) -> &'static str {
+    match code {
+        "yydb.unique.violation" => CODE_UNIQUE_CONFLICT,
+        "yydb.transaction.conflict" => CODE_TRANSACTION_FAILED,
+        "yydb.schema.vector_dimension_exceeded" => CODE_VECTOR_DIMENSION,
+        "yydb.schema.conflict" | "yydb.schema.invalid" | "yydb.schema.invalidated" => CODE_SCHEMA_MISMATCH,
+        "yydb.session.closed" => CODE_INVALID_ARGUMENT,
+        "yydb.io" => CODE_CONNECTION_FAILED,
+        _ => CODE_INTERNAL,
     }
 }
 
 fn from_yydb_error(err: iris_connector_yydb::Error) -> ErrorEnvelope {
     match err {
-        iris_connector_yydb::Error::Yydb(inner) => ErrorEnvelope::new(inner.code().to_string(), inner.to_string()),
-        iris_connector_yydb::Error::NotReady(report) => ErrorEnvelope::new(report.code, report.message),
-        iris_connector_yydb::Error::Runtime(message) | iris_connector_yydb::Error::Policy(message) => {
-            ErrorEnvelope::new(CODE_EXEC_FAILED, message)
+        iris_connector_yydb::Error::Yydb(inner) => {
+            ErrorEnvelope::new(classify_yydb_code(inner.code()), inner.to_string()).with_diagnostic(inner.code())
         }
+        iris_connector_yydb::Error::NotReady(report) => ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, report.message).with_diagnostic(report.code),
+        iris_connector_yydb::Error::Runtime(message) => ErrorEnvelope::internal(DIAG_EXEC_FAILED, message),
+        iris_connector_yydb::Error::Policy(message) => ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, message).with_diagnostic("IRIS-SCHEMA-POLICY"),
+    }
+}
+
+fn classify_sqlite_message(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("unique constraint failed") || lower.contains("primary key") {
+        CODE_UNIQUE_CONFLICT
+    }
+    else if lower.contains("no such table") || lower.contains("no such column") {
+        CODE_SCHEMA_MISMATCH
+    }
+    else if lower.contains("unable to open database file") || lower.contains("database is locked") {
+        CODE_CONNECTION_FAILED
+    }
+    else {
+        CODE_INTERNAL
     }
 }
 
 fn from_sqlite_error(err: iris_adapter_sqlite::Error) -> ErrorEnvelope {
-    ErrorEnvelope::new(CODE_EXEC_FAILED, err.to_string())
+    let message = err.to_string();
+    let code = classify_sqlite_message(&message);
+    let diagnostic = match code {
+        CODE_UNIQUE_CONFLICT => "sqlite.unique",
+        CODE_SCHEMA_MISMATCH => "sqlite.schema",
+        CODE_CONNECTION_FAILED => "sqlite.io",
+        _ => "sqlite.error",
+    };
+    ErrorEnvelope::new(code, message).with_diagnostic(diagnostic)
+}
+
+fn postal_state_of(err: &postgres::Error) -> Option<String> {
+    err.code().map(|state| state.code().to_string())
+}
+
+fn classify_sql_state(state: Option<&str>) -> &'static str {
+    match state {
+        Some("23505") => CODE_UNIQUE_CONFLICT,
+        Some("22P02") | Some("22001") | Some("22003") => CODE_INVALID_ARGUMENT,
+        Some("42P01") | Some("42703") | Some("42P07") | Some("42710") => CODE_SCHEMA_MISMATCH,
+        Some(code) if code.starts_with("08") => CODE_CONNECTION_FAILED,
+        _ => CODE_INTERNAL,
+    }
 }
 
 fn from_postgres_error(err: iris_adapter_postgres::Error) -> ErrorEnvelope {
-    ErrorEnvelope::new(CODE_EXEC_FAILED, err.to_string())
+    match &err {
+        iris_adapter_postgres::Error::Config(message) | iris_adapter_postgres::Error::Pool(message) => {
+            ErrorEnvelope::new(CODE_CONNECTION_FAILED, message).with_diagnostic("postgres.connection")
+        }
+        iris_adapter_postgres::Error::Postgres(inner) => {
+            let state = postal_state_of(inner);
+            let code = classify_sql_state(state.as_deref());
+            let diagnostic = state.clone().unwrap_or_else(|| "postgres.error".to_string());
+            ErrorEnvelope::new(code, inner.to_string()).with_diagnostic(diagnostic)
+        }
+        iris_adapter_postgres::Error::Vos(message) => ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, message).with_diagnostic("postgres.vos"),
+        iris_adapter_postgres::Error::Policy(message) => {
+            ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, message).with_diagnostic("IRIS-SCHEMA-POLICY")
+        }
+    }
+}
+
+fn classify_mysql_code(code: u16) -> &'static str {
+    match code {
+        1062 | 1586 => CODE_UNIQUE_CONFLICT,
+        1048 | 1364 | 1136 => CODE_INVALID_ARGUMENT,
+        1146 | 1054 | 1050 | 1060 => CODE_SCHEMA_MISMATCH,
+        1045 | 1049 | 2003 | 2005 | 2013 => CODE_CONNECTION_FAILED,
+        _ => CODE_INTERNAL,
+    }
 }
 
 fn from_mysql_error(err: iris_adapter_mysql::Error) -> ErrorEnvelope {
-    ErrorEnvelope::new(CODE_EXEC_FAILED, err.to_string())
+    match &err {
+        iris_adapter_mysql::Error::Config(message) => ErrorEnvelope::new(CODE_CONNECTION_FAILED, message).with_diagnostic("mysql.connection"),
+        iris_adapter_mysql::Error::Mysql(inner) => {
+            let server_code = match inner {
+                mysql::Error::MySqlError(server) => Some(server.code),
+                _ => None,
+            };
+            let code = server_code.map(classify_mysql_code).unwrap_or(CODE_INTERNAL);
+            let diagnostic = server_code.map(|code| code.to_string()).unwrap_or_else(|| "mysql.error".to_string());
+            ErrorEnvelope::new(code, inner.to_string()).with_diagnostic(diagnostic)
+        }
+        iris_adapter_mysql::Error::Vos(message) => ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, message).with_diagnostic("mysql.vos"),
+        iris_adapter_mysql::Error::Policy(message) => ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, message).with_diagnostic("IRIS-SCHEMA-POLICY"),
+    }
 }
 
 fn closed() -> ErrorEnvelope {
-    ErrorEnvelope::new(CODE_SESSION_CLOSED, "session closed")
+    ErrorEnvelope::invalid_argument(DIAG_SESSION_CLOSED, "session closed")
 }
 
 fn transaction_unsupported(profile: &str) -> ErrorEnvelope {
-    ErrorEnvelope::new(CODE_TRANSACTION_UNSUPPORTED, format!("{profile} sessions have no transaction control"))
+    ErrorEnvelope::new(CODE_TRANSACTION_FAILED, format!("{profile} sessions have no transaction control"))
+        .with_diagnostic(DIAG_TRANSACTION_UNSUPPORTED)
+}
+
+fn transaction_already_open() -> ErrorEnvelope {
+    ErrorEnvelope::invalid_argument(DIAG_TRANSACTION_ALREADY_OPEN, "a transaction is already open on this session")
+}
+
+fn transaction_not_open() -> ErrorEnvelope {
+    ErrorEnvelope::invalid_argument(DIAG_TRANSACTION_NOT_OPEN, "no transaction is open on this session")
+}
+
+fn lock_failed() -> ErrorEnvelope {
+    ErrorEnvelope::internal(DIAG_EXEC_FAILED, "session transaction lock is poisoned")
 }
 
 enum SessionStore {
     Memory(Iris),
     Yydb(YydbSource),
     Sqlite(SqliteSource),
-    Postgres(PostgresSource),
-    Mysql(MysqlSource),
+    /// A PostgreSQL session keeps its open transaction, if any, on this
+    /// connection so statements inside `transaction` share one backend transaction.
+    Postgres {
+        db: PostgresSource,
+        transaction: Mutex<Option<PostgresTransaction>>,
+    },
+    /// MySQL counterpart of [`SessionStore::Postgres`].
+    Mysql {
+        db: MysqlSource,
+        transaction: Mutex<Option<MysqlTransaction>>,
+    },
 }
 
 impl SessionStore {
@@ -165,8 +351,8 @@ impl SessionStore {
             Self::Memory(_) => CapabilitySet::reference_full(),
             Self::Yydb(_) => YydbSource::capabilities(),
             Self::Sqlite(_) => SqliteSource::capabilities(),
-            Self::Postgres(_) => PostgresSource::capabilities(),
-            Self::Mysql(_) => MysqlSource::capabilities(),
+            Self::Postgres { .. } => PostgresSource::capabilities(),
+            Self::Mysql { .. } => MysqlSource::capabilities(),
         }
     }
 
@@ -178,13 +364,21 @@ impl SessionStore {
                 let plan = planner.plan_source(source).map_err(from_iris_error)?;
                 db.execute_plan(&plan).map_err(from_sqlite_error)
             }
-            Self::Postgres(db) => {
+            Self::Postgres { db, transaction } => {
                 let plan = planner.plan_source(source).map_err(from_iris_error)?;
-                db.execute_plan(&plan).map_err(from_postgres_error)
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                match guard.as_mut() {
+                    Some(txn) => txn.execute_plan(&plan).map_err(from_postgres_error),
+                    None => db.execute_plan(&plan).map_err(from_postgres_error),
+                }
             }
-            Self::Mysql(db) => {
+            Self::Mysql { db, transaction } => {
                 let plan = planner.plan_source(source).map_err(from_iris_error)?;
-                db.execute_plan(&plan).map_err(from_mysql_error)
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                match guard.as_mut() {
+                    Some(txn) => txn.execute_plan(&plan).map_err(from_mysql_error),
+                    None => db.execute_plan(&plan).map_err(from_mysql_error),
+                }
             }
         }
     }
@@ -193,21 +387,7 @@ impl SessionStore {
         match self {
             Self::Memory(iris) => iris.session().execute(source).map_err(from_iris_error),
             Self::Yydb(db) => db.execute(source).map_err(from_yydb_error),
-            Self::Sqlite(db) => {
-                let plan = planner.plan_source(source).map_err(from_iris_error)?;
-                db.execute_plan(&plan).map_err(from_sqlite_error)?;
-                Ok(())
-            }
-            Self::Postgres(db) => {
-                let plan = planner.plan_source(source).map_err(from_iris_error)?;
-                db.execute_plan(&plan).map_err(from_postgres_error)?;
-                Ok(())
-            }
-            Self::Mysql(db) => {
-                let plan = planner.plan_source(source).map_err(from_iris_error)?;
-                db.execute_plan(&plan).map_err(from_mysql_error)?;
-                Ok(())
-            }
+            _ => self.query(planner, source).map(|_| ()),
         }
     }
 
@@ -216,8 +396,22 @@ impl SessionStore {
             Self::Memory(_) => Err(transaction_unsupported("memory")),
             Self::Yydb(db) => db.begin().map_err(from_yydb_error),
             Self::Sqlite(db) => db.begin().map_err(from_sqlite_error),
-            Self::Postgres(_) => Err(transaction_unsupported("postgres")),
-            Self::Mysql(_) => Err(transaction_unsupported("mysql")),
+            Self::Postgres { db, transaction } => {
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                if guard.is_some() {
+                    return Err(transaction_already_open());
+                }
+                *guard = Some(db.begin_transaction().map_err(from_postgres_error)?);
+                Ok(())
+            }
+            Self::Mysql { db, transaction } => {
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                if guard.is_some() {
+                    return Err(transaction_already_open());
+                }
+                *guard = Some(db.begin_transaction().map_err(from_mysql_error)?);
+                Ok(())
+            }
         }
     }
 
@@ -226,8 +420,20 @@ impl SessionStore {
             Self::Memory(_) => Err(transaction_unsupported("memory")),
             Self::Yydb(db) => db.commit().map_err(from_yydb_error),
             Self::Sqlite(db) => db.commit().map_err(from_sqlite_error),
-            Self::Postgres(_) => Err(transaction_unsupported("postgres")),
-            Self::Mysql(_) => Err(transaction_unsupported("mysql")),
+            Self::Postgres { transaction, .. } => {
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                match guard.take() {
+                    Some(mut txn) => txn.commit().map_err(from_postgres_error),
+                    None => Err(transaction_not_open()),
+                }
+            }
+            Self::Mysql { transaction, .. } => {
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                match guard.take() {
+                    Some(mut txn) => txn.commit().map_err(from_mysql_error),
+                    None => Err(transaction_not_open()),
+                }
+            }
         }
     }
 
@@ -236,8 +442,20 @@ impl SessionStore {
             Self::Memory(_) => Err(transaction_unsupported("memory")),
             Self::Yydb(db) => db.rollback().map_err(from_yydb_error),
             Self::Sqlite(db) => db.rollback().map_err(from_sqlite_error),
-            Self::Postgres(_) => Err(transaction_unsupported("postgres")),
-            Self::Mysql(_) => Err(transaction_unsupported("mysql")),
+            Self::Postgres { transaction, .. } => {
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                match guard.take() {
+                    Some(mut txn) => txn.rollback().map_err(from_postgres_error),
+                    None => Err(transaction_not_open()),
+                }
+            }
+            Self::Mysql { transaction, .. } => {
+                let mut guard = transaction.lock().map_err(|_| lock_failed())?;
+                match guard.take() {
+                    Some(mut txn) => txn.rollback().map_err(from_mysql_error),
+                    None => Err(transaction_not_open()),
+                }
+            }
         }
     }
 }
@@ -257,7 +475,7 @@ fn open_yydb_endpoint(project_dir: &Path, endpoint: &str) -> Result<YydbSource, 
     let path = endpoint.strip_prefix("file:").unwrap_or(endpoint);
     let path = resolve_path(project_dir, path);
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err.to_string()))?;
+        std::fs::create_dir_all(parent).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err.to_string()))?;
     }
     YydbSource::open(path).map_err(from_yydb_error)
 }
@@ -288,44 +506,46 @@ impl HostSession {
     /// PostgreSQL profile over a real server URL.
     pub fn open_postgres(url: &str) -> Result<Self, ErrorEnvelope> {
         let db = PostgresSource::connect(url).map_err(from_postgres_error)?;
-        Ok(Self::new_store(SessionStore::Postgres(db), None))
+        Ok(Self::new_store(SessionStore::Postgres { db, transaction: Mutex::new(None) }, None))
     }
 
     /// MySQL profile over a real server URL.
     pub fn open_mysql(url: &str) -> Result<Self, ErrorEnvelope> {
         let db = MysqlSource::connect(url).map_err(from_mysql_error)?;
-        Ok(Self::new_store(SessionStore::Mysql(db), None))
+        Ok(Self::new_store(SessionStore::Mysql { db, transaction: Mutex::new(None) }, None))
     }
 
     /// Project profile resolved from an Iris config and datasource name.
     pub fn open_project(config_path: &str, source: &str) -> Result<Self, ErrorEnvelope> {
-        let (project_dir, project) = load_project(Path::new(config_path)).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
-        let ds = project.datasource(source).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err.to_string()))?;
+        let (project_dir, project) = load_project(Path::new(config_path)).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err))?;
+        let ds = project.datasource(source).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err.to_string()))?;
         let (store, session_ddl_revision) = match ds.kind {
             DatasourceKind::Yydb => {
-                let endpoint = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
+                let endpoint = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err))?;
                 let db = open_yydb_endpoint(&project_dir, &endpoint)?;
-                let schema = read_schema(&project_dir, &project).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
+                let schema = read_schema(&project_dir, &project).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err))?;
                 db.ensure_schema(&schema).map_err(from_yydb_error)?;
                 let revision = db.schema_handshake().map_err(from_yydb_error)?.ddl_revision;
                 (SessionStore::Yydb(db), Some(revision))
             }
             DatasourceKind::Sqlite => {
-                let endpoint = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
+                let endpoint = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err))?;
                 let path = resolve_path(&project_dir, &endpoint);
                 (SessionStore::Sqlite(SqliteSource::open(path).map_err(from_sqlite_error)?), None)
             }
             DatasourceKind::Postgres => {
-                let url = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
-                (SessionStore::Postgres(PostgresSource::connect(&url).map_err(from_postgres_error)?), None)
+                let url = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err))?;
+                let db = PostgresSource::connect(&url).map_err(from_postgres_error)?;
+                (SessionStore::Postgres { db, transaction: Mutex::new(None) }, None)
             }
             DatasourceKind::Mysql => {
-                let url = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
-                (SessionStore::Mysql(MysqlSource::connect(&url).map_err(from_mysql_error)?), None)
+                let url = expand_endpoint(ds, source).map_err(|err| ErrorEnvelope::internal(DIAG_EXEC_FAILED, err))?;
+                let db = MysqlSource::connect(&url).map_err(from_mysql_error)?;
+                (SessionStore::Mysql { db, transaction: Mutex::new(None) }, None)
             }
             other => {
-                return Err(ErrorEnvelope::new(
-                    CODE_EXEC_FAILED,
+                return Err(ErrorEnvelope::invalid_argument(
+                    DIAG_OPERATION_INVALID,
                     format!("open_project_session does not support {:?} yet (use yydb/sqlite/postgres/mysql)", other),
                 ));
             }
@@ -382,7 +602,7 @@ impl HostSession {
 
     fn bind_parameters(&self, source: &str, parameters_json: Option<&str>) -> Result<bind::BoundParameters, ErrorEnvelope> {
         match parameters_json {
-            Some(json) => bind::bind_parameters_typed(source, json).map_err(|err| ErrorEnvelope::new(CODE_PARAM_ENCODING, err)),
+            Some(json) => bind::bind_parameters_typed(source, json).map_err(|err| ErrorEnvelope::invalid_argument(DIAG_PARAM_ENCODING, err)),
             None => Ok(bind::BoundParameters::unbound(source)),
         }
     }
@@ -413,7 +633,7 @@ impl HostSession {
         }
         let source = match bound.text_only() {
             Ok(source) => source,
-            Err(err) => return ExecuteOutcome::failure(ErrorEnvelope::new(CODE_PARAM_ENCODING, err)),
+            Err(err) => return ExecuteOutcome::failure(ErrorEnvelope::invalid_argument(DIAG_PARAM_ENCODING, err)),
         };
         match store.query(&self.planner, source) {
             Ok(rows) => ExecuteOutcome::rows(rows),
@@ -460,7 +680,7 @@ impl HostSession {
         }
         let source = match bound.text_only() {
             Ok(source) => source,
-            Err(err) => return ExecuteOutcome::failure(ErrorEnvelope::new(CODE_PARAM_ENCODING, err)),
+            Err(err) => return ExecuteOutcome::failure(ErrorEnvelope::invalid_argument(DIAG_PARAM_ENCODING, err)),
         };
         match store.execute_unit(&self.planner, source) {
             Ok(()) => ExecuteOutcome::unit(),
@@ -475,7 +695,7 @@ impl HostSession {
         }
         let bound = match operation::encode_request_json(request_json) {
             Ok(bound) => bound,
-            Err(err) => return ExecuteOutcome::failure(ErrorEnvelope::new(CODE_OPERATION_INVALID, err)),
+            Err(err) => return ExecuteOutcome::failure(ErrorEnvelope::invalid_argument(DIAG_OPERATION_INVALID, err)),
         };
         self.run_bound_query(&bound)
     }
@@ -488,7 +708,10 @@ impl HostSession {
         match &self.store {
             Some(SessionStore::Yydb(db)) => db.ensure_schema(schema).map_err(from_yydb_error).map(|_| ()),
             Some(SessionStore::Sqlite(db)) => db.managed_push(schema).map_err(from_sqlite_error).map(|_| ()),
-            _ => Err(ErrorEnvelope::new(CODE_EXEC_FAILED, "managed_push is only supported on yydb and sqlite sessions")),
+            _ => Err(ErrorEnvelope::invalid_argument(
+                DIAG_MANAGED_PUSH_UNSUPPORTED,
+                "managed_push is only supported on yydb and sqlite sessions",
+            )),
         }
     }
 
@@ -551,7 +774,7 @@ impl HostSession {
         }
         match &self.store {
             Some(SessionStore::Sqlite(db)) => db.sqlite_version().map_err(from_sqlite_error),
-            _ => Err(ErrorEnvelope::new(CODE_EXEC_FAILED, "sqlite identity requires a sqlite session")),
+            _ => Err(ErrorEnvelope::invalid_argument(DIAG_OPERATION_INVALID, "sqlite identity requires a sqlite session")),
         }
     }
 
@@ -562,7 +785,7 @@ impl HostSession {
         }
         match &self.store {
             Some(SessionStore::Sqlite(db)) => db.sqlite_source_id().map_err(from_sqlite_error),
-            _ => Err(ErrorEnvelope::new(CODE_EXEC_FAILED, "sqlite identity requires a sqlite session")),
+            _ => Err(ErrorEnvelope::invalid_argument(DIAG_OPERATION_INVALID, "sqlite identity requires a sqlite session")),
         }
     }
 }
@@ -615,15 +838,17 @@ table User {
         let session = HostSession::open_memory();
         let rows = session.query("User.collect()", None);
         assert!(!rows.ok);
-        assert_eq!(rows.error_code().as_deref(), Some(CODE_EXEC_FAILED));
+        assert_eq!(rows.error_code().as_deref(), Some(CODE_INTERNAL));
 
         let write = session.execute(r#"User::insert({ user_id: "u1", user_name: "alice", active: true })"#, None);
         assert!(!write.ok);
-        assert_eq!(write.error_code().as_deref(), Some("IRIS-PLAN-REJECTED"));
+        assert_eq!(write.error_code().as_deref(), Some(CODE_INVALID_ARGUMENT));
+        assert_eq!(write.error_diagnostic_code().as_deref(), Some("IRIS-PLAN-REJECTED"));
 
         let txn = session.begin();
         assert!(!txn.ok);
-        assert_eq!(txn.error_code().as_deref(), Some(CODE_TRANSACTION_UNSUPPORTED));
+        assert_eq!(txn.error_code().as_deref(), Some(CODE_TRANSACTION_FAILED));
+        assert_eq!(txn.error_diagnostic_code().as_deref(), Some(DIAG_TRANSACTION_UNSUPPORTED));
     }
 
     #[test]
@@ -631,11 +856,13 @@ table User {
         let session = HostSession::open_memory();
         let bound = session.query("User.filter(x => x.user_id == $id).collect()", Some("{not json"));
         assert!(!bound.ok);
-        assert_eq!(bound.error_code().as_deref(), Some(CODE_PARAM_ENCODING));
+        assert_eq!(bound.error_code().as_deref(), Some(CODE_INVALID_ARGUMENT));
+        assert_eq!(bound.error_diagnostic_code().as_deref(), Some(DIAG_PARAM_ENCODING));
 
         let operation = session.execute_operation("{");
         assert!(!operation.ok);
-        assert_eq!(operation.error_code().as_deref(), Some(CODE_OPERATION_INVALID));
+        assert_eq!(operation.error_code().as_deref(), Some(CODE_INVALID_ARGUMENT));
+        assert_eq!(operation.error_diagnostic_code().as_deref(), Some(DIAG_OPERATION_INVALID));
     }
 
     #[test]
@@ -644,6 +871,7 @@ table User {
         session.close();
         let outcome = session.query("User.collect()", None);
         assert!(!outcome.ok);
-        assert_eq!(outcome.error_code().as_deref(), Some(CODE_SESSION_CLOSED));
+        assert_eq!(outcome.error_code().as_deref(), Some(CODE_INVALID_ARGUMENT));
+        assert_eq!(outcome.error_diagnostic_code().as_deref(), Some(DIAG_SESSION_CLOSED));
     }
 }

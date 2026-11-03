@@ -184,6 +184,17 @@ impl MysqlSource {
         execute::delete_row(conn, table, primary_key, key, &self.uuid_fields)
     }
 
+    /// Begin a transaction that owns its checked-out connection.
+    ///
+    /// The returned [`MysqlTransaction`] keeps the connection for every
+    /// statement it runs, so read-then-write sequences stay inside the same
+    /// transaction instead of silently checking out another pooled connection.
+    pub fn begin_transaction(&self) -> Result<MysqlTransaction> {
+        let mut conn = self.pool.get_conn()?;
+        conn.query_drop("START TRANSACTION")?;
+        Ok(MysqlTransaction { conn, uuid_fields: self.uuid_fields.clone(), open: true })
+    }
+
     /// Run `f` inside a transaction, rolling back on error.
     ///
     /// Prefer generated `Txn` (or these `*_on` helpers) inside `f`. Calling
@@ -213,6 +224,48 @@ impl MysqlSource {
         let result = f(&mut conn);
         let _ = conn.query_drop("ROLLBACK");
         result
+    }
+}
+
+/// Open transaction that owns one MySQL connection.
+///
+/// Statements executed through this handle share the connection and therefore
+/// the transaction. Dropping it without [`Self::commit`] rolls back.
+pub struct MysqlTransaction {
+    conn: mysql::PooledConn,
+    uuid_fields: HashSet<(String, String)>,
+    open: bool,
+}
+
+impl MysqlTransaction {
+    /// Execute a physical plan inside this transaction.
+    pub fn execute_plan(&mut self, plan: &PhysicalPlan) -> Result<Vec<Row>> {
+        if plan.is_rejected() {
+            return Err(Error::Policy(plan.rejection_note().unwrap_or("plan rejected").to_string()));
+        }
+        execute::execute_plan(&mut self.conn, plan, &self.uuid_fields)
+    }
+
+    /// Commit and release the connection.
+    pub fn commit(&mut self) -> Result<()> {
+        self.conn.query_drop("COMMIT")?;
+        self.open = false;
+        Ok(())
+    }
+
+    /// Roll back and release the connection.
+    pub fn rollback(&mut self) -> Result<()> {
+        self.conn.query_drop("ROLLBACK")?;
+        self.open = false;
+        Ok(())
+    }
+}
+
+impl Drop for MysqlTransaction {
+    fn drop(&mut self) {
+        if self.open {
+            let _ = self.conn.query_drop("ROLLBACK");
+        }
     }
 }
 

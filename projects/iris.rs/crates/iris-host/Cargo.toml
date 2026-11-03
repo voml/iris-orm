@@ -15,5 +15,7 @@ iris-adapter-sqlite = { workspace = true }
 iris-adapter-postgres = { workspace = true }
 iris-adapter-mysql = { workspace = true }
 iris-connector-yydb = { workspace = true }
+mysql = { workspace = true }
+postgres = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

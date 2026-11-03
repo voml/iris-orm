@@ -18,7 +18,12 @@ export type IrisDiagnosticSeverity = "error" | "warning";
 
 /** Structured diagnostic returned with results or failures. */
 export interface IrisDiagnostic {
+    /** Stable author-facing code (`IRIS-UNIQUE-CONFLICT`, …). */
     readonly code: string;
+    /** Semantic class (`unique_conflict`, `not_found`, …). */
+    readonly kind?: string;
+    /** Internal backend / host code, for diagnostics only. */
+    readonly diagnosticCode?: string;
     readonly message: string;
     readonly severity: IrisDiagnosticSeverity;
     readonly retryable?: boolean;
