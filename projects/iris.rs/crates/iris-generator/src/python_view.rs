@@ -200,20 +200,29 @@ fn build_table_view(table: &TableModel) -> Result<PyTableView> {
         has_vector: !vector_names.is_empty(),
         model_fields: model_fields.join("\n"),
         model_assignments: model_assignments.join("\n"),
-        where_fields: where_fields.join("\n"),
-        select_fields: select_fields.join("\n"),
-        create_fields: create_fields.join("\n"),
-        patch_fields: patch_fields.join("\n"),
+        where_fields: body(where_fields),
+        select_fields: body(select_fields),
+        create_fields: body(create_fields),
+        patch_fields: body(patch_fields),
         primary_field: primary_field_name(table),
         ref_fields: reference_fields(table)?,
     })
+}
+
+/// Class body of a generated `TypedDict`. An empty body would be a syntax error.
+fn body(lines: Vec<String>) -> String {
+    if lines.is_empty() {
+        "    pass".into()
+    } else {
+        lines.join("\n")
+    }
 }
 
 /// `{pk: value}` write shape of a `&T` reference input.
 fn reference_fields(table: &TableModel) -> Result<String> {
     match table.fields.iter().find(|field| field.primary).or_else(|| table.fields.first()) {
         Some(field) => Ok(format!("    {}: {}", field.name, python_value_type(field)?)),
-        None => Ok(String::new()),
+        None => Ok("    pass".into()),
     }
 }
 

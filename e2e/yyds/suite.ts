@@ -6,6 +6,7 @@
 import assert from "node:assert/strict";
 
 import { createClient } from "./.generated/ts/node.ts";
+import { createClient as createVectorClient } from "./.generated/vector-ts/node.ts";
 
 const dsn = process.env.IRIS_E2E_DSN;
 if (!dsn) throw new Error("IRIS_E2E_DSN is required");
@@ -50,17 +51,17 @@ assert.deepEqual(
     ["a3"],
 );
 
-// Vector near: only yydb binds typed vector payloads today, so the probe
-// records the author code instead of asserting a ranking on this backend.
+// Vector search is a yydb capability in `/v0`: a SQL backend must reject a
+// schema that declares `vector` while the client is built, before any call.
 try {
-    await db.tables.doc.create({ data: { docId: "d1", label: "probe", embedding: new Float32Array([1, 0, 0]) } });
-    await db.tables.doc.findNear({
-        field: "embedding",
-        near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.1 },
-    });
-    codes.vector_payload = null;
+    createVectorClient({ dsn });
+    codes.vector_schema = null;
 } catch (error) {
-    codes.vector_payload = authorCode(error);
+    const diagnostic = (error as { diagnosticCode?: unknown }).diagnosticCode;
+    assert.equal(typeof diagnostic, "string", "vector schema rejection must carry a diagnostic");
+    assert.equal((error as { kind?: unknown }).kind, "schema_mismatch");
+    codes.vector_schema = authorCode(error);
+    codes.vector_schema_diagnostic = "present";
 }
 
 // Transaction commit.

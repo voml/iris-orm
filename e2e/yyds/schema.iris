@@ -3,9 +3,3 @@ table Article {
     slug: utf8,
     body: utf8,
 }
-
-table Doc {
-    @@doc_id: utf8,
-    label: utf8,
-    embedding: vector<3>,
-}

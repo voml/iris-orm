@@ -16,20 +16,39 @@ export function openSessionFromDsn(
     try {
         return core.openDsnSession!(dsn, schemaSource && schemaSource.trim() ? schemaSource : null);
     } catch (error) {
-        throw new IrisFacadeError(...decodeEnvelopeError(error));
+        const decoded = decodeEnvelopeError(error);
+        throw new IrisFacadeError(decoded.code, decoded.message, {
+            kind: decoded.kind,
+            diagnosticCode: decoded.diagnosticCode,
+        });
     }
 }
 
-/** Decode a native `{code, message}` payload, falling back to connection failure. */
-function decodeEnvelopeError(error: unknown): [code: string, message: string] {
+/** Decode a native error payload, falling back to connection failure. */
+function decodeEnvelopeError(error: unknown): {
+    code: string;
+    message: string;
+    kind?: string;
+    diagnosticCode?: string;
+} {
     const message = error instanceof Error ? error.message : String(error);
     try {
-        const payload = JSON.parse(message) as { code?: unknown; message?: unknown };
+        const payload = JSON.parse(message) as {
+            code?: unknown;
+            message?: unknown;
+            kind?: unknown;
+            diagnosticCode?: unknown;
+        };
         if (typeof payload.code === "string" && typeof payload.message === "string") {
-            return [payload.code, payload.message];
+            return {
+                code: payload.code,
+                message: payload.message,
+                kind: typeof payload.kind === "string" ? payload.kind : undefined,
+                diagnosticCode: typeof payload.diagnosticCode === "string" ? payload.diagnosticCode : undefined,
+            };
         }
     } catch {
         // not an envelope payload
     }
-    return ["IRIS-CONNECTION-FAILED", message];
+    return { code: "IRIS-CONNECTION-FAILED", message };
 }

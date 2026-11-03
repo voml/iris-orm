@@ -13,8 +13,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / ".generated" / "py"))
+sys.path.insert(0, str(HERE / ".generated" / "vector-py"))
 
 from generated.iris import IrisError, create_client  # noqa: E402
+from vector_generated.iris import IrisError as VectorIrisError  # noqa: E402
+from vector_generated.iris import create_client as create_vector_client  # noqa: E402
 
 DSN = os.environ.get("IRIS_E2E_DSN")
 if not DSN:
@@ -30,46 +33,43 @@ SEED = [
 ]
 
 for row in SEED:
-    db.tables.Article.create(data=row)
+    db.tables.article.create(data=row)
 
-unique = db.tables.Article.find_unique(where={"article_id": "a1"})
-assert unique is not None and unique["slug"] == "alpha-one"
+unique = db.tables.article.find_unique(where={"article_id": "a1"})
+assert unique is not None and unique.slug == "alpha-one"
 
-contains = db.tables.Article.find_many(where={"body": {"contains": "needle"}})
-assert sorted(row["article_id"] for row in contains) == ["a1", "a3"]
+contains = db.tables.article.find_many(where={"body": {"contains": "needle"}})
+assert sorted(row.article_id for row in contains) == ["a1", "a3"]
 
-startsWith = db.tables.Article.find_many(where={"slug": {"starts_with": "alpha"}})
-assert [row["article_id"] for row in startsWith] == ["a1"]
+startsWith = db.tables.article.find_many(where={"slug": {"starts_with": "alpha"}})
+assert [row.article_id for row in startsWith] == ["a1"]
 
-endsWith = db.tables.Article.find_many(where={"slug": {"ends_with": "-three"}})
-assert [row["article_id"] for row in endsWith] == ["a3"]
+endsWith = db.tables.article.find_many(where={"slug": {"ends_with": "-three"}})
+assert [row.article_id for row in endsWith] == ["a3"]
 
 try:
-    db.tables.Doc.create(data={"doc_id": "d1", "label": "probe", "embedding": [1.0, 0.0, 0.0]})
-    db.tables.Doc.find_near(
-        field="embedding",
-        vector=[1.0, 0.0, 0.0],
-        metric="cosine",
-        threshold=0.1,
-    )
-    codes["vector_payload"] = None
-except IrisError as error:
-    codes["vector_payload"] = error.code
+    create_vector_client(DSN)
+    codes["vector_schema"] = None
+except VectorIrisError as error:
+    assert error.diagnostic_code, "vector schema rejection must carry a diagnostic"
+    assert error.kind == "schema_mismatch"
+    codes["vector_schema"] = error.code
+    codes["vector_schema_diagnostic"] = "present"
 
 with db.transaction() as tx:
-    tx.tables.Article.create(data={"article_id": "a4", "slug": "delta-four", "body": "committed row"})
-assert db.tables.Article.find_unique(where={"article_id": "a4"}) is not None
+    tx.tables.article.create(data={"article_id": "a4", "slug": "delta-four", "body": "committed row"})
+assert db.tables.article.find_unique(where={"article_id": "a4"}) is not None
 
 try:
     with db.transaction() as tx:
-        tx.tables.Article.create(data={"article_id": "a5", "slug": "epsilon-five", "body": "rolled back"})
+        tx.tables.article.create(data={"article_id": "a5", "slug": "epsilon-five", "body": "rolled back"})
         raise RuntimeError("rollback probe")
 except RuntimeError:
     pass
-assert db.tables.Article.find_unique(where={"article_id": "a5"}) is None
+assert db.tables.article.find_unique(where={"article_id": "a5"}) is None
 
 try:
-    db.tables.Article.create(data={"article_id": "a6", "slug": "alpha-one", "body": "duplicate"})
+    db.tables.article.create(data={"article_id": "a6", "slug": "alpha-one", "body": "duplicate"})
     codes["unique_conflict"] = None
 except IrisError as error:
     expected = os.environ.get("IRIS_E2E_UNIQUE_DIAGNOSTIC")
@@ -79,7 +79,7 @@ except IrisError as error:
     codes["unique_conflict_diagnostic"] = "present"
 
 try:
-    db.tables.Article.update(where={"article_id": "missing"}, data={"body": "no match"})
+    db.tables.article.update(where={"article_id": "missing"}, data={"body": "no match"})
     codes["not_found"] = None
 except IrisError as error:
     codes["not_found"] = error.code

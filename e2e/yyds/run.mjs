@@ -171,11 +171,6 @@ const CREATE_TABLE = {
         body TEXT,
         UNIQUE KEY uq_article_slug (slug)
     )`,
-        `CREATE TABLE Doc (
-        doc_id VARCHAR(191) NOT NULL PRIMARY KEY,
-        label TEXT,
-        embedding TEXT
-    )`,
     ],
     postgres: [
         `CREATE TABLE Article (
@@ -183,11 +178,6 @@ const CREATE_TABLE = {
         slug TEXT NOT NULL,
         body TEXT,
         CONSTRAINT uq_article_slug UNIQUE (slug)
-    )`,
-        `CREATE TABLE Doc (
-        doc_id TEXT NOT NULL PRIMARY KEY,
-        label TEXT,
-        embedding TEXT
     )`,
     ],
 };
@@ -222,18 +212,20 @@ async function createTable() {
 
 async function generateClients() {
     rmSync(generatedRoot, { recursive: true, force: true });
-    const schema = (await import("node:fs/promises")).readFile(join(HERE, "schema.iris"), "utf8");
+    const { readFile } = await import("node:fs/promises");
+    const schema = await readFile(join(HERE, "schema.iris"), "utf8");
+    const vectorSchema = await readFile(join(HERE, "vector.iris"), "utf8");
     const { loadIrisNative } = await import("@yydb/iris/node");
     const core = loadIrisNative();
-    const tsDir = join(generatedRoot, "ts");
-    const pyDir = join(generatedRoot, "py", "generated", "iris");
-    mkdirSync(tsDir, { recursive: true });
-    mkdirSync(pyDir, { recursive: true });
-    for (const [target, outDir] of [
-        ["typescript", tsDir],
-        ["python", pyDir],
-    ]) {
-        const result = core.generate(await schema, target, outDir);
+    const targets = [
+        [schema, "typescript", join(generatedRoot, "ts")],
+        [schema, "python", join(generatedRoot, "py", "generated", "iris")],
+        [vectorSchema, "typescript", join(generatedRoot, "vector-ts")],
+        [vectorSchema, "python", join(generatedRoot, "vector-py", "vector_generated", "iris")],
+    ];
+    for (const [source, target, outDir] of targets) {
+        mkdirSync(outDir, { recursive: true });
+        const result = core.generate(source, target, outDir);
         if (!result.ok) throw new Error(`generate ${target} failed: ${result.message ?? "unknown"}`);
         console.log(`[generate] ${target} -> ${outDir} (${result.files.length} files)`);
     }
@@ -244,7 +236,6 @@ async function resetTables() {
         const connection = await mysql.createConnection({ host, port: mysqlPort, user: "yyds", password: "" });
         try {
             await connection.query("DELETE FROM Article");
-            await connection.query("DELETE FROM Doc");
         } finally {
             await connection.end();
         }
@@ -254,7 +245,6 @@ async function resetTables() {
     await client.connect();
     try {
         await client.query("DELETE FROM Article");
-        await client.query("DELETE FROM Doc");
     } finally {
         await client.end();
     }
