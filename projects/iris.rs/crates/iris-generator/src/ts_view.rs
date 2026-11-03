@@ -377,7 +377,7 @@ fn vector_field_views(table: &TableModel) -> Result<Vec<TsVectorFieldView>> {
 
 /// Declared dimension of a `vector<N>` / `vector<N>?` label; `None` for a
 /// bare `vector`. Malformed or zero dimensions are generation errors.
-fn vector_dimension(field: &FieldModel) -> Result<Option<u32>> {
+pub(crate) fn vector_dimension(field: &FieldModel) -> Result<Option<u32>> {
     let label = field.vos_type.strip_suffix('?').unwrap_or(&field.vos_type);
     let Some(inner) = label.strip_prefix("vector<").and_then(|rest| rest.strip_suffix('>'))
     else {
@@ -407,7 +407,7 @@ fn camel_case(name: &str) -> String {
 /// `StringFilter`. The operator list is the single source for the runtime map
 /// inlined into `_internal/synthesize.ts`, so the lowered surface and the
 /// authored surface can never drift apart.
-fn vos_filter_surface(vos_type: &str) -> Option<(&'static str, &'static [&'static str])> {
+pub(crate) fn vos_filter_surface(vos_type: &str) -> Option<(&'static str, &'static [&'static str])> {
     let base = carrier::base_vos_type(vos_type);
     Some(match base {
         "bool" => ("BooleanFilter", &["eq", "not"]),

@@ -1,0 +1,14 @@
+"""Error surface of the generated client.
+
+`IrisError` carries the stable author-facing `code` (`IRIS-UNIQUE-CONFLICT`,
+`IRIS-NOT-FOUND`, …). Diagnostic detail such as a backend error number never
+appears as `code`.
+"""
+
+from __future__ import annotations
+
+from iris import IrisError
+
+IrisGeneratedError = IrisError
+
+__all__ = ["IrisError", "IrisGeneratedError"]

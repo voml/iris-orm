@@ -126,13 +126,24 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 mod carrier;
 mod operations_artifact;
+mod python;
+mod python_view;
 mod rust_view;
 mod ts_view;
 mod typescript;
 
 include!(concat!(env!("OUT_DIR"), "/aot_registry.rs"));
 
+pub use python::{emit_python_client, write_python_client};
+
+/// Fixed output directory of the Python target under a project root.
+pub const PYTHON_GENERATE_OUT: &str = "src/generated/iris";
 pub use typescript::{emit_typescript_client, emit_typescript_runtime, write_typescript_client, write_typescript_runtime};
+
+/// Output directory for the Python target (`generate_root`, same as TypeScript).
+pub fn python_target_dir(generate_root: &std::path::Path) -> std::path::PathBuf {
+    generate_root.to_path_buf()
+}
 
 /// One VOS field in the generation model.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -649,6 +660,7 @@ pub fn generate(
     match target {
         "rust" => write_rust_domain(model, datasource.ok_or(Error::MissingDatasource)?, generate_root),
         "typescript" | "ts" => write_typescript_client(model, generate_root),
+        "python" | "py" => write_python_client(model, generate_root),
         other => Err(typescript::unsupported_target(other)),
     }
 }
@@ -659,6 +671,7 @@ pub fn emit_target_files(model: &GenerationModel, target: &str, datasource: Opti
     match target {
         "rust" => emit_rust_files(model, datasource.ok_or(Error::MissingDatasource)?),
         "typescript" | "ts" => emit_typescript_client(model),
+        "python" | "py" => emit_python_client(model),
         other => Err(typescript::unsupported_target(other)),
     }
 }

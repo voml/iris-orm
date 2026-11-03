@@ -104,10 +104,11 @@ pub struct GenerateResult {
     pub error: Option<String>,
 }
 
-/// Generate client bindings (`rust` | `typescript`) from merged schema source.
+/// Generate client bindings (`rust` | `typescript` | `python`) from merged schema source.
 ///
 /// `datasource` is required for the `rust` target and selects the adapter
-/// binding for the generated client; the `typescript` target ignores it.
+/// binding for the generated client; the `typescript` and `python` targets
+/// ignore it.
 #[napi]
 pub fn generate(source: String, target: String, out_dir: String, datasource: Option<String>) -> Result<GenerateResult> {
     match iris_generator::generate_from_source(&source, &target, Path::new(&out_dir), datasource.as_deref()) {

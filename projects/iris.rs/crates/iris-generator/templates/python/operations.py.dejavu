@@ -1,0 +1,190 @@
+"""Generated entity delegates — the authoring surface of this schema.
+
+`create_client(dsn)` opens one client, `client.tables.<Entity>` exposes the
+entity delegates and `client.transaction()` groups writes. No method here
+accepts VOS text, a backend name, or a raw SQL statement.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Sequence
+
+from ._internal.executor import OperationExecutor, open_executor
+from ._internal.synthesize import (
+    build_declared_operation_request,
+    evaluate_vector_near_rows,
+    synthesize_create,
+    synthesize_delete,
+    synthesize_find_many,
+    synthesize_find_unique,
+    synthesize_operation_call,
+    synthesize_update,
+    synthesize_vector_near,
+)
+from .errors import IrisError
+from .inputs import (
+<% loop table in tables_view %>
+    <% table.name %>CreateInput,
+    <% table.name %>Select,
+    <% table.name %>UpdateInput,
+    <% table.name %>WhereInput,
+<% end loop %>
+)
+from .models import (
+<% loop table in tables_view %>
+    <% table.name %>,
+<% end loop %>
+)
+
+<% loop table in tables_view %>
+class <% table.name %>Delegate:
+    """Entity delegate for `<% table.name %>`."""
+
+    def __init__(self, executor: OperationExecutor) -> None:
+        self._executor = executor
+
+    def find_many(
+        self,
+        *,
+        where: <% table.name %>WhereInput | None = None,
+        select: <% table.name %>Select | None = None,
+        take: int | None = None,
+    ) -> list[<% table.name %>]:
+        synthesis = synthesize_find_many("<% table.name %>", where, select, take)
+        return self._executor.execute(
+            build_declared_operation_request("<% table.name %>.findMany", synthesis)
+        )
+
+    def find_first(
+        self,
+        *,
+        where: <% table.name %>WhereInput | None = None,
+        select: <% table.name %>Select | None = None,
+    ) -> <% table.name %> | None:
+        synthesis = synthesize_find_many("<% table.name %>", where, select, 1)
+        rows = self._executor.execute(
+            build_declared_operation_request("<% table.name %>.findFirst", synthesis)
+        )
+        return rows[0] if rows else None
+
+    def find_unique(
+        self,
+        *,
+        where: <% table.name %>WhereInput,
+        select: <% table.name %>Select | None = None,
+    ) -> <% table.name %> | None:
+        synthesis = synthesize_find_unique("<% table.name %>", where, select)
+        rows = self._executor.execute(
+            build_declared_operation_request("<% table.name %>.findUnique", synthesis)
+        )
+        return rows[0] if rows else None
+
+    def create(
+        self,
+        *,
+        data: <% table.name %>CreateInput,
+        select: <% table.name %>Select | None = None,
+    ) -> <% table.name %>:
+        synthesis = synthesize_create("<% table.name %>", data, select)
+        rows = self._executor.execute(
+            build_declared_operation_request("<% table.name %>.create", synthesis)
+        )
+        if not rows:
+            raise IrisError("`create` returned no row", code="IRIS-NOT-FOUND")
+        return rows[0]
+
+    def update(
+        self,
+        *,
+        where: <% table.name %>WhereInput,
+        data: <% table.name %>UpdateInput,
+        select: <% table.name %>Select | None = None,
+    ) -> <% table.name %>:
+        synthesis = synthesize_update("<% table.name %>", where, data, select)
+        rows = self._executor.execute(
+            build_declared_operation_request("<% table.name %>.update", synthesis)
+        )
+        if not rows:
+            raise IrisError("`update` matched no row", code="IRIS-NOT-FOUND")
+        return rows[0]
+
+    def delete(self, *, where: <% table.name %>WhereInput) -> None:
+        synthesis = synthesize_delete("<% table.name %>", where)
+        self._executor.execute_unit(
+            build_declared_operation_request("<% table.name %>.delete", synthesis)
+        )
+
+    def find_near(
+        self,
+        *,
+        field: str,
+        vector: Sequence[float],
+        metric: str,
+        threshold: float,
+        where: <% table.name %>WhereInput | None = None,
+        take: int | None = None,
+    ) -> list[<% table.name %>]:
+        synthesis = synthesize_vector_near("<% table.name %>", field, vector, metric, threshold, where)
+        rows = self._executor.execute(
+            build_declared_operation_request("<% table.name %>.findNear", synthesis)
+        )
+        return list(
+            evaluate_vector_near_rows("<% table.name %>", rows, field, vector, metric, threshold, take)
+        )
+
+
+<% end loop %>
+class Tables:
+    """Entity namespace of one client: `client.tables.<Entity>`."""
+
+<% loop table in tables_view %>
+    <% table.name %>: <% table.name %>Delegate
+<% end loop %>
+
+    def __init__(self, executor: OperationExecutor) -> None:
+        self._executor = executor
+<% loop table in tables_view %>
+        self.<% table.name %> = <% table.name %>Delegate(self._executor)
+<% end loop %>
+
+
+class Transaction:
+    """Transaction scope: normal exit commits, an exception rolls back."""
+
+    def __init__(self, executor: OperationExecutor) -> None:
+        self._executor = executor
+        self.tables = Tables(executor)
+
+    def __enter__(self) -> "Transaction":
+        self._executor.begin()
+        return self
+
+    def __exit__(self, exc_type: Any, exc: Any, traceback: Any) -> bool:
+        if exc_type is None:
+            self._executor.commit()
+        else:
+            self._executor.rollback()
+        return False
+
+
+class Client:
+    """One generated client bound to the adapter its DSN selects."""
+
+    def __init__(self, executor: OperationExecutor) -> None:
+        self._executor = executor
+        self.tables = Tables(executor)
+<% if has_operations %>
+        self.operations = GeneratedOperations(executor)
+<% end if %>
+
+    def transaction(self) -> Transaction:
+        return Transaction(self._executor)
+
+
+def create_client(dsn: str, **options: Any) -> Client:
+    """Open a generated client for `dsn`.
+
+    The DSN selects the adapter internally (`sqlite:`, `file:`, `mysql://`,
+    `postgres://`). Unknown options are rejected rather than ignored.
+    """
+    return Client(open_executor(dsn, options))

@@ -1,0 +1,473 @@
+"""VOS synthesis shared by every generated delegate.
+
+One schema, one lowering table: the filter surface, reference targets and
+vector dimensions below are inlined from the same generation model the
+TypeScript target renders. This module authors no VOS of its own beyond the
+declared operation text built from the author's arguments.
+"""
+
+from __future__ import annotations
+
+import math
+import struct
+from typing import Any, Mapping, Sequence
+
+from ..errors import IrisError
+from ..metadata import SCHEMA_FINGERPRINT
+
+FILTER_OPS: dict[str, dict[str, tuple[str, ...]]] = {<% filter_ops_literal %>}
+REFERENCE_TARGETS: dict[str, dict[str, str]] = {<% reference_targets_literal %>}
+VECTOR_FIELDS: dict[str, dict[str, int | None]] = {<% vector_fields_literal %>}
+
+FILTER_OPERATORS = frozenset(
+    {
+        "eq",
+        "not",
+        "gt",
+        "gte",
+        "lt",
+        "lte",
+        "contains",
+        "starts_with",
+        "ends_with",
+        "is_null",
+        "is_not_null",
+    }
+)
+
+_OPERATOR_ALIASES = {
+    "starts_with": "startsWith",
+    "ends_with": "endsWith",
+    "is_null": "isNull",
+    "is_not_null": "isNotNull",
+}
+
+_OPERATOR_KEYWORDS = {
+    "eq": "==",
+    "not": "!=",
+    "gt": ">",
+    "gte": ">=",
+    "lt": "<",
+    "lte": "<=",
+}
+
+
+def _near_error(code: str, message: str) -> IrisError:
+    return IrisError(message, code=code)
+
+
+def _is_filter_object(value: Mapping[str, Any]) -> bool:
+    keys = list(value.keys())
+    return bool(keys) and all(key in FILTER_OPERATORS for key in keys)
+
+
+def _reference_target(entity: str, field: str) -> str | None:
+    return REFERENCE_TARGETS.get(entity, {}).get(field)
+
+
+def _next_param(parameters: dict[str, Any], hint: str, value: Any) -> str:
+    base = "".join(character if character.isalnum() or character == "_" else "_" for character in hint)
+    name = base
+    index = 0
+    while name in parameters:
+        index += 1
+        name = f"{base}_{index}"
+    parameters[name] = value
+    return name
+
+
+def _path_expr(root: str, path: Sequence[str]) -> str:
+    return root if not path else f"{root}.{'.'.join(path)}"
+
+
+def _encode_carrier(entity: str, field: str, value: Any) -> Any:
+    """Encode author carriers into the tagged wire values the binder binds."""
+    if value is None:
+        return None
+    vectors = VECTOR_FIELDS.get(entity, {})
+    if field in vectors:
+        if isinstance(value, (bytes, bytearray)) or not isinstance(value, Sequence):
+            raise IrisError(
+                f"`{entity}.{field}` expects a sequence of floats",
+                code="IRIS-INVALID-ARGUMENT",
+            )
+        components = [float(component) for component in value]
+        hex_components = struct.pack(f"<{len(components)}f", *components).hex()
+        return {"$yydb": "vector", "dimension": len(components), "components": hex_components}
+    if isinstance(value, (bytes, bytearray)):
+        return {"$yydb": "bytes", "hex": bytes(value).hex()}
+    return value
+
+
+def _flatten_reference(entity: str, field: str, value: Any) -> Any:
+    """Flatten `{id: …}` reference inputs at declared `&T` positions only."""
+    if _reference_target(entity, field) is None or not isinstance(value, Mapping):
+        return value
+    for key, nested in value.items():
+        if isinstance(key, str) and key.startswith("__"):
+            continue
+        return nested
+    return value
+
+
+def _compile_leaf_predicate(
+    root: str,
+    path: Sequence[str],
+    entity: str,
+    author_key: str,
+    value: Any,
+    parameters: dict[str, Any],
+) -> str:
+    target = _path_expr(root, path)
+    hint = f"p_{'_'.join(path) or 'value'}"
+    allowed = FILTER_OPS.get(entity, {}).get(author_key)
+    if allowed is None:
+        raise IrisError(
+            f"filter field `{entity}.{author_key}` declares no filter surface",
+            code="IRIS-INVALID-ARGUMENT",
+        )
+
+    if value is True and path:
+        return target
+    if value is False and path:
+        return f"!{target}"
+
+    if isinstance(value, Mapping) and _is_filter_object(value):
+        clauses: list[str] = []
+        for operator in value:
+            lowered = _OPERATOR_ALIASES.get(operator, operator)
+            if lowered not in allowed:
+                raise IrisError(
+                    f"operator `{operator}` is outside the `{entity}.{author_key}` filter surface "
+                    f"[{', '.join(allowed)}]",
+                    code="IRIS-INVALID-ARGUMENT",
+                )
+        if "eq" in value:
+            param = _next_param(parameters, hint, value["eq"])
+            clauses.append(f"{target} == ${param}")
+        if "not" in value:
+            param = _next_param(parameters, f"{hint}_not", value["not"])
+            clauses.append(f"{target} != ${param}")
+        for operator in ("gt", "gte", "lt", "lte"):
+            if operator in value:
+                param = _next_param(parameters, f"{hint}_{operator}", value[operator])
+                clauses.append(f"{target} {_OPERATOR_KEYWORDS[operator]} ${param}")
+        if "contains" in value:
+            param = _next_param(parameters, f"{hint}_contains", value["contains"])
+            clauses.append(f"{target}.contains(${param})")
+        if "starts_with" in value:
+            param = _next_param(parameters, f"{hint}_starts", value["starts_with"])
+            clauses.append(f"{target}.startsWith(${param})")
+        if "ends_with" in value:
+            param = _next_param(parameters, f"{hint}_ends", value["ends_with"])
+            clauses.append(f"{target}.endsWith(${param})")
+        if value.get("is_null") is True:
+            clauses.append(f"{target} == null")
+        if value.get("is_not_null") is True:
+            clauses.append(f"{target} != null")
+        return clauses[0] if len(clauses) == 1 else f"({' && '.join(clauses)})"
+
+    param = _next_param(parameters, hint, value)
+    return f"{target} == ${param}"
+
+
+def compile_where_predicates(
+    entity: str,
+    where: Mapping[str, Any],
+    parameters: dict[str, Any],
+    root: str = "x",
+    path: Sequence[str] = (),
+) -> list[str]:
+    """Lower a condition object into VOS predicates rooted at `root`."""
+    predicates: list[str] = []
+    for key, value in where.items():
+        if value is None and key not in ("is_null", "is_not_null"):
+            continue
+        if key == "is" and isinstance(value, Mapping):
+            predicates.extend(compile_where_predicates(entity, value, parameters, root, path))
+            continue
+        if isinstance(value, Mapping) and not _is_filter_object(value):
+            target = _reference_target(entity, key) or entity
+            predicates.extend(compile_where_predicates(target, value, parameters, root, (*path, key)))
+            continue
+        predicates.append(_compile_leaf_predicate(root, (*path, key), entity, key, value, parameters))
+    return predicates
+
+
+def compile_select_wire_columns(entity: str, select: Mapping[str, Any]) -> list[str]:
+    """Flat scalar columns selected with `{field: True}`, sorted for plan metadata."""
+    columns = [key for key, value in select.items() if value is True]
+    columns.sort()
+    return columns
+
+
+def _append_select_cols_parameter(
+    entity: str, select: Mapping[str, Any] | None, parameters: dict[str, Any]
+) -> None:
+    if not select:
+        return
+    columns = compile_select_wire_columns(entity, select)
+    if columns:
+        parameters["select_cols"] = ",".join(columns)
+
+
+def compile_select_projection(entity: str, select: Mapping[str, Any], root: str = "x") -> str:
+    parts: list[str] = []
+    for key, value in select.items():
+        if value is True:
+            parts.append(key)
+            continue
+        if isinstance(value, Mapping):
+            nested_select = value["select"] if isinstance(value.get("select"), Mapping) else value
+            target = _reference_target(entity, key) or entity
+            parts.append(f"{key}: {compile_select_projection(target, nested_select, f'{root}.{key}')}")
+    return f"{root}.{{ {', '.join(parts)} }}"
+
+
+def _append_filter(entity: str, where: Mapping[str, Any] | None, parameters: dict[str, Any]) -> str:
+    if not where:
+        return entity
+    predicates = compile_where_predicates(entity, where, parameters)
+    if not predicates:
+        return entity
+    return f"{entity}.filter(x => {' && '.join(predicates)})"
+
+
+def _append_map(entity: str, pipeline: str, select: Mapping[str, Any] | None) -> str:
+    if not select:
+        return pipeline
+    return f"{pipeline}.map(x => {compile_select_projection(entity, select, 'x')})"
+
+
+def synthesize_find_many(
+    entity: str,
+    where: Mapping[str, Any] | None = None,
+    select: Mapping[str, Any] | None = None,
+    take: int | None = None,
+) -> dict[str, Any]:
+    """Synthesize VOS for `find_many` — where paths and projections are use-site IR."""
+    parameters: dict[str, Any] = {}
+    pipeline = _append_filter(entity, where, parameters)
+    pipeline = _append_map(entity, pipeline, select)
+    if take is not None:
+        parameters["take"] = take
+        pipeline += ".take($take)"
+    pipeline += ".collect()"
+    return {"source": pipeline, "parameters": parameters}
+
+
+def synthesize_find_unique(
+    entity: str,
+    where: Mapping[str, Any],
+    select: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Synthesize VOS for `find_unique` — same use-site rules as `find_many`."""
+    parameters: dict[str, Any] = {}
+    pipeline = _append_filter(entity, where, parameters)
+    pipeline = _append_map(entity, pipeline, select)
+    pipeline += ".collect()"
+    return {"source": pipeline, "parameters": parameters}
+
+
+def _validate_near_args(
+    entity: str, field: str, vector: Sequence[float], metric: str, threshold: float
+) -> tuple[list[float], str, float]:
+    fields = VECTOR_FIELDS.get(entity)
+    if not fields or field not in fields:
+        raise _near_error(
+            "IRIS-VECTOR-DIMENSION",
+            f"entity `{entity}` declares no `vector` field `{field}`",
+        )
+    declared = fields[field]
+    if metric not in ("cosine", "dot", "euclidean"):
+        raise _near_error(
+            "IRIS-INVALID-ARGUMENT",
+            f"`{entity}.find_near` requires an explicit metric (cosine | dot | euclidean), got `{metric}`",
+        )
+    if not isinstance(vector, Sequence) or isinstance(vector, (str, bytes, bytearray)) or not vector:
+        raise _near_error(
+            "IRIS-INVALID-ARGUMENT",
+            f"`{entity}.{field}` near vector must be a non-empty sequence of floats",
+        )
+    components = [float(component) for component in vector]
+    if not all(math.isfinite(component) for component in components):
+        raise _near_error(
+            "IRIS-INVALID-ARGUMENT",
+            f"`{entity}.{field}` near vector has a non-finite component",
+        )
+    if declared is not None and len(components) != declared:
+        raise _near_error(
+            "IRIS-VECTOR-DIMENSION",
+            f"`{entity}.{field}` is declared `vector<{declared}>` but the near vector has "
+            f"{len(components)} components",
+        )
+    if not isinstance(threshold, (int, float)) or not math.isfinite(float(threshold)):
+        raise _near_error(
+            "IRIS-INVALID-ARGUMENT",
+            f"`{entity}.find_near` threshold must be a finite number",
+        )
+    return components, metric, float(threshold)
+
+
+def _decode_vector_cell(cell: Any, entity: str, field: str) -> list[float]:
+    if isinstance(cell, Mapping) and cell.get("$yydb") == "vector":
+        components = cell.get("components")
+        dimension = cell.get("dimension")
+        if isinstance(components, str) and isinstance(dimension, int) and dimension > 0:
+            octets = bytes.fromhex(components)
+            if len(octets) == dimension * 4:
+                return list(struct.unpack(f"<{dimension}f", octets))
+    raise _near_error(
+        "IRIS-VECTOR-DIMENSION",
+        f"`{entity}.{field}` row did not decode to a vector carrier",
+    )
+
+
+def _vector_similarity(left: Sequence[float], right: Sequence[float], metric: str, field: str) -> float:
+    if len(left) != len(right):
+        raise _near_error(
+            "IRIS-VECTOR-DIMENSION",
+            f"`{field}` row has {len(left)} components but the near vector has {len(right)}",
+        )
+    if metric == "cosine":
+        dot = sum(l * r for l, r in zip(left, right))
+        left_norm = sum(component * component for component in left)
+        right_norm = sum(component * component for component in right)
+        if left_norm == 0 or right_norm == 0:
+            raise _near_error(
+                "IRIS-VECTOR-DIMENSION",
+                f"cosine similarity is undefined for a zero-norm vector on `{field}`",
+            )
+        return dot / (left_norm ** 0.5 * right_norm ** 0.5)
+    if metric == "dot":
+        return sum(l * r for l, r in zip(left, right))
+    return sum((l - r) ** 2 for l, r in zip(left, right)) ** 0.5
+
+
+def synthesize_vector_near(
+    entity: str,
+    field: str,
+    vector: Sequence[float],
+    metric: str,
+    threshold: float,
+    where: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Synthesize the scan a `find_near` call ranks, validating input first."""
+    _validate_near_args(entity, field, vector, metric, threshold)
+    return synthesize_find_many(entity, where=where)
+
+
+def evaluate_vector_near_rows(
+    entity: str,
+    rows: Sequence[Mapping[str, Any]],
+    field: str,
+    vector: Sequence[float],
+    metric: str,
+    threshold: float,
+    take: int | None = None,
+) -> list[Mapping[str, Any]]:
+    """Rank scanned rows closest-first under the explicit metric."""
+    components, checked_metric, checked_threshold = _validate_near_args(
+        entity, field, vector, metric, threshold
+    )
+    higher_is_closer = checked_metric != "euclidean"
+    scored: list[tuple[float, Mapping[str, Any]]] = []
+    for row in rows:
+        cell = row.get(field)
+        if cell is None:
+            continue
+        value = _vector_similarity(
+            _decode_vector_cell(cell, entity, field), components, checked_metric, f"{entity}.{field}"
+        )
+        passes = value >= checked_threshold if higher_is_closer else value <= checked_threshold
+        if passes:
+            scored.append((value, row))
+    scored.sort(key=lambda entry: entry[0], reverse=higher_is_closer)
+    ranked = [row for _, row in scored]
+    return ranked[:take] if take is not None else ranked
+
+
+def synthesize_create(
+    entity: str,
+    data: Mapping[str, Any],
+    select: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Synthesize `Entity::insert({ field: $p, … })` with bound parameters."""
+    parameters: dict[str, Any] = {}
+    fields: list[str] = []
+    for key, value in data.items():
+        encoded = _encode_carrier(entity, key, _flatten_reference(entity, key, value))
+        param = _next_param(parameters, f"data_{key}", encoded)
+        fields.append(f"{key}: ${param}")
+    source = f"{entity}::insert({{ {', '.join(fields)} }})"
+    if select:
+        _append_select_cols_parameter(entity, select, parameters)
+        source = f"({source}).map(x => {compile_select_projection(entity, select, 'x')})"
+    return {"source": source, "parameters": parameters}
+
+
+def _compile_patch_assignments(
+    entity: str, data: Mapping[str, Any], parameters: dict[str, Any]
+) -> list[str]:
+    assignments: list[str] = []
+    for key, value in data.items():
+        if isinstance(value, Mapping) and "set" in value:
+            encoded = _encode_carrier(entity, key, _flatten_reference(entity, key, value["set"]))
+            param = _next_param(parameters, f"patch_{key}", encoded)
+            assignments.append(f"{key}: ${param}")
+        elif isinstance(value, Mapping) and value.get("set_null") is True:
+            assignments.append(f"{key}: null")
+    return assignments
+
+
+def synthesize_update(
+    entity: str,
+    where: Mapping[str, Any],
+    data: Mapping[str, Any],
+    select: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Synthesize `<Entity>.filter(…).patch({ … })` with bound where and patch parameters."""
+    parameters: dict[str, Any] = {}
+    predicates = compile_where_predicates(entity, where, parameters)
+    assignments = _compile_patch_assignments(entity, data, parameters)
+    source = f"{entity}.filter(x => {' && '.join(predicates)}).patch({{ {', '.join(assignments)} }})"
+    if select:
+        _append_select_cols_parameter(entity, select, parameters)
+        source = f"({source}).map(x => {compile_select_projection(entity, select, 'x')})"
+    return {"source": source, "parameters": parameters}
+
+
+def synthesize_delete(entity: str, where: Mapping[str, Any]) -> dict[str, Any]:
+    """Synthesize `<Entity>.filter(…).delete()` with bound where parameters."""
+    parameters: dict[str, Any] = {}
+    pipeline = _append_filter(entity, where, parameters)
+    return {"source": f"{pipeline}.delete()", "parameters": parameters}
+
+
+def synthesize_operation_call(
+    name: str, args: Sequence[Any], reference_flags: Sequence[bool] | None = None
+) -> dict[str, Any]:
+    """Synthesize `name($arg0, $arg1, …)` with positional binds."""
+    parameters: dict[str, Any] = {}
+    placeholders: list[str] = []
+    for index, value in enumerate(args):
+        flatten = bool(reference_flags[index]) if reference_flags else False
+        flattened = value
+        if flatten and isinstance(value, Mapping):
+            for key, nested in value.items():
+                if isinstance(key, str) and key.startswith("__"):
+                    continue
+                flattened = nested
+                break
+        param = _next_param(parameters, f"arg{index}", flattened)
+        placeholders.append(f"${param}")
+    return {"source": f"{name}({', '.join(placeholders)})", "parameters": parameters}
+
+
+def build_declared_operation_request(operation_id: str, synthesis: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the declared-operation request the generated client sends."""
+    return {
+        "identity": {"operationId": operation_id, "contractFingerprint": SCHEMA_FINGERPRINT},
+        "operation": {"kind": "declared-vos", "source": synthesis["source"]},
+        "parameters": dict(synthesis["parameters"]),
+    }

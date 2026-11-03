@@ -1,0 +1,68 @@
+"""Operation channel between the generated client and the Iris runtime.
+
+Every call is one declared operation: one request, one envelope, one result.
+The backend name never reaches this layer — the DSN selects the adapter.
+"""
+
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from iris._runtime import begin, close_session, commit, execute_operation, open_session, rollback
+
+from ..errors import IrisError
+
+_KNOWN_OPTIONS: frozenset[str] = frozenset()
+
+
+def _raise_envelope(envelope: dict[str, Any]) -> None:
+    error = envelope.get("error") or {}
+    raise IrisError(
+        error.get("message") or "iris operation failed",
+        code=error.get("code") or "IRIS-INTERNAL",
+    )
+
+
+def _require_ok(envelope: dict[str, Any]) -> dict[str, Any]:
+    if not envelope.get("ok"):
+        _raise_envelope(envelope)
+    return envelope
+
+
+class OperationExecutor:
+    """Thin request/envelope bridge onto one open session."""
+
+    def __init__(self, session: Any) -> None:
+        self._session = session
+
+    def execute(self, request: dict[str, Any]) -> list[dict[str, Any]]:
+        envelope = _require_ok(execute_operation(self._session, json.dumps(request)))
+        rows = envelope.get("rows") or []
+        return list(rows)
+
+    def execute_unit(self, request: dict[str, Any]) -> None:
+        _require_ok(execute_operation(self._session, json.dumps(request)))
+
+    def begin(self) -> None:
+        _require_ok(begin(self._session))
+
+    def commit(self) -> None:
+        _require_ok(commit(self._session))
+
+    def rollback(self) -> None:
+        _require_ok(rollback(self._session))
+
+    def close(self) -> None:
+        close_session(self._session)
+
+
+def open_executor(dsn: str, options: dict[str, Any] | None = None) -> OperationExecutor:
+    """Open the adapter `dsn` selects and wrap it in an executor."""
+    unknown = set(options or {}) - _KNOWN_OPTIONS
+    if unknown:
+        raise IrisError(
+            f"unknown client option(s): {', '.join(sorted(unknown))}",
+            code="IRIS-INVALID-ARGUMENT",
+        )
+    return OperationExecutor(open_session(dsn))
