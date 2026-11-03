@@ -2,9 +2,10 @@
 
 use std::collections::BTreeMap;
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, WriteField};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, StringMatchOp, WriteField};
 
 use crate::{
+    diagnostic::Diagnostic,
     error::{Error, Result},
     lower,
     value::{Row, Value, hex_to_bytes},
@@ -45,7 +46,13 @@ impl ReferenceStore {
                     rows = store.tables.get(table).cloned().ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
                 }
                 PhysicalOp::Filter { predicate } => {
-                    rows.retain(|row| eval_pred(predicate, row));
+                    let mut kept = Vec::with_capacity(rows.len());
+                    for row in rows {
+                        if eval_pred(predicate, &row)? {
+                            kept.push(row);
+                        }
+                    }
+                    rows = kept;
                 }
                 PhysicalOp::Project { fields } => {
                     rows = apply_projection(rows, fields);
@@ -80,7 +87,11 @@ impl ReferenceStore {
                     let table_rows = store.tables.get_mut(table).ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
                     let mut updated = Vec::new();
                     for row in table_rows.iter_mut() {
-                        if filter.as_ref().is_none_or(|pred| eval_pred(pred, row)) {
+                        let matched = match filter.as_ref() {
+                            Some(pred) => eval_pred(pred, row)?,
+                            None => true,
+                        };
+                        if matched {
                             apply_patch(row, fields);
                             updated.push(row.clone());
                         }
@@ -91,7 +102,13 @@ impl ReferenceStore {
                     let table_rows = store.tables.get_mut(table).ok_or_else(|| Error::Runtime(format!("unknown table `{table}`")))?;
                     let before = table_rows.len();
                     if let Some(pred) = filter {
-                        table_rows.retain(|row| !eval_pred(pred, row));
+                        let mut kept = Vec::with_capacity(table_rows.len());
+                        for row in table_rows.iter() {
+                            if !eval_pred(pred, row)? {
+                                kept.push(row.clone());
+                            }
+                        }
+                        *table_rows = kept;
                     }
                     else {
                         table_rows.clear();
@@ -138,19 +155,61 @@ impl ReferenceStore {
     }
 }
 
-fn eval_pred(pred: &Pred, row: &Row) -> bool {
+fn eval_pred(pred: &Pred, row: &Row) -> Result<bool> {
     match pred {
-        Pred::FieldBool { field, value } => match row.get(field) {
+        Pred::FieldBool { field, value } => Ok(match row.get(field) {
             Some(Value::Bool(b)) => b == value,
             _ => false,
-        },
+        }),
         Pred::FieldCmp { field, op, literal, kind } => {
             let left = row.get(field).cloned().unwrap_or(Value::Null);
             let right = decode_literal(literal, *kind);
-            cmp_values(&left, *op, &right)
+            Ok(cmp_values(&left, *op, &right))
         }
-        Pred::And(a, b) => eval_pred(a, row) && eval_pred(b, row),
-        Pred::Or(a, b) => eval_pred(a, row) || eval_pred(b, row),
+        Pred::StringMatch { field, op, needle } => eval_string_match(field, *op, needle, row),
+        Pred::And(a, b) => Ok(eval_pred(a, row)? && eval_pred(b, row)?),
+        Pred::Or(a, b) => Ok(eval_pred(a, row)? || eval_pred(b, row)?),
+    }
+}
+
+/// Case-sensitive UTF-8 substring semantics. A missing or null field never
+/// matches, and a non-text value is rejected instead of silently filtering
+/// the row out.
+fn eval_string_match(field: &str, op: StringMatchOp, needle: &str, row: &Row) -> Result<bool> {
+    let Some(value) = row.get(field)
+    else {
+        return Ok(false);
+    };
+    let Value::Str(text) = value
+    else {
+        if matches!(value, Value::Null) {
+            return Ok(false);
+        }
+        return Err(Error::diagnostic(Diagnostic::string_match_not_text(field, value_kind(value))));
+    };
+    Ok(match op {
+        StringMatchOp::Contains => text.contains(needle),
+        StringMatchOp::StartsWith => text.starts_with(needle),
+        StringMatchOp::EndsWith => text.ends_with(needle),
+    })
+}
+
+fn value_kind(value: &Value) -> &'static str {
+    match value {
+        Value::Null => "null",
+        Value::Bool(_) => "bool",
+        Value::Int(_) => "i64",
+        Value::UInt(_) => "u64",
+        Value::Float(_) => "f64",
+        Value::Str(_) => "utf8",
+        Value::Decimal(_) => "decimal",
+        Value::Date(_) => "date",
+        Value::Time(_) => "time",
+        Value::DateTime(_) => "datetime",
+        Value::Bytes(_) => "bytes",
+        Value::Vector(_) => "vector",
+        Value::File(_) => "file",
+        Value::Object(_) => "object",
     }
 }
 

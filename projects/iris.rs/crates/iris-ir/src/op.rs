@@ -19,6 +19,17 @@ pub enum CmpOp {
     Ge,
 }
 
+/// String containment relation for text-field predicates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StringMatchOp {
+    /// Needle occurs anywhere in the field text.
+    Contains,
+    /// Field text starts with the needle.
+    StartsWith,
+    /// Field text ends with the needle.
+    EndsWith,
+}
+
 /// Backend-neutral filter predicate (Phase 1 subset).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Pred {
@@ -39,6 +50,16 @@ pub enum Pred {
         literal: String,
         /// Literal kind tag.
         kind: LiteralKind,
+    },
+    /// `field` string-matches `needle` (case-sensitive UTF-8 substring
+    /// semantics; the empty needle matches every text row).
+    StringMatch {
+        /// Field name.
+        field: String,
+        /// Which containment relation to test.
+        op: StringMatchOp,
+        /// Needle as plain text (never a pattern: no wildcards, no escaping).
+        needle: String,
     },
     /// Conjunction.
     And(Box<Pred>, Box<Pred>),

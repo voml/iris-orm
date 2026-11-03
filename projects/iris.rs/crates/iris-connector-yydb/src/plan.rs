@@ -8,7 +8,7 @@
 
 use std::collections::BTreeMap;
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, StringMatchOp};
 use iris_types::{RowWrite, Value};
 
 use crate::{Error, Result};
@@ -160,6 +160,17 @@ fn render_pred(pred: &Pred, params: &mut BTreeMap<String, Value>, slot: &mut u32
             *slot += 1;
             params.insert(name.clone(), value);
             Ok(format!("x.{field} {} ${name}", cmp_text(*op)))
+        }
+        Pred::StringMatch { field, op, needle } => {
+            let name = format!("p{slot}");
+            *slot += 1;
+            params.insert(name.clone(), Value::Str(needle.clone()));
+            let method = match op {
+                StringMatchOp::Contains => "contains",
+                StringMatchOp::StartsWith => "starts_with",
+                StringMatchOp::EndsWith => "ends_with",
+            };
+            Ok(format!("x.{field}.{method}(${name})"))
         }
         Pred::And(left, right) => Ok(format!("({} && {})", render_pred(left, params, slot)?, render_pred(right, params, slot)?)),
         Pred::Or(left, right) => Ok(format!("({} || {})", render_pred(left, params, slot)?, render_pred(right, params, slot)?)),

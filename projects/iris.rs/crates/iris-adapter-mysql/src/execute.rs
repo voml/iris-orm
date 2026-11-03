@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, StringMatchOp, WriteField};
 use iris_types::{Row, RowWrite, Value};
 use mysql::{Params, PooledConn, Value as MysqlValue, prelude::*};
 
@@ -301,6 +301,14 @@ fn pred_to_sql(pred: &Pred, table: &str, uuid_fields: &HashSet<(String, String)>
                 CmpOp::Ge => ">=",
             };
             Ok((format!("`{field}` {op_sql} ?"), vec![literal_to_mysql(literal, *kind, table, field, uuid_fields)?]))
+        }
+        Pred::StringMatch { field, op, needle } => {
+            let param = MysqlValue::Bytes(needle.as_bytes().to_vec());
+            match op {
+                StringMatchOp::Contains => Ok((format!("INSTR(CAST(`{field}` AS BINARY), ?) > 0"), vec![param])),
+                StringMatchOp::StartsWith => Ok((format!("LEFT(CAST(`{field}` AS BINARY), CHAR_LENGTH(?)) = ?"), vec![param.clone(), param])),
+                StringMatchOp::EndsWith => Ok((format!("RIGHT(CAST(`{field}` AS BINARY), CHAR_LENGTH(?)) = ?"), vec![param.clone(), param])),
+            }
         }
         Pred::And(a, b) => {
             let (sa, mut pa) = pred_to_sql(a, table, uuid_fields)?;

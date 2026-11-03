@@ -1,6 +1,6 @@
 //! Physical plan execution and row writes (private PostgreSQL SQL).
 
-use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
+use iris_ir::{CmpOp, LiteralKind, PhysicalOp, PhysicalPlan, Pred, ProjectField, StringMatchOp, WriteField};
 use iris_types::{Row, RowWrite, Value, hex_to_bytes};
 use postgres::{
     Client, GenericClient,
@@ -306,6 +306,18 @@ fn pred_to_sql(pred: &Pred, start: usize) -> Result<(String, Vec<OwnedSql>, usiz
                 CmpOp::Ge => ">=",
             };
             Ok((format!("\"{field}\" {op_sql} ${start}"), vec![literal_to_owned(literal, *kind)], start + 1))
+        }
+        Pred::StringMatch { field, op, needle } => {
+            let param = OwnedSql::Text(needle.clone());
+            match op {
+                StringMatchOp::Contains => Ok((format!("strpos(\"{field}\", ${start}) > 0"), vec![param], start + 1)),
+                StringMatchOp::StartsWith => {
+                    Ok((format!("left(\"{field}\", char_length(${start})) = ${}", start + 1), vec![param.clone(), param], start + 2))
+                }
+                StringMatchOp::EndsWith => {
+                    Ok((format!("right(\"{field}\", char_length(${start})) = ${}", start + 1), vec![param.clone(), param], start + 2))
+                }
+            }
         }
         Pred::And(a, b) => {
             let (sa, mut pa, n1) = pred_to_sql(a, start)?;

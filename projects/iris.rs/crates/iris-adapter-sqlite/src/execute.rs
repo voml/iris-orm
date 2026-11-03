@@ -1,6 +1,6 @@
 //! Physical plan execution and row writes (private SQL only).
 
-use iris_ir::{CmpOp, PhysicalOp, PhysicalPlan, Pred, ProjectField, WriteField};
+use iris_ir::{CmpOp, PhysicalOp, PhysicalPlan, Pred, ProjectField, StringMatchOp, WriteField};
 use iris_types::{Row, RowWrite, TypedColumn, TypedLogicalPlan, Value};
 
 use crate::{
@@ -256,6 +256,17 @@ fn pred_to_sql(pred: &Pred) -> Result<(String, Vec<SqliteValue>)> {
                 CmpOp::Ge => ">=",
             };
             Ok((format!("\"{field}\" {op_sql} ?"), vec![literal_to_sql_value(literal, *kind)?]))
+        }
+        Pred::StringMatch { field, op, needle } => {
+            let param = SqliteValue::Text(needle.as_bytes().to_vec());
+            match op {
+                StringMatchOp::Contains => Ok((format!("instr(\"{field}\", ?) > 0"), vec![param])),
+                StringMatchOp::StartsWith => Ok((format!("substr(\"{field}\", 1, length(?)) = ?"), vec![param.clone(), param])),
+                StringMatchOp::EndsWith => Ok((
+                    format!("length(\"{field}\") >= length(?) AND substr(\"{field}\", length(\"{field}\") - length(?) + 1) = ?"),
+                    vec![param.clone(), param.clone(), param],
+                )),
+            }
         }
         Pred::And(a, b) => {
             let (sa, mut pa) = pred_to_sql(a)?;

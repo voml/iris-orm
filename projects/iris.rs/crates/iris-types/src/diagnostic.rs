@@ -48,4 +48,17 @@ impl Diagnostic {
     pub fn from_vos_parse(message: impl Into<String>) -> Self {
         Self { code: "IRIS-PARSE".into(), message: message.into(), span: (0..0).into(), stage: StageKind::Parse, backend: None, hint: None }
     }
+
+    /// Build a rejection for a string-matching predicate applied to a non-text value.
+    pub fn string_match_not_text(field: impl Into<String>, actual: &str) -> Self {
+        let field = field.into();
+        Self {
+            code: "IRIS-STRING-MATCH-NOT-TEXT".into(),
+            message: format!("field `{field}` holds `{actual}`, which has no string-matching semantics"),
+            span: (0..0).into(),
+            stage: StageKind::Execute,
+            backend: None,
+            hint: Some("`contains`, `starts_with` and `ends_with` apply to `utf8` / `utf16` fields only".into()),
+        }
+    }
 }
