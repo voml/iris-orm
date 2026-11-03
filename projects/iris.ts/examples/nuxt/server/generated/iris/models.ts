@@ -1,4 +1,4 @@
-import type { UserId, UserReference, PostId, PostReference } from "./references.js";
+import type { PostId, PostReference, UserId, UserReference } from "./references.js";
 export interface User {
     userId: UserId;
     userName: string;

@@ -79,8 +79,8 @@ test("declared `vector` and `file` operations generate native carriers in `opera
             `${name} must call through its documented op id`,
         );
     }
-    assert.match(operations, /synthesizeOperationCall\("search", \[embedding\]\)/);
-    assert.match(operations, /synthesizeOperationCall\("download", \[doc\]\)/);
+    assert.match(operations, /synthesizeOperationCall\("search", \[embedding\], \[false\]\)/);
+    assert.match(operations, /synthesizeOperationCall\("download", \[doc\], \[false\]\)/);
 
     // Table fields keep their scalar carriers; operations never leak into them.
     const metadata = await readFile(join(root, "metadata.ts"), "utf8");

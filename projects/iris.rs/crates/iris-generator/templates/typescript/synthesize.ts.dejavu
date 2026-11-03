@@ -78,6 +78,11 @@ function referenceTargetEntity(entity: string, tsField: string): string | undefi
     return SYNTHESIZE_REF_TARGETS[entity]?.[tsField];
 }
 
+/** Whether the entity field is a declared `&T` reference (only those may flatten write inputs). */
+function isReferenceField(entity: string, tsField: string): boolean {
+    return referenceTargetEntity(entity, tsField) !== undefined;
+}
+
 function nextParam(parameters: VosParameters, hint: string, value: unknown): string {
     const base = hint.replace(/[^a-zA-Z0-9_]/g, "_");
     let name = base;
@@ -312,8 +317,16 @@ export function synthesizeFindUnique(entity: string, args: FindUniqueArgs): VosS
     return { source: pipeline, parameters };
 }
 
-/** Flatten `&T` write inputs (branded id | { pk } | Reference) to a scalar bind value. */
-export function flattenRefInput(value: unknown): unknown {
+/**
+ * Flatten `&T` write inputs (branded id | { pk } | Reference) to a scalar bind
+ * value. Only declared reference positions may flatten: any other object
+ * carrier — a `file` descriptor above all — must pass through untouched,
+ * since flattening would reduce it to its first member.
+ */
+export function flattenRefInput(value: unknown, allow: boolean): unknown {
+    if (!allow) {
+        return value;
+    }
     if (isPlainObject(value)) {
         for (const [key, nested] of Object.entries(value)) {
             if (key.startsWith("__")) {
@@ -352,7 +365,7 @@ function compilePatchAssignments(
         }
         const wireKey = wireName(entity, key);
         if (isPlainObject(value) && "set" in value) {
-            const param = nextParam(parameters, `patch_${wireKey}`, flattenRefInput(value.set));
+            const param = nextParam(parameters, `patch_${wireKey}`, flattenRefInput(value.set, isReferenceField(entity, key)));
             assignments.push(`${wireKey}: $${param}`);
         } else if (isPlainObject(value) && "setNull" in value && value.setNull === true) {
             assignments.push(`${wireKey}: null`);
@@ -392,7 +405,7 @@ export function synthesizeCreate(entity: string, args: CreateArgs): VosSynthesis
             continue;
         }
         const wireKey = wireName(entity, key);
-        const param = nextParam(parameters, `data_${wireKey}`, flattenRefInput(value));
+        const param = nextParam(parameters, `data_${wireKey}`, flattenRefInput(value, isReferenceField(entity, key)));
         fields.push(`${wireKey}: $${param}`);
     }
     let source = `${entity}::insert({ ${fields.join(", ")} })`;
@@ -404,10 +417,10 @@ export function synthesizeCreate(entity: string, args: CreateArgs): VosSynthesis
 }
 
 /** Synthesize a declared operation invocation `name($arg0, $arg1, ...)` with positional binds. */
-export function synthesizeOperationCall(name: string, args: readonly unknown[]): VosSynthesis {
+export function synthesizeOperationCall(name: string, args: readonly unknown[], refFlags?: readonly boolean[]): VosSynthesis {
     const parameters: VosParameters = {};
     const placeholders = args.map((value, index) => {
-        const param = nextParam(parameters, `arg${index}`, flattenRefInput(value));
+        const param = nextParam(parameters, `arg${index}`, flattenRefInput(value, refFlags?.[index] ?? false));
         return `$${param}`;
     });
     return {

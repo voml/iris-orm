@@ -46,6 +46,9 @@ struct TsMacroView {
     params: Vec<TsMacroParamView>,
     param_signature: String,
     param_names: String,
+    /// Per-parameter flag (`true` = declared `&T` reference) for the
+    /// `synthesizeOperationCall` flatten allow-list.
+    ref_flags: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -200,6 +203,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
             params.iter().map(|param| format!("{}: {}", param.name, param.ts_type)).collect::<Vec<_>>().join(", ")
         };
         let param_names = params.iter().map(|param| param.name.clone()).collect::<Vec<_>>().join(", ");
+        let ref_flags = operation.params.iter().map(|param| param.vos_type.starts_with('&').to_string()).collect::<Vec<_>>().join(", ");
         macros_view.push(TsMacroView {
             name: operation.name.clone(),
             operation_id: operation.operation_id.clone(),
@@ -208,6 +212,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
             params,
             param_signature,
             param_names,
+            ref_flags,
         });
     }
 
@@ -392,8 +397,8 @@ fn primary_key_field(table: &TableModel) -> Option<&FieldModel> {
     table.fields.iter().find(|f| f.primary).or(table.fields.first())
 }
 
-fn reference_targets(model: &GenerationModel) -> HashSet<String> {
-    let mut targets = HashSet::new();
+fn reference_targets(model: &GenerationModel) -> std::collections::BTreeSet<String> {
+    let mut targets = std::collections::BTreeSet::new();
     for table in &model.tables {
         targets.insert(table.name.clone());
         for field in &table.fields {

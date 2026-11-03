@@ -98,7 +98,7 @@ pub struct ExecuteResult {
 /// Iris session bound to a reference or foreign adapter.
 #[napi]
 pub struct MemorySession {
-    store: SessionStore,
+    store: Option<SessionStore>,
     planner: Planner,
     closed: bool,
     session_ddl_revision: Option<u64>,
@@ -128,7 +128,10 @@ impl MemorySession {
     /// source through its own frontend so writes reach the write executor,
     /// while other adapters take text-only reads through the Iris planner.
     fn run_bound_query(&self, bound: &bind::BoundParameters) -> Result<ExecuteResult> {
-        if let SessionStore::Yydb(db) = &self.store {
+        let Some(store) = &self.store else {
+            return Err(Error::from_reason("session closed"));
+        };
+        if let SessionStore::Yydb(db) = store {
             self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
             return match db.run_with_params(&bound.source, &bound.value_parameters) {
                 Ok(rows) => Ok(ok_result(rows)),
@@ -136,7 +139,7 @@ impl MemorySession {
             };
         }
         let source = bound.text_only().map_err(Error::from_reason)?;
-        match self.store.query(&self.planner, source) {
+        match store.query(&self.planner, source) {
             Ok(rows) => Ok(ok_result(rows)),
             Err(err) => Ok(err_result(err)),
         }
@@ -144,7 +147,7 @@ impl MemorySession {
 
     fn new_store(store: SessionStore, session_ddl_revision: Option<u64>) -> Self {
         let planner = Planner::new(store.capabilities());
-        Self { store, planner, closed: false, session_ddl_revision }
+        Self { store: Some(store), planner, closed: false, session_ddl_revision }
     }
 
     fn ensure_yydb_session_fresh(&self, db: &YydbSource) -> std::result::Result<(), String> {
@@ -170,7 +173,7 @@ impl MemorySession {
 
     fn sqlite_source(&self) -> Result<&SqliteSource> {
         match &self.store {
-            SessionStore::Sqlite(db) => Ok(db),
+            Some(SessionStore::Sqlite(db)) => Ok(db),
             _ => Err(Error::from_reason("sqlite identity requires a sqlite session")),
         }
     }
@@ -233,7 +236,13 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let bound = self.bind_parameters(&source, parameters_json.as_deref())?;
+        // Bind failures are request-level rejections: they travel the same
+        // structured envelope as backend diagnostics instead of an untyped
+        // host exception.
+        let bound = match self.bind_parameters(&source, parameters_json.as_deref()) {
+            Ok(bound) => bound,
+            Err(err) => return Ok(err_result(err.to_string())),
+        };
         self.run_bound_query(&bound)
     }
 
@@ -243,8 +252,14 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let bound = self.bind_parameters(&source, parameters_json.as_deref())?;
-        if let SessionStore::Yydb(db) = &self.store {
+        let bound = match self.bind_parameters(&source, parameters_json.as_deref()) {
+            Ok(bound) => bound,
+            Err(err) => return Ok(err_result(err.to_string())),
+        };
+        let Some(store) = &self.store else {
+            return Err(Error::from_reason("session closed"));
+        };
+        if let SessionStore::Yydb(db) = store {
             self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
             return match db.execute_with_params(&bound.source, &bound.value_parameters) {
                 Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
@@ -252,7 +267,7 @@ impl MemorySession {
             };
         }
         let source = bound.text_only().map_err(Error::from_reason)?;
-        match self.store.execute_unit(&self.planner, source) {
+        match store.execute_unit(&self.planner, source) {
             Ok(()) => Ok(ExecuteResult { ok: true, rows_json: "[]".into(), error: None }),
             Err(err) => Ok(err_result(err)),
         }
@@ -270,7 +285,10 @@ impl MemorySession {
         if self.closed {
             return Err(Error::from_reason("session closed"));
         }
-        let bound = operation::encode_request_json(&request_json).map_err(|err| Error::from_reason(err))?;
+        let bound = match operation::encode_request_json(&request_json) {
+            Ok(bound) => bound,
+            Err(err) => return Ok(err_result(err)),
+        };
         self.run_bound_query(&bound)
     }
 
@@ -281,11 +299,11 @@ impl MemorySession {
             return Err(Error::from_reason("session closed"));
         }
         match &self.store {
-            SessionStore::Yydb(db) => {
+            Some(SessionStore::Yydb(db)) => {
                 db.ensure_schema(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
-            SessionStore::Sqlite(db) => {
+            Some(SessionStore::Sqlite(db)) => {
                 db.managed_push(&schema).map_err(|err| Error::from_reason(err.to_string()))?;
                 Ok(())
             }
@@ -311,8 +329,14 @@ impl MemorySession {
         self.sqlite_source()?.sqlite_source_id().map_err(|err| Error::from_reason(err.to_string()))
     }
 
+    /// Close the session, releasing the bound datasource.
+    ///
+    /// Dropping the store is what frees a file-backed datasource's writer
+    /// lock, so `close` must do more than flip a flag: after it returns the
+    /// same database file can be opened again from this process.
     #[napi]
     pub fn close(&mut self) {
         self.closed = true;
+        drop(self.store.take());
     }
 }

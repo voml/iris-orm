@@ -1131,13 +1131,16 @@ pub(crate) fn emit_ts_operation_stubs(model: &GenerationModel) -> Result<String>
         };
         let param_sig = op.params.iter().map(|p| format!("{}: {}", p.name, p.ts_type)).collect::<Vec<_>>().join(", ");
         let param_values = op.params.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", ");
+        // Only declared `&T` reference parameters may flatten `{ pk }` /
+        // Reference write inputs; every other carrier passes through untouched.
+        let ref_flags = op.params.iter().map(|p| p.vos_type.starts_with('&').to_string()).collect::<Vec<_>>().join(", ");
         let use_execute = ts_ret == "void";
         let kind_label = operation_kind_ts_label(op.kind.as_str())
             .ok_or_else(|| Error::UnsupportedOperationKind { operation: op.name.clone(), kind: op.kind.clone() })?;
         out.push_str(&format!(
             "    /** VOS {kind} operation `{name}` (op_id: {op_id}). */\n\
              async {name}({param_sig}): Promise<{ts_ret}> {{\n\
-             {indent}const synthesis = synthesizeOperationCall(\"{name}\", [{param_values}]);\n\
+             {indent}const synthesis = synthesizeOperationCall(\"{name}\", [{param_values}], [{ref_flags}]);\n\
              {indent}const envelope = await this.executor.{exec_fn}(buildDeclaredOperationRequest(\"{op_id}\", synthesis));\n",
             kind = kind_label,
             name = op.name,

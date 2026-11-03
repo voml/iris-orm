@@ -23,6 +23,7 @@ const GET_USER: &str = "op_a1b2c3d4e5f6a7b8";
 const HASH_PASSWORD: &str = "op_b1b2c3d4e5f6a7b8";
 const SEED_USER: &str = "op_c1b2c3d4e5f6a7b8";
 const LABEL_USER: &str = "op_d1b2c3d4e5f6a7b8";
+const TOUCH_USER: &str = "op_e1b2c3d4e5f6a7b8";
 
 fn contract_json() -> String {
     let projection = parse_oak(USER_SCHEMA).unwrap().project_schema().unwrap();
@@ -65,6 +66,7 @@ fn artifact() -> String {
         operation("udf", "hash_password", HASH_PASSWORD, vec![param("raw", "utf8")], json!({ "named": ["utf8"] })),
         operation("macro", "seed_user", SEED_USER, vec![], Value::Null),
         operation("macro", "label_user", LABEL_USER, vec![param("id", "uuid"), param("prefix", "utf8")], Value::Null),
+        operation("macro", "touch_user", TOUCH_USER, vec![json!({ "name": "target", "typeExpr": { "reference": { "named": ["User"] } }, "span": { "start": 0, "end": 1 } })], Value::Null),
     ];
     json!({
         "envelope": {
@@ -114,7 +116,7 @@ fn generated_calls_carry_the_declared_operation_identity() {
     let mut identities = request_identity_literals(ops);
     identities.sort();
     identities.dedup();
-    let declared = [GET_USER, HASH_PASSWORD, SEED_USER, LABEL_USER];
+    let declared = [GET_USER, HASH_PASSWORD, SEED_USER, LABEL_USER, TOUCH_USER];
     for operation_id in declared {
         assert!(identities.contains(&operation_id.to_owned()), "missing declared identity `{operation_id}`:\n{ops}");
     }
@@ -127,7 +129,7 @@ fn generated_calls_carry_the_declared_operation_identity() {
     expected.sort_unstable();
     assert_eq!(extra, expected, "undeclared identity class invented by the generator:\n{ops}");
 
-    for name in ["get_user", "hash_password", "seed_user", "label_user"] {
+    for name in ["get_user", "hash_password", "seed_user", "label_user", "touch_user"] {
         assert!(
             !ops.contains(&format!("buildDeclaredOperationRequest(\"{name}\"")),
             "generated `{name}` must not use the author name as identity:\n{ops}"
@@ -164,17 +166,24 @@ fn generated_calls_bind_parameters_positionally_in_declared_order() {
     let ops = typescript_file(&files, "operations.ts");
 
     for (call, expected) in [
-        ("get_user", "synthesizeOperationCall(\"get_user\", [id])"),
-        ("hash_password", "synthesizeOperationCall(\"hash_password\", [raw])"),
-        ("seed_user", "synthesizeOperationCall(\"seed_user\", [])"),
-        ("label_user", "synthesizeOperationCall(\"label_user\", [id, prefix])"),
+        ("get_user", "synthesizeOperationCall(\"get_user\", [id], [false])"),
+        ("hash_password", "synthesizeOperationCall(\"hash_password\", [raw], [false])"),
+        ("seed_user", "synthesizeOperationCall(\"seed_user\", [], [])"),
+        ("label_user", "synthesizeOperationCall(\"label_user\", [id, prefix], [false, false])"),
     ] {
         assert!(ops.contains(expected), "generated `{call}` must bind declared parameter order `{expected}`:\n{ops}");
     }
 
+    // Only declared `&T` reference parameters may flatten write inputs: the
+    // `touch_user(target: &User)` delegate must flag exactly that position.
+    assert!(
+        ops.contains("synthesizeOperationCall(\"touch_user\", [target], [true])"),
+        "the reference parameter must be the one flattenable position:\n{ops}"
+    );
+
     // Macro delegates exist twice (`$macros` and `GeneratedOperations`). Both must
     // synthesize the same call, otherwise the two delegates diverge on plan input.
-    for call in ["synthesizeOperationCall(\"seed_user\", [])", "synthesizeOperationCall(\"label_user\", [id, prefix])"] {
+    for call in ["synthesizeOperationCall(\"seed_user\", [], [])", "synthesizeOperationCall(\"label_user\", [id, prefix], [false, false])"] {
         assert_eq!(ops.matches(call).count(), 2, "every macro delegate must share `{call}`:\n{ops}");
     }
 }

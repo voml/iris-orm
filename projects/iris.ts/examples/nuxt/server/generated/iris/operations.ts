@@ -20,7 +20,7 @@ export class GeneratedMacros {
         this.executor = executor;
     }
     async seed_blog(): Promise<void> {
-        const synthesis = synthesizeOperationCall("seed_blog", []);
+        const synthesis = synthesizeOperationCall("seed_blog", [], []);
         const request = buildDeclaredOperationRequest("op_83d9146745765d0b7e4ffec3106540cec2437a2597e8a8faf1d044fb54dcb81e", synthesis);
         const envelope = await this.executor.executeUnit(request);
         if (!envelope.ok) {
@@ -211,7 +211,7 @@ export class GeneratedOperations {
     }
     /** VOS macro operation `seed_blog` (op_id: op_83d9146745765d0b7e4ffec3106540cec2437a2597e8a8faf1d044fb54dcb81e). */
 async seed_blog(): Promise<void> {
-        const synthesis = synthesizeOperationCall("seed_blog", []);
+        const synthesis = synthesizeOperationCall("seed_blog", [], []);
         const envelope = await this.executor.executeUnit(buildDeclaredOperationRequest("op_83d9146745765d0b7e4ffec3106540cec2437a2597e8a8faf1d044fb54dcb81e", synthesis));
         if (!envelope.ok) {
             throwOperationEnvelopeError(envelope);
