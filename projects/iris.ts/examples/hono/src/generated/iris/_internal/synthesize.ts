@@ -159,11 +159,11 @@ function compileLeafPredicate(
         }
         if ("startsWith" in value) {
             const param = nextParam(parameters, `${hint}_starts`, value.startsWith);
-            clauses.push(`${target}.starts_with($${param})`);
+            clauses.push(`${target}.startsWith($${param})`);
         }
         if ("endsWith" in value) {
             const param = nextParam(parameters, `${hint}_ends`, value.endsWith);
-            clauses.push(`${target}.ends_with($${param})`);
+            clauses.push(`${target}.endsWith($${param})`);
         }
         if ("isNull" in value && value.isNull === true) {
             clauses.push(`${target} == null`);

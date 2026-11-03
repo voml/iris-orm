@@ -119,14 +119,14 @@ fn planner_lowers_text_predicates_instead_of_rejecting_them() {
     let contains = store().interpret_source("Note.filter(x => x.title.contains(\"lph\")).collect()").expect("contains");
     assert_eq!(ids(&contains), vec![1]);
 
-    let prefix = store().interpret_source("Note.filter(x => x.title.starts_with(\"be\")).collect()").expect("prefix");
+    let prefix = store().interpret_source("Note.filter(x => x.title.startsWith(\"be\")).collect()").expect("prefix");
     assert_eq!(ids(&prefix), vec![2]);
 
-    let suffix = store().interpret_source("Note.filter(x => x.title.ends_with(\"ta\")).collect()").expect("suffix");
+    let suffix = store().interpret_source("Note.filter(x => x.title.endsWith(\"ta\")).collect()").expect("suffix");
     assert_eq!(ids(&suffix), vec![2]);
 
     let combined =
-        store().interpret_source("Note.filter(x => x.title.contains(\"a\") && x.title.starts_with(\"al\")).collect()").expect("combined");
+        store().interpret_source("Note.filter(x => x.title.contains(\"a\") && x.title.startsWith(\"al\")).collect()").expect("combined");
     assert_eq!(ids(&combined), vec![1]);
 }
 

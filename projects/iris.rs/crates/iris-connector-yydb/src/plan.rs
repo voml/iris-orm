@@ -165,10 +165,13 @@ fn render_pred(pred: &Pred, params: &mut BTreeMap<String, Value>, slot: &mut u32
             let name = format!("p{slot}");
             *slot += 1;
             params.insert(name.clone(), Value::Str(needle.clone()));
+            // The rendered program is YYDB's own VOS surface, which spells
+            // text methods in camelCase; Iris's IR-side spelling stays
+            // snake_case and is translated only here.
             let method = match op {
                 StringMatchOp::Contains => "contains",
-                StringMatchOp::StartsWith => "starts_with",
-                StringMatchOp::EndsWith => "ends_with",
+                StringMatchOp::StartsWith => "startsWith",
+                StringMatchOp::EndsWith => "endsWith",
             };
             Ok(format!("x.{field}.{method}(${name})"))
         }

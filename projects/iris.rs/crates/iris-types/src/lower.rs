@@ -403,13 +403,13 @@ fn lower_pred_body(expr: &Expr) -> Result<Pred> {
             };
             let op = match name.as_str() {
                 "contains" => StringMatchOp::Contains,
-                "starts_with" => StringMatchOp::StartsWith,
-                "ends_with" => StringMatchOp::EndsWith,
+                "startsWith" => StringMatchOp::StartsWith,
+                "endsWith" => StringMatchOp::EndsWith,
                 _ => {
                     return Err(Error::diagnostic(Diagnostic::plan_rejected(
                         format!("`{name}` is not a supported filter predicate"),
                         *span,
-                        Some("supported text predicates are `contains`, `starts_with` and `ends_with`".into()),
+                        Some("supported text predicates are `contains`, `startsWith` and `endsWith`".into()),
                     )));
                 }
             };
