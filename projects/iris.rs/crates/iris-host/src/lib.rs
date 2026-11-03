@@ -73,6 +73,8 @@ pub const DIAG_TRANSACTION_ALREADY_OPEN: &str = "IRIS-TRANSACTION-ALREADY-OPEN";
 pub const DIAG_TRANSACTION_NOT_OPEN: &str = "IRIS-TRANSACTION-NOT-OPEN";
 /// Diagnostic only: managed push is not available on this profile.
 pub const DIAG_MANAGED_PUSH_UNSUPPORTED: &str = "IRIS-MANAGED-PUSH-UNSUPPORTED";
+/// Diagnostic only: the selected backend cannot represent a schema capability.
+pub const DIAG_SCHEMA_VECTOR_UNSUPPORTED: &str = "IRIS-SCHEMA-VECTOR-UNSUPPORTED";
 
 /// Structured failure shared by every host binding.
 ///
@@ -341,6 +343,63 @@ fn lock_failed() -> ErrorEnvelope {
     ErrorEnvelope::internal(DIAG_EXEC_FAILED, "session transaction lock is poisoned")
 }
 
+/// Reject a schema the selected SQL backend cannot represent.
+///
+/// Vector search is a yydb capability in `/v0`, so building a MySQL or
+/// PostgreSQL client from a schema that declares `vector` fields fails here,
+/// before any call, instead of surfacing later as an argument error.
+fn reject_unsupported_schema(profile: &str, schema: Option<&str>) -> Result<(), ErrorEnvelope> {
+    let Some(schema) = schema
+    else {
+        return Ok(());
+    };
+    if schema.trim().is_empty() || !schema_declares_vector(schema)? {
+        return Ok(());
+    }
+    Err(ErrorEnvelope::new(
+        CODE_SCHEMA_MISMATCH,
+        format!("{profile} cannot represent the `vector` fields of this schema: vector search is only available on yydb profiles"),
+    )
+    .with_diagnostic(DIAG_SCHEMA_VECTOR_UNSUPPORTED))
+}
+
+fn schema_declares_vector(schema: &str) -> Result<bool, ErrorEnvelope> {
+    use vos::syntax::VosDeclarationKind;
+    let input = vos::parse_oak(schema)
+        .map_err(|message| ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, message).with_diagnostic(DIAG_SCHEMA_VECTOR_UNSUPPORTED))?;
+    let root = input.into_oak();
+    let declarations = root
+        .declarations
+        .iter()
+        .filter(|declaration| matches!(declaration.kind, VosDeclarationKind::Namespace | VosDeclarationKind::Table | VosDeclarationKind::Class))
+        .cloned()
+        .collect();
+    let projection = vos::ContractInput::from_oak(vos::syntax::VosRoot { source: root.source, syntax: root.syntax, declarations })
+        .project_schema()
+        .map_err(|diagnostics| {
+            let reason =
+                diagnostics.iter().map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message)).collect::<Vec<_>>().join("\n");
+            ErrorEnvelope::new(CODE_SCHEMA_MISMATCH, reason).with_diagnostic(DIAG_SCHEMA_VECTOR_UNSUPPORTED)
+        })?;
+    Ok(projection.types.iter().flat_map(|item| item.fields.iter()).any(|field| type_declares_vector(&field.canonical_type)))
+}
+
+fn type_declares_vector(ty: &vos::CanonicalType) -> bool {
+    match ty {
+        vos::CanonicalType::Named(path) => path.last().is_some_and(|name| name == "vector"),
+        vos::CanonicalType::Reference(inner) | vos::CanonicalType::Optional(inner) | vos::CanonicalType::List(inner) => {
+            type_declares_vector(inner)
+        }
+        vos::CanonicalType::Generic { path, arguments } => {
+            path.last().is_some_and(|name| name == "vector")
+                || arguments.iter().any(|argument| match argument {
+                    vos::CanonicalTypeArgument::Type(inner) => type_declares_vector(inner),
+                    vos::CanonicalTypeArgument::Literal(_) => false,
+                })
+        }
+    }
+}
+
 enum SessionStore {
     Memory(Iris),
     Yydb(YydbSource),
@@ -571,7 +630,9 @@ impl HostSession {
     /// This is the single DSN parser: generated clients pass their DSN here
     /// and the adapter never leaks into an authoring signature. Managed
     /// adapters (`sqlite:` and `file:`) apply `schema` when it is supplied,
-    /// foreign servers get their DDL from migrations instead.
+    /// foreign servers get their DDL from migrations instead. SQL backends
+    /// also reject a schema that declares `vector` fields while the client is
+    /// built, because vector search is a yydb capability in `/v0`.
     pub fn open_dsn(dsn: &str, schema: Option<&str>) -> Result<Self, ErrorEnvelope> {
         let text = dsn.trim();
         if text.is_empty() {
@@ -590,9 +651,11 @@ impl HostSession {
             (Self::open_yydb(path)?, true)
         }
         else if text.starts_with("mysql://") {
+            reject_unsupported_schema("MySQL", schema)?;
             (Self::open_mysql(text)?, false)
         }
         else if text.starts_with("postgres://") || text.starts_with("postgresql://") {
+            reject_unsupported_schema("PostgreSQL", schema)?;
             (Self::open_postgres(text)?, false)
         }
         else {
@@ -833,6 +896,36 @@ table User {
         for code in AUTHOR_CODES {
             assert_eq!(ErrorEnvelope::new(*code, "probe").code, *code);
         }
+    }
+
+    const VECTOR_SCHEMA: &str = r#"
+table Doc {
+    @@doc_id: utf8,
+    embedding: vector<3>,
+}
+"#;
+
+    #[test]
+    fn sql_backends_reject_vector_schemas_when_the_client_is_built() {
+        for (label, dsn) in [("mysql", "mysql://iris@127.0.0.1:1"), ("postgres", "postgres://iris:@127.0.0.1:1/yyds")] {
+            let err = match HostSession::open_dsn(dsn, Some(VECTOR_SCHEMA)) {
+                Ok(_) => panic!("{label} accepted a schema that declares `vector`"),
+                Err(err) => err,
+            };
+            assert_eq!(err.code, CODE_SCHEMA_MISMATCH, "{label}: {err:?}");
+            assert_eq!(err.kind, "schema_mismatch", "{label}: {err:?}");
+            assert_eq!(err.diagnostic_code.as_deref(), Some(DIAG_SCHEMA_VECTOR_UNSUPPORTED), "{label}: {err:?}");
+            assert!(!AUTHOR_CODES.contains(&DIAG_SCHEMA_VECTOR_UNSUPPORTED), "the diagnostic stays out of the author code table");
+        }
+    }
+
+    #[test]
+    fn sql_backends_only_reject_schemas_that_declare_vector() {
+        assert!(!schema_declares_vector(USER_SCHEMA).expect("project user schema"));
+        assert!(schema_declares_vector(VECTOR_SCHEMA).expect("project vector schema"));
+        assert!(!schema_declares_vector("").expect("empty schema"));
+        assert!(reject_unsupported_schema("MySQL", Some(USER_SCHEMA)).is_ok());
+        assert!(reject_unsupported_schema("MySQL", None).is_ok());
     }
 
     #[test]
