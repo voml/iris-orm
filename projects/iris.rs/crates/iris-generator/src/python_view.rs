@@ -14,10 +14,15 @@ use crate::{FieldModel, GenerationModel, Result, TableModel, carrier, ts_view};
 #[derive(Debug, Clone, Serialize)]
 struct PyTableView {
     name: String,
+    /// Lowercase entity key of `client.tables.<accessor>`.
+    accessor: String,
     /// Union of `vector` field names for the `find_near` `field` argument.
     vector_field_union: String,
     has_vector: bool,
+    /// Row-model attribute annotations, in field order.
     model_fields: String,
+    /// Row-model `__init__` body: copy the fields the row actually carries.
+    model_assignments: String,
     where_fields: String,
     select_fields: String,
     create_fields: String,
@@ -128,6 +133,7 @@ fn build_py_context(model: &GenerationModel) -> Result<PyTemplateContext> {
 
 fn build_table_view(table: &TableModel) -> Result<PyTableView> {
     let mut model_fields = Vec::with_capacity(table.fields.len());
+    let mut model_assignments = Vec::with_capacity(table.fields.len());
     let mut where_fields = Vec::new();
     let mut select_fields = Vec::with_capacity(table.fields.len());
     let mut create_fields = Vec::with_capacity(table.fields.len());
@@ -137,7 +143,13 @@ fn build_table_view(table: &TableModel) -> Result<PyTableView> {
     for field in &table.fields {
         let base = carrier::base_vos_type(&field.vos_type);
         let value_type = python_value_type(field)?;
-        model_fields.push(format!("    {}: NotRequired[{}]", field.name, value_type));
+        model_fields.push(format!("    {}: {}", field.name, value_type));
+        model_assignments.push(format!(
+            "        if {} in row:\n            self.{} = row[{}]",
+            py_string(&field.name),
+            field.name,
+            py_string(&field.name)
+        ));
 
         if let Some(target) = field.reference_target.as_ref() {
             where_fields.push(format!("    {}: NotRequired[{}WhereInput]", field.name, target));
@@ -183,9 +195,11 @@ fn build_table_view(table: &TableModel) -> Result<PyTableView> {
 
     Ok(PyTableView {
         name: table.name.clone(),
+        accessor: table.name.to_ascii_lowercase(),
         vector_field_union: vector_names.iter().map(|name| format!("\"{name}\"")).collect::<Vec<_>>().join(" | "),
         has_vector: !vector_names.is_empty(),
         model_fields: model_fields.join("\n"),
+        model_assignments: model_assignments.join("\n"),
         where_fields: where_fields.join("\n"),
         select_fields: select_fields.join("\n"),
         create_fields: create_fields.join("\n"),

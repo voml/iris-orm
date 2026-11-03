@@ -23,6 +23,7 @@ import iris_pyo3  # noqa: E402
 from generated.docs import IrisError as DocsIrisError  # noqa: E402
 from generated.docs import create_client as create_docs_client  # noqa: E402
 from generated.iris import IrisError, create_client  # noqa: E402
+from generated.iris.models import User  # noqa: E402
 
 
 def native_extension_path() -> Path:
@@ -52,34 +53,35 @@ class GeneratedCrudTest(unittest.TestCase):
         self.db = create_client("sqlite::memory:")
 
     def test_create_read_update_delete(self) -> None:
-        created = self.db.tables.User.create(
+        created = self.db.tables.user.create(
             data={"user_id": "u1", "user_name": "alice", "active": True}
         )
-        self.assertEqual("alice", created["user_name"])
+        self.assertIsInstance(created, User)
+        self.assertEqual("alice", created.user_name)
 
-        self.assertEqual(["u1"], [row["user_id"] for row in self.db.tables.User.find_many()])
+        self.assertEqual(["u1"], [row.user_id for row in self.db.tables.user.find_many()])
         self.assertEqual(
             "alice",
-            self.db.tables.User.find_unique(where={"user_id": "u1"})["user_name"],
+            self.db.tables.user.find_unique(where={"user_id": "u1"}).user_name,
         )
         self.assertEqual(
             "alice",
-            self.db.tables.User.find_first(where={"user_name": {"contains": "lic"}})["user_name"],
+            self.db.tables.user.find_first(where={"user_name": {"contains": "lic"}}).user_name,
         )
 
-        updated = self.db.tables.User.update(
+        updated = self.db.tables.user.update(
             where={"user_id": "u1"},
             data={"user_name": {"set": "grace"}},
         )
-        self.assertEqual("grace", updated["user_name"])
+        self.assertEqual("grace", updated.user_name)
 
-        self.db.tables.User.delete(where={"user_id": "u1"})
-        self.assertEqual([], self.db.tables.User.find_many())
-        self.assertIsNone(self.db.tables.User.find_unique(where={"user_id": "missing"}))
+        self.db.tables.user.delete(where={"user_id": "u1"})
+        self.assertEqual([], self.db.tables.user.find_many())
+        self.assertIsNone(self.db.tables.user.find_unique(where={"user_id": "missing"}))
 
     def test_update_and_delete_missing_row_are_not_found(self) -> None:
         with self.assertRaises(IrisError) as caught:
-            self.db.tables.User.update(
+            self.db.tables.user.update(
                 where={"user_id": "missing"},
                 data={"user_name": {"set": "nobody"}},
             )
@@ -87,37 +89,37 @@ class GeneratedCrudTest(unittest.TestCase):
         self.assertEqual("not_found", caught.exception.kind)
 
         with self.assertRaises(IrisError) as caught:
-            self.db.tables.User.delete(where={"user_id": "missing"})
+            self.db.tables.user.delete(where={"user_id": "missing"})
         self.assertEqual("IRIS-NOT-FOUND", caught.exception.code)
         self.assertEqual("not_found", caught.exception.kind)
 
     def test_transaction_commits_and_rolls_back(self) -> None:
         with self.db.transaction() as tx:
-            tx.tables.User.create(data={"user_id": "u1", "user_name": "alice", "active": True})
-        self.assertEqual(1, len(self.db.tables.User.find_many()))
+            tx.tables.user.create(data={"user_id": "u1", "user_name": "alice", "active": True})
+        self.assertEqual(1, len(self.db.tables.user.find_many()))
 
         with self.assertRaises(RuntimeError):
             with self.db.transaction() as tx:
-                tx.tables.User.create(data={"user_id": "u2", "user_name": "bob", "active": False})
+                tx.tables.user.create(data={"user_id": "u2", "user_name": "bob", "active": False})
                 raise RuntimeError("rollback")
-        self.assertEqual(["u1"], [row["user_id"] for row in self.db.tables.User.find_many()])
+        self.assertEqual(["u1"], [row.user_id for row in self.db.tables.user.find_many()])
 
 
 class GeneratedVectorTest(unittest.TestCase):
     def test_find_near_ranks_scanned_rows(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             db = create_docs_client(f"file:{Path(directory) / 'docs.yydb'}")
-            db.tables.Doc.create(data={"doc_id": 1, "label": "east", "embedding": [1.0, 0.0, 0.0]})
-            db.tables.Doc.create(data={"doc_id": 2, "label": "north", "embedding": [0.0, 1.0, 0.0]})
+            db.tables.doc.create(data={"doc_id": 1, "label": "east", "embedding": [1.0, 0.0, 0.0]})
+            db.tables.doc.create(data={"doc_id": 2, "label": "north", "embedding": [0.0, 1.0, 0.0]})
 
-            rows = db.tables.Doc.find_near(
+            rows = db.tables.doc.find_near(
                 field="embedding",
                 vector=[1.0, 0.0, 0.0],
                 metric="cosine",
                 threshold=0.5,
                 take=1,
             )
-            self.assertEqual(["east"], [row["label"] for row in rows])
+            self.assertEqual(["east"], [row.label for row in rows])
 
 
 class GeneratedErrorTest(unittest.TestCase):
@@ -134,7 +136,7 @@ class GeneratedAuthorCodeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             db = create_docs_client(f"file:{Path(directory) / 'docs.yydb'}")
             with self.assertRaises(DocsIrisError) as caught:
-                db.tables.Doc.find_near(
+                db.tables.doc.find_near(
                     field="embedding",
                     vector=[1.0, 0.0],
                     metric="cosine",
@@ -146,13 +148,13 @@ class GeneratedAuthorCodeTest(unittest.TestCase):
     def test_unknown_filter_field_is_a_call_shape_error(self) -> None:
         db = create_client("sqlite::memory:")
         with self.assertRaises(IrisError) as caught:
-            db.tables.User.find_many(where={"not_a_field": "x"})
+            db.tables.user.find_many(where={"not_a_field": "x"})
         self.assertEqual("IRIS-INVALID-ARGUMENT", caught.exception.code)
         self.assertEqual("IRIS-FILTER-FIELD-UNKNOWN", caught.exception.diagnostic_code)
 
     def test_unsupported_filter_operator_is_a_call_shape_error(self) -> None:
         db = create_client("sqlite::memory:")
         with self.assertRaises(IrisError) as caught:
-            db.tables.User.find_many(where={"active": {"gt": True}})
+            db.tables.user.find_many(where={"active": {"gt": True}})
         self.assertEqual("IRIS-INVALID-ARGUMENT", caught.exception.code)
         self.assertEqual("IRIS-FILTER-OPERATOR-NOT-SUPPORTED", caught.exception.diagnostic_code)

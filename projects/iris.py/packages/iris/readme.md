@@ -20,9 +20,9 @@ the project's VOS schema:
 from generated.iris import IrisError, create_client
 
 db = create_client("sqlite:./app.sqlite")
-db.tables.User.find_many(where={"user_name": {"contains": "ali"}})
+db.tables.user.find_many(where={"user_name": {"contains": "ali"}})
 with db.transaction() as tx:
-    tx.tables.User.create(data={"user_name": "ali"})
+    tx.tables.user.create(data={"user_name": "ali"})
 ```
 
 Session plumbing, DSN parsing and adapter selection stay behind the generated

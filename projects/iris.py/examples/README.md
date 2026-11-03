@@ -5,7 +5,7 @@ prints its version and the accepted contract envelope.
 
 `examples/blog` is a generated project: `schemas/*.iris` are compiled into
 `src/generated/` and the tests exercise the generated authoring surface
-(`create_client`, `client.tables.<Entity>`, `client.transaction`) against an
+(`create_client`, `client.tables.<entity>`, `client.transaction`) against an
 installed wheel.
 
 ```bash

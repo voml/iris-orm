@@ -67,13 +67,18 @@ fn python_target_writes_authoring_surface() {
     assert!(operations.contains("class Transaction:"), "transactions stay on the authoring surface:\n{operations}");
     assert!(operations.contains("def find_many("), "entity delegates expose `find_many`:\n{operations}");
     assert!(operations.contains("def find_near("), "entity delegates expose `find_near`:\n{operations}");
+    assert!(operations.contains("self.user = UserDelegate(self._executor)"), "the entity accessor is the lowercase entity name:\n{operations}");
+    assert!(!operations.contains("self.User = "), "the entity accessor is never the class name:\n{operations}");
+    assert!(operations.contains("return [User(row) for row in rows]"), "reads return entity models:\n{operations}");
     for forbidden in ["$query", "$execute", "def query(", "def execute(", "open_mysql", "open_postgres", "managed_push", "def close("] {
         assert!(!operations.contains(forbidden), "`{forbidden}` must not appear in the authoring surface:\n{operations}");
     }
 
     let models = std::fs::read_to_string(root.join("models.py")).expect("read models");
-    assert!(models.contains("class User(TypedDict):"), "row shape per entity:\n{models}");
-    assert!(models.contains("class Post(TypedDict):"), "row shape per entity:\n{models}");
+    assert!(models.contains("class User:"), "row model per entity:\n{models}");
+    assert!(models.contains("class Post:"), "row model per entity:\n{models}");
+    assert!(models.contains("        if \"user_id\" in row:"), "row models copy the fields the row carries:\n{models}");
+    assert!(!models.contains("TypedDict"), "row values are models, not dicts:\n{models}");
 
     let inputs = std::fs::read_to_string(root.join("inputs.py")).expect("read inputs");
     assert!(inputs.contains("class UserWhereInput(TypedDict, total=False):"), "condition object per entity:\n{inputs}");

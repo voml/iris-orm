@@ -1,6 +1,6 @@
 """Generated entity delegates — the authoring surface of this schema.
 
-`create_client(dsn)` opens one client, `client.tables.<Entity>` exposes the
+`create_client(dsn)` opens one client, `client.tables.<entity>` exposes the
 entity delegates and `client.transaction()` groups writes. No method here
 accepts VOS text, a backend name, or a raw SQL statement.
 """
@@ -63,9 +63,10 @@ class DocDelegate:
         take: int | None = None,
     ) -> list[Doc]:
         synthesis = synthesize_find_many("Doc", where, select, take)
-        return self._executor.execute(
+        rows = self._executor.execute(
             build_declared_operation_request("Doc.findMany", synthesis)
         )
+        return [Doc(row) for row in rows]
 
     def find_first(
         self,
@@ -77,7 +78,7 @@ class DocDelegate:
         rows = self._executor.execute(
             build_declared_operation_request("Doc.findFirst", synthesis)
         )
-        return rows[0] if rows else None
+        return Doc(rows[0]) if rows else None
 
     def find_unique(
         self,
@@ -89,7 +90,7 @@ class DocDelegate:
         rows = self._executor.execute(
             build_declared_operation_request("Doc.findUnique", synthesis)
         )
-        return rows[0] if rows else None
+        return Doc(rows[0]) if rows else None
 
     def create(
         self,
@@ -102,7 +103,7 @@ class DocDelegate:
         rows = self._executor.execute(
             build_declared_operation_request("Doc.create", synthesis)
         )
-        return rows[0] if rows else None
+        return Doc(rows[0]) if rows else None
 
     def update(
         self,
@@ -129,7 +130,7 @@ class DocDelegate:
         rows = self._executor.execute(
             build_declared_operation_request("Doc.update", synthesis)
         )
-        return rows[0] if rows else None
+        return Doc(rows[0]) if rows else None
 
     def delete(self, *, where: DocWhereInput) -> None:
         """Delete matching rows.
@@ -165,23 +166,26 @@ class DocDelegate:
         rows = self._executor.execute(
             build_declared_operation_request("Doc.findNear", synthesis)
         )
-        return list(
-            evaluate_vector_near_rows("Doc", rows, field, vector, metric, threshold, take)
-        )
+        return [
+            Doc(row)
+            for row in evaluate_vector_near_rows(
+                "Doc", rows, field, vector, metric, threshold, take
+            )
+        ]
 
 
 
 class Tables:
-    """Entity namespace of one client: `client.tables.<Entity>`."""
+    """Entity namespace of one client: `client.tables.<entity>`."""
 
 
-    Doc: DocDelegate
+    doc: DocDelegate
 
 
     def __init__(self, executor: OperationExecutor) -> None:
         self._executor = executor
 
-        self.Doc = DocDelegate(self._executor)
+        self.doc = DocDelegate(self._executor)
 
 
 
