@@ -78,8 +78,15 @@ impl Ord for Value {
             | (Self::Time(a), Self::Time(b))
             | (Self::DateTime(a), Self::DateTime(b)) => a.cmp(b),
             (Self::Bytes(a), Self::Bytes(b)) => a.cmp(b),
+            // Structural order (dimension, then bit patterns) gives sorting a
+            // deterministic total order; it is *not* an equality semantics —
+            // vector comparison for queries is similarity under an explicit
+            // metric (see `VectorValue::similarity`).
             (Self::Vector(a), Self::Vector(b)) => a.cmp(b),
-            (Self::File(a), Self::File(b)) => a.cmp(b),
+            // File identity is the content digest: the SHA-256 over the
+            // complete octets. `name` / `media_type` are labels and never
+            // take part in comparison, so equal digests mean the same file.
+            (Self::File(a), Self::File(b)) => a.digest.cmp(&b.digest),
             (Self::Object(a), Self::Object(b)) => a.cmp(b),
             _ => Self::rank(self).cmp(&Self::rank(other)),
         }
@@ -151,7 +158,102 @@ impl VectorValue {
         let components = octets.as_chunks::<4>().0.iter().map(|chunk| f32::from_le_bytes(*chunk)).collect::<Vec<_>>();
         Self::new(dimension, components)
     }
+
+    /// Similarity or distance to `other` under an explicit `metric`.
+    ///
+    /// Vector comparison is a query capability, never a storage default: the
+    /// caller must always pick the metric, and a dimension mismatch is
+    /// rejected instead of silently producing a number. `Cosine` and
+    /// `DotProduct` return scores where a higher value means closer, while
+    /// `Euclidean` returns a distance where a lower value means closer; the
+    /// query side owns the threshold direction (see
+    /// [`similarity_meets_threshold`]).
+    pub fn similarity(&self, other: &Self, metric: SimilarityMetric) -> Result<f64, VectorSimilarityError> {
+        if self.dimension != other.dimension {
+            return Err(VectorSimilarityError::DimensionMismatch);
+        }
+        match metric {
+            SimilarityMetric::Cosine => {
+                let mut dot = 0.0_f64;
+                let mut left_norm = 0.0_f64;
+                let mut right_norm = 0.0_f64;
+                for (left, right) in self.components.iter().zip(&other.components) {
+                    let left = f64::from(*left);
+                    let right = f64::from(*right);
+                    dot += left * right;
+                    left_norm += left * left;
+                    right_norm += right * right;
+                }
+                if left_norm == 0.0 || right_norm == 0.0 {
+                    return Err(VectorSimilarityError::ZeroNorm);
+                }
+                Ok(dot / (left_norm.sqrt() * right_norm.sqrt()))
+            }
+            SimilarityMetric::DotProduct => {
+                Ok(self.components.iter().zip(&other.components).map(|(left, right)| f64::from(*left) * f64::from(*right)).sum())
+            }
+            SimilarityMetric::Euclidean => {
+                let squared: f64 = self
+                    .components
+                    .iter()
+                    .zip(&other.components)
+                    .map(|(left, right)| {
+                        let delta = f64::from(*left) - f64::from(*right);
+                        delta * delta
+                    })
+                    .sum();
+                Ok(squared.sqrt())
+            }
+        }
+    }
 }
+
+/// Explicit metric for vector similarity queries.
+///
+/// Deliberately has no `Default`: a storage layer must never pick a metric on
+/// the query's behalf, and every similarity computation names its metric.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SimilarityMetric {
+    /// Cosine similarity in `[-1, 1]`; higher means closer. Undefined for a
+    /// zero-norm operand.
+    Cosine,
+    /// Inner product; higher means closer. Unbounded.
+    DotProduct,
+    /// Euclidean (L2) distance; lower means closer.
+    Euclidean,
+}
+
+/// Whether a similarity measurement satisfies a query threshold.
+///
+/// Score metrics (`Cosine` / `DotProduct`) pass when `value >= threshold`;
+/// `Euclidean` is a distance and passes when `value <= threshold`.
+pub fn similarity_meets_threshold(metric: SimilarityMetric, value: f64, threshold: f64) -> bool {
+    match metric {
+        SimilarityMetric::Cosine | SimilarityMetric::DotProduct => value >= threshold,
+        SimilarityMetric::Euclidean => value <= threshold,
+    }
+}
+
+/// Why a vector similarity computation was rejected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VectorSimilarityError {
+    /// The operands declare different dimensions.
+    DimensionMismatch,
+    /// Cosine similarity is undefined for a zero-norm operand.
+    ZeroNorm,
+}
+
+impl std::fmt::Display for VectorSimilarityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DimensionMismatch => write!(f, "vector similarity requires equal dimensions"),
+            Self::ZeroNorm => write!(f, "cosine similarity is undefined for a zero-norm vector"),
+        }
+    }
+}
+
+impl std::error::Error for VectorSimilarityError {}
 
 /// Wire shape of [`VectorValue`]; deserialized only to feed [`VectorValue::new`].
 #[derive(Deserialize)]
@@ -549,7 +651,8 @@ mod tests {
 
     #[test]
     fn file_inside_value_deserialize_is_checked() {
-        let illegal = serde_json::json!({"File": {"digest": valid_digest(0)[..63], "octets": 1, "manifest": {"hash": valid_digest(1), "size": 1}}});
+        let illegal =
+            serde_json::json!({"File": {"digest": valid_digest(0)[..63], "octets": 1, "manifest": {"hash": valid_digest(1), "size": 1}}});
         assert!(serde_json::from_value::<Value>(illegal).is_err());
         let legal = serde_json::to_value(Value::File(valid_file())).expect("serialize");
         let decoded = serde_json::from_value::<Value>(legal).expect("deserialize");

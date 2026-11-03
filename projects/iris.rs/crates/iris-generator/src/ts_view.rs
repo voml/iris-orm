@@ -100,8 +100,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         model.tables.iter().map(|t| format!("\"{}\"", t.name)).collect::<Vec<_>>().join(" | ")
     };
     let entity_map_lines = model.tables.iter().map(|t| format!("    {}: {};", t.name, t.name)).collect::<Vec<_>>().join("\n");
-    let where_map_lines =
-        model.tables.iter().map(|t| format!("    {}: {}WhereInput;", t.name, t.name)).collect::<Vec<_>>().join("\n");
+    let where_map_lines = model.tables.iter().map(|t| format!("    {}: {}WhereInput;", t.name, t.name)).collect::<Vec<_>>().join("\n");
     let models_import_lines = model.tables.iter().map(|t| format!("    {},", t.name)).collect::<Vec<_>>().join("\n");
     let refs_import_lines =
         model.tables.iter().flat_map(|t| [format!("    {}Id,", t.name), format!("    {}RefInput,", t.name)]).collect::<Vec<_>>().join("\n");
@@ -338,6 +337,12 @@ fn vos_filter_surface(vos_type: &str) -> Option<(&'static str, &'static [&'stati
         "decimal" => ("DecimalFilter", &["eq", "not", "gt", "gte", "lt", "lte"]),
         "date" | "time" | "datetimeUtc" => ("DateTimeFilter", &["eq", "not", "gt", "gte", "lt", "lte"]),
         "bytes" => ("BytesFilter", &["eq", "not"]),
+        // File comparison is content-hash identity: `eq` / `not` test the
+        // SHA-256 digest, never the metadata labels or the raw octets.
+        "file" => ("FileFilter", &["eq", "not"]),
+        // `vector` deliberately has no equality surface: vector comparison is
+        // similarity under an explicit query-side metric, not element-wise
+        // equality.
         _ => return None,
     })
 }

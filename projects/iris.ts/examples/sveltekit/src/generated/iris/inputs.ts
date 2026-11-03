@@ -78,6 +78,16 @@ export type BytesFilter = {
     readonly eq?: Uint8Array;
     readonly not?: Uint8Array;
 };
+/**
+ * Scalar filter operators for file fields.
+ *
+ * Equality is content-hash identity: two files compare by their SHA-256
+ * digest, never by `name` / `mediaType` labels or by raw octets.
+ */
+export type FileFilter = {
+    readonly eq?: { readonly digest: string; readonly octets: bigint; readonly name?: string; readonly mediaType?: string; readonly manifest: { readonly hash: string; readonly size: bigint } };
+    readonly not?: { readonly digest: string; readonly octets: bigint; readonly name?: string; readonly mediaType?: string; readonly manifest: { readonly hash: string; readonly size: bigint } };
+};
 /** Patch field: write a value. Omitted field means unchanged. */
 export type PatchValue<T> = { readonly set: T };
 /** Patch field on nullable columns: write a value or explicit null. */

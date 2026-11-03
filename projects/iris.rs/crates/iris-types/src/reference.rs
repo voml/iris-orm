@@ -185,6 +185,12 @@ fn decode_literal(text: &str, kind: LiteralKind) -> Value {
 }
 
 fn cmp_values(left: &Value, op: CmpOp, right: &Value) -> bool {
+    // Vector pairs have no equality/ordering filter semantics: vector
+    // comparison is similarity under an explicit query-side metric, so no
+    // filter predicate ever matches a vector pair.
+    if matches!((left, right), (Value::Vector(_), Value::Vector(_))) {
+        return false;
+    }
     let ord = left.cmp(right);
     match op {
         CmpOp::Eq => ord == std::cmp::Ordering::Equal,

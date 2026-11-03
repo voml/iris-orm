@@ -107,21 +107,28 @@ test("generation is deterministic for the same declared `vector` and `file` oper
     }
 });
 
-test("`vector` and `file` table fields fail closed at generation", async (t) => {
+test("`vector` fields fail closed while `file` fields filter by content hash", async (t) => {
     const core = await loadCore(t);
     if (!core) {
         return;
     }
 
+    // Vector comparison is similarity under an explicit query-side metric,
+    // not element-wise equality, so no equality filter surface is generated.
     const vectorField = `table Doc {\n    @@doc_id: uuid,\n    embedding: vector,\n}\n`;
     const vectorResult = core.generate(vectorField, "typescript", join(await mkdtemp(join(tmpdir(), "iris-codegen-native-vec-")), "generated", "iris"));
     assert.equal(vectorResult.ok, false);
     assert.match(vectorResult.error, /unsupported filter type `vector` on `Doc\.embedding`/);
 
+    // File equality is content-hash identity: the where surface exposes exactly
+    // `eq` / `not` over the file descriptor carrier.
     const fileField = `table Doc {\n    @@doc_id: uuid,\n    attachment: file,\n}\n`;
-    const fileResult = core.generate(fileField, "typescript", join(await mkdtemp(join(tmpdir(), "iris-codegen-native-file-")), "generated", "iris"));
-    assert.equal(fileResult.ok, false);
-    assert.match(fileResult.error, /unsupported filter type `file` on `Doc\.attachment`/);
+    const fileRoot = join(await mkdtemp(join(tmpdir(), "iris-codegen-native-file-")), "generated", "iris");
+    const fileResult = core.generate(fileField, "typescript", fileRoot);
+    assert.equal(fileResult.ok, true, fileResult.error);
+    const inputs = await readFile(join(fileRoot, "inputs.ts"), "utf8");
+    assert.match(inputs, /export type FileFilter/);
+    assert.match(inputs, /attachment\?: .* \| FileFilter/);
 });
 
 test("dimensioned `vector<4>` and unknown labels are rejected on operation signatures", async (t) => {

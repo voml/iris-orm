@@ -313,11 +313,11 @@ table Doc {
     );
 }
 
-/// Payload filters need a design ruling (digest equality for `file`,
-/// similarity ops for `vector`); until then the TypeScript surface stays
-/// fail-closed instead of guessing an operator set.
+/// `file` filters are content-hash identity: the surface exposes exactly
+/// `eq` / `not` over the file carrier (digest equality), never ordering or
+/// text operators.
 #[test]
-fn file_field_without_filter_surface_is_rejected() {
+fn file_field_filters_by_content_hash_identity() {
     const FILE_FIELD_SCHEMA: &str = r#"
 table Doc {
     @@id: uuid,
@@ -325,12 +325,32 @@ table Doc {
 }
 "#;
     let model = GenerationModel::from_vos_schema(FILE_FIELD_SCHEMA).expect("model");
-    let error = emit_target_files(&model, "typescript", None).expect_err("a `file` field must not gain a guessed filter type");
+    let files = emit_target_files(&model, "typescript", None).expect("a `file` field has a hash-identity filter surface");
+    let inputs = target_file(&files, "inputs.ts");
+    assert!(inputs.contains("export type FileFilter"), "inputs.ts must declare `FileFilter`:\n{inputs}");
+    assert!(inputs.contains("| FileFilter"), "the where input must accept `FileFilter`:\n{inputs}");
+    let synthesize = target_file(&files, "_internal/synthesize.ts");
+    assert!(synthesize.contains("attachment: [\"eq\", \"not\"]"), "the runtime op allow-list must be exactly eq/not:\n{synthesize}");
+}
+
+/// `vector` keeps no equality filter surface: vector comparison is similarity
+/// under an explicit query-side metric, not element-wise equality, so the
+/// TypeScript surface stays closed instead of guessing an operator set.
+#[test]
+fn vector_field_without_filter_surface_is_rejected() {
+    const VECTOR_FIELD_SCHEMA: &str = r#"
+table Doc {
+    @@id: uuid,
+    embedding: vector,
+}
+"#;
+    let model = GenerationModel::from_vos_schema(VECTOR_FIELD_SCHEMA).expect("model");
+    let error = emit_target_files(&model, "typescript", None).expect_err("a `vector` field must not gain an equality filter type");
     assert!(
         matches!(
             error,
             Error::UnsupportedFilterType { ref entity, ref field, ref vos_type }
-                if entity == "Doc" && field == "attachment" && vos_type == "file"
+                if entity == "Doc" && field == "embedding" && vos_type == "vector"
         ),
         "{error}"
     );
