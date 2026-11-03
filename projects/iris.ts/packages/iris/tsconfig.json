@@ -18,6 +18,7 @@
         "tests/codegen-g0/negative",
         "tests/generated-e2e-runner.ts",
         "tests/generated-project-e2e-runner.ts",
-        "tests/yydb-*-runner.ts"
+        "tests/yydb-*-runner.ts",
+        "tests/string-match-filter-runner.ts"
     ]
 }
