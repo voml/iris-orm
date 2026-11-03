@@ -1,0 +1,19 @@
+{
+    "name": "@yydb/iris-e2e",
+    "private": true,
+    "type": "module",
+    "description": "Cross-repo end-to-end suites: generated Iris clients against a live yyds node.",
+    "scripts": {
+        "e2e:mysql": "node yyds/run.mjs --backend mysql",
+        "e2e:postgres": "node yyds/run.mjs --backend postgres"
+    },
+    "dependencies": {
+        "@yydb/iris": "workspace:*",
+        "@yydb/iris-language": "workspace:*"
+    },
+    "devDependencies": {
+        "mysql2": "^3.24.6",
+        "pg": "^8.23.1",
+        "tsx": "^4.20.5"
+    }
+}

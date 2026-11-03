@@ -3,3 +3,4 @@ packages:
   - "projects/iris.ts/platforms/*"
   - "projects/iris.ts/homepage"
   - "projects/iris.ts/examples/*"
+  - "e2e"

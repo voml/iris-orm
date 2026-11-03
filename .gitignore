@@ -51,3 +51,4 @@ iris.lock
 **/.iris/
 projects/examples/**/src/generated/
 projects/examples/**/generated/
+e2e/yyds/.generated/
