@@ -2,6 +2,26 @@
 
 from __future__ import annotations
 
-from .iris_pyo3 import capabilities, contract_version, version
+from .iris_pyo3 import (
+    Session,
+    capabilities,
+    contract_version,
+    open_memory,
+    open_mysql,
+    open_postgres,
+    open_sqlite,
+    open_yydb,
+    version,
+)
 
-__all__ = ["capabilities", "contract_version", "version"]
+__all__ = [
+    "Session",
+    "capabilities",
+    "contract_version",
+    "open_memory",
+    "open_mysql",
+    "open_postgres",
+    "open_sqlite",
+    "open_yydb",
+    "version",
+]

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "iris"
-description = "Iris ORM Python binding skeleton (version and capability probing)"
+description = "Iris ORM Python binding (memory, sqlite, yydb, postgres and mysql sessions)"
 readme = "readme.md"
 requires-python = ">=3.11"
 license = { text = "MPL-2.0" }

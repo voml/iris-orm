@@ -27,7 +27,21 @@ NATIVE_REASON = (
 
 class PackageTests(unittest.TestCase):
     def test_public_names_are_exported(self) -> None:
-        self.assertEqual(sorted(iris.__all__), ["IrisError", "capabilities", "contract_version", "version"])
+        self.assertEqual(
+            sorted(iris.__all__),
+            [
+                "IrisError",
+                "Session",
+                "capabilities",
+                "contract_version",
+                "openMemory",
+                "openMysql",
+                "openPostgres",
+                "openSqlite",
+                "openYydb",
+                "version",
+            ],
+        )
         for name in iris.__all__:
             self.assertTrue(hasattr(iris, name), name)
 
@@ -54,7 +68,23 @@ class NativeTests(unittest.TestCase):
         self.assertEqual(iris.contract_version(), "vos/iris.contract/v0")
 
     def test_capabilities_are_a_read_only_list(self) -> None:
-        self.assertEqual(iris.capabilities(), ["version", "contract_version", "capabilities"])
+        self.assertEqual(
+            iris.capabilities(),
+            [
+                "version",
+                "contract_version",
+                "capabilities",
+                "open_memory",
+                "open_sqlite",
+                "open_yydb",
+                "open_postgres",
+                "open_mysql",
+            ],
+        )
+
+    def test_iris_error_carries_a_code(self) -> None:
+        self.assertEqual(iris.IrisError("boom").code, "IRIS-EXEC-FAILED")
+        self.assertEqual(iris.IrisError("boom", code="IRIS-SESSION-CLOSED").code, "IRIS-SESSION-CLOSED")
 
 
 if __name__ == "__main__":

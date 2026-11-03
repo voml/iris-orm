@@ -18,5 +18,6 @@ doctest = false
 
 [dependencies]
 iris = { workspace = true }
+iris-host = { workspace = true }
 iris-types = { workspace = true }
 pyo3 = { workspace = true }

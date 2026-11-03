@@ -24,12 +24,7 @@ pub struct ExecuteResult {
 }
 
 fn to_result(outcome: ExecuteOutcome) -> ExecuteResult {
-    ExecuteResult {
-        ok: outcome.ok,
-        rows_json: outcome.rows_json(),
-        error: outcome.error_message(),
-        error_code: outcome.error_code(),
-    }
+    ExecuteResult { ok: outcome.ok, rows_json: outcome.rows_json(), error: outcome.error_message(), error_code: outcome.error_code() }
 }
 
 /// Iris session bound to a reference or foreign adapter.
@@ -63,9 +58,7 @@ impl MemorySession {
     }
 
     pub(crate) fn open_project(config_path: String, source: String) -> Result<Self> {
-        HostSession::open_project(&config_path, &source)
-            .map(|inner| Self { inner: Some(inner) })
-            .map_err(envelope_error)
+        HostSession::open_project(&config_path, &source).map(|inner| Self { inner: Some(inner) }).map_err(envelope_error)
     }
 }
 

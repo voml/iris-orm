@@ -271,13 +271,7 @@ impl HostSession {
 
     /// SQLite profile (`:memory:` or a file path).
     pub fn open_sqlite(path: &str) -> Result<Self, ErrorEnvelope> {
-        let db = if path == ":memory:" {
-            SqliteSource::open_in_memory()
-        }
-        else {
-            SqliteSource::open(path)
-        }
-        .map_err(from_sqlite_error)?;
+        let db = if path == ":memory:" { SqliteSource::open_in_memory() } else { SqliteSource::open(path) }.map_err(from_sqlite_error)?;
         Ok(Self::new_store(SessionStore::Sqlite(db), None))
     }
 
@@ -301,8 +295,7 @@ impl HostSession {
 
     /// Project profile resolved from an Iris config and datasource name.
     pub fn open_project(config_path: &str, source: &str) -> Result<Self, ErrorEnvelope> {
-        let (project_dir, project) =
-            load_project(Path::new(config_path)).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
+        let (project_dir, project) = load_project(Path::new(config_path)).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err))?;
         let ds = project.datasource(source).map_err(|err| ErrorEnvelope::new(CODE_EXEC_FAILED, err.to_string()))?;
         let (store, session_ddl_revision) = match ds.kind {
             DatasourceKind::Yydb => {
