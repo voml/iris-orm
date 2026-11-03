@@ -163,9 +163,9 @@ export interface CanonicalResult {
 /** Subset of the wasm package surface the bridge calls. */
 interface D1WasmExports {
     /** Accepts a serialised `D1Request`, returns the same envelope JSON. */
-    prepareD1Operation ? (requestJson: string) : string;
+    prepareD1Operation?: (requestJson: string) => string;
     /** Accepts a serialised `D1RawResult`, returns a `CanonicalResult` JSON string. */
-    decodeD1Result ? (rawJson: string) : string;
+    decodeD1Result?: (rawJson: string) => string;
 }
 
 let wasmApi: D1WasmExports | undefined;

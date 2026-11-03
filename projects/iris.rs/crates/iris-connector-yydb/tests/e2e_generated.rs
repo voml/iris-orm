@@ -45,12 +45,45 @@ fn checked_in_generated_fixture_matches_the_generator() {
     let model = iris_generator::GenerationModel::from_vos_schema(SCHEMA).expect("schema");
     let files = iris_generator::emit_rust_files(&model, "yydb").expect("emit");
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/generated");
+    let sync = std::env::var_os("IRIS_FIXTURE_SYNC").is_some();
     for (name, content) in &files {
-        let checked_in = fs::read_to_string(dir.join(name)).unwrap_or_else(|error| panic!("fixture `{name}` missing: {error}"));
+        let path = dir.join(name);
+        // The generator does not reimplement rustfmt's width model, so both
+        // sides are compared in the canonical form produced by the pinned
+        // nightly rustfmt with the repo `rustfmt.toml`. That keeps this drift
+        // gate and the workspace `cargo fmt --all -- --check` gate on the same
+        // fixed point. Regenerate after generator changes with
+        // `IRIS_FIXTURE_SYNC=1 cargo test -p iris-connector-yydb --test e2e_generated`.
+        let expected = rustfmt_canonical(content);
+        if sync {
+            fs::write(&path, &expected).unwrap_or_else(|error| panic!("write fixture `{name}`: {error}"));
+        }
+        let checked_in = fs::read_to_string(&path).unwrap_or_else(|error| panic!("fixture `{name}` missing: {error}"));
         // `core.autocrlf` decides each side's line endings independently of the
         // generator's logic; the gate is about content drift, not line endings.
-        assert_eq!(checked_in.replace("\r\n", "\n"), content.replace("\r\n", "\n"), "fixture `{name}` drifted from generator output");
+        assert_eq!(checked_in.replace("\r\n", "\n"), expected.replace("\r\n", "\n"), "fixture `{name}` drifted from generator output");
     }
+}
+
+/// Canonical form of generated Rust: the pinned nightly `rustfmt` under the
+/// repo `rustfmt.toml`, resolved through the rustup shim so the same toolchain
+/// that CI's `cargo fmt --all -- --check` uses decides the output.
+fn rustfmt_canonical(content: &str) -> String {
+    use std::io::Write as _;
+
+    let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../..").canonicalize().expect("repo root");
+    let config = repo_root.join("rustfmt.toml");
+    let mut child = std::process::Command::new("rustfmt")
+        .args(["--edition", "2024", "--config-path", &config.to_string_lossy(), "--emit", "stdout"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn rustfmt (nightly toolchain via rustup shim)");
+    child.stdin.as_mut().expect("rustfmt stdin").write_all(content.as_bytes()).expect("feed rustfmt");
+    let output = child.wait_with_output().expect("wait for rustfmt");
+    assert!(output.status.success(), "rustfmt rejected generator output: {}", String::from_utf8_lossy(&output.stderr));
+    String::from_utf8(output.stdout).expect("rustfmt output is utf-8")
 }
 
 fn stored_descriptor(db: &YydbSource, octets: &[u8]) -> FileDescriptor {
