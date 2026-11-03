@@ -91,7 +91,7 @@ impl Doc {
     /// Decode one Iris [`Row`] into `Doc` (flat scalar fields).
     pub fn from_row(row: &Row) -> Option<Self> {
         Some(Self {
-            doc_id: __iris_value_i64(row, "doc_id").map(|v| v as i64)?,
+            doc_id: __iris_value_i64(row, "doc_id")?,
             title: __iris_value_str(row, "title")?,
             published: __iris_value_bool(row, "published")?,
             body: __iris_value_bytes(row, "body")?,

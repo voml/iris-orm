@@ -184,7 +184,8 @@ fn value_extract_expr(field: &FieldModel) -> String {
     match base {
         "bool" => format!("__iris_value_bool(row, \"{}\")", field.name),
         "u64" => format!("__iris_value_u64(row, \"{}\")", field.name),
-        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => {
+        "i64" => format!("__iris_value_i64(row, \"{}\")", field.name),
+        "i8" | "i16" | "i32" | "u8" | "u16" | "u32" => {
             format!("__iris_value_i64(row, \"{}\").map(|v| v as {base})", field.name)
         }
         "f64" => format!("__iris_value_f64(row, \"{}\")", field.name),
@@ -256,7 +257,7 @@ fn synthesize_fns(table: &TableModel) -> String {
         r#"    fn synthesize_find_many(where_: &{name}Where) -> String {{
         let mut preds: Vec<String> = Vec::new();
 {pred_build}        if preds.is_empty() {{
-            format!("{name}.collect()")
+            "{name}.collect()".to_owned()
         }} else {{
             format!("{name}.filter(x => {{}}).collect()", preds.join(" && "))
         }}
@@ -265,7 +266,7 @@ fn synthesize_fns(table: &TableModel) -> String {
     fn synthesize_find_unique(where_: &{name}Where) -> String {{
         let mut preds: Vec<String> = Vec::new();
 {pred_build}        if preds.is_empty() {{
-            format!("{name}.take(1).collect()")
+            "{name}.take(1).collect()".to_owned()
         }} else {{
             format!(
                 "{name}.filter(x => {{}}).take(1).collect()",
@@ -360,7 +361,13 @@ fn row_write_fn(table: &TableModel, pk: &str) -> Result<String> {
             }}),"#,
                             )
                         }
-                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => format!(
+                        "i64" => format!(
+                            r#"            ("{fname}".into(), match &row.{fname} {{
+                Some(v) => Value::Int(*v),
+                None => Value::Null,
+            }}),"#,
+                        ),
+                        "i8" | "i16" | "i32" | "u8" | "u16" | "u32" => format!(
                             r#"            ("{fname}".into(), match &row.{fname} {{
                 Some(v) => Value::Int((*v) as i64),
                 None => Value::Null,
@@ -389,7 +396,8 @@ fn row_write_fn(table: &TableModel, pk: &str) -> Result<String> {
             }}),"#,
                             )
                         }
-                        "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" => {
+                        "i64" => format!(r#"            ("{fname}".into(), Value::Int(row.{fname})),"#),
+                        "i8" | "i16" | "i32" | "u8" | "u16" | "u32" => {
                             format!(r#"            ("{fname}".into(), Value::Int(row.{fname} as i64)),"#)
                         }
                         _ => format!(r#"            ("{fname}".into(), Value::Str(row.{fname}.clone())),"#),

@@ -112,7 +112,7 @@ impl DocDelegate<'_> {
                 preds.push("x.published == false".to_string());
             }
         }
-        if preds.is_empty() { format!("Doc.collect()") } else { format!("Doc.filter(x => {}).collect()", preds.join(" && ")) }
+        if preds.is_empty() { "Doc.collect()".to_owned() } else { format!("Doc.filter(x => {}).collect()", preds.join(" && ")) }
     }
 
     fn synthesize_find_unique(where_: &DocWhere) -> String {
@@ -131,7 +131,7 @@ impl DocDelegate<'_> {
                 preds.push("x.published == false".to_string());
             }
         }
-        if preds.is_empty() { format!("Doc.take(1).collect()") } else { format!("Doc.filter(x => {}).take(1).collect()", preds.join(" && ")) }
+        if preds.is_empty() { "Doc.take(1).collect()".to_owned() } else { format!("Doc.filter(x => {}).take(1).collect()", preds.join(" && ")) }
     }
 
     fn to_row_write(row: &Doc) -> super::errors::Result<RowWrite> {
@@ -139,7 +139,7 @@ impl DocDelegate<'_> {
             table: "Doc".into(),
             primary_key: "doc_id".into(),
             fields: BTreeMap::from([
-                ("doc_id".into(), Value::Int(row.doc_id as i64)),
+                ("doc_id".into(), Value::Int(row.doc_id)),
                 ("title".into(), Value::Str(row.title.clone())),
                 ("published".into(), Value::Bool(row.published)),
                 ("body".into(), Value::Bytes(row.body.clone())),
