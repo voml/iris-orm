@@ -32,7 +32,7 @@ Post.filter(x => x.author.user_name == $name).collect()
 Post.map(x => { title: x.title, author_name: x.author.user_name }).collect()
 ```
 
-Demo fixtures live in `schemas/seed.iris` as the durable macro `seed_blog()` (users `ada` / `linus`, one post each). Examples call `await db.$macros.seed_blog()` on boot. `iris.config.ts` uses `schemas/**/*.iris` so `blog.iris` and `seed.iris` merge at generate and runtime.
+Demo fixtures live in `schemas/seed.iris` as the durable macro `seed_blog()` (users `ada` / `linus`, one post each). Examples call `await db.macros.seed_blog()` on boot. `iris.config.ts` uses `schemas/**/*.iris` so `blog.iris` and `seed.iris` merge at generate and runtime.
 
 ## HTTP servers
 
@@ -66,7 +66,7 @@ hono/
   iris.config.ts            # datasources + schema pointer (YYDB `:memory:`)
   schemas/blog.iris         # schema data (User + Post with author: &User)
   src/generated/iris/       # `iris generate --config .` output (local, gitignored)
-  src/index.ts              # `Database.open` from `@iris/node.ts`, then `db.user` / `db.post`
+  src/index.ts              # `createClient({ dsn })` from `@iris/node.ts`, then `db.tables.user` / `db.tables.post`
 ```
 
 ### `generate.out` (framework layout)
@@ -88,7 +88,7 @@ App code imports through **`@iris/*`**, mapped to each project's `generate.out`:
 
 ```ts
 import type { UserId } from "@iris/index.ts";
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 ```
 
 | Surface | Mapping |
@@ -103,10 +103,10 @@ Full-stack (Next / Nuxt / SvelteKit / Astro) import directly from `@iris/node.ts
 
 | Framework | Pattern |
 |-----------|---------|
-| Next | `Database.create` per handler (no process singleton) |
-| Nuxt / SvelteKit / Astro | `Database.open({ config: process.cwd(), source: "default" })` |
+| Next | `createClient({ dsn })` per handler (no process singleton) |
+| Nuxt / SvelteKit / Astro | `createClient({ dsn: "file:.iris/dev.yydb" })` |
 
-HTTP servers call `Database.open` once at startup and `Database.close` on shutdown. No hand-written `db.ts` wrapper.
+HTTP servers call `createClient({ dsn })` once at startup. The generated authoring surface has no `close`; the process exits on shutdown.
 
 Full-stack configs use file-backed `.iris/dev.yydb` so data survives dev HMR. Boot hooks call `seed_blog` once, or use `POST /users` and `POST /posts`.
 
@@ -151,9 +151,9 @@ pnpm run examples:generate
 pnpm iris generate --config projects/examples/hono
 ```
 
-`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generate.out` (`Database.create`, `Database.open`, `Database.close`, `db.user`, `db.post`, …).
+`iris generate` reads `iris.config.ts`, loads `schemas/blog.iris`, and writes `generate.out` (`createClient`, `Client`, `db.tables.user`, `db.tables.post`, `db.macros`, …).
 
-Route handlers import **`@iris/node.ts`** (`Database.create` / `Database.open` / `Database.close`) and **`@iris/index.ts`** (domain types). No hand-written `db.ts`, no parallel `iris.ts` wrapper, no seed logic outside routes.
+Route handlers import **`@iris/node.ts`** (`createClient({ dsn })`) and **`@iris/index.ts`** (domain types). No hand-written `db.ts`, no parallel `iris.ts` wrapper, no seed logic outside routes.
 
 Full-stack apps expose the same API under `/api/*` (for example `/api/posts`).
 

@@ -257,6 +257,12 @@ pub struct GenerationModel {
     /// to identity resolution.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub operations: Vec<OperationModel>,
+    /// Original VOS schema text when the model came from source.
+    ///
+    /// Generated clients embed it so a managed adapter can apply the schema it
+    /// was generated from; artifact-only models leave it empty.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub schema_source: String,
 }
 
 impl GenerationModel {
@@ -298,6 +304,7 @@ impl GenerationModel {
             tables,
             macros: Vec::new(),
             operations: Vec::new(),
+            schema_source: String::new(),
         })
     }
 
@@ -367,7 +374,9 @@ impl GenerationModel {
         if !source.trim().is_empty() && input.declarations().is_empty() {
             return Err(Error::Vos("schema document contains no VOS declarations".into()));
         }
-        Self::from_document(&input)
+        let mut model = Self::from_document(&input)?;
+        model.schema_source = source.to_owned();
+        Ok(model)
     }
 
     /// Build from a parsed VOS contract input.
@@ -438,6 +447,7 @@ impl GenerationModel {
             tables,
             macros,
             operations: operation_models,
+            schema_source: String::new(),
         };
         model.operations.sort_by(|a, b| a.operation_id.cmp(&b.operation_id));
         model.validate_operation_surface()?;

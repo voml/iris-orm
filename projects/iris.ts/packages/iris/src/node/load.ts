@@ -73,6 +73,10 @@ function loadModule(specifier: string): IrisNodeBindings {
                 const session = (module.openSqliteSession as (p: string) => NativeMemorySession)(path);
                 return wrapNativeSession(session);
             },
+            openYydbSession: (endpoint) => {
+                const session = (module.openYydbSession as (e: string) => NativeMemorySession)(endpoint);
+                return wrapNativeSession(session);
+            },
             openPostgresSession: (url) => {
                 const session = (module.openPostgresSession as (u: string) => NativeMemorySession)(url);
                 return wrapNativeSession(session);

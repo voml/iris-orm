@@ -1,12 +1,12 @@
-import { createClient } from "../../index.js";
+import { Client } from "../../operations.js";
 import { postId } from "../../references.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
-    const post = await db.post.findUnique({
+    const post = await db.tables.post.findUnique({
         where: {
             postId: postId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
         },

@@ -64,22 +64,25 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.match(result.outputPath.replace(/\\/g, "/"), /generated\/iris$/);
 
     const index = await readFile(join(root, "index.ts"), "utf8");
-    assert.match(index, /export \{ DbClient, createClient \}/);
+    assert.match(index, /export \{ Client \}/);
     assert.match(index, /from "\.\/operations\.js"/);
     assert.match(index, /from "\.\/errors\.js"/);
     assert.doesNotMatch(index, /export \{ db \}/);
+    assert.doesNotMatch(index, /createClient/);
     assert.doesNotMatch(index, /synthesize/);
 
     const nodeEntry = await readFile(join(root, "node.ts"), "utf8");
-    assert.match(nodeEntry, /createIrisOperationExecutor/);
+    assert.match(nodeEntry, /createIrisOperationExecutorFromDsn/);
+    assert.match(nodeEntry, /CreateIrisClientOptions/);
+    assert.match(nodeEntry, /export function createClient\(options: CreateIrisClientOptions\): Client/);
     assert.match(nodeEntry, /IRIS_FIELD_WIRE_NAMES/);
     assert.match(nodeEntry, /wireNamesByEntity: IRIS_FIELD_WIRE_NAMES/);
     assert.match(nodeEntry, /IRIS_SCHEMA_FINGERPRINT/);
     assert.match(nodeEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
-    assert.match(nodeEntry, /export class Database/);
-    assert.match(nodeEntry, /static async create/);
-    assert.match(nodeEntry, /static async open/);
-    assert.match(nodeEntry, /static async close/);
+    assert.match(nodeEntry, /schemaSource: IRIS_SCHEMA_SOURCE/);
+    assert.doesNotMatch(nodeEntry, /class Database/);
+    assert.doesNotMatch(nodeEntry, /static async create/);
+    assert.doesNotMatch(nodeEntry, /static async close/);
     assert.doesNotMatch(nodeEntry, /@yydb\/iris-language/);
     assert.doesNotMatch(nodeEntry, /@yydb\/hermes/);
     assert.doesNotMatch(nodeEntry, /@yydb\/iris-unknown-wasm32/);
@@ -88,6 +91,9 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     const browserEntry = await readFile(join(root, "browser.ts"), "utf8");
     assert.match(browserEntry, /@yydb\/iris-language/);
     assert.match(browserEntry, /CreateIrisDbBindingOptions/);
+    assert.match(browserEntry, /export type CreateClientOptions = CreateIrisDbBindingOptions & \{ dsn: string \}/);
+    assert.match(browserEntry, /export function createClient\(options: CreateClientOptions\): Client/);
+    assert.match(browserEntry, /schemaSource: IRIS_SCHEMA_SOURCE/);
     assert.doesNotMatch(browserEntry, /@yydb\/iris\/types/);
     assert.doesNotMatch(browserEntry, /@yydb\/iris\/runtime/);
     assert.doesNotMatch(browserEntry, /"@yydb\/iris"/);
@@ -95,12 +101,12 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
     assert.doesNotMatch(browserEntry, /@yydb\/hermes/);
     assert.doesNotMatch(browserEntry, /@yydb\/iris-unknown-wasm32/);
     assert.doesNotMatch(browserEntry, /\.wasm/);
-    assert.match(browserEntry, /createIrisOperationExecutor/);
+    assert.match(browserEntry, /createIrisOperationExecutorFromDsn/);
     assert.match(browserEntry, /wireNamesByEntity: IRIS_FIELD_WIRE_NAMES/);
     assert.match(browserEntry, /IRIS_SCHEMA_FINGERPRINT/);
     assert.match(browserEntry, /contractFingerprint: IRIS_SCHEMA_FINGERPRINT/);
-    assert.match(browserEntry, /export class Database/);
-    assert.match(browserEntry, /static async create/);
+    assert.doesNotMatch(browserEntry, /class Database/);
+    assert.doesNotMatch(browserEntry, /static async create/);
     assert.doesNotMatch(browserEntry, /createBrowserIrisDbBinding/);
 
     const cloudflareEntry = await readFile(join(root, "cloudflare.ts"), "utf8");
@@ -118,6 +124,14 @@ test("generate writes TypeScript client via Rust iris-generator", async (t) => {
 
     const operations = await readFile(join(root, "operations.ts"), "utf8");
     assert.match(operations, /OperationExecutor/);
+    assert.match(operations, /export class Client/);
+    assert.match(operations, /readonly tables: Tables/);
+    assert.match(operations, /readonly macros: GeneratedMacros/);
+    assert.doesNotMatch(operations, /DbClient/);
+    // `operations.ts` only mentions `createClient` in the `Client` doc comment.
+    assert.doesNotMatch(operations, /export function createClient/);
+    assert.doesNotMatch(operations, /\$close/);
+    assert.doesNotMatch(operations, /\$macros/);
     assert.match(operations, /from "\.\/_internal\/contract-types\.js"/);
     assert.doesNotMatch(operations, /@yydb\/iris\/types/);
     assert.match(operations, /buildDeclaredOperationRequest/);
@@ -208,8 +222,13 @@ export type OperationRequest = {
 export interface OperationExecutor {
   execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>>;
   executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
+  begin(): Promise<ResultEnvelope<void>>;
+  commit(): Promise<ResultEnvelope<void>>;
+  rollback(): Promise<ResultEnvelope<void>>;
   close(): Promise<void>;
 }
+
+export type CreateIrisClientOptions = { dsn: string };
 
 export type IrisDbBinding = {
   query(source: string, parameters?: Readonly<Record<string, unknown>>): Promise<unknown>;
@@ -250,6 +269,12 @@ export async function createIrisDbBinding(_options?: CreateIrisDbBindingOptions)
   throw new Error("stub");
 }
 export async function createIrisOperationExecutor(_options?: CreateIrisDbBindingOptions): Promise<OperationExecutor> {
+  throw new Error("stub");
+}
+export function createIrisOperationExecutorFromDsn(
+  _dsn: string,
+  _options?: Pick<CreateIrisDbBindingOptions, "wireNamesByEntity" | "valueCarriersByEntity" | "contractFingerprint"> & { schemaSource?: string },
+): OperationExecutor {
   throw new Error("stub");
 }
 `,
@@ -300,12 +325,12 @@ export const createBrowserIrisDbBinding = createIrisDbBinding;
 
     await writeFile(
         join(generatedRoot, "consumer.ts"),
-        `import { createClient } from "./index.js";
+        `import { Client } from "./operations.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 import type { PostFindManyArgs } from "./inputs.js";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
   const args = {
@@ -329,7 +354,7 @@ async function run() {
     },
   } satisfies PostFindManyArgs;
 
-  const posts = await db.post.findMany(args);
+  const posts = await db.tables.post.findMany(args);
   const _title: string = posts[0]!.title;
   const _name: string = posts[0]!.author.userName;
   void _title;
@@ -342,14 +367,14 @@ void run;
 
     await writeFile(
         join(generatedRoot, "consumer-negative.ts"),
-        `import { createClient } from "./index.js";
+        `import { Client } from "./operations.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
-  await db.post.findMany({
+  await db.tables.post.findMany({
     where: {
       title: { contains: 123 },
     },
@@ -479,7 +504,7 @@ test("generated synthesize runs findMany through OperationExecutor on Node", asy
     assert.equal(payload.afterDeleteCount, 0);
 });
 
-test("generated project Database.open runs CRUD against on-disk sqlite", async (t) => {
+test("generated project createClient({ dsn }) runs CRUD against on-disk sqlite", async (t) => {
     const core = await loadCore(t);
     if (!core) {
         return;

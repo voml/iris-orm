@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { PostId, UserId } from "@iris/index.ts";
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 
 export const runtime = "nodejs";
 
@@ -14,11 +14,11 @@ const postListSelect = {
 
 export async function GET(request: Request) {
     const author = new URL(request.url).searchParams.get("author")?.trim();
-    const db = await Database.create({ config: process.cwd(), source: "default" });
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
     const where = author
         ? { published: true, author: { userName: author } }
         : { published: true };
-    return Response.json(await db.post.findMany({ where, select: postListSelect }));
+    return Response.json(await db.tables.post.findMany({ where, select: postListSelect }));
 }
 
 export async function POST(request: Request) {
@@ -28,8 +28,8 @@ export async function POST(request: Request) {
     if (!authorUserId || !title) {
         return Response.json({ error: "author_user_id and title are required" }, { status: 400 });
     }
-    const db = await Database.create({ config: process.cwd(), source: "default" });
-    const post = await db.post.create({
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
+    const post = await db.tables.post.create({
         data: {
             postId: randomUUID() as PostId,
             author: authorUserId as UserId,

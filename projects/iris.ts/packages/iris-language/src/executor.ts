@@ -51,6 +51,50 @@ export async function createIrisOperationExecutor(options: WebCreateIrisDbBindin
     return executor;
 }
 
+/**
+ * Build the browser operation executor for a generated `createClient({ dsn })`.
+ *
+ * Browser storage is memory-only until YYDB browser persistence is wired, so
+ * `memory:` is the only accepted DSN and anything else fails closed at
+ * construction instead of silently degrading.
+ */
+export function createIrisOperationExecutorFromDsn(
+    dsn: string,
+    options: Pick<
+        WebCreateIrisDbBindingOptions,
+        "wireNamesByEntity" | "valueCarriersByEntity" | "contractFingerprint"
+    > & { schemaSource?: string } = {},
+): WebOperationExecutor {
+    if (typeof dsn !== "string" || !dsn.trim()) {
+        throw new IrisLanguageError("invalid-dsn", "`dsn` must be a non-empty string");
+    }
+    const text = dsn.trim();
+    if (text !== "memory:" && text !== "memory") {
+        throw new IrisLanguageError(
+            "connection-failed",
+            `browser hosts support only \`memory:\` DSNs until YYDB browser persistence is wired (got \`${text}\`)`,
+        );
+    }
+    const session = getWasmSemanticCore().openMemorySession();
+    const managed = session as { managedPush?: (schema: string) => unknown };
+    if (options.schemaSource && managed.managedPush) {
+        const pushed = managed.managedPush(options.schemaSource) as
+            | { ok?: boolean; error?: string | null }
+            | undefined;
+        if (pushed && pushed.ok === false) {
+            throw new IrisLanguageError("connection-failed", pushed.error ?? "schema push failed");
+        }
+    }
+    const executor = createOperationExecutorFromSession(session, {
+        wireNamesByEntity: options.wireNamesByEntity,
+        valueCarriersByEntity: options.valueCarriersByEntity,
+    });
+    if (options.contractFingerprint) {
+        return guardOperationExecutor(executor, options.contractFingerprint);
+    }
+    return executor;
+}
+
 /** @deprecated Use `createIrisDbBinding`. */
 export const createBrowserIrisDbBinding = createIrisDbBinding;
 

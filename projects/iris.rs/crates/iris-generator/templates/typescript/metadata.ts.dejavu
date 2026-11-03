@@ -1,6 +1,9 @@
 export const IRIS_SCHEMA_FINGERPRINT = "<% schema_fingerprint %>";
 export const IRIS_GENERATOR_VERSION = "<% generator_version %>";
 
+/** VOS schema text this client was generated from (applied by managed adapters). */
+export const IRIS_SCHEMA_SOURCE: string = <% schema_source_literal %>;
+
 /** TypeScript author field name → VOS wire field name (per entity). */
 export const IRIS_FIELD_WIRE_NAMES: Record<string, Readonly<Record<string, string>>> = {
 <% wire_map_lines %>

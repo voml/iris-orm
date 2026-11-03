@@ -1,9 +1,9 @@
-import { createClient } from "../../index.js";
+import { Client } from "../../operations.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 import type { PostFindManyArgs } from "../../inputs.js";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
     const args = {
@@ -13,7 +13,7 @@ async function run() {
         },
     } satisfies PostFindManyArgs;
 
-    await db.post.findMany(args);
+    await db.tables.post.findMany(args);
 }
 
 void run;

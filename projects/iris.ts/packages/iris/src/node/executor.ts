@@ -4,8 +4,52 @@ import { createIrisDbBindingFromSession } from "../runtime/db-binding.ts";
 import { createOperationExecutorFromSession } from "../runtime/operation-binding.ts";
 import { openBindingSession, resolveBindingProfile } from "../runtime/open-binding-session.ts";
 import { guardOperationExecutor } from "../runtime/validate-contract.ts";
+import { IrisFacadeError } from "../types/errors.ts";
+import { openSessionFromDsn } from "./dsn.ts";
 import { loadIrisNative } from "./load.ts";
 import { loadProject, readProjectSchema } from "./project.ts";
+
+/**
+ * Build the operation executor for a generated `createClient({ dsn })`.
+ *
+ * The DSN picks the adapter; the session opens synchronously, so the authoring
+ * constructor stays synchronous like Python's `create_client`.
+ */
+export function createIrisOperationExecutorFromDsn(
+    dsn: string,
+    options: Pick<
+        CreateIrisDbBindingOptions,
+        "wireNamesByEntity" | "valueCarriersByEntity" | "contractFingerprint"
+    > & { schemaSource?: string } = {},
+): OperationExecutor {
+    const core = loadIrisNative();
+    const session = openSessionFromDsn(core, dsn);
+    if (options.schemaSource && isManagedDsn(dsn)) {
+        try {
+            session.managedPush!(options.schemaSource);
+        } catch (error) {
+            session.close();
+            throw new IrisFacadeError(
+                "IRIS-CONNECTION-FAILED",
+                error instanceof Error ? error.message : String(error),
+            );
+        }
+    }
+    const executor = createOperationExecutorFromSession(session, {
+        wireNamesByEntity: options.wireNamesByEntity,
+        valueCarriersByEntity: options.valueCarriersByEntity,
+    });
+    if (options.contractFingerprint) {
+        return guardOperationExecutor(executor, options.contractFingerprint);
+    }
+    return executor;
+}
+
+/** Managed adapters apply the generated schema; foreign servers get DDL via migration. */
+function isManagedDsn(dsn: string): boolean {
+    const text = dsn.trim();
+    return text.startsWith("sqlite:") || text.startsWith("file:");
+}
 
 /** Create internal binding support for generated `db` (not an application entry). */
 export async function createIrisDbBinding(options: CreateIrisDbBindingOptions = {}): Promise<IrisDbBinding> {

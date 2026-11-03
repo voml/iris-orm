@@ -1,12 +1,12 @@
-import { createClient } from "../../index.js";
+import { Client } from "../../operations.js";
 import { postId, userId } from "../../references.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
-    const author = await db.user.create({
+    const author = await db.tables.user.create({
         data: {
             userId: userId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             userName: "Ada",
@@ -15,7 +15,7 @@ async function run() {
         select: { userId: true, userName: true },
     });
 
-    await db.post.create({
+    await db.tables.post.create({
         data: {
             postId: postId("bbbbbbbb-cccc-dddd-eeee-ffff00000000"),
             author: author.userId,

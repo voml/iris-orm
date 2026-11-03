@@ -59,6 +59,12 @@ export interface CreateIrisDbBindingOptions {
     valueCarriersByEntity?: Readonly<Record < string, Readonly < Record < string, string >>> >;
 }
 
+/** Authoring-surface construction options: one DSN, never a backend name. */
+export interface CreateIrisClientOptions {
+    /** `sqlite:`, `file:` (YYDB), `mysql://`, `postgres://` or `memory:`. */
+    dsn: string;
+}
+
 /** @deprecated Use `IrisDbBinding`. */
 export type IrisExecutor = IrisDbBinding;
 

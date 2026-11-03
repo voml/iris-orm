@@ -163,7 +163,9 @@ fn typescript_browser_artifacts_stay_host_neutral() {
 
     let browser = file("browser.ts");
     assert!(browser.contains("@yydb/iris-language"), "{browser}");
-    assert!(browser.contains("CreateIrisDbBindingOptions"), "{browser}");
+    assert!(browser.contains("createIrisOperationExecutorFromDsn"), "{browser}");
+    assert!(browser.contains("CreateClientOptions"), "{browser}");
+    assert!(!browser.contains("createIrisOperationExecutor("), "{browser}");
 
     // Everything reachable from `browser.ts` must stay off the desktop package.
     for name in [
@@ -350,6 +352,35 @@ table Post {
     let ops = file("operations.ts");
     assert!(ops.contains("findMany<const A extends UserFindManyArgs>"));
     assert!(ops.contains("findMany<const A extends PostFindManyArgs>"));
+}
+
+#[test]
+fn typescript_emit_exposes_generated_client_surface_only() {
+    let model = GenerationModel::from_vos_schema(BLOG_SCHEMA).expect("schema");
+    let files = iris_generator::emit_typescript_client(&model).expect("emit");
+    let file = |name: &str| files.iter().find(|(path, _)| path == name).map(|(_, content)| content.as_str()).expect(name);
+
+    let ops = file("operations.ts");
+    assert!(ops.contains("export type Tables"), "{ops}");
+    assert!(ops.contains("readonly user: UserDelegate;"), "{ops}");
+    assert!(ops.contains("readonly post: PostDelegate;"), "{ops}");
+    assert!(ops.contains("readonly tables: Tables;"), "{ops}");
+    assert!(ops.contains("async transaction<T>(body: (tx: Client) => Promise<T>): Promise<T>"), "{ops}");
+    assert!(!ops.contains("export function createClient"), "construction belongs to the host entry: {ops}");
+    assert!(!ops.contains("$close"), "{ops}");
+    assert!(!ops.contains("$macros"), "{ops}");
+    assert!(!ops.contains("$query"), "{ops}");
+    assert!(!ops.contains("$execute"), "{ops}");
+
+    let node = file("node.ts");
+    assert!(node.contains("import type { CreateIrisClientOptions } from \"@yydb/iris/types\""), "{node}");
+    assert!(node.contains("export function createClient(options: CreateIrisClientOptions): Client"), "{node}");
+    assert!(node.contains("createIrisOperationExecutorFromDsn(options.dsn"), "{node}");
+    assert!(!node.contains("Database"), "{node}");
+
+    let index = file("index.ts");
+    assert!(!index.contains("createClient"), "host entry owns construction: {index}");
+    assert!(index.contains("export { Client }"), "{index}");
 }
 
 const OPERATION_ARTIFACT_JSON: &str = r#"{

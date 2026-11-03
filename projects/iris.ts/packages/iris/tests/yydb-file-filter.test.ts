@@ -19,6 +19,10 @@ const LAYOUTS = [
     { label: "folder `.yydx`", path: "data/app.yydx" },
 ];
 
+// One schema text feeds both the project file and the generator, so the
+// generated client applies the same document the project session pushed.
+const SCHEMA_SOURCE = `${SCHEMA.trim()}\n`;
+
 function ensureNativeOverride(): void {
     if (process.env.NAPI_RS_NATIVE_LIBRARY_PATH) {
         return;
@@ -75,7 +79,7 @@ async function runLayout(
     // the close-and-reopen leg, in both the single-file and folder layouts.
     const projectRoot = await mkdtemp(join(tmpdir(), "iris-yydb-file-filter-"));
     await mkdir(join(projectRoot, "schemas"), { recursive: true });
-    await writeFile(join(projectRoot, "schemas", "app.iris"), `${SCHEMA.trim()}\n`, "utf8");
+    await writeFile(join(projectRoot, "schemas", "app.iris"), SCHEMA_SOURCE, "utf8");
     await writeFile(
         join(projectRoot, "iris.config.ts"),
         `export default {
@@ -89,7 +93,7 @@ async function runLayout(
     );
 
     const generatedRoot = join(projectRoot, "src", "generated", "iris");
-    const result = core.generate(SCHEMA, "typescript", generatedRoot);
+    const result = core.generate(SCHEMA_SOURCE, "typescript", generatedRoot);
     assert.equal(result.ok, true, result.error);
 
     const runnerTemplate = fileURLToPath(new URL("./yydb-file-filter-runner.ts", import.meta.url));

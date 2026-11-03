@@ -1,11 +1,11 @@
-import { createClient } from "../../index.js";
+import { Client } from "../../operations.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
-    await db.post.findMany({
+    await db.tables.post.findMany({
         where: {
             title: { contains: 123 },
         },

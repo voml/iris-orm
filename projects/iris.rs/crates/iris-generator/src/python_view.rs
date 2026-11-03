@@ -30,6 +30,8 @@ struct PyTableView {
 struct PyTemplateContext {
     generator_version: String,
     schema_fingerprint: String,
+    /// VOS schema text as a Python string literal for generated metadata.
+    schema_source_literal: String,
     tables_view: Vec<PyTableView>,
     has_operations: bool,
     /// `{entity: {field: [ops...]}}` Python literal inlined into synthesize.
@@ -115,6 +117,7 @@ fn build_py_context(model: &GenerationModel) -> Result<PyTemplateContext> {
     Ok(PyTemplateContext {
         generator_version: model.generator_version.clone(),
         schema_fingerprint: model.schema_fingerprint.clone(),
+        schema_source_literal: serde_json::to_string(&model.schema_source).expect("schema source serializes"),
         tables_view,
         has_operations: !model.operations.is_empty(),
         filter_ops_literal,

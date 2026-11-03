@@ -129,6 +129,37 @@ function declaredVosWire(
     return runQuery(request.operation.source, parametersJson);
 }
 
+function transactionFailure(code: string, message: string): ResultEnvelope<never> {
+    return { ok: false, diagnostics: [{ code, message, severity: "error" }] };
+}
+
+function transactionControl(run: (() => SessionExecuteWire) | undefined): ResultEnvelope<void> {
+    if (!run) {
+        return transactionFailure(
+            "IRIS-TRANSACTION-UNSUPPORTED",
+            "the active session has no transaction control",
+        );
+    }
+    let raw: SessionExecuteWire;
+    try {
+        raw = run();
+    } catch (error) {
+        return transactionFailure(
+            "IRIS-TRANSACTION-FAILED",
+            error instanceof Error ? error.message : String(error),
+        );
+    }
+    if (typeof raw === "string") {
+        const parsed = parseExecuteJson(raw);
+        return parsed.ok
+            ? { ok: true, value: undefined }
+            : transactionFailure("IRIS-TRANSACTION-FAILED", parsed.error ?? "transaction failed");
+    }
+    return raw.ok
+        ? { ok: true, value: undefined }
+        : transactionFailure(raw.errorCode ?? "IRIS-TRANSACTION-FAILED", raw.error ?? "transaction failed");
+}
+
 /** Build the async operation executor from an open in-process session. */
 export function createOperationExecutorFromSession(
     session: MemorySessionBinding,
@@ -193,6 +224,15 @@ export function createOperationExecutorFromSession(
             }
             const envelope = wireToEnvelope(raw);
             return envelope.ok ? { ok: true, value: undefined } : { ok: false, diagnostics: envelope.diagnostics };
+        },
+        async begin() {
+            return transactionControl(session.begin?.bind(session));
+        },
+        async commit() {
+            return transactionControl(session.commit?.bind(session));
+        },
+        async rollback() {
+            return transactionControl(session.rollback?.bind(session));
         },
         async close() {
             session.close();

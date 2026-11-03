@@ -1,36 +1,28 @@
-import { createIrisOperationExecutor } from "@yydb/iris/node";
-import type { CreateIrisDbBindingOptions } from "@yydb/iris/types";
-import { createClient, type DbClient } from "./operations.js";
-import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
-let openDatabaseClient: DbClient | null = null;
-/** Node host: construct and reuse generated clients with N-API operation executor. */
-export class Database {
-    /** Construct a new client for this call site (no process singleton). */
-    static async create(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
-        return createClient(
-            await createIrisOperationExecutor({
-                ...options,
-                wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
-                valueCarriersByEntity: IRIS_VALUE_CARRIERS,
-                contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
-            }),
-        );
-    }
-    /** Reuse one client per process. Options apply only on the first call. */
-    static async open(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
-        if (!openDatabaseClient) {
-            openDatabaseClient = await Database.create(
-                options ?? { config: process.cwd(), source: "default" },
-            );
-        }
-        return openDatabaseClient;
-    }
-    static async close(): Promise<void> {
-        if (!openDatabaseClient) {
-            return;
-        }
-        await openDatabaseClient.$close();
-        openDatabaseClient = null;
-    }
+import { createIrisOperationExecutorFromDsn } from "@yydb/iris/node";
+import type { CreateIrisClientOptions } from "@yydb/iris/types";
+import { Client } from "./operations.js";
+import {
+    IRIS_FIELD_WIRE_NAMES,
+    IRIS_SCHEMA_FINGERPRINT,
+    IRIS_SCHEMA_SOURCE,
+    IRIS_VALUE_CARRIERS,
+} from "./metadata.js";
+/**
+ * Node host: construct one generated client for `options.dsn`.
+ *
+ * The DSN selects the adapter inside the runtime (`sqlite:`, `file:` for
+ * YYDB, `mysql://`, `postgres://`); the backend name never appears in the
+ * generated signature.
+ */
+export function createClient(options: CreateIrisClientOptions): Client {
+    return new Client(
+        createIrisOperationExecutorFromDsn(options.dsn, {
+            wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
+            valueCarriersByEntity: IRIS_VALUE_CARRIERS,
+            contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
+            schemaSource: IRIS_SCHEMA_SOURCE,
+        }),
+    );
 }
-export { createClient, DbClient } from "./operations.js";
+export { Client } from "./operations.js";
+export type { Tables } from "./operations.js";

@@ -1,12 +1,12 @@
-import { createClient } from "../../index.js";
+import { Client } from "../../operations.js";
 import { userId } from "../../references.js";
 import type { OperationExecutor } from "@yydb/iris/types";
 
 declare const executor: OperationExecutor;
-const db = createClient(executor);
+const db = new Client(executor);
 
 async function run() {
-    await db.user.create({
+    await db.tables.user.create({
         data: {
             user_id: userId("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
             active: true,

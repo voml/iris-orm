@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from iris._runtime import begin, close_session, commit, execute_operation, open_session, rollback
+from iris._runtime import begin, close_session, commit, execute_operation, open_managed_session, rollback
 
 from ..errors import IrisError
 
@@ -57,7 +57,7 @@ class OperationExecutor:
         close_session(self._session)
 
 
-def open_executor(dsn: str, options: dict[str, Any] | None = None) -> OperationExecutor:
+def open_executor(dsn: str, schema_source: str = "", options: dict[str, Any] | None = None) -> OperationExecutor:
     """Open the adapter `dsn` selects and wrap it in an executor."""
     unknown = set(options or {}) - _KNOWN_OPTIONS
     if unknown:
@@ -65,4 +65,4 @@ def open_executor(dsn: str, options: dict[str, Any] | None = None) -> OperationE
             f"unknown client option(s): {', '.join(sorted(unknown))}",
             code="IRIS-INVALID-ARGUMENT",
         )
-    return OperationExecutor(open_session(dsn))
+    return OperationExecutor(open_managed_session(dsn, schema_source or None))

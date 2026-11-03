@@ -36,6 +36,15 @@ export function guardOperationExecutor(executor: OperationExecutor, expectedFing
             }
             return executor.executeUnit(request);
         },
+        begin() {
+            return executor.begin();
+        },
+        commit() {
+            return executor.commit();
+        },
+        rollback() {
+            return executor.rollback();
+        },
         close() {
             return executor.close();
         },

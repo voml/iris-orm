@@ -1,4 +1,4 @@
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 
 const postListSelect = {
     postId: true,
@@ -9,10 +9,10 @@ const postListSelect = {
 
 export default defineEventHandler(async (event) => {
     const author = getQuery(event).author;
-    const db = await Database.open({ config: process.cwd(), source: "default" });
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
     const authorName = typeof author === "string" ? author.trim() : "";
     const where = authorName
         ? { published: true, author: { userName: authorName } }
         : { published: true };
-    return await db.post.findMany({ where, select: postListSelect });
+    return await db.tables.post.findMany({ where, select: postListSelect });
 });

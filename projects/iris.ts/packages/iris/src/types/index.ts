@@ -67,6 +67,7 @@ export type {
 } from "./vos.ts";
 export type { ExecutionResult, ExecutionRow, ExecutionWireResult } from "./execution-result.ts";
 export type {
+    CreateIrisClientOptions,
     CreateIrisDbBindingOptions,
     CreateIrisExecutorOptions,
     IrisDbBinding,

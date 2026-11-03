@@ -163,27 +163,61 @@ export class <% table.name %>Delegate {
 }
 <% end loop %>
 
-export class DbClient {
+/** Entity namespace of one client: `db.tables.<entity>`. */
+export type Tables = {
 <% loop table in tables_view %>
     readonly <% table.camel_name %>: <% table.name %>Delegate;
 <% end loop %>
-    readonly $macros: GeneratedMacros;
+};
+
+/**
+ * One generated client bound to the adapter its DSN selects.
+ *
+ * Authors call `createClient({ dsn })` from the host entry and then
+ * `db.tables.<entity>`; connection, adapter selection and the operation
+ * channel never appear here.
+ */
+export class Client {
+    readonly tables: Tables;
+    readonly macros: GeneratedMacros;
+<% if has_operations %>
+    readonly operations: GeneratedOperations;
+<% end if %>
     private readonly executor: OperationExecutor;
 
     constructor(executor: OperationExecutor) {
         this.executor = executor;
-        this.$macros = new GeneratedMacros(executor);
+        this.tables = {
 <% loop table in tables_view %>
-        this.<% table.camel_name %> = new <% table.name %>Delegate(executor);
+            <% table.camel_name %>: new <% table.name %>Delegate(executor),
 <% end loop %>
+        };
+        this.macros = new GeneratedMacros(executor);
+<% if has_operations %>
+        this.operations = new GeneratedOperations(executor);
+<% end if %>
     }
 
-    async $close(): Promise<void> {
-        await this.executor.close();
+    /**
+     * Run `body` inside one transaction: a resolved promise commits, a thrown
+     * error rolls back and is rethrown. The callback receives the same client
+     * shape, so entity calls inside are identical to calls outside.
+     */
+    async transaction<T>(body: (tx: Client) => Promise<T>): Promise<T> {
+        const begun = await this.executor.begin();
+        if (!begun.ok) {
+            throwOperationEnvelopeError(begun);
+        }
+        try {
+            const value = await body(this);
+            const committed = await this.executor.commit();
+            if (!committed.ok) {
+                throwOperationEnvelopeError(committed);
+            }
+            return value;
+        } catch (error) {
+            await this.executor.rollback();
+            throw error;
+        }
     }
-}
-
-/** Construct a client from an injected operation executor (preferred ABI). */
-export function createClient(executor: OperationExecutor): DbClient {
-    return new DbClient(executor);
 }

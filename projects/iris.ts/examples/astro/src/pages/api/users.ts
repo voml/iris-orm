@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import type { APIRoute } from "astro";
 
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 import type { UserId } from "@iris/index.ts";
 
 export const GET: APIRoute = async () => {
-    const db = await Database.open({ config: process.cwd(), source: "default" });
-    return new Response(JSON.stringify(await db.user.findMany({ where: { active: true } })), {
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
+    return new Response(JSON.stringify(await db.tables.user.findMany({ where: { active: true } })), {
         headers: { "content-type": "application/json" },
     });
 };
@@ -20,8 +20,8 @@ export const POST: APIRoute = async ({ request }) => {
             headers: { "content-type": "application/json" },
         });
     }
-    const db = await Database.open({ config: process.cwd(), source: "default" });
-    const user = await db.user.create({
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
+    const user = await db.tables.user.create({
         data: {
             userId: randomUUID() as UserId,
             userName: userName,

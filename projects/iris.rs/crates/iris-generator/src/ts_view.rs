@@ -67,6 +67,8 @@ struct TsMacroView {
 struct TsTemplateContext {
     generator_version: String,
     schema_fingerprint: String,
+    /// VOS schema text as a JSON string literal for generated metadata.
+    schema_source_literal: String,
     tables: Vec<TableModel>,
     macros: Vec<MacroModel>,
     entity_union: String,
@@ -84,6 +86,8 @@ struct TsTemplateContext {
     tables_view: Vec<TsTableView>,
     macros_view: Vec<TsMacroView>,
     has_macros: bool,
+    /// Whether projected operations add a `GeneratedOperations` stub class.
+    has_operations: bool,
     /// Pre-computed per-entity wire-name map inlined into synthesize.ts
     /// so the runtime no longer imports IRIS_FIELD_WIRE_NAMES from metadata.
     synthesize_wire_map_lines: String,
@@ -298,6 +302,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
     Ok(TsTemplateContext {
         generator_version: model.generator_version.clone(),
         schema_fingerprint: model.schema_fingerprint.clone(),
+        schema_source_literal: serde_json::to_string(&model.schema_source).expect("schema source serializes"),
         tables: model.tables.clone(),
         macros: model.macros.clone(),
         entity_union,
@@ -313,6 +318,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         tables_view,
         macros_view,
         has_macros,
+        has_operations: !model.operations.is_empty(),
         synthesize_wire_map_lines,
         synthesize_reference_target_lines,
         synthesize_filter_ops_lines,

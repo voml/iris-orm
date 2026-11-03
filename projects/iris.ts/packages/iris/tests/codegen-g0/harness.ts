@@ -45,6 +45,9 @@ export type ExecutionRow = Record<string, string | number | boolean | bigint | U
 export type OperationExecutor = {
   execute(request: OperationRequest): Promise<ResultEnvelope<readonly ExecutionRow[]>>;
   executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
+  begin(): Promise<ResultEnvelope<void>>;
+  commit(): Promise<ResultEnvelope<void>>;
+  rollback(): Promise<ResultEnvelope<void>>;
   close(): Promise<void>;
 };
 

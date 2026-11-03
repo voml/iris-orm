@@ -7,12 +7,11 @@
  * so this entry fails closed instead of falling back to a TypeScript-side or
  * in-memory executor.
  */
-export class Database {
-    static async create(): Promise<never> {
-        throw new Error(
-            "IRIS-D1-EDGE-ARTIFACT-PENDING: the generated D1 edge artifact is not emitted yet. Bridge `env.DB` through the WASM `d1-wasm-bridge` instead of a generated `Database.create`.",
-        );
-    }
+export function createClient(): never {
+    throw new Error(
+        "IRIS-D1-EDGE-ARTIFACT-PENDING: the generated D1 edge artifact is not emitted yet. Bridge `env.DB` through the WASM `d1-wasm-bridge` instead of a generated `createClient`.",
+    );
 }
 
-export { createClient, DbClient } from "./operations.js";
+export { Client } from "./operations.js";
+export type { Tables } from "./operations.js";

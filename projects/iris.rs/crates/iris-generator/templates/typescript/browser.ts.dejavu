@@ -1,19 +1,31 @@
-import { createIrisOperationExecutor, type CreateIrisDbBindingOptions } from "@yydb/iris-language";
-import { createClient, type DbClient } from "./operations.js";
-import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
+import { createIrisOperationExecutorFromDsn } from "@yydb/iris-language";
+import type { CreateIrisDbBindingOptions } from "@yydb/iris-language";
+import { Client } from "./operations.js";
+import {
+    IRIS_FIELD_WIRE_NAMES,
+    IRIS_SCHEMA_FINGERPRINT,
+    IRIS_SCHEMA_SOURCE,
+    IRIS_VALUE_CARRIERS,
+} from "./metadata.js";
 
-/** Browser / Worker host: WASM operation executor (call `initIris()` or `loadIrisWeb()` before `Database.create`). */
-export class Database {
-    static async create(options?: CreateIrisDbBindingOptions): Promise<DbClient> {
-        return createClient(
-            await createIrisOperationExecutor({
-                ...options,
-                wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
-                valueCarriersByEntity: IRIS_VALUE_CARRIERS,
-                contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
-            }),
-        );
-    }
+export type CreateClientOptions = CreateIrisDbBindingOptions & { dsn: string };
+
+/**
+ * Browser / Worker host: construct one generated client after `initIris()`.
+ *
+ * Browser storage is memory-only until YYDB wires browser persistence, so a
+ * non-memory DSN fails at construction instead of silently degrading.
+ */
+export function createClient(options: CreateClientOptions): Client {
+    return new Client(
+        createIrisOperationExecutorFromDsn(options.dsn, {
+            wireNamesByEntity: IRIS_FIELD_WIRE_NAMES,
+            valueCarriersByEntity: IRIS_VALUE_CARRIERS,
+            contractFingerprint: IRIS_SCHEMA_FINGERPRINT,
+            schemaSource: IRIS_SCHEMA_SOURCE,
+        }),
+    );
 }
 
-export { createClient, DbClient } from "./operations.js";
+export { Client } from "./operations.js";
+export type { Tables } from "./operations.js";

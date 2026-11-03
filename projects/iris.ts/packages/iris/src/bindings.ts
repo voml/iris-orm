@@ -3,7 +3,7 @@ import type { CheckSourceResult } from "./types/check-source.ts";
 /** Wire execute payload from Node N-API or browser WASM session methods. */
 export type SessionExecuteWire =
     | string
-    | { ok: boolean; rowsJson: string; error?: string | null };
+    | { ok: boolean; rowsJson: string; error?: string | null; errorCode?: string | null };
 
 /** Wire session surface shared by Node N-API and browser WASM hosts. */
 export type MemorySessionBinding = {
@@ -17,6 +17,9 @@ export type MemorySessionBinding = {
         parametersJson?: string | null,
     ): SessionExecuteWire;
     executeOperation ? (operationJson: string) : SessionExecuteWire;
+    begin ? () : SessionExecuteWire;
+    commit ? () : SessionExecuteWire;
+    rollback ? () : SessionExecuteWire;
     close(): void;
     managedPush?: (schema: string) => void;
     sqliteEngineVersion?: () => string;
@@ -41,6 +44,7 @@ export type IrisBindings = {
     openMemorySession(): MemorySessionBinding;
     openSession ? (options?: OpenSessionNapiOptions) : MemorySessionBinding;
     openSqliteSession ? (path: string) : MemorySessionBinding;
+    openYydbSession ? (endpoint: string) : MemorySessionBinding;
     openPostgresSession ? (url: string) : MemorySessionBinding;
     openMysqlSession ? (url: string) : MemorySessionBinding;
     openProjectSession ? (configPath: string, source: string) : MemorySessionBinding;

@@ -71,5 +71,11 @@ export type OperationRequest = {
 export interface OperationExecutor {
     execute(request: OperationRequest): Promise<ResultEnvelope<readonly GeneratedExecutionRow[]>>;
     executeUnit(request: OperationRequest): Promise<ResultEnvelope<void>>;
+    /** Open the transaction scope used by `Client.transaction`. */
+    begin(): Promise<ResultEnvelope<void>>;
+    /** Commit the active transaction scope. */
+    commit(): Promise<ResultEnvelope<void>>;
+    /** Roll back the active transaction scope. */
+    rollback(): Promise<ResultEnvelope<void>>;
     close(): Promise<void>;
 }

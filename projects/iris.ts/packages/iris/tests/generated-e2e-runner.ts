@@ -1,5 +1,5 @@
-import { createClient } from "./operations.js";
-import { Database } from "./node.js";
+import { Client } from "./operations.js";
+import { createClient } from "./node.js";
 import { buildDeclaredOperationRequest, synthesizeFindMany } from "./_internal/synthesize.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT } from "./metadata.js";
 
@@ -31,51 +31,45 @@ const synthesis = synthesizeFindMany("User", {
 const request = buildDeclaredOperationRequest("User.findMany", synthesis);
 const directEnvelope = await executor.execute(request);
 
-const client = createClient(executor);
-const clientRows = await client.user.findMany({
+const client = new Client(executor);
+const clientRows = await client.tables.user.findMany({
     where: {
         active: { eq: true },
     },
 });
 await executor.close();
 
-const db = await Database.create({
-    profile: "sqlite",
-    sqlitePath: ":memory:",
-    schema,
-});
+const db = createClient({ dsn: "sqlite::memory:" });
 
-const databaseRows = await db.user.findMany({
+const databaseRows = await db.tables.user.findMany({
     where: {
         active: { eq: true },
     },
 });
 
-const created = await db.user.create({
+const created = await db.tables.user.create({
     data: { userId: "e2e-1", userName: "Ada", active: true },
     select: { userId: true, userName: true, active: true },
 });
 
-const unique = await db.user.findUnique({
+const unique = await db.tables.user.findUnique({
     where: { userId: "e2e-1" },
 });
 
-const afterCreate = await db.user.findMany({
+const afterCreate = await db.tables.user.findMany({
     where: { userId: { eq: "e2e-1" } },
 });
 
-const updated = await db.user.update({
+const updated = await db.tables.user.update({
     where: { userId: "e2e-1" },
     data: { userName: { set: "Grace" } },
 });
 
-await db.user.delete({ where: { userId: "e2e-1" } });
+await db.tables.user.delete({ where: { userId: "e2e-1" } });
 
-const afterDelete = await db.user.findMany({
+const afterDelete = await db.tables.user.findMany({
     where: { userId: { eq: "e2e-1" } },
 });
-
-await Database.close();
 
 if (!directEnvelope.ok) {
     throw new Error(directEnvelope.diagnostics[0]?.message ?? "generated findMany failed");

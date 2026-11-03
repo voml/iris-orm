@@ -5,12 +5,12 @@
  * Writes three rows through the generated client (two share one content
  * digest under different labels), then proves the digest-identity filter
  * semantics on the generated face, the direct executor face and the
- * `Database` face, across a close-and-reopen of the same file.
+ * `createClient({ dsn })` face, across a close-and-reopen of the same file.
  */
 import { createHash } from "node:crypto";
 
-import { createClient } from "./operations.js";
-import { Database } from "./node.js";
+import { Client } from "./operations.js";
+import { createClient } from "./node.js";
 import { buildDeclaredOperationRequest, synthesizeFindMany } from "./_internal/synthesize.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
 
@@ -19,7 +19,9 @@ if (!projectRoot) {
     throw new Error("IRIS_TEST_PROJECT is required");
 }
 
-const { createIrisOperationExecutor } = await import("@yydb/iris/node");
+const { createIrisOperationExecutor, loadIrisConfig } = await import("@yydb/iris/node");
+const projectConfig = await loadIrisConfig(projectRoot);
+const datasourcePath = projectConfig.datasources?.default?.path ?? "data/app.yydb";
 
 const executorOptions = {
     profile: "project",
@@ -70,18 +72,18 @@ const payloadFieldsOf = (rows) =>
     }));
 
 const executor = await createIrisOperationExecutor(executorOptions);
-const client = createClient(executor);
+const client = new Client(executor);
 
 // Writes go through the generated face with the typed descriptor carrier.
-await client.asset.create({ data: { assetId: 1n, label: "alpha", payload: alpha } });
-await client.asset.create({ data: { assetId: 2n, label: "alpha-copy", payload: alphaRenamed } });
-await client.asset.create({ data: { assetId: 3n, label: "beta", payload: beta } });
+await client.tables.asset.create({ data: { assetId: 1n, label: "alpha", payload: alpha } });
+await client.tables.asset.create({ data: { assetId: 2n, label: "alpha-copy", payload: alphaRenamed } });
+await client.tables.asset.create({ data: { assetId: 3n, label: "beta", payload: beta } });
 
 // Generated face: equality and inequality on the content digest.
-const eqRows = await client.asset.findMany({ where: { payload: { eq: alpha } } });
-const notRows = await client.asset.findMany({ where: { payload: { not: alpha } } });
-const relabeledRows = await client.asset.findMany({ where: { payload: { eq: relabeledProbe } } });
-const allRows = await client.asset.findMany();
+const eqRows = await client.tables.asset.findMany({ where: { payload: { eq: alpha } } });
+const notRows = await client.tables.asset.findMany({ where: { payload: { not: alpha } } });
+const relabeledRows = await client.tables.asset.findMany({ where: { payload: { eq: relabeledProbe } } });
+const allRows = await client.tables.asset.findMany();
 
 // Direct face: the same synthesized operation through the raw executor.
 const directEnvelope = await executor.execute(
@@ -91,7 +93,7 @@ const directEnvelope = await executor.execute(
 // Error path: a descriptor outside the canonical digest form is refused.
 let malformedCode = null;
 try {
-    await client.asset.findMany({ where: { payload: { eq: { ...alpha, digest: "not-a-digest" } } } });
+    await client.tables.asset.findMany({ where: { payload: { eq: { ...alpha, digest: "not-a-digest" } } } });
 } catch (error) {
     malformedCode = error && typeof error === "object" && "code" in error ? String(error.code) : "unknown";
 }
@@ -100,15 +102,14 @@ await executor.close();
 
 // Reopen: a fresh session over the same file sees the same identity semantics.
 const reopened = await createIrisOperationExecutor(executorOptions);
-const reopenedClient = createClient(reopened);
-const reopenEqRows = await reopenedClient.asset.findMany({ where: { payload: { eq: alpha } } });
-const reopenAllRows = await reopenedClient.asset.findMany();
+const reopenedClient = new Client(reopened);
+const reopenEqRows = await reopenedClient.tables.asset.findMany({ where: { payload: { eq: alpha } } });
+const reopenAllRows = await reopenedClient.tables.asset.findMany();
 await reopened.close();
 
-// `Database` face on the same on-disk file.
-const database = await Database.create({ profile: "project", config: projectRoot });
-const databaseFaceRows = await database.asset.findMany({ where: { payload: { eq: alpha } } });
-await database.$close();
+// `createClient({ dsn })` face on the same on-disk file.
+const database = createClient({ dsn: `file:${datasourcePath}` });
+const databaseFaceRows = await database.tables.asset.findMany({ where: { payload: { eq: alpha } } });
 
 if (!directEnvelope.ok) {
     throw new Error(directEnvelope.diagnostics[0]?.message ?? "direct findMany failed");

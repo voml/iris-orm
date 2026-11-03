@@ -190,6 +190,21 @@ def open_session(dsn: str) -> Session:
     raise IrisError(f"unrecognized DSN `{text}`", code="IRIS-INVALID-ARGUMENT")
 
 
+_MANAGED_SCHEMES: tuple[str, ...] = ("sqlite:", "file:")
+
+
+def open_managed_session(dsn: str, schema: str | None = None) -> Session:
+    """Open `dsn` and apply the generated schema on managed adapters."""
+    session = open_session(dsn)
+    if schema and dsn.strip().startswith(_MANAGED_SCHEMES):
+        try:
+            session.managedPush(schema)
+        except IrisError:
+            session.close()
+            raise
+    return session
+
+
 def execute_operation(session: Session, request_json: str) -> dict[str, Any]:
     """Run one structured operation request and return its envelope."""
     return session.executeOperation(request_json)

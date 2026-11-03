@@ -65,8 +65,30 @@ export function createOperationExecutorFromBinding(binding: IrisDbBinding): Oper
                 };
             }
         },
+        async begin(): Promise<ResultEnvelope<void>> {
+            return unsupportedTransaction();
+        },
+        async commit(): Promise<ResultEnvelope<void>> {
+            return unsupportedTransaction();
+        },
+        async rollback(): Promise<ResultEnvelope<void>> {
+            return unsupportedTransaction();
+        },
         async close() {
             await binding.close();
         },
+    };
+}
+
+function unsupportedTransaction(): ResultEnvelope<void> {
+    return {
+        ok: false,
+        diagnostics: [
+            {
+                code: "IRIS-TRANSACTION-UNSUPPORTED",
+                message: "the legacy binding adapter has no transaction control",
+                severity: "error",
+            },
+        ],
     };
 }

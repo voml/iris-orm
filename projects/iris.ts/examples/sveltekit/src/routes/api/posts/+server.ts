@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { json, type RequestEvent } from "@sveltejs/kit";
 
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 import type { PostId, UserId } from "@iris/index.ts";
 
 const postListSelect = {
@@ -13,11 +13,11 @@ const postListSelect = {
 
 export async function GET({ url }: RequestEvent) {
     const author = url.searchParams.get("author")?.trim();
-    const db = await Database.open({ config: process.cwd(), source: "default" });
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
     const where = author
         ? { published: true, author: { userName: author } }
         : { published: true };
-    return json(await db.post.findMany({ where, select: postListSelect }));
+    return json(await db.tables.post.findMany({ where, select: postListSelect }));
 }
 
 export async function POST({ request }: RequestEvent) {
@@ -27,8 +27,8 @@ export async function POST({ request }: RequestEvent) {
     if (!authorUserId || !title) {
         return json({ error: "author_user_id and title are required" }, { status: 400 });
     }
-    const db = await Database.open({ config: process.cwd(), source: "default" });
-    const post = await db.post.create({
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
+    const post = await db.tables.post.create({
         data: {
             postId: randomUUID() as PostId,
             author: authorUserId as UserId,

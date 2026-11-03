@@ -53,6 +53,10 @@ impl MemorySession {
         HostSession::open_postgres(&url).map(|inner| Self { inner: Some(inner) }).map_err(envelope_error)
     }
 
+    pub(crate) fn open_yydb(endpoint: String) -> Result<Self> {
+        HostSession::open_yydb(&endpoint).map(|inner| Self { inner: Some(inner) }).map_err(envelope_error)
+    }
+
     pub(crate) fn open_mysql(url: String) -> Result<Self> {
         HostSession::open_mysql(&url).map(|inner| Self { inner: Some(inner) }).map_err(envelope_error)
     }

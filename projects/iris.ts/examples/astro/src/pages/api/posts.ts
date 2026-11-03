@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { APIRoute } from "astro";
 
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 import type { PostId, UserId } from "@iris/index.ts";
 
 const postListSelect = {
@@ -13,11 +13,11 @@ const postListSelect = {
 
 export const GET: APIRoute = async ({ request }) => {
     const author = new URL(request.url).searchParams.get("author")?.trim();
-    const db = await Database.open({ config: process.cwd(), source: "default" });
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
     const where = author
         ? { published: true, author: { userName: author } }
         : { published: true };
-    return new Response(JSON.stringify(await db.post.findMany({ where, select: postListSelect })), {
+    return new Response(JSON.stringify(await db.tables.post.findMany({ where, select: postListSelect })), {
         headers: { "content-type": "application/json" },
     });
 };
@@ -32,8 +32,8 @@ export const POST: APIRoute = async ({ request }) => {
             headers: { "content-type": "application/json" },
         });
     }
-    const db = await Database.open({ config: process.cwd(), source: "default" });
-    const post = await db.post.create({
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
+    const post = await db.tables.post.create({
         data: {
             postId: randomUUID() as PostId,
             author: authorUserId as UserId,

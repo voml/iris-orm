@@ -185,6 +185,9 @@ def create_client(dsn: str, **options: Any) -> Client:
     """Open a generated client for `dsn`.
 
     The DSN selects the adapter internally (`sqlite:`, `file:`, `mysql://`,
-    `postgres://`). Unknown options are rejected rather than ignored.
+    `postgres://`). Managed adapters apply the schema this module was
+    generated from. Unknown options are rejected rather than ignored.
     """
-    return Client(open_executor(dsn, options))
+    from .metadata import SCHEMA_SOURCE
+
+    return Client(open_executor(dsn, SCHEMA_SOURCE, options))

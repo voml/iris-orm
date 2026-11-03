@@ -1,6 +1,6 @@
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 
 export default defineNitroPlugin(async () => {
-    const db = await Database.open({ config: process.cwd(), source: "default" });
-    await db.$macros.seed_blog();
+    const db = createClient({ dsn: "file:.iris/dev.yydb" });
+    await db.macros.seed_blog();
 });

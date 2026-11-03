@@ -1,4 +1,5 @@
-export { DbClient, createClient } from "./operations.js";
+export { Client } from "./operations.js";
+export type { Tables } from "./operations.js";
 export type * from "./models.js";
 export type * from "./inputs.js";
 export type * from "./references.js";

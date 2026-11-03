@@ -1,6 +1,6 @@
 import { defineConfig } from "@yydb/iris";
 
-/** Astro SSR (`@astrojs/node`) - file-backed YYDB survives dev HMR (`Database.open` from `@iris/node.ts`). */
+/** Astro SSR (`@astrojs/node`) - file-backed YYDB survives dev HMR (`createClient({ dsn })` from `@iris/node.ts`). */
 export default defineConfig({
     schema: "schemas/**/*.iris",
     datasources: {

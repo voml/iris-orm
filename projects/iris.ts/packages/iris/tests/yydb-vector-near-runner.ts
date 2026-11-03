@@ -8,7 +8,7 @@
  * `where` pre-filter, `take`, dimension mismatch and zero-norm cosine as
  * structured rejections, and the same semantics after a close-and-reopen.
  */
-import { createClient } from "./operations.js";
+import { Client } from "./operations.js";
 import { buildDeclaredOperationRequest, evaluateVectorNearRows, synthesizeVectorNear } from "./_internal/synthesize.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
 
@@ -38,29 +38,29 @@ const codes = async (fn) => {
 };
 
 const executor = await createIrisOperationExecutor(executorOptions);
-const client = createClient(executor);
+const client = new Client(executor);
 
 // One row per direction so cosine covers parallel / orthogonal / opposite.
-await client.doc.create({ data: { docId: 1n, label: "east", embedding: new Float32Array([1, 0, 0]) } });
-await client.doc.create({ data: { docId: 2n, label: "north", embedding: new Float32Array([0, 1, 0]) } });
-await client.doc.create({ data: { docId: 3n, label: "east2", embedding: new Float32Array([2, 0, 0]) } });
-await client.doc.create({ data: { docId: 4n, label: "west", embedding: new Float32Array([-1, 0, 0]) } });
+await client.tables.doc.create({ data: { docId: 1n, label: "east", embedding: new Float32Array([1, 0, 0]) } });
+await client.tables.doc.create({ data: { docId: 2n, label: "north", embedding: new Float32Array([0, 1, 0]) } });
+await client.tables.doc.create({ data: { docId: 3n, label: "east2", embedding: new Float32Array([2, 0, 0]) } });
+await client.tables.doc.create({ data: { docId: 4n, label: "west", embedding: new Float32Array([-1, 0, 0]) } });
 
 // A wrong-dimension write is refused before any row lands.
 const wrongDimensionCreateCode = await codes(() =>
-    client.doc.create({ data: { docId: 99n, label: "bad", embedding: new Float32Array([1, 0]) } }),
+    client.tables.doc.create({ data: { docId: 99n, label: "bad", embedding: new Float32Array([1, 0]) } }),
 );
 
 // Generated face: score metrics pass at or above the threshold.
-const cosineStrong = await client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.9 } });
-const cosineAll = await client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 } });
-const dotStrong = await client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "dot", threshold: 1.5 } });
+const cosineStrong = await client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.9 } });
+const cosineAll = await client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 } });
+const dotStrong = await client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "dot", threshold: 1.5 } });
 // Distance metric passes at or below the threshold and orders ascending.
-const euclideanClose = await client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "euclidean", threshold: 1.5 } });
+const euclideanClose = await client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "euclidean", threshold: 1.5 } });
 // Closest-first ordering feeds `take`.
-const cosineTakeOne = await client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 }, take: 1 });
+const cosineTakeOne = await client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 }, take: 1 });
 // The `where` pre-filter narrows the scanned rows before ranking.
-const cosineFiltered = await client.doc.findNear({
+const cosineFiltered = await client.tables.doc.findNear({
     field: "embedding",
     near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 },
     where: { label: { eq: "east2" } },
@@ -92,28 +92,28 @@ const euclideanBoundary = evaluateVectorNearRows(
 
 // Error paths: explicit structured rejections, never silent matching.
 const dimensionCode = await codes(() =>
-    client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0]), metric: "cosine", threshold: 0.5 } }),
+    client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0]), metric: "cosine", threshold: 0.5 } }),
 );
-const metricCode = await codes(() => client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "manhattan", threshold: 0.5 } }));
-const fieldCode = await codes(() => client.doc.findNear({ field: "label", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.5 } }));
+const metricCode = await codes(() => client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "manhattan", threshold: 0.5 } }));
+const fieldCode = await codes(() => client.tables.doc.findNear({ field: "label", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.5 } }));
 const zeroNormQueryCode = await codes(() =>
-    client.doc.findNear({ field: "embedding", near: { vector: new Float32Array([0, 0, 0]), metric: "cosine", threshold: 0.0 } }),
+    client.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([0, 0, 0]), metric: "cosine", threshold: 0.0 } }),
 );
 
 await executor.close();
 
 // Reopen: a fresh session over the same file ranks the same rows.
 const reopened = await createIrisOperationExecutor(executorOptions);
-const reopenedClient = createClient(reopened);
-const reopenCosineStrong = await reopenedClient.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.9 } });
+const reopenedClient = new Client(reopened);
+const reopenCosineStrong = await reopenedClient.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.9 } });
 await reopened.close();
 
 // A zero-norm row poisons cosine retrieval explicitly instead of being skipped.
 const poisoned = await createIrisOperationExecutor(executorOptions);
-const poisonedClient = createClient(poisoned);
-await poisonedClient.doc.create({ data: { docId: 5n, label: "zero", embedding: new Float32Array([0, 0, 0]) } });
+const poisonedClient = new Client(poisoned);
+await poisonedClient.tables.doc.create({ data: { docId: 5n, label: "zero", embedding: new Float32Array([0, 0, 0]) } });
 const zeroNormRowCode = await codes(() =>
-    poisonedClient.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 } }),
+    poisonedClient.tables.doc.findNear({ field: "embedding", near: { vector: new Float32Array([1, 0, 0]), metric: "cosine", threshold: 0.0 } }),
 );
 await poisoned.close();
 

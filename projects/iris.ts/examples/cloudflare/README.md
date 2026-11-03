@@ -14,13 +14,9 @@ Deploy the same blog schema on **Cloudflare Workers** with a **D1** binding, whi
 
 ## Target shape (not implemented)
 
-```ts
-// Future: one generated entry, D1 as foreign SQLite session
-const db = await Database.create({ profile: "d1", binding: env.DB, source: "default" });
-await db.$macros.seed_blog();
-```
+The generated Worker client (`@iris/browser.ts`) currently accepts only `createClient({ dsn: "memory:" })`. D1 lowering is pending, so there is no `env.DB` passthrough on the generated client yet.
 
-Until Iris ships a D1 / foreign-sqlite session, this example keeps:
+Until Iris ships a D1 session, this example keeps:
 
 1. **D1 migrations** (`migrations/`) aligned with `schemas/blog.iris`
 2. A thin **`d1-blog.ts`** SQL layer (explicitly temporary)

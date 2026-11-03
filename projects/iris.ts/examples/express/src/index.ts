@@ -1,17 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import express from "express";
 
 import type { PostId, UserId } from "@iris/index.ts";
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = express();
 app.use(express.json());
 
-const db = await Database.open({ config: projectRoot, source: "default" });
-await db.$macros.seed_blog();
+const db = createClient({ dsn: "file::memory:" });
+await db.macros.seed_blog();
 
 const postListSelect = {
     postId: true,
@@ -21,7 +18,7 @@ const postListSelect = {
 } as const;
 
 app.get("/users", async (_req, res) => {
-    res.json(await db.user.findMany({ where: { active: true } }));
+    res.json(await db.tables.user.findMany({ where: { active: true } }));
 });
 
 app.post("/users", async (req, res) => {
@@ -31,7 +28,7 @@ app.post("/users", async (req, res) => {
         return;
     }
     const active = typeof req.body?.active === "boolean" ? req.body.active : true;
-    const user = await db.user.create({
+    const user = await db.tables.user.create({
         data: { userId: randomUUID() as UserId, userName, active },
     });
     res.status(201).json(user);
@@ -42,7 +39,7 @@ app.get("/posts", async (req, res) => {
     const where = author
         ? { published: true, author: { userName: author } }
         : { published: true };
-    res.json(await db.post.findMany({ where, select: postListSelect }));
+    res.json(await db.tables.post.findMany({ where, select: postListSelect }));
 });
 
 app.post("/posts", async (req, res) => {
@@ -53,7 +50,7 @@ app.post("/posts", async (req, res) => {
         return;
     }
     const published = typeof req.body?.published === "boolean" ? req.body.published : true;
-    const post = await db.post.create({
+    const post = await db.tables.post.create({
         data: {
             postId: randomUUID() as PostId,
             author: authorUserId as UserId,
@@ -71,9 +68,8 @@ const server = app.listen(port, () => {
 });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-    process.on(signal, async () => {
+    process.on(signal, () => {
         server.close();
-        await Database.close();
         process.exit(0);
     });
 }

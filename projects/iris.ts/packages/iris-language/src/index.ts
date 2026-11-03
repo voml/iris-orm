@@ -31,6 +31,7 @@ export {
     createIris,
     createIrisDbBinding,
     createIrisOperationExecutor,
+    createIrisOperationExecutorFromDsn,
     openLocalStore,
 } from "./executor.ts";
 export type {

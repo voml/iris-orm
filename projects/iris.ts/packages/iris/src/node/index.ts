@@ -15,6 +15,7 @@ export {
     createIrisDbBinding,
     createIrisExecutor,
     createIrisOperationExecutor,
+    createIrisOperationExecutorFromDsn,
     resolveNodeBindingProfile,
 } from "./executor.ts";
 export { printDoctorReport } from "./doctor.ts";

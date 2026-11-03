@@ -4,11 +4,11 @@
  * Executed inside a generated project root by `yydb-layout-string-match.test.ts`.
  * Seeds five text rows plus one `NULL` row through the generated client, then
  * proves the same predicate matrix on the generated face, the direct executor
- * face and the `Database` face. The project config decides whether the layout
- * is a single-file `.yydb` database or a `.yydx` folder database.
+ * face and the `createClient({ dsn })` face. The project config decides whether
+ * the layout is a single-file `.yydb` database or a `.yydx` folder database.
  */
-import { createClient } from "./operations.js";
-import { Database } from "./node.js";
+import { Client } from "./operations.js";
+import { createClient } from "./node.js";
 import { buildDeclaredOperationRequest, synthesizeFindMany } from "./_internal/synthesize.js";
 import { IRIS_FIELD_WIRE_NAMES, IRIS_SCHEMA_FINGERPRINT, IRIS_VALUE_CARRIERS } from "./metadata.js";
 
@@ -17,7 +17,9 @@ if (!projectRoot) {
     throw new Error("IRIS_TEST_PROJECT is required");
 }
 
-const { createIrisOperationExecutor } = await import("@yydb/iris/node");
+const { createIrisOperationExecutor, loadIrisConfig } = await import("@yydb/iris/node");
+const projectConfig = await loadIrisConfig(projectRoot);
+const datasourcePath = projectConfig.datasources?.default?.path ?? "data/app.yydb";
 
 const executorOptions = {
     profile: "project",
@@ -44,21 +46,21 @@ const idsOf = (rows) =>
     rows.map((row) => row.id.toString()).sort((left, right) => Number(left) - Number(right));
 
 const executor = await createIrisOperationExecutor(executorOptions);
-const client = createClient(executor);
+const client = new Client(executor);
 
-await client.note.create({ data: { id: 1n, title: "alpha" } });
-await client.note.create({ data: { id: 2n, title: "beta" } });
-await client.note.create({ data: { id: 3n, title: "alphabet" } });
-await client.note.create({ data: { id: 4n, title: "" } });
-await client.note.create({ data: { id: 5n, title: "hello 世界" } });
+await client.tables.note.create({ data: { id: 1n, title: "alpha" } });
+await client.tables.note.create({ data: { id: 2n, title: "beta" } });
+await client.tables.note.create({ data: { id: 3n, title: "alphabet" } });
+await client.tables.note.create({ data: { id: 4n, title: "" } });
+await client.tables.note.create({ data: { id: 5n, title: "hello 世界" } });
 // A `NULL` text row: every text predicate is unknown for it, so it is never
 // part of a filtered result even though it exists in the table.
-await client.note.create({ data: { id: 6n, title: null } });
+await client.tables.note.create({ data: { id: 6n, title: null } });
 
 const generated = {};
 const direct = {};
 for (const probe of PROBES) {
-    generated[probe.name] = idsOf(await client.note.findMany({ where: probe.where }));
+    generated[probe.name] = idsOf(await client.tables.note.findMany({ where: probe.where }));
     const envelope = await executor.execute(
         buildDeclaredOperationRequest("Note.findMany", synthesizeFindMany("Note", { where: probe.where })),
     );
@@ -68,15 +70,14 @@ for (const probe of PROBES) {
     direct[probe.name] = idsOf(envelope.value);
 }
 
-const allIds = idsOf(await client.note.findMany());
+const allIds = idsOf(await client.tables.note.findMany());
 
 await executor.close();
 
-const database = await Database.create(executorOptions);
+const database = createClient({ dsn: `file:${datasourcePath}` });
 const databaseFace = {};
 for (const probe of PROBES) {
-    databaseFace[probe.name] = idsOf(await database.note.findMany({ where: probe.where }));
+    databaseFace[probe.name] = idsOf(await database.tables.note.findMany({ where: probe.where }));
 }
-await database.$close();
 
 console.log(JSON.stringify({ ok: true, allIds, generated, direct, database: databaseFace }));

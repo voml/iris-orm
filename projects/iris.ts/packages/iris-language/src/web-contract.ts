@@ -18,7 +18,9 @@ export interface CheckSourceResult {
 }
 
 /** Wire execute payload from a WASM memory session. */
-export type WebSessionExecuteWire = string | { ok: boolean; rowsJson: string; error?: string | null };
+export type WebSessionExecuteWire =
+    | string
+    | { ok: boolean; rowsJson: string; error?: string | null; errorCode?: string | null };
 
 /** In-memory VOS session exposed by the WASM semantic core. */
 export interface WebMemorySessionBinding {
@@ -30,6 +32,9 @@ export interface WebMemorySessionBinding {
     executeVos(source: string, parametersJson?: string | null): WebSessionExecuteWire;
     executeOperation ? (operationJson: string) : WebSessionExecuteWire;
     managedPush ? (schema: string) : void;
+    begin ? () : WebSessionExecuteWire;
+    commit ? () : WebSessionExecuteWire;
+    rollback ? () : WebSessionExecuteWire;
     close(): void;
 }
 
@@ -299,6 +304,12 @@ export interface WebOperationExecutor {
     execute(request: WebOperationRequest): Promise<WebResultEnvelope<readonly WebExecutionRow[]>>;
     /** Unit-valued / DDL-shaped declared operations. */
     executeUnit(request: WebOperationRequest): Promise<WebResultEnvelope<void>>;
+    /** Open the scope used by generated `Client.transaction`. */
+    begin(): Promise<WebResultEnvelope<void>>;
+    /** Commit the active scope. */
+    commit(): Promise<WebResultEnvelope<void>>;
+    /** Roll back the active scope. */
+    rollback(): Promise<WebResultEnvelope<void>>;
     close(): Promise<void>;
 }
 

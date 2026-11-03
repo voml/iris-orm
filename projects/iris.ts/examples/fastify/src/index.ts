@@ -1,15 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
 
 import type { PostId, UserId } from "@iris/index.ts";
-import { Database } from "@iris/node.ts";
+import { createClient } from "@iris/node.ts";
 
-const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const app = Fastify({ logger: false });
-const db = await Database.open({ config: projectRoot, source: "default" });
-await db.$macros.seed_blog();
+const db = createClient({ dsn: "file::memory:" });
+await db.macros.seed_blog();
 
 const postListSelect = {
     postId: true,
@@ -19,7 +16,7 @@ const postListSelect = {
 } as const;
 
 app.get("/users", async () => {
-    return await db.user.findMany({ where: { active: true } });
+    return await db.tables.user.findMany({ where: { active: true } });
 });
 
 app.post<{ Body: { user_name?: string; active?: boolean } }>("/users", async (request, reply) => {
@@ -27,7 +24,7 @@ app.post<{ Body: { user_name?: string; active?: boolean } }>("/users", async (re
     if (!userName) {
         return reply.code(400).send({ error: "user_name is required" });
     }
-    const user = await db.user.create({
+    const user = await db.tables.user.create({
         data: {
             userId: randomUUID() as UserId,
             userName: userName,
@@ -42,7 +39,7 @@ app.get<{ Querystring: { author?: string } }>("/posts", async (request) => {
     const where = author
         ? { published: true, author: { userName: author } }
         : { published: true };
-    return await db.post.findMany({ where, select: postListSelect });
+    return await db.tables.post.findMany({ where, select: postListSelect });
 });
 
 app.post<{ Body: { author_user_id?: string; title?: string; published?: boolean } }>("/posts", async (request, reply) => {
@@ -51,7 +48,7 @@ app.post<{ Body: { author_user_id?: string; title?: string; published?: boolean 
     if (!authorUserId || !title) {
         return reply.code(400).send({ error: "author_user_id and title are required" });
     }
-    const post = await db.post.create({
+    const post = await db.tables.post.create({
         data: {
             postId: randomUUID() as PostId,
             author: authorUserId as UserId,
@@ -70,7 +67,6 @@ console.log(`@yydb/iris + Fastify → http://127.0.0.1:${port}`);
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.on(signal, async () => {
         await app.close();
-        await Database.close();
         process.exit(0);
     });
 }

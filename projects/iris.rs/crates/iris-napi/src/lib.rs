@@ -292,6 +292,12 @@ pub fn open_sqlite_session(path: String) -> Result<MemorySession> {
     MemorySession::open_sqlite(path)
 }
 
+/// Open a YYDB session over a `.yydb` file or `.yydx` directory layout.
+#[napi]
+pub fn open_yydb_session(endpoint: String) -> Result<MemorySession> {
+    MemorySession::open_yydb(endpoint)
+}
+
 /// Open a PostgreSQL session from a connection URL.
 #[napi]
 pub fn open_postgres_session(url: String) -> Result<MemorySession> {

@@ -92,7 +92,7 @@ app.post("/posts", async (c) => {
 /** Generated Iris client on WASM (same routes as Hono example; isolate memory only). */
 app.get("/iris/users", async (c) => {
     const db = await openIrisDatabase();
-    return c.json(await db.user.findMany({ where: { active: true } }));
+    return c.json(await db.tables.user.findMany({ where: { active: true } }));
 });
 
 app.get("/iris/posts", async (c) => {
@@ -101,7 +101,7 @@ app.get("/iris/posts", async (c) => {
     const where = author
         ? { published: true, author: { userName: author } }
         : { published: true };
-    return c.json(await db.post.findMany({ where, select: postListSelect }));
+    return c.json(await db.tables.post.findMany({ where, select: postListSelect }));
 });
 
 app.post("/iris/users", async (c) => {
@@ -110,7 +110,7 @@ app.post("/iris/users", async (c) => {
         return c.json({ error: "user_name is required" }, 400);
     }
     const db = await openIrisDatabase();
-    const user = await db.user.create({
+    const user = await db.tables.user.create({
         data: {
             userId: crypto.randomUUID() as UserId,
             userName: body.user_name.trim(),
@@ -128,7 +128,7 @@ app.post("/iris/posts", async (c) => {
         return c.json({ error: "author_user_id and title are required" }, 400);
     }
     const db = await openIrisDatabase();
-    const post = await db.post.create({
+    const post = await db.tables.post.create({
         data: {
             postId: crypto.randomUUID() as PostId,
             author: authorUserId as UserId,
