@@ -81,6 +81,12 @@ def _error_code(result: dict[str, object]) -> str:
     return str(error["code"])
 
 
+def _error_diagnostic(result: dict[str, object]) -> str:
+    error = result["error"]
+    assert isinstance(error, dict), result
+    return str(error["diagnosticCode"])
+
+
 @unittest.skipUnless(NATIVE_AVAILABLE, NATIVE_REASON)
 class MemoryProfileTests(unittest.TestCase):
     def test_query_on_unseeded_reference_profile_reports_code(self) -> None:
@@ -88,24 +94,28 @@ class MemoryProfileTests(unittest.TestCase):
         result = session.query("User.collect()")
         self.assertFalse(result["ok"])
         self.assertEqual(result["rows"], [])
-        self.assertEqual(_error_code(result), "IRIS-EXEC-FAILED")
+        self.assertEqual(_error_code(result), "IRIS-INTERNAL")
+        self.assertEqual(_error_diagnostic(result), "IRIS-EXEC-FAILED")
 
     def test_reference_profile_rejects_writes_at_plan_time(self) -> None:
         session = _runtime.openMemory()
         result = session.execute('User::insert({ user_id: "u1", user_name: "alice", active: true })')
         self.assertFalse(result["ok"])
-        self.assertEqual(_error_code(result), "IRIS-PLAN-REJECTED")
+        self.assertEqual(_error_code(result), "IRIS-INVALID-ARGUMENT")
+        self.assertEqual(_error_diagnostic(result), "IRIS-PLAN-REJECTED")
 
     def test_transactions_are_unsupported_on_the_reference_profile(self) -> None:
         session = _runtime.openMemory()
-        self.assertEqual(_error_code(session.begin()), "IRIS-TRANSACTION-UNSUPPORTED")
+        self.assertEqual(_error_code(session.begin()), "IRIS-TRANSACTION-FAILED")
+        self.assertEqual(_error_diagnostic(session.begin()), "IRIS-TRANSACTION-UNSUPPORTED")
 
     def test_closed_session_returns_a_session_closed_code(self) -> None:
         session = _runtime.openMemory()
         session.close()
         result = session.query("User.collect()")
         self.assertFalse(result["ok"])
-        self.assertEqual(_error_code(result), "IRIS-SESSION-CLOSED")
+        self.assertEqual(_error_code(result), "IRIS-INVALID-ARGUMENT")
+        self.assertEqual(_error_diagnostic(result), "IRIS-SESSION-CLOSED")
 
 
 @unittest.skipUnless(NATIVE_AVAILABLE, NATIVE_REASON)
@@ -183,13 +193,15 @@ class ErrorEnvelopeTests(unittest.TestCase):
         session = _runtime.openSqlite()
         result = session.query("User.filter(x => x.user_id == $id).collect()", "{not json")
         self.assertFalse(result["ok"])
-        self.assertEqual(_error_code(result), "IRIS-PARAM-ENCODING")
+        self.assertEqual(_error_code(result), "IRIS-INVALID-ARGUMENT")
+        self.assertEqual(_error_diagnostic(result), "IRIS-PARAM-ENCODING")
 
     def test_invalid_operation_payload_is_an_operation_error(self) -> None:
         session = _runtime.openSqlite()
         result = session.executeOperation("{")
         self.assertFalse(result["ok"])
-        self.assertEqual(_error_code(result), "IRIS-OPERATION-INVALID")
+        self.assertEqual(_error_code(result), "IRIS-INVALID-ARGUMENT")
+        self.assertEqual(_error_diagnostic(result), "IRIS-OPERATION-INVALID")
 
     def test_open_failure_raises_iris_error_with_code(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

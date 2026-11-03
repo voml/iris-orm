@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import sys
 import unittest
 from pathlib import Path
@@ -25,6 +26,22 @@ NATIVE_REASON = (
 )
 
 
+INTERNAL_SESSION_NAMES = {
+    "Session",
+    "open_memory",
+    "open_sqlite",
+    "open_yydb",
+    "open_postgres",
+    "open_mysql",
+    "open_dsn",
+    "openMemory",
+    "openSqlite",
+    "openYydb",
+    "openPostgres",
+    "openMysql",
+}
+
+
 class PackageTests(unittest.TestCase):
     def test_public_names_are_exported(self) -> None:
         self.assertEqual(sorted(iris.__all__), ["IrisError", "contract_version", "version"])
@@ -34,6 +51,16 @@ class PackageTests(unittest.TestCase):
     def test_session_surface_is_not_public(self) -> None:
         for name in ["Session", "capabilities", "openMemory", "openSqlite", "openYydb", "openPostgres", "openMysql"]:
             self.assertFalse(hasattr(iris, name), f"`iris.{name}` belongs to `iris._runtime`")
+
+    def test_runtime_internals_stay_out_of_the_stub(self) -> None:
+        stub = Path(iris.__file__).resolve().parent / "__init__.pyi"
+        self.assertTrue(stub.is_file(), f"{stub} is missing from the installed package")
+        declared = {
+            node.name for node in ast.parse(stub.read_text(encoding="utf-8")).body if isinstance(node, (ast.ClassDef, ast.FunctionDef))
+        }
+        self.assertEqual(declared, {"IrisError", "version", "contract_version"})
+        self.assertEqual(declared & INTERNAL_SESSION_NAMES, set())
+        self.assertEqual(set(iris.__all__) & INTERNAL_SESSION_NAMES, set())
 
     def test_iris_error_is_an_exception(self) -> None:
         self.assertTrue(issubclass(iris.IrisError, Exception))
@@ -76,8 +103,11 @@ class NativeTests(unittest.TestCase):
         )
 
     def test_iris_error_carries_a_code(self) -> None:
-        self.assertEqual(iris.IrisError("boom").code, "IRIS-EXEC-FAILED")
-        self.assertEqual(iris.IrisError("boom", code="IRIS-SESSION-CLOSED").code, "IRIS-SESSION-CLOSED")
+        self.assertEqual(iris.IrisError("boom").code, "IRIS-INTERNAL")
+        self.assertEqual(
+            iris.IrisError("boom", code="IRIS-INVALID-ARGUMENT", diagnostic_code="IRIS-SESSION-CLOSED").code,
+            "IRIS-INVALID-ARGUMENT",
+        )
 
 
 if __name__ == "__main__":

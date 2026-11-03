@@ -20,6 +20,7 @@ SRC_DIR = PROJECT_DIR / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 import iris_pyo3  # noqa: E402
+from generated.docs import IrisError as DocsIrisError  # noqa: E402
 from generated.docs import create_client as create_docs_client  # noqa: E402
 from generated.iris import IrisError, create_client  # noqa: E402
 
@@ -124,3 +125,34 @@ class GeneratedErrorTest(unittest.TestCase):
         with self.assertRaises(IrisError) as caught:
             create_client("iri://localhost/app")
         self.assertEqual("IRIS-INVALID-ARGUMENT", caught.exception.code)
+
+
+class GeneratedAuthorCodeTest(unittest.TestCase):
+    """Author codes for the converged vector and filter surfaces."""
+
+    def test_vector_dimension_mismatch_is_a_data_error(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            db = create_docs_client(f"file:{Path(directory) / 'docs.yydb'}")
+            with self.assertRaises(DocsIrisError) as caught:
+                db.tables.Doc.find_near(
+                    field="embedding",
+                    vector=[1.0, 0.0],
+                    metric="cosine",
+                    threshold=0.5,
+                )
+        self.assertEqual("IRIS-VECTOR-DIMENSION", caught.exception.code)
+        self.assertEqual("IRIS-VECTOR-NEAR-DIMENSION", caught.exception.diagnostic_code)
+
+    def test_unknown_filter_field_is_a_call_shape_error(self) -> None:
+        db = create_client("sqlite::memory:")
+        with self.assertRaises(IrisError) as caught:
+            db.tables.User.find_many(where={"not_a_field": "x"})
+        self.assertEqual("IRIS-INVALID-ARGUMENT", caught.exception.code)
+        self.assertEqual("IRIS-FILTER-FIELD-UNKNOWN", caught.exception.diagnostic_code)
+
+    def test_unsupported_filter_operator_is_a_call_shape_error(self) -> None:
+        db = create_client("sqlite::memory:")
+        with self.assertRaises(IrisError) as caught:
+            db.tables.User.find_many(where={"active": {"gt": True}})
+        self.assertEqual("IRIS-INVALID-ARGUMENT", caught.exception.code)
+        self.assertEqual("IRIS-FILTER-OPERATOR-NOT-SUPPORTED", caught.exception.diagnostic_code)
