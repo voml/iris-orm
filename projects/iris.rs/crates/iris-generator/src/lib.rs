@@ -487,15 +487,19 @@ struct OperationCarrier {
 /// never guesses a carrier.
 fn resolve_operation_carrier(operation: &str, vos_type: &str, declared: &HashSet<String>) -> Result<OperationCarrier> {
     let trimmed = vos_type.trim();
-    let base = carrier::base_vos_type(trimmed);
     let optional = trimmed.ends_with('?');
     let is_reference = trimmed.starts_with('&');
     let unsupported =
         |reason: &'static str| Error::UnsupportedOperationType { operation: operation.to_owned(), ty: vos_type.to_owned(), reason };
 
-    if base.contains('[') || base.contains('<') || base.contains(',') {
+    // Collection and generic shapes keep their raw spelling here: an
+    // operation signature carries `vector` only in its dimension-free form,
+    // so `vector<N>` hard-fails rather than silently dropping the declared
+    // dimension the field surface would inline.
+    if trimmed.contains('[') || trimmed.contains('<') || trimmed.contains(',') {
         return Err(unsupported("collection and generic shapes have no declared-vos operation carrier"));
     }
+    let base = carrier::base_vos_type(trimmed);
     if let Some(label) = carrier::faithful_label(base) {
         if label == "unit" {
             return Ok(OperationCarrier { rust_ty: "()".into(), ts_type: "void".into() });

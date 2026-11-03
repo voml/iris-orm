@@ -1,6 +1,6 @@
 /** Runtime VOS synthesis for generated delegates (use-site reference paths, not include/relation). */
 
-import type { OperationRequest, ResultEnvelope } from "./contract-types.js";
+import type { GeneratedExecutionRow, OperationRequest, ResultEnvelope } from "./contract-types.js";
 import type { IrisGeneratedError } from "../errors.js";
 import { IRIS_SCHEMA_FINGERPRINT } from "../metadata.js";
 
@@ -22,6 +22,13 @@ const SYNTHESIZE_REF_TARGETS: Record<string, Readonly<Record<string, string>>> =
  */
 const SYNTHESIZE_FILTER_OPS: Record<string, Readonly<Record<string, readonly string[]>>> = {
 <% synthesize_filter_ops_lines %>
+};
+/**
+ * Per-entity `vector` field → declared dimension (`null` for a bare `vector`
+ * field), inlined at codegen time so `findNear` validates dimension eagerly.
+ */
+const SYNTHESIZE_VECTOR_FIELDS: Record<string, Readonly<Record<string, number | null>>> = {
+<% synthesize_vector_fields_lines %>
 };
 
 export type VosParameters = Record<string, unknown>;
@@ -315,6 +322,145 @@ export function synthesizeFindUnique(entity: string, args: FindUniqueArgs): VosS
     pipeline = appendMap(entity, pipeline, args.select);
     pipeline += ".collect()";
     return { source: pipeline, parameters };
+}
+
+/** Arguments of a `findNear` similarity query (mirrors the generated `<Entity>FindNearArgs`). */
+export type VectorNearArgs = {
+    readonly field: string;
+    readonly near: {
+        readonly vector: Float32Array;
+        readonly metric: string;
+        readonly threshold: number;
+    };
+    readonly where?: Record<string, unknown>;
+    readonly take?: number;
+};
+
+type NearMetric = "cosine" | "dot" | "euclidean";
+
+/**
+ * Threshold and ordering direction of one metric: scores (`cosine` / `dot`)
+ * pass at or above the threshold and rank descending, the `euclidean`
+ * distance passes at or below the threshold and ranks ascending. The metric
+ * is always query-side explicit — there is no storage-layer default.
+ */
+const METRIC_DIRECTION: Readonly<Record<NearMetric, { readonly higherIsCloser: boolean }>> = {
+    cosine: { higherIsCloser: true },
+    dot: { higherIsCloser: true },
+    euclidean: { higherIsCloser: false },
+};
+
+function nearError(code: string, message: string): IrisGeneratedError {
+    return { code, message };
+}
+
+/** Validate the `findNear` input and return it narrowed to a checked shape. */
+function validateVectorNearArgs(
+    entity: string,
+    args: VectorNearArgs,
+): { readonly vector: Float32Array; readonly metric: NearMetric; readonly threshold: number } {
+    const fields = SYNTHESIZE_VECTOR_FIELDS[entity];
+    if (!fields || !Object.prototype.hasOwnProperty.call(fields, args.field)) {
+        throw nearError("IRIS-VECTOR-NEAR-FIELD", `entity \`${entity}\` declares no \`vector\` field \`${args.field}\``);
+    }
+    const declared = fields[args.field] ?? null;
+    const near = args.near;
+    if (!near || typeof near !== "object") {
+        throw nearError("IRIS-VECTOR-NEAR-INPUT", `\`${entity}.findNear\` requires a \`near\` input`);
+    }
+    const metric = near.metric as NearMetric;
+    if (!(metric in METRIC_DIRECTION)) {
+        throw nearError("IRIS-VECTOR-NEAR-METRIC", `\`${entity}.findNear\` requires an explicit metric (cosine | dot | euclidean), got \`${String(near.metric)}\``);
+    }
+    const vector = near.vector;
+    if (!(vector instanceof Float32Array) || vector.length === 0) {
+        throw nearError("IRIS-VECTOR-NEAR-VECTOR", `\`${entity}.${args.field}\` near vector must be a non-empty \`Float32Array\``);
+    }
+    for (const component of vector) {
+        if (!Number.isFinite(component)) {
+            throw nearError("IRIS-VECTOR-NEAR-VECTOR", `\`${entity}.${args.field}\` near vector has a non-finite component`);
+        }
+    }
+    if (declared !== null && vector.length !== declared) {
+        throw nearError(
+            "IRIS-VECTOR-NEAR-DIMENSION",
+            `\`${entity}.${args.field}\` is declared \`vector<${declared}>\` but the near vector has ${vector.length} components`,
+        );
+    }
+    if (typeof near.threshold !== "number" || !Number.isFinite(near.threshold)) {
+        throw nearError("IRIS-VECTOR-NEAR-THRESHOLD", `\`${entity}.findNear\` threshold must be a finite number`);
+    }
+    return { vector, metric, threshold: near.threshold };
+}
+
+/** Similarity or distance of one row vector against the near vector under the explicit metric. */
+function vectorSimilarity(left: Float32Array, right: Float32Array, metric: NearMetric, field: string): number {
+    if (left.length !== right.length) {
+        throw nearError("IRIS-VECTOR-NEAR-DIMENSION", `\`${field}\` row has ${left.length} components but the near vector has ${right.length}`);
+    }
+    if (metric === "cosine") {
+        let dot = 0;
+        let leftNorm = 0;
+        let rightNorm = 0;
+        for (let index = 0; index < left.length; index += 1) {
+            const l = left[index] as number;
+            const r = right[index] as number;
+            dot += l * r;
+            leftNorm += l * l;
+            rightNorm += r * r;
+        }
+        if (leftNorm === 0 || rightNorm === 0) {
+            throw nearError("IRIS-VECTOR-NEAR-ZERO-NORM", `cosine similarity is undefined for a zero-norm vector on \`${field}\``);
+        }
+        return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
+    }
+    if (metric === "dot") {
+        let sum = 0;
+        for (let index = 0; index < left.length; index += 1) {
+            sum += (left[index] as number) * (right[index] as number);
+        }
+        return sum;
+    }
+    let squared = 0;
+    for (let index = 0; index < left.length; index += 1) {
+        const delta = (left[index] as number) - (right[index] as number);
+        squared += delta * delta;
+    }
+    return Math.sqrt(squared);
+}
+
+/** Synthesize the scan a `findNear` call ranks, validating the near input before any backend round-trip. */
+export function synthesizeVectorNear(entity: string, args: VectorNearArgs): VosSynthesis {
+    validateVectorNearArgs(entity, args);
+    return synthesizeFindMany(entity, { where: args.where });
+}
+
+/**
+ * Rank scanned rows by similarity under the explicit metric, keeping rows
+ * that meet the threshold in the metric's direction ordered closest-first.
+ * A null vector cell never matches, mirroring filter-unknown semantics.
+ */
+export function evaluateVectorNearRows(entity: string, args: VectorNearArgs, rows: readonly GeneratedExecutionRow[]): readonly GeneratedExecutionRow[] {
+    const { vector, metric, threshold } = validateVectorNearArgs(entity, args);
+    const { higherIsCloser } = METRIC_DIRECTION[metric];
+    const scored: Array<{ readonly value: number; readonly row: GeneratedExecutionRow }> = [];
+    for (const row of rows) {
+        const cell = row[args.field];
+        if (cell === null || cell === undefined) {
+            continue;
+        }
+        if (!(cell instanceof Float32Array)) {
+            throw nearError("IRIS-VECTOR-NEAR-CARRIER", `\`${entity}.${args.field}\` row did not decode to a \`Float32Array\``);
+        }
+        const value = vectorSimilarity(cell, vector, metric, `${entity}.${args.field}`);
+        const passes = higherIsCloser ? value >= threshold : value <= threshold;
+        if (passes) {
+            scored.push({ value, row });
+        }
+    }
+    scored.sort((a, b) => (higherIsCloser ? b.value - a.value : a.value - b.value));
+    const ranked = scored.map((entry) => entry.row);
+    return args.take != null ? ranked.slice(0, args.take) : ranked;
 }
 
 /**

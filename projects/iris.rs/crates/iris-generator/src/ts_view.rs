@@ -18,6 +18,14 @@ struct TsFieldView {
     patch_line: Option<String>,
 }
 
+/// One `vector` field on an entity, for the generated `findNear` surface.
+#[derive(Debug, Clone, Serialize)]
+struct TsVectorFieldView {
+    ts_name: String,
+    /// Declared dimension of `vector<N>` fields; `None` for bare `vector`.
+    dimension: Option<u32>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct TsTableView {
     name: String,
@@ -28,6 +36,10 @@ struct TsTableView {
     pk_ts_scalar: String,
     fields: Vec<TsFieldView>,
     unique_where_lines: String,
+    vector_fields: Vec<TsVectorFieldView>,
+    has_vector: bool,
+    /// Union of `vector` field names for the `findNear` `field` argument.
+    vector_field_union: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -82,6 +94,9 @@ struct TsTemplateContext {
     /// the runtime lowers filters by the faithful VOS label instead of
     /// accepting any operator key a generic object happens to carry.
     synthesize_filter_ops_lines: String,
+    /// Per-entity `vector` field → declared dimension (`null` for bare
+    /// `vector`) inlined into synthesize.ts for `findNear` validation.
+    synthesize_vector_fields_lines: String,
 }
 
 impl GenerationModel {
@@ -107,11 +122,16 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
     let models_import_lines = model.tables.iter().map(|t| format!("    {},", t.name)).collect::<Vec<_>>().join("\n");
     let refs_import_lines =
         model.tables.iter().flat_map(|t| [format!("    {}Id,", t.name), format!("    {}RefInput,", t.name)]).collect::<Vec<_>>().join("\n");
-    let input_import_names = model
-        .tables
+
+    let mut tables_view = Vec::with_capacity(model.tables.len());
+    for table in &model.tables {
+        tables_view.push(build_table_view(table, &entity_names)?);
+    }
+
+    let input_import_names = tables_view
         .iter()
         .flat_map(|table| {
-            [
+            let mut names = vec![
                 format!("{}FindManyArgs", table.name),
                 format!("{}FindFirstArgs", table.name),
                 format!("{}FindUniqueArgs", table.name),
@@ -119,17 +139,16 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
                 format!("{}DeleteArgs", table.name),
                 format!("{}UpdateArgs", table.name),
                 format!("{}GetPayload", table.name),
-            ]
+            ];
+            if table.has_vector {
+                names.push(format!("{}FindNearArgs", table.name));
+            }
+            names
         })
         .collect::<Vec<_>>()
         .join(", ");
     let needed = reference_targets(model);
     let ref_type_imports = needed.iter().flat_map(|name| [format!("{name}Id"), format!("{name}Reference")]).collect::<Vec<_>>().join(", ");
-
-    let mut tables_view = Vec::with_capacity(model.tables.len());
-    for table in &model.tables {
-        tables_view.push(build_table_view(table, &entity_names)?);
-    }
 
     let wire_map_lines = model
         .tables
@@ -230,18 +249,27 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
                 .fields
                 .iter()
                 .filter(|field| field.reference_target.is_none())
-                .map(|field| {
-                    let (_name, ops) = vos_filter_surface(&field.vos_type).ok_or_else(|| Error::UnsupportedFilterType {
-                        entity: table.name.clone(),
-                        field: field.name.clone(),
-                        vos_type: field.vos_type.clone(),
-                    })?;
-                    let mut allowed: Vec<&str> = ops.to_vec();
-                    if field.optional {
-                        allowed.extend(["isNull", "isNotNull"]);
+                .filter_map(|field| {
+                    // `vector` has no filter operators at all: it is excluded
+                    // from the map so the runtime fails closed if a caller
+                    // tries to filter it anyway.
+                    if carrier::base_vos_type(&field.vos_type) == "vector" {
+                        return None;
                     }
-                    let ops = allowed.iter().map(|op| format!("\"{op}\"")).collect::<Vec<_>>().join(", ");
-                    Ok(format!("{}: [{ops}]", field_ts_name(field)))
+                    let result = (|| {
+                        let (_name, ops) = vos_filter_surface(&field.vos_type).ok_or_else(|| Error::UnsupportedFilterType {
+                            entity: table.name.clone(),
+                            field: field.name.clone(),
+                            vos_type: field.vos_type.clone(),
+                        })?;
+                        let mut allowed: Vec<&str> = ops.to_vec();
+                        if field.optional {
+                            allowed.extend(["isNull", "isNotNull"]);
+                        }
+                        let ops = allowed.iter().map(|op| format!("\"{op}\"")).collect::<Vec<_>>().join(", ");
+                        Ok(format!("{}: [{ops}]", field_ts_name(field)))
+                    })();
+                    Some(result)
                 })
                 .collect::<Result<Vec<_>>>()?
                 .join(", ");
@@ -250,6 +278,20 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         .collect::<Result<Vec<_>>>()?
         .join("\n");
     let has_macros = !macros_view.is_empty();
+    let synthesize_vector_fields_lines = tables_view
+        .iter()
+        .filter(|table| table.has_vector)
+        .map(|table| {
+            let fields = table
+                .vector_fields
+                .iter()
+                .map(|field| format!("{}: {}", field.ts_name, field.dimension.map(|dimension| dimension.to_string()).unwrap_or_else(|| "null".into())))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("    {}: {{ {} }},", table.name, fields)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
 
     Ok(TsTemplateContext {
         generator_version: model.generator_version.clone(),
@@ -272,6 +314,7 @@ fn build_ts_context(model: &GenerationModel) -> Result<TsTemplateContext> {
         synthesize_wire_map_lines,
         synthesize_reference_target_lines,
         synthesize_filter_ops_lines,
+        synthesize_vector_fields_lines,
     })
 }
 
@@ -302,6 +345,9 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> Result<
         });
     }
 
+    let vector_fields = vector_field_views(table)?;
+    let vector_field_union = vector_fields.iter().map(|field| format!("\"{}\"", field.ts_name)).collect::<Vec<_>>().join(" | ");
+    let has_vector = !vector_fields.is_empty();
     Ok(TsTableView {
         name: table.name.clone(),
         camel_name: camel_case(&table.name),
@@ -311,7 +357,36 @@ fn build_table_view(table: &TableModel, entity_names: &HashSet<&str>) -> Result<
         pk_ts_scalar,
         fields,
         unique_where_lines,
+        vector_fields,
+        has_vector,
+        vector_field_union,
     })
+}
+
+/// The `vector` fields of one entity with their declared dimensions.
+fn vector_field_views(table: &TableModel) -> Result<Vec<TsVectorFieldView>> {
+    table
+        .fields
+        .iter()
+        .filter(|field| carrier::base_vos_type(&field.vos_type) == "vector")
+        .map(|field| Ok(TsVectorFieldView { ts_name: field_ts_name(field), dimension: vector_dimension(field)? }))
+        .collect()
+}
+
+/// Declared dimension of a `vector<N>` / `vector<N>?` label; `None` for a
+/// bare `vector`. Malformed or zero dimensions are generation errors.
+fn vector_dimension(field: &FieldModel) -> Result<Option<u32>> {
+    let label = field.vos_type.strip_suffix('?').unwrap_or(&field.vos_type);
+    let Some(inner) = label.strip_prefix("vector<").and_then(|rest| rest.strip_suffix('>')) else {
+        return Ok(None);
+    };
+    let dimension: u32 = inner
+        .parse()
+        .map_err(|_| Error::UnsupportedType(format!("vector dimension `{inner}` is not a positive integer")))?;
+    if dimension == 0 {
+        return Err(Error::UnsupportedType("vector dimension must be greater than zero".into()));
+    }
+    Ok(Some(dimension))
 }
 
 fn camel_case(name: &str) -> String {
@@ -420,6 +495,12 @@ fn emit_where_field(table: &TableModel, field: &FieldModel, entity_names: &HashS
                 target
             )));
         }
+        return Ok(None);
+    }
+    // `vector` stays out of the where surface: vector comparison is similarity
+    // under an explicit query-side metric (the generated `findNear`), never
+    // element-wise equality, so no guessed operator set exists for it.
+    if carrier::base_vos_type(&field.vos_type) == "vector" {
         return Ok(None);
     }
     let scalar = scalar_filter_type(table, field)?;

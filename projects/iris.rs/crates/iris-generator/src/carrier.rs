@@ -8,8 +8,16 @@
 use crate::Error as GenError;
 
 /// Strips a trailing `?` and a leading `&` to reach the base VOS type label.
+///
+/// `vector<N>` normalizes to `vector`: the declared dimension lives in the
+/// field contract, while the host carrier (`Float32Array`) and the tagged
+/// wire label stay dimension-free. Every other label keeps its spelling.
 pub(crate) fn base_vos_type(vos_type: &str) -> &str {
-    vos_type.trim_end_matches('?').trim_start_matches('&')
+    let stripped = vos_type.trim_end_matches('?').trim_start_matches('&');
+    match stripped.split_once('<') {
+        Some(("vector", _)) if stripped.ends_with('>') => "vector",
+        _ => stripped,
+    }
 }
 
 /// TypeScript carrier of a faithful VOS label (`None` = not a mapped label).

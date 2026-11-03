@@ -1,6 +1,7 @@
 import type { OperationExecutor } from "./_internal/contract-types.js";
 import {
     buildDeclaredOperationRequest,
+    evaluateVectorNearRows,
     synthesizeCreate,
     synthesizeDelete,
     synthesizeUpdate,
@@ -8,6 +9,7 @@ import {
     synthesizeFindMany,
     synthesizeFindUnique,
     synthesizeOperationCall,
+    synthesizeVectorNear,
     throwOperationEnvelopeError,
 } from "./_internal/synthesize.js";
 import type {
@@ -102,6 +104,26 @@ export class <% table.name %>Delegate {
         const rows = envelope.value;
         return (rows[0] ?? null) as <% table.name %>GetPayload<A> | null;
     }
+<% if table.has_vector %>
+
+    /**
+     * Similarity retrieval over a `vector` field: scan the entity (with the
+     * optional `where` pre-filter), score every row against `near.vector`
+     * under the explicit `near.metric`, keep rows meeting `near.threshold` in
+     * the metric's direction and order closest-first. The metric is always
+     * required — no storage-layer default exists.
+     */
+    async findNear(args: <% table.name %>FindNearArgs): Promise<ReadonlyArray<<% table.name %>>> {
+        const synthesis = synthesizeVectorNear("<% table.name %>", args);
+        const envelope = await this.executor.execute(
+            buildDeclaredOperationRequest("<% table.name %>.findNear", synthesis),
+        );
+        if (!envelope.ok) {
+            throwOperationEnvelopeError(envelope);
+        }
+        return evaluateVectorNearRows("<% table.name %>", args, envelope.value) as ReadonlyArray<<% table.name %>>;
+    }
+<% end if %>
 
     async create<const A extends <% table.name %>CreateArgs>(
         args: A,

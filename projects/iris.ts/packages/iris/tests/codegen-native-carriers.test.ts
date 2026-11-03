@@ -107,18 +107,26 @@ test("generation is deterministic for the same declared `vector` and `file` oper
     }
 });
 
-test("`vector` fields fail closed while `file` fields filter by content hash", async (t) => {
+test("`vector` fields generate a near surface without an equality filter while `file` fields filter by content hash", async (t) => {
     const core = await loadCore(t);
     if (!core) {
         return;
     }
 
     // Vector comparison is similarity under an explicit query-side metric,
-    // not element-wise equality, so no equality filter surface is generated.
+    // not element-wise equality, so the where surface stays closed while the
+    // entity gains `findNear` with the metric named by the caller.
     const vectorField = `table Doc {\n    @@doc_id: uuid,\n    embedding: vector,\n}\n`;
-    const vectorResult = core.generate(vectorField, "typescript", join(await mkdtemp(join(tmpdir(), "iris-codegen-native-vec-")), "generated", "iris"));
-    assert.equal(vectorResult.ok, false);
-    assert.match(vectorResult.error, /unsupported filter type `vector` on `Doc\.embedding`/);
+    const vectorRoot = join(await mkdtemp(join(tmpdir(), "iris-codegen-native-vec-")), "generated", "iris");
+    const vectorResult = core.generate(vectorField, "typescript", vectorRoot);
+    assert.equal(vectorResult.ok, true, vectorResult.error);
+    const vectorInputs = await readFile(join(vectorRoot, "inputs.ts"), "utf8");
+    assert.match(vectorInputs, /export type SimilarityMetric/);
+    assert.match(vectorInputs, /export type DocFindNearArgs/);
+    const whereBlock = vectorInputs.slice(vectorInputs.indexOf("export type DocWhereInput"), vectorInputs.indexOf("export type DocCreateInput"));
+    assert.equal(whereBlock.includes("embedding"), false, "the vector field must stay out of the where surface");
+    const vectorOperations = await readFile(join(vectorRoot, "operations.ts"), "utf8");
+    assert.match(vectorOperations, /async findNear\(args: DocFindNearArgs\)/);
 
     // File equality is content-hash identity: the where surface exposes exactly
     // `eq` / `not` over the file descriptor carrier.

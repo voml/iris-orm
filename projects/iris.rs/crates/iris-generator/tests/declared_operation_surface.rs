@@ -334,10 +334,11 @@ table Doc {
 }
 
 /// `vector` keeps no equality filter surface: vector comparison is similarity
-/// under an explicit query-side metric, not element-wise equality, so the
-/// TypeScript surface stays closed instead of guessing an operator set.
+/// under an explicit query-side metric, so the field stays out of the where
+/// input and out of the runtime operator map, and the entity gains `findNear`
+/// instead.
 #[test]
-fn vector_field_without_filter_surface_is_rejected() {
+fn vector_field_generates_near_surface_without_equality_filter() {
     const VECTOR_FIELD_SCHEMA: &str = r#"
 table Doc {
     @@id: uuid,
@@ -345,21 +346,32 @@ table Doc {
 }
 "#;
     let model = GenerationModel::from_vos_schema(VECTOR_FIELD_SCHEMA).expect("model");
-    let error = emit_target_files(&model, "typescript", None).expect_err("a `vector` field must not gain an equality filter type");
+    let files = emit_target_files(&model, "typescript", None).expect("a `vector` field generates the near surface");
+    let inputs = target_file(&files, "inputs.ts");
+    assert!(inputs.contains("export type SimilarityMetric"), "inputs.ts must declare the explicit metric:\n{inputs}");
+    assert!(inputs.contains("export type VectorNearInput"), "inputs.ts must declare the near input:\n{inputs}");
+    assert!(inputs.contains("export type DocFindNearArgs"), "inputs.ts must declare `DocFindNearArgs`:\n{inputs}");
+    assert!(inputs.contains("readonly field: \"embedding\""), "the near field union names the vector field:\n{inputs}");
+    let where_start = inputs.find("export type DocWhereInput").expect("DocWhereInput");
+    let create_start = inputs.find("export type DocCreateInput").expect("DocCreateInput");
+    let where_block = &inputs[where_start..create_start];
+    assert!(!where_block.contains("embedding"), "the vector field must stay out of the where surface:\n{where_block}");
+
+    let operations = target_file(&files, "operations.ts");
+    assert!(operations.contains("async findNear(args: DocFindNearArgs)"), "the delegate must expose `findNear`:\n{operations}");
+
+    let synthesize = target_file(&files, "_internal/synthesize.ts");
     assert!(
-        matches!(
-            error,
-            Error::UnsupportedFilterType { ref entity, ref field, ref vos_type }
-                if entity == "Doc" && field == "embedding" && vos_type == "vector"
-        ),
-        "{error}"
+        !synthesize.contains("embedding: ["),
+        "the vector field must not gain a filter operator allow-list:\n{synthesize}"
     );
+    assert!(synthesize.contains("embedding: null"), "a bare `vector` field inlines a null declared dimension:\n{synthesize}");
 }
 
-/// `vector<N>` has no TypeScript carrier yet: the carrier table keys on the
-/// bare `vector` label while the field text keeps the declared dimension.
+/// `vector<N>` carries the declared dimension into the generated near surface
+/// while keeping the dimension-free `Float32Array` carrier.
 #[test]
-fn vector_field_without_carrier_is_rejected() {
+fn dimensioned_vector_field_generates_with_declared_dimension() {
     const VECTOR_FIELD_SCHEMA: &str = r#"
 table Doc {
     @@id: uuid,
@@ -367,8 +379,11 @@ table Doc {
 }
 "#;
     let model = GenerationModel::from_vos_schema(VECTOR_FIELD_SCHEMA).expect("model");
-    let error = emit_target_files(&model, "typescript", None).expect_err("a `vector<3>` label has no TypeScript carrier");
-    assert!(matches!(error, Error::UnknownVosLabel(ref label) if label == "vector<3>"), "{error}");
+    let files = emit_target_files(&model, "typescript", None).expect("a `vector<3>` field generates");
+    let models = target_file(&files, "models.ts");
+    assert!(models.contains("embedding: Float32Array"), "the model carrier stays `Float32Array`:\n{models}");
+    let synthesize = target_file(&files, "_internal/synthesize.ts");
+    assert!(synthesize.contains("embedding: 3"), "the declared dimension is inlined for eager validation:\n{synthesize}");
 }
 
 #[test]

@@ -1,6 +1,7 @@
 import type { OperationExecutor } from "./_internal/contract-types.js";
 import {
     buildDeclaredOperationRequest,
+    evaluateVectorNearRows,
     synthesizeCreate,
     synthesizeDelete,
     synthesizeUpdate,
@@ -8,6 +9,7 @@ import {
     synthesizeFindMany,
     synthesizeFindUnique,
     synthesizeOperationCall,
+    synthesizeVectorNear,
     throwOperationEnvelopeError,
 } from "./_internal/synthesize.js";
 import type {

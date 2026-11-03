@@ -88,6 +88,24 @@ export type FileFilter = {
     readonly eq?: { readonly digest: string; readonly octets: bigint; readonly name?: string; readonly mediaType?: string; readonly manifest: { readonly hash: string; readonly size: bigint } };
     readonly not?: { readonly digest: string; readonly octets: bigint; readonly name?: string; readonly mediaType?: string; readonly manifest: { readonly hash: string; readonly size: bigint } };
 };
+/**
+ * Explicit metric for vector similarity queries.
+ *
+ * Deliberately has no default: the query side must always name the metric.
+ * `cosine` and `dot` are scores (higher is closer), `euclidean` is a distance
+ * (lower is closer); the threshold direction follows the metric.
+ */
+export type SimilarityMetric = "cosine" | "dot" | "euclidean";
+/**
+ * Similarity query for one `vector` field (`findNear`): score or distance of
+ * every row against `vector`, keeping rows that meet `threshold` in the
+ * metric's direction, ordered closest-first.
+ */
+export type VectorNearInput = {
+    readonly vector: Float32Array;
+    readonly metric: SimilarityMetric;
+    readonly threshold: number;
+};
 /** Patch field: write a value. Omitted field means unchanged. */
 export type PatchValue<T> = { readonly set: T };
 /** Patch field on nullable columns: write a value or explicit null. */
