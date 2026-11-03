@@ -74,6 +74,21 @@ class GeneratedCrudTest(unittest.TestCase):
 
         self.db.tables.User.delete(where={"user_id": "u1"})
         self.assertEqual([], self.db.tables.User.find_many())
+        self.assertIsNone(self.db.tables.User.find_unique(where={"user_id": "missing"}))
+
+    def test_update_and_delete_missing_row_are_not_found(self) -> None:
+        with self.assertRaises(IrisError) as caught:
+            self.db.tables.User.update(
+                where={"user_id": "missing"},
+                data={"user_name": {"set": "nobody"}},
+            )
+        self.assertEqual("IRIS-NOT-FOUND", caught.exception.code)
+        self.assertEqual("not_found", caught.exception.kind)
+
+        with self.assertRaises(IrisError) as caught:
+            self.db.tables.User.delete(where={"user_id": "missing"})
+        self.assertEqual("IRIS-NOT-FOUND", caught.exception.code)
+        self.assertEqual("not_found", caught.exception.kind)
 
     def test_transaction_commits_and_rolls_back(self) -> None:
         with self.db.transaction() as tx:

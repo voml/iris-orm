@@ -15,6 +15,15 @@ import {
 import type {
     <% input_import_names %>
 } from "./inputs.js";
+
+/** Raise the author `not_found` failure when a unique `where` matched nothing. */
+function throwNotFound(entity: string, operation: string): never {
+    throw {
+        code: "IRIS-NOT-FOUND",
+        kind: "not_found",
+        message: `\`${entity}.${operation}\` matched no row`,
+    };
+}
 <% if has_macros %>
 
 /** Generated macro bindings from schema truth (not backend capability intersection). */
@@ -141,6 +150,18 @@ export class <% table.name %>Delegate {
     async update<const A extends <% table.name %>UpdateArgs>(
         args: A,
     ): Promise<<% table.name %>GetPayload<A>> {
+        const matched = await this.executor.execute(
+            buildDeclaredOperationRequest(
+                "<% table.name %>.findMany",
+                synthesizeFindMany("<% table.name %>", { where: args.where, take: 1 }),
+            ),
+        );
+        if (!matched.ok) {
+            throwOperationEnvelopeError(matched);
+        }
+        if (matched.value.length === 0) {
+            throwNotFound("<% table.name %>", "update");
+        }
         const synthesis = synthesizeUpdate("<% table.name %>", args);
         const envelope = await this.executor.execute(
             buildDeclaredOperationRequest("<% table.name %>.update", synthesis),
@@ -152,6 +173,18 @@ export class <% table.name %>Delegate {
     }
 
     async delete(args: <% table.name %>DeleteArgs): Promise<void> {
+        const matched = await this.executor.execute(
+            buildDeclaredOperationRequest(
+                "<% table.name %>.findMany",
+                synthesizeFindMany("<% table.name %>", { where: args.where, take: 1 }),
+            ),
+        );
+        if (!matched.ok) {
+            throwOperationEnvelopeError(matched);
+        }
+        if (matched.value.length === 0) {
+            throwNotFound("<% table.name %>", "delete");
+        }
         const synthesis = synthesizeDelete("<% table.name %>", args);
         const envelope = await this.executor.executeUnit(
             buildDeclaredOperationRequest("<% table.name %>.delete", synthesis),

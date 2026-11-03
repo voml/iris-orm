@@ -21,6 +21,7 @@ from ._internal.synthesize import (
     synthesize_update,
     synthesize_vector_near,
 )
+from .errors import IrisError
 from .inputs import (
 
     UserCreateInput,
@@ -34,6 +35,18 @@ from .models import (
     User,
 
 )
+
+
+def _require_match(rows: Sequence[Any], entity: str, operation: str) -> None:
+    """Raise `IRIS-NOT-FOUND` when the unique `where` matched no row."""
+    if rows:
+        return
+    raise IrisError(
+        f"`{entity}.{operation}` matched no row",
+        code="IRIS-NOT-FOUND",
+        kind="not_found",
+    )
+
 
 
 class UserDelegate:
@@ -98,7 +111,20 @@ class UserDelegate:
         data: UserUpdateInput,
         select: UserSelect | None = None,
     ) -> User | None:
-        """Update matching rows and return the first echoed row, if any."""
+        """Update matching rows and return the first echoed row.
+
+        Raises `IrisError` with `IRIS-NOT-FOUND` when `where` matches no row.
+        """
+        _require_match(
+            self._executor.execute(
+                build_declared_operation_request(
+                    "User.findMany",
+                    synthesize_find_many("User", where, None, 1),
+                )
+            ),
+            "User",
+            "update",
+        )
         synthesis = synthesize_update("User", where, data, select)
         rows = self._executor.execute(
             build_declared_operation_request("User.update", synthesis)
@@ -106,6 +132,20 @@ class UserDelegate:
         return rows[0] if rows else None
 
     def delete(self, *, where: UserWhereInput) -> None:
+        """Delete matching rows.
+
+        Raises `IrisError` with `IRIS-NOT-FOUND` when `where` matches no row.
+        """
+        _require_match(
+            self._executor.execute(
+                build_declared_operation_request(
+                    "User.findMany",
+                    synthesize_find_many("User", where, None, 1),
+                )
+            ),
+            "User",
+            "delete",
+        )
         synthesis = synthesize_delete("User", where)
         self._executor.execute_unit(
             build_declared_operation_request("User.delete", synthesis)

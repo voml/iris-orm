@@ -133,10 +133,10 @@ fn typescript_emit_has_typed_filters_patch_and_payload() {
     let ops = files.iter().find(|(name, _)| name == "operations.ts").map(|(_, content)| content.as_str()).expect("operations.ts");
     assert!(ops.contains("findMany<const A extends UserFindManyArgs>"));
     assert!(ops.contains("ReadonlyArray<UserGetPayload<A>>"));
-    assert!(
-        ops.contains("} from \"./inputs.js\";\n/** Schema macros"),
-        "single newline between imports and GeneratedMacros when macros are empty"
-    );
+    assert!(ops.contains("} from \"./inputs.js\";\n/** Raise the author"), "single newline between imports and the not-found helper");
+    assert!(ops.contains("throwNotFound(\"User\", \"update\")"));
+    assert!(ops.contains("throwNotFound(\"User\", \"delete\")"));
+    assert!(ops.contains("\"IRIS-NOT-FOUND\""));
     assert!(inputs.contains("active?: boolean | BooleanFilter"));
     assert!(inputs.contains("userName?: string | StringFilter"));
     assert!(inputs.contains("userId: UserId"));

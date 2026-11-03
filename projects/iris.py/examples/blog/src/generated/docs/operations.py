@@ -21,6 +21,7 @@ from ._internal.synthesize import (
     synthesize_update,
     synthesize_vector_near,
 )
+from .errors import IrisError
 from .inputs import (
 
     DocCreateInput,
@@ -34,6 +35,18 @@ from .models import (
     Doc,
 
 )
+
+
+def _require_match(rows: Sequence[Any], entity: str, operation: str) -> None:
+    """Raise `IRIS-NOT-FOUND` when the unique `where` matched no row."""
+    if rows:
+        return
+    raise IrisError(
+        f"`{entity}.{operation}` matched no row",
+        code="IRIS-NOT-FOUND",
+        kind="not_found",
+    )
+
 
 
 class DocDelegate:
@@ -98,7 +111,20 @@ class DocDelegate:
         data: DocUpdateInput,
         select: DocSelect | None = None,
     ) -> Doc | None:
-        """Update matching rows and return the first echoed row, if any."""
+        """Update matching rows and return the first echoed row.
+
+        Raises `IrisError` with `IRIS-NOT-FOUND` when `where` matches no row.
+        """
+        _require_match(
+            self._executor.execute(
+                build_declared_operation_request(
+                    "Doc.findMany",
+                    synthesize_find_many("Doc", where, None, 1),
+                )
+            ),
+            "Doc",
+            "update",
+        )
         synthesis = synthesize_update("Doc", where, data, select)
         rows = self._executor.execute(
             build_declared_operation_request("Doc.update", synthesis)
@@ -106,6 +132,20 @@ class DocDelegate:
         return rows[0] if rows else None
 
     def delete(self, *, where: DocWhereInput) -> None:
+        """Delete matching rows.
+
+        Raises `IrisError` with `IRIS-NOT-FOUND` when `where` matches no row.
+        """
+        _require_match(
+            self._executor.execute(
+                build_declared_operation_request(
+                    "Doc.findMany",
+                    synthesize_find_many("Doc", where, None, 1),
+                )
+            ),
+            "Doc",
+            "delete",
+        )
         synthesis = synthesize_delete("Doc", where)
         self._executor.execute_unit(
             build_declared_operation_request("Doc.delete", synthesis)

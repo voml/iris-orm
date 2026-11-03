@@ -21,6 +21,7 @@ from ._internal.synthesize import (
     synthesize_update,
     synthesize_vector_near,
 )
+from .errors import IrisError
 from .inputs import (
 <% loop table in tables_view %>
     <% table.name %>CreateInput,
@@ -34,6 +35,18 @@ from .models import (
     <% table.name %>,
 <% end loop %>
 )
+
+
+def _require_match(rows: Sequence[Any], entity: str, operation: str) -> None:
+    """Raise `IRIS-NOT-FOUND` when the unique `where` matched no row."""
+    if rows:
+        return
+    raise IrisError(
+        f"`{entity}.{operation}` matched no row",
+        code="IRIS-NOT-FOUND",
+        kind="not_found",
+    )
+
 
 <% loop table in tables_view %>
 class <% table.name %>Delegate:
@@ -98,7 +111,20 @@ class <% table.name %>Delegate:
         data: <% table.name %>UpdateInput,
         select: <% table.name %>Select | None = None,
     ) -> <% table.name %> | None:
-        """Update matching rows and return the first echoed row, if any."""
+        """Update matching rows and return the first echoed row.
+
+        Raises `IrisError` with `IRIS-NOT-FOUND` when `where` matches no row.
+        """
+        _require_match(
+            self._executor.execute(
+                build_declared_operation_request(
+                    "<% table.name %>.findMany",
+                    synthesize_find_many("<% table.name %>", where, None, 1),
+                )
+            ),
+            "<% table.name %>",
+            "update",
+        )
         synthesis = synthesize_update("<% table.name %>", where, data, select)
         rows = self._executor.execute(
             build_declared_operation_request("<% table.name %>.update", synthesis)
@@ -106,6 +132,20 @@ class <% table.name %>Delegate:
         return rows[0] if rows else None
 
     def delete(self, *, where: <% table.name %>WhereInput) -> None:
+        """Delete matching rows.
+
+        Raises `IrisError` with `IRIS-NOT-FOUND` when `where` matches no row.
+        """
+        _require_match(
+            self._executor.execute(
+                build_declared_operation_request(
+                    "<% table.name %>.findMany",
+                    synthesize_find_many("<% table.name %>", where, None, 1),
+                )
+            ),
+            "<% table.name %>",
+            "delete",
+        )
         synthesis = synthesize_delete("<% table.name %>", where)
         self._executor.execute_unit(
             build_declared_operation_request("<% table.name %>.delete", synthesis)
