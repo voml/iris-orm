@@ -1,16 +1,15 @@
-"""Probe the installed Iris Python binding."""
+"""Probe the installed Iris Python runtime package."""
 
 from __future__ import annotations
 
-from iris import IrisError, capabilities, contract_version, version
+from iris import IrisError, contract_version, version
 
 
 def main() -> int:
-    """Print the binding version, accepted contract, and capability ids."""
+    """Print the binding version and the accepted contract."""
     try:
         print(f"iris binding: {version()}")
         print(f"accepted contract: {contract_version()}")
-        print("capabilities: " + ", ".join(capabilities()))
     except IrisError as error:
         print(f"iris binding unavailable: {error}")
         return 1

@@ -1,21 +1,33 @@
 # `iris` (Python)
 
-Python binding skeleton for Iris ORM, built with `maturin` from the
+Runtime package for Iris ORM for Python, built with `maturin` from the
 `iris-pyo3` crate.
 
-It currently provides version and capability probing only:
+The public surface is intentionally tiny:
 
 ```python
 import iris
 
 iris.version()           # Rust facade version
 iris.contract_version()  # accepted contract envelope format
-iris.capabilities()      # capability ids exposed by this binding
+iris.IrisError           # error type raised by generated clients
 ```
 
-There is no `Database` entry, no query DSL, no SQL entry, and no `.iris`
-parsing in this package. Schema authoring, generation, and runtime data access
-remain in the Rust and Node surfaces.
+Data access comes from a **generated client**, one per project, produced from
+the project's VOS schema:
+
+```python
+from generated.iris import create_client
+
+db = create_client("sqlite:./app.sqlite")
+db.tables.User.find_many(where={"user_name": {"contains": "ali"}})
+with db.transaction() as tx:
+    tx.tables.User.create(data={"user_name": "ali"})
+```
+
+Session plumbing, DSN parsing and adapter selection live in `iris._runtime` and
+are not part of the authoring surface. There is no query DSL, no SQL entry and
+no `.iris` parsing in this package.
 
 ## Development
 

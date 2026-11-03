@@ -20,6 +20,8 @@ except ImportError:  # running the suite from a source checkout
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
     import iris
 
+from iris import IrisError, _runtime
+
 try:
     import iris_pyo3  # noqa: F401
 except ImportError:
@@ -82,24 +84,24 @@ def _error_code(result: dict[str, object]) -> str:
 @unittest.skipUnless(NATIVE_AVAILABLE, NATIVE_REASON)
 class MemoryProfileTests(unittest.TestCase):
     def test_query_on_unseeded_reference_profile_reports_code(self) -> None:
-        session = iris.openMemory()
+        session = _runtime.openMemory()
         result = session.query("User.collect()")
         self.assertFalse(result["ok"])
         self.assertEqual(result["rows"], [])
         self.assertEqual(_error_code(result), "IRIS-EXEC-FAILED")
 
     def test_reference_profile_rejects_writes_at_plan_time(self) -> None:
-        session = iris.openMemory()
+        session = _runtime.openMemory()
         result = session.execute('User::insert({ user_id: "u1", user_name: "alice", active: true })')
         self.assertFalse(result["ok"])
         self.assertEqual(_error_code(result), "IRIS-PLAN-REJECTED")
 
     def test_transactions_are_unsupported_on_the_reference_profile(self) -> None:
-        session = iris.openMemory()
+        session = _runtime.openMemory()
         self.assertEqual(_error_code(session.begin()), "IRIS-TRANSACTION-UNSUPPORTED")
 
     def test_closed_session_returns_a_session_closed_code(self) -> None:
-        session = iris.openMemory()
+        session = _runtime.openMemory()
         session.close()
         result = session.query("User.collect()")
         self.assertFalse(result["ok"])
@@ -108,8 +110,8 @@ class MemoryProfileTests(unittest.TestCase):
 
 @unittest.skipUnless(NATIVE_AVAILABLE, NATIVE_REASON)
 class SqliteProfileTests(unittest.TestCase):
-    def _open(self) -> "iris.Session":
-        session = iris.openSqlite()
+    def _open(self) -> "_runtime.Session":
+        session = _runtime.openSqlite()
         pushed = session.managedPush(USER_SCHEMA)
         self.assertTrue(pushed["ok"], pushed)
         return session
@@ -151,12 +153,12 @@ class SqliteProfileTests(unittest.TestCase):
     def test_close_and_reopen_the_same_sqlite_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = str(Path(directory) / "app.sqlite")
-            session = iris.openSqlite(path)
+            session = _runtime.openSqlite(path)
             session.managedPush(USER_SCHEMA)
             session.execute('User::insert({ user_id: "u1", user_name: "alice", active: true })')
             session.close()
 
-            reopened = iris.openSqlite(path)
+            reopened = _runtime.openSqlite(path)
             rows = reopened.query('User.filter(x => x.user_id == "u1").collect()')
             self.assertTrue(rows["ok"], rows)
             self.assertEqual(len(rows["rows"]), 1)
@@ -178,13 +180,13 @@ class SqliteProfileTests(unittest.TestCase):
 @unittest.skipUnless(NATIVE_AVAILABLE, NATIVE_REASON)
 class ErrorEnvelopeTests(unittest.TestCase):
     def test_bind_failure_is_a_param_encoding_error(self) -> None:
-        session = iris.openSqlite()
+        session = _runtime.openSqlite()
         result = session.query("User.filter(x => x.user_id == $id).collect()", "{not json")
         self.assertFalse(result["ok"])
         self.assertEqual(_error_code(result), "IRIS-PARAM-ENCODING")
 
     def test_invalid_operation_payload_is_an_operation_error(self) -> None:
-        session = iris.openSqlite()
+        session = _runtime.openSqlite()
         result = session.executeOperation("{")
         self.assertFalse(result["ok"])
         self.assertEqual(_error_code(result), "IRIS-OPERATION-INVALID")
@@ -193,8 +195,8 @@ class ErrorEnvelopeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             blocker = Path(directory) / "blocked"
             blocker.write_text("not a database", encoding="utf-8")
-            with self.assertRaises(iris.IrisError) as caught:
-                iris.openYydb(str(blocker / "app.yydb"))
+            with self.assertRaises(IrisError) as caught:
+                _runtime.openYydb(str(blocker / "app.yydb"))
             self.assertTrue(caught.exception.code.startswith("IRIS-"))
 
 
@@ -206,7 +208,7 @@ class YydbProfileTests(unittest.TestCase):
     def test_vector_payload_round_trips_in_yydb_and_yydx(self) -> None:
         for layout in ("yydb", "yydx"):
             with self.subTest(layout=layout), tempfile.TemporaryDirectory() as directory:
-                session = iris.openYydb(self._layout_path(directory, layout))
+                session = _runtime.openYydb(self._layout_path(directory, layout))
                 pushed = session.managedPush(DOC_SCHEMA)
                 self.assertTrue(pushed["ok"], pushed)
 
@@ -226,7 +228,7 @@ class YydbProfileTests(unittest.TestCase):
                 self.assertEqual(embedding["components"], VECTOR_THREE)
                 session.close()
 
-                reopened = iris.openYydb(self._layout_path(directory, layout))
+                reopened = _runtime.openYydb(self._layout_path(directory, layout))
                 rows = reopened.query("Doc.collect()")
                 self.assertEqual(len(rows["rows"]), 1)
                 reopened.close()
@@ -238,7 +240,7 @@ class YydbProfileTests(unittest.TestCase):
 
         for layout in ("yydb", "yydx"):
             with self.subTest(layout=layout), tempfile.TemporaryDirectory() as directory:
-                session = iris.openYydb(self._layout_path(directory, layout))
+                session = _runtime.openYydb(self._layout_path(directory, layout))
                 pushed = session.managedPush(ASSET_SCHEMA)
                 self.assertTrue(pushed["ok"], pushed)
 

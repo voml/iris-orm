@@ -1,4 +1,4 @@
-"""Smoke tests for the Iris Python binding skeleton."""
+"""Smoke tests for the `iris` runtime package boundary."""
 
 from __future__ import annotations
 
@@ -27,23 +27,13 @@ NATIVE_REASON = (
 
 class PackageTests(unittest.TestCase):
     def test_public_names_are_exported(self) -> None:
-        self.assertEqual(
-            sorted(iris.__all__),
-            [
-                "IrisError",
-                "Session",
-                "capabilities",
-                "contract_version",
-                "openMemory",
-                "openMysql",
-                "openPostgres",
-                "openSqlite",
-                "openYydb",
-                "version",
-            ],
-        )
+        self.assertEqual(sorted(iris.__all__), ["IrisError", "contract_version", "version"])
         for name in iris.__all__:
             self.assertTrue(hasattr(iris, name), name)
+
+    def test_session_surface_is_not_public(self) -> None:
+        for name in ["Session", "capabilities", "openMemory", "openSqlite", "openYydb", "openPostgres", "openMysql"]:
+            self.assertFalse(hasattr(iris, name), f"`iris.{name}` belongs to `iris._runtime`")
 
     def test_iris_error_is_an_exception(self) -> None:
         self.assertTrue(issubclass(iris.IrisError, Exception))
@@ -67,9 +57,11 @@ class NativeTests(unittest.TestCase):
     def test_contract_version_is_the_v0_envelope(self) -> None:
         self.assertEqual(iris.contract_version(), "vos/iris.contract/v0")
 
-    def test_capabilities_are_a_read_only_list(self) -> None:
+    def test_capabilities_are_an_internal_list(self) -> None:
+        from iris import _runtime
+
         self.assertEqual(
-            iris.capabilities(),
+            _runtime.native().capabilities(),
             [
                 "version",
                 "contract_version",
