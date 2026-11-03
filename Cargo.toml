@@ -42,6 +42,7 @@ iris-types = { path = "projects/iris.rs/crates/iris-types" }
 iris-ir = { path = "projects/iris.rs/crates/iris-ir" }
 iris-generator = { path = "projects/iris.rs/crates/iris-generator" }
 iris-wasm = { path = "projects/iris.rs/crates/iris-wasm" }
+iris-host = { path = "projects/iris.rs/crates/iris-host" }
 iris-connector-yydb = { path = "projects/iris.rs/crates/iris-connector-yydb" }
 iris-connector-yyds = { path = "projects/iris.rs/crates/iris-connector-yyds" }
 iris-adapter-mysql = { path = "projects/iris.rs/crates/iris-adapter-mysql" }

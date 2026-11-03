@@ -13,11 +13,8 @@ crate-type = ["cdylib"]
 [dependencies]
 iris = { workspace = true, features = ["migrate"] }
 iris-generator = { workspace = true }
+iris-host = { workspace = true }
 iris-wasm = { workspace = true }
-iris-adapter-sqlite = { workspace = true }
-iris-adapter-postgres = { workspace = true }
-iris-adapter-mysql = { workspace = true }
-iris-connector-yydb = { workspace = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
 serde = { workspace = true }

@@ -4,7 +4,6 @@
 
 #![deny(clippy::all)]
 
-mod operation;
 mod session;
 
 use std::path::Path;
