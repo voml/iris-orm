@@ -124,11 +124,13 @@ impl MemorySession {
         }
     }
 
-    /// Run a bound read pipeline: YYDB takes typed values, other adapters take text only.
+    /// Run a bound operation: YYDB takes typed values and classifies the
+    /// source through its own frontend so writes reach the write executor,
+    /// while other adapters take text-only reads through the Iris planner.
     fn run_bound_query(&self, bound: &bind::BoundParameters) -> Result<ExecuteResult> {
         if let SessionStore::Yydb(db) = &self.store {
             self.ensure_yydb_session_fresh(db).map_err(Error::from_reason)?;
-            return match db.query_with_params(&bound.source, &bound.value_parameters) {
+            return match db.run_with_params(&bound.source, &bound.value_parameters) {
                 Ok(rows) => Ok(ok_result(rows)),
                 Err(err) => Ok(err_result(err.to_string())),
             };

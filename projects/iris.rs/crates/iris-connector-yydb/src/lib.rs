@@ -225,6 +225,28 @@ impl YydbSource {
         Ok(())
     }
 
+    /// Run a VOS program with typed named parameters, classifying it as a
+    /// write or a read before execution: write programs (`Type::insert`,
+    /// `Type { … }.insert()`, zero-argument schema macros) go to the write
+    /// executor and read pipelines go to the query executor. Writes return
+    /// no rows.
+    ///
+    /// Classification happens on the parsed program shape (see
+    /// [`is_write_program`]): the read executor silently accepts no writes,
+    /// and `.patch()` / `.delete()` attempts keep surfacing the Phase 1
+    /// diagnostics of the read path instead of being misrouted.
+    pub fn run_with_params(&self, program: &str, named: &BTreeMap<String, iris_types::Value>) -> Result<Vec<iris_types::Row>> {
+        self.require_vos_executor()?;
+        let named = value_params_to_yydb(named)?;
+        let conn = self.conn.borrow();
+        if is_write_program(program) {
+            conn.execute_vos_write_with_params(program, &named)?;
+            return Ok(Vec::new());
+        }
+        let rows = conn.query_vos_with_params(program, &named)?;
+        rows.into_iter().map(row_from_yydb).collect()
+    }
+
     /// Prepare a VOS program into a cached plan.
     ///
     /// The plan is bound to the current DDL revision — re-prepare when the
@@ -436,6 +458,98 @@ impl PreparedVos {
 // ---------------------------------------------------------------------------
 // Row / value conversion — yydb types → iris_types
 // ---------------------------------------------------------------------------
+
+/// Whether a VOS program is a write the Phase 1 write executor accepts.
+///
+/// The classifier parses the program shape instead of guessing from text:
+/// `$name` parameters are replaced by `null` only for parsing (typed payload
+/// placeholders have no VOS literal form), then the top-level expression
+/// decides. `Type::insert({ … })` (associated form), `Type { … }.insert()`
+/// (method form) and zero-argument schema macro calls are writes. Everything
+/// else — read pipelines, `.patch()` / `.delete()` attempts, malformed
+/// sources — stays a read so the canonical Phase 1 diagnostics of the read
+/// path surface for it.
+fn is_write_program(source: &str) -> bool {
+    let Ok(program) = yydb::vos::parse_program(&probe_source(source))
+    else {
+        return false;
+    };
+    // `let` bindings are outside the shapes the classifier owns; keep them on
+    // the read path.
+    if !program.statements.is_empty() {
+        return false;
+    }
+    let Some(result) = program.result.as_ref()
+    else {
+        return false;
+    };
+    is_write_expr(result)
+}
+
+fn is_write_expr(expr: &yydb::vos::syntax::VosExpr) -> bool {
+    use yydb::vos::syntax::VosExpr;
+    let VosExpr::Call { callee, args, .. } = expr
+    else {
+        return false;
+    };
+    match callee.as_ref() {
+        // `Type::insert({ … })` and `Type { … }.insert()` — both insert shapes
+        // the Phase 1 write executor accepts. Read pipelines end in a `collect`
+        // call instead, so they never reach this arm.
+        VosExpr::Member { name, .. } if name == "insert" => true,
+        // Zero-argument schema macro call (e.g. `seed_fixture()`); a call with
+        // arguments is a declared query operation and stays a read.
+        VosExpr::Name { .. } => args.is_empty(),
+        _ => false,
+    }
+}
+
+/// Replace each `$ident` parameter placeholder outside string literals with a
+/// `null` literal so the classifier can parse the program. Only used for
+/// shape detection — never executed.
+fn probe_source(source: &str) -> String {
+    let chars: Vec<char> = source.chars().collect();
+    let mut out = String::with_capacity(source.len());
+    let mut i = 0;
+    let mut in_string = false;
+    while i < chars.len() {
+        let ch = chars[i];
+        if in_string {
+            out.push(ch);
+            if ch == '\\' && i + 1 < chars.len() {
+                out.push(chars[i + 1]);
+                i += 2;
+                continue;
+            }
+            if ch == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if ch == '"' {
+            in_string = true;
+            out.push('"');
+            i += 1;
+            continue;
+        }
+        if ch == '$' {
+            let start = i + 1;
+            let mut end = start;
+            while end < chars.len() && (chars[end].is_ascii_alphanumeric() || chars[end] == '_') {
+                end += 1;
+            }
+            if end > start {
+                out.push_str("null");
+                i = end;
+                continue;
+            }
+        }
+        out.push(ch);
+        i += 1;
+    }
+    out
+}
 
 /// Convert a typed Iris `FileDescriptor` into the backend file descriptor.
 ///

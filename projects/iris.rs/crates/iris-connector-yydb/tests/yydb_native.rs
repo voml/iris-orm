@@ -775,3 +775,120 @@ fn adapter_transaction_commits_and_with_rollback_leaves_no_residue() {
         let _ = fs::remove_dir_all(dir);
     }
 }
+
+// ---------------------------------------------------------------------------
+// `run_with_params`: write programs reach the write executor, reads stay reads
+// ---------------------------------------------------------------------------
+
+#[test]
+fn run_with_params_routes_inserts_to_the_write_executor() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
+
+    // The unified runner must really write: handing a write program to the
+    // read executor silently produces an empty row set without storing
+    // anything, which is exactly the failure this routing exists to prevent.
+    let rows = db
+        .run_with_params(
+            r#"User::insert({ user_id: "55555555-5555-5555-5555-555555555555", user_name: "erin", active: true })"#,
+            &BTreeMap::new(),
+        )
+        .expect("insert through `run_with_params`");
+    assert!(rows.is_empty(), "writes return no rows");
+
+    let found = db.query(r#"User.filter(x => x.user_name == "erin").collect()"#).unwrap();
+    assert_eq!(found.len(), 1, "the insert must be visible to reads");
+
+    let rows = db.run_with_params(r#"User.filter(x => x.active == true).collect()"#, &BTreeMap::new()).expect("read through `run_with_params`");
+    assert_eq!(rows.len(), 1, "read pipelines keep returning rows");
+}
+
+/// A `file` descriptor valid under the descriptor contract (64-hex digests,
+/// non-blank labels); identity is the content digest alone.
+fn asset_descriptor(digest_byte: u8, name: &str, media_type: Option<&str>) -> iris_types::FileDescriptor {
+    let digest = std::iter::repeat_n(format!("{digest_byte:02x}"), 32).collect::<String>();
+    let manifest_hash = std::iter::repeat_n(format!("{:02x}", digest_byte.wrapping_add(1)), 32).collect::<String>();
+    iris_types::FileDescriptor::new(
+        digest,
+        700,
+        Some(name.to_owned()),
+        media_type.map(str::to_owned),
+        iris_types::FileManifestRef { hash: manifest_hash, size: 700 },
+    )
+    .expect("canonical descriptor")
+}
+
+fn asset_params(asset_id: i64, payload: &iris_types::FileDescriptor) -> BTreeMap<String, iris_types::Value> {
+    BTreeMap::from([
+        ("asset_id".to_string(), iris_types::Value::Int(asset_id)),
+        ("payload".to_string(), iris_types::Value::File(payload.clone())),
+    ])
+}
+
+fn filtered_asset_ids(db: &YydbSource, predicate: &str, probe: &iris_types::FileDescriptor) -> Vec<i64> {
+    let source = format!("Asset.filter(x => x.payload {predicate} $probe).collect()");
+    let named = BTreeMap::from([("probe".to_string(), iris_types::Value::File(probe.clone()))]);
+    let mut ids = db
+        .run_with_params(&source, &named)
+        .unwrap_or_else(|error| panic!("filter `{predicate}`: {error}"))
+        .into_iter()
+        .map(|row| match row.get("asset_id") {
+            Some(iris_types::Value::Int(id)) => *id,
+            other => panic!("`asset_id` must decode to an integer, got {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    ids.sort_unstable();
+    ids
+}
+
+#[test]
+fn run_with_params_filters_files_by_content_hash_identity() {
+    // Real on-disk `.yydx`: two rows share one content digest under different
+    // labels, a third carries distinct content. Equality and inequality
+    // filters compare the digest alone, before and after a reopen.
+    let path = temp_layout_path("run-file-filter", "yydx");
+    let db = YydbSource::open(&path).unwrap();
+    db.ensure_schema(ASSET_SCHEMA).unwrap();
+
+    let alpha = asset_descriptor(0xaa, "alpha.bin", Some("application/octet-stream"));
+    let alpha_renamed = asset_descriptor(0xaa, "alpha-renamed.bin", None);
+    let beta = asset_descriptor(0xbb, "beta.bin", Some("application/octet-stream"));
+    for (asset_id, payload) in [(1, &alpha), (2, &alpha_renamed), (3, &beta)] {
+        db.run_with_params(ASSET_INSERT, &asset_params(asset_id, payload))
+            .unwrap_or_else(|error| panic!("insert `asset_id` {asset_id}: {error}"));
+    }
+
+    // A probe whose labels match none of the stored rows still matches both
+    // rows carrying its digest — labels never take part in the comparison.
+    let probe = asset_descriptor(0xaa, "unrelated-name.dat", Some("application/x-other"));
+    assert_eq!(filtered_asset_ids(&db, "==", &probe), vec![1, 2], "digest equality ignores labels");
+    assert_eq!(filtered_asset_ids(&db, "!=", &probe), vec![3], "digest inequality keeps only other content");
+    assert_eq!(filtered_asset_ids(&db, "==", &beta), vec![3]);
+
+    let db = db.reopen().expect("reopen");
+    assert_eq!(filtered_asset_ids(&db, "==", &probe), vec![1, 2], "digest equality survives reopen");
+    assert_eq!(filtered_asset_ids(&db, "!=", &probe), vec![3], "digest inequality survives reopen");
+
+    drop(db);
+    if let Some(dir) = path.parent() {
+        let _ = fs::remove_dir_all(dir);
+    }
+}
+
+#[test]
+fn run_with_params_keeps_pipeline_writes_fail_closed() {
+    let db = YydbSource::open_in_memory().unwrap();
+    db.ensure_schema(USER_SCHEMA).unwrap();
+
+    // `.patch()` is a pipeline write outside the Phase 1 write executor: the
+    // runner must surface that rejection loudly instead of silently matching
+    // nothing. The canonical read-path diagnostic names the pipeline contract.
+    let err = db
+        .run_with_params(
+            r#"User.filter(x => x.user_name == "ada").patch({ user_name: $patched })"#,
+            &BTreeMap::from([("patched".to_string(), iris_types::Value::Str("grace".into()))]),
+        )
+        .expect_err("pipeline writes stay rejected");
+    let message = err.to_string();
+    assert!(message.contains("Phase 1"), "{message}");
+}
