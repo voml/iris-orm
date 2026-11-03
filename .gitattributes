@@ -1,0 +1,2 @@
+# Generated Python clients are byte-compared against the generator output.
+projects/iris.py/examples/blog/src/generated/** text eol=lf

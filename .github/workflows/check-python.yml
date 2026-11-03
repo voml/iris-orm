@@ -7,6 +7,7 @@ on:
     paths:
       - "projects/iris.py/**"
       - "projects/iris.rs/crates/iris-pyo3/**"
+      - "projects/iris.rs/crates/iris-generator/**"
       - "Cargo.toml"
       - ".github/workflows/check-python.yml"
   pull_request:
@@ -14,6 +15,7 @@ on:
     paths:
       - "projects/iris.py/**"
       - "projects/iris.rs/crates/iris-pyo3/**"
+      - "projects/iris.rs/crates/iris-generator/**"
       - "Cargo.toml"
       - ".github/workflows/check-python.yml"
 
@@ -90,6 +92,21 @@ jobs:
 
       - name: Python tests
         run: ${{ matrix.venv-python }} -m unittest discover -s projects/iris.py/packages/iris/tests -v
+
+      - name: Generate the example clients
+        run: |
+          cargo run -q -p iris-generator --bin iris-python-generate -- \
+            projects/iris.py/examples/blog/schemas/blog.iris \
+            projects/iris.py/examples/blog/src/generated/iris
+          cargo run -q -p iris-generator --bin iris-python-generate -- \
+            projects/iris.py/examples/blog/schemas/docs.iris \
+            projects/iris.py/examples/blog/src/generated/docs
+
+      - name: Check the generated client is current
+        run: git diff --exit-code -- projects/iris.py/examples/blog/src/generated
+
+      - name: Generated client tests
+        run: ${{ matrix.venv-python }} -m unittest discover -s projects/iris.py/examples/blog/tests -v
 
       - name: Example smoke
         run: ${{ matrix.venv-python }} projects/iris.py/packages/iris/examples/embedded/main.py
