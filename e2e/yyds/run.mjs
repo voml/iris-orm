@@ -95,6 +95,10 @@ async function stopNode() {
     if (nodeProcess === null) return;
     const stopped = runCli(["stop", "--data-dir", dataDir], 20_000);
     console.log(`[stop] exit=${stopped.code}`);
+    if (nodeProcess.exitCode !== null) {
+        nodeProcess = null;
+        return;
+    }
     const exited = new Promise((resolveExit) => nodeProcess.once("exit", resolveExit));
     const timeout = new Promise((resolveTimeout) => setTimeout(resolveTimeout, 10_000, "timeout"));
     if ((await Promise.race([exited, timeout])) === "timeout") {
@@ -184,7 +188,7 @@ const CREATE_TABLE = {
 
 const DSN = {
     mysql: `mysql://yyds@${host}:${mysqlPort}`,
-    postgres: `postgres://yyds:@${host}:${pgPort}/yyds?schema=public`,
+    postgres: `postgres://yyds:@${host}:${pgPort}/yyds?sslmode=disable`,
 };
 
 async function createTable() {
@@ -323,7 +327,25 @@ try {
         }
         console.log(`[parity] ${Object.keys(ts.result.codes).length} codes compared, ${mismatches} mismatches`);
     }
-    exitCode = ts.ok && py.ok && mismatches === 0 ? 0 : 1;
+
+    // PostgreSQL additionally proves reconnect: one long-lived client, one call
+    // after the node stops, then the same client after the node comes back.
+    let reconnect = null;
+    if (BACKEND === "postgres") {
+        reconnect = await runSuite("reconnect", process.execPath, [join(REPO, "e2e", "node_modules", "tsx", "dist", "cli.mjs"), join(HERE, "reconnect.ts")], {
+            IRIS_E2E_DSN: DSN[BACKEND],
+            YYDS_CLI: CLI,
+            YYDS_DATA_DIR: dataDir,
+            YYDS_CLUSTER_ID: clusterId,
+            YYDS_NODE_ID: nodeId,
+            YYDS_PORTS: JSON.stringify({ redis: redisPort, pg: pgPort, mysql: mysqlPort }),
+        });
+        console.log(`[reconnect] ${reconnect.ok ? "PASS" : "FAIL"}`);
+        if (!reconnect.ok) console.log(reconnect.log.trimEnd());
+        else console.log(`[reconnect] codes=${JSON.stringify(reconnect.result.codes)}`);
+    }
+
+    exitCode = ts.ok && py.ok && mismatches === 0 && (reconnect === null || reconnect.ok) ? 0 : 1;
 } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     exitCode = 1;
