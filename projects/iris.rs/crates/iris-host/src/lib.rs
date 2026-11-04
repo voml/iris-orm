@@ -642,6 +642,10 @@ impl HostSession {
             (Self::open_memory(), false)
         }
         else if let Some(path) = text.strip_prefix("sqlite:") {
+            // SQLite is a SQL backend: it cannot represent a `vector` field, so
+            // a schema that declares one must fail here rather than in the
+            // adapter's push layer.
+            reject_unsupported_schema("SQLite", schema)?;
             (Self::open_sqlite(if path.is_empty() { ":memory:" } else { path })?, true)
         }
         else if let Some(path) = text.strip_prefix("file:") {
@@ -907,7 +911,11 @@ table Doc {
 
     #[test]
     fn sql_backends_reject_vector_schemas_when_the_client_is_built() {
-        for (label, dsn) in [("mysql", "mysql://iris@127.0.0.1:1"), ("postgres", "postgres://iris:@127.0.0.1:1/yyds")] {
+        for (label, dsn) in [
+            ("sqlite", "sqlite::memory:"),
+            ("mysql", "mysql://iris@127.0.0.1:1"),
+            ("postgres", "postgres://iris:@127.0.0.1:1/yyds"),
+        ] {
             let err = match HostSession::open_dsn(dsn, Some(VECTOR_SCHEMA)) {
                 Ok(_) => panic!("{label} accepted a schema that declares `vector`"),
                 Err(err) => err,

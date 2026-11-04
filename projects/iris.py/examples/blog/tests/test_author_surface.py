@@ -128,6 +128,13 @@ class GeneratedErrorTest(unittest.TestCase):
             create_client("iri://localhost/app")
         self.assertEqual("IRIS-INVALID-ARGUMENT", caught.exception.code)
 
+    def test_vector_schema_is_rejected_while_the_sql_clients_is_built(self) -> None:
+        with self.assertRaises(DocsIrisError) as caught:
+            create_docs_client("sqlite::memory:")
+        self.assertEqual("IRIS-SCHEMA-MISMATCH", caught.exception.code)
+        self.assertEqual("schema_mismatch", caught.exception.kind)
+        self.assertIsInstance(caught.exception.diagnostic_code, str)
+
 
 class GeneratedAuthorCodeTest(unittest.TestCase):
     """Author codes for the converged vector and filter surfaces."""
