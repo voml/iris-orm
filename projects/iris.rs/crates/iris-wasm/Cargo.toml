@@ -12,7 +12,12 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 iris-types = { workspace = true }
-iris-generator = { workspace = true }
+# The browser binding only renders the TypeScript family. `aot` stays explicit
+# because `default-features = false` also drops it from `iris-generator`.
+iris-generator = { workspace = true, default-features = false, features = [
+  "aot",
+  "templates-typescript",
+] }
 iris-adapter-d1 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

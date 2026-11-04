@@ -8,8 +8,18 @@ description = "Iris GenerationModel + Dejavu-backed emitters"
 publish = false
 
 [features]
-default = ["aot"]
+default = ["aot", "templates-host"]
+# Parse every enabled `.dejavu` template into the registry that is embedded
+# into each host binary.
 aot = []
+# Every family a native host can render (`iris-host`, `iris-pyo3`, `iris-napi`).
+templates-host = ["templates-typescript", "templates-python", "templates-rust"]
+# Template families. Each one adds its own `.dejavu` files to the AOT registry.
+# `iris-wasm` turns off the families it cannot render so the browser artifact
+# does not carry their IR payload.
+templates-typescript = []
+templates-python = []
+templates-rust = []
 
 [dependencies]
 vos = { workspace = true }

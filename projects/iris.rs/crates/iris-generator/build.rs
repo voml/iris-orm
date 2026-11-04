@@ -17,14 +17,27 @@ fn main() {
     println!("cargo:rerun-if-changed={}", templates_dir.display());
     println!("cargo:rerun-if-changed=build.rs");
 
-    let mut entries = Vec::new();
-    collect_dejavu(&templates_dir, &mut entries);
-    entries.sort();
-
     let aot = env::var("CARGO_FEATURE_AOT").is_ok();
     if !aot {
         panic!("iris-generator: enable feature `aot` (default)");
     }
+
+    let mut entries = Vec::new();
+    for family in TEMPLATE_FAMILIES {
+        if !family_enabled(family) {
+            continue;
+        }
+        let family_dir = templates_dir.join(family);
+        if !family_dir.is_dir() {
+            panic!("iris-generator: feature `templates-{family}` is enabled but {} is missing", family_dir.display());
+        }
+        println!("cargo:rerun-if-changed={}", family_dir.display());
+        collect_dejavu(&family_dir, &mut entries);
+    }
+    if entries.is_empty() {
+        panic!("iris-generator: enable at least one `templates-*` family");
+    }
+    entries.sort();
 
     let mut match_arms = String::new();
     let mut name_list = Vec::new();
@@ -65,6 +78,16 @@ pub(crate) fn render_registered(name: &str, ctx: &serde_json::Value) -> crate::R
         arms = match_arms,
     );
     fs::write(out_dir.join("aot_registry.rs"), registry).expect("write aot_registry.rs");
+}
+
+/// Template families selected by the `templates-<family>` features. `iris-wasm`
+/// turns off the families it cannot render so the browser artifact does not
+/// carry their IR payload.
+const TEMPLATE_FAMILIES: [&str; 3] = ["typescript", "python", "rust"];
+
+fn family_enabled(family: &str) -> bool {
+    let key = format!("CARGO_FEATURE_TEMPLATES_{}", family.to_ascii_uppercase());
+    env::var_os(key).is_some()
 }
 
 fn collect_dejavu(dir: &Path, out: &mut Vec<PathBuf>) {

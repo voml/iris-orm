@@ -40,7 +40,9 @@ sha2 = "0.10"
 iris = { path = "projects/iris.rs/crates/iris" }
 iris-types = { path = "projects/iris.rs/crates/iris-types" }
 iris-ir = { path = "projects/iris.rs/crates/iris-ir" }
-iris-generator = { path = "projects/iris.rs/crates/iris-generator" }
+# Template families are opt-in per consumer: hosts inherit the umbrella
+# `templates-host` feature, `iris-wasm` enables only `templates-typescript`.
+iris-generator = { path = "projects/iris.rs/crates/iris-generator", default-features = false }
 iris-wasm = { path = "projects/iris.rs/crates/iris-wasm" }
 iris-host = { path = "projects/iris.rs/crates/iris-host" }
 iris-connector-yydb = { path = "projects/iris.rs/crates/iris-connector-yydb" }

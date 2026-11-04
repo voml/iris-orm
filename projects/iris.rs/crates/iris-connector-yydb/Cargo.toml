@@ -16,4 +16,4 @@ serde_json = { workspace = true }
 
 [dev-dependencies]
 iris = { workspace = true }
-iris-generator = { workspace = true }
+iris-generator = { workspace = true, features = ["aot", "templates-host"] }

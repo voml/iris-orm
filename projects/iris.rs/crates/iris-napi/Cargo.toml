@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 iris = { workspace = true, features = ["migrate"] }
-iris-generator = { workspace = true }
+iris-generator = { workspace = true, features = ["aot", "templates-host"] }
 iris-host = { workspace = true }
 iris-wasm = { workspace = true }
 napi = { workspace = true }
