@@ -108,5 +108,8 @@ jobs:
       - name: Generated client tests
         run: ${{ matrix.venv-python }} -m unittest discover -s projects/iris.py/examples/blog/tests -v
 
+      - name: Author error codes
+        run: ${{ matrix.venv-python }} projects/iris.py/examples/blog/examples/author_codes.py
+
       - name: Example smoke
         run: ${{ matrix.venv-python }} projects/iris.py/packages/iris/examples/embedded/main.py

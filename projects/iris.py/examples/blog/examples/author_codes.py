@@ -36,6 +36,12 @@ def expect(label: str, code: str, kind: str, action) -> None:
     raise AssertionError(f"{label}: expected {code}, nothing was raised")
 
 
+def memory_transaction() -> None:
+    """内存 profile 没有事务控制，开事务即返回作者码。"""
+    with create_client("memory:").transaction():
+        pass
+
+
 def main() -> int:
     db = create_client("sqlite::memory:")
     db.tables.user.create(data={"user_id": "u1", "user_name": "alice", "active": True})
@@ -67,12 +73,28 @@ def main() -> int:
             lambda: docs.tables.doc.find_near(field="embedding", vector=[1.0, 0.0], metric="cosine", threshold=0.5),
         )
 
-    # 未能在此处触发、因此不计入覆盖的码：
-    # - `IRIS-SCHEMA-MISMATCH` 当前由文档客户端在 `sqlite::memory:` 上落到 `IRIS-INTERNAL`，
-    #   与生成客户端契约不符，先用 `test_author_surface` 的既有断言跟踪，不在此复制错误期望。
-    # - `IRIS-CONNECTION-FAILED` 需要真实远端节点（本仓 `e2e/yyds/reconnect.ts` 覆盖）。
-    # - `IRIS-TRANSACTION-FAILED` 需要已失效的事务会话，生成客户端未公开该入口。
-    # - `IRIS-INTERNAL` 只在宿主缺陷时出现，示例不应构造。
+    expect(
+        "transaction_failed",
+        "IRIS-TRANSACTION-FAILED",
+        "transaction_failed",
+        memory_transaction,
+    )
+    # 建连前就按 schema 拒绝：端口不可达也无所谓，所以不需要真实服务端。
+    expect(
+        "connection_failed",
+        "IRIS-CONNECTION-FAILED",
+        "connection_failed",
+        lambda: create_client("postgres://127.0.0.1:1/app"),
+    )
+    # 声明 `vector` 的 schema 只能走 yydb；SQL 后端在建连前返回 schema_mismatch。
+    expect(
+        "schema_mismatch",
+        "IRIS-SCHEMA-MISMATCH",
+        "schema_mismatch",
+        lambda: create_docs_client("mysql://127.0.0.1:1/app"),
+    )
+
+    # 未计入覆盖：`IRIS-INTERNAL` 按契约只在宿主缺陷时出现，示例不应构造。
     for label, code in CASES:
         print(f"PASS {label}: {code}")
     print(f"author codes covered {len(CASES)}/8")
