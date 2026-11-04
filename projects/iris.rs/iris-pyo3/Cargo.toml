@@ -1,0 +1,18 @@
+[package]
+name = "iris-pyo3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Python (pyo3) binding skeleton for Iris ORM"
+publish = false
+
+[lib]
+name = "iris_pyo3"
+crate-type = ["cdylib"]
+test = false
+doctest = false
+
+[dependencies]
+iris = { workspace = true, features = ["pyo3"] }
+pyo3 = { workspace = true }

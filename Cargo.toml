@@ -1,8 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["projects/iris.rs/crates/*"]
+members = [
+    "projects/iris.rs/iris-napi",
+    "projects/iris.rs/iris-pyo3",
+]
 default-members = [
-    "projects/iris.rs/crates/iris",
+    "projects/iris.rs/iris-napi",
 ]
 
 [workspace.package]
@@ -14,50 +17,18 @@ repository = "https://github.com/voml/iris-orm"
 homepage = "https://iris-orm.pages.dev/"
 
 [workspace.dependencies]
-# Public VOS/VON/YYDB â€” git `rev` pinned (CI / Docker; no sibling path checkouts).
-vos = { git = "https://github.com/voml/vos-language.git", rev = "387d9fc3c9a556ddb8a433c627a866a2918d0186" }
-von = { git = "https://github.com/voml/von-language.git", rev = "ccc58c90c8f94c0be3dfcacb3b0caec98a6ae3e4", features = ["serde"] }
-yydb = { git = "https://github.com/yy-database/yydb.rs.git", rev = "04aad1c5984b2011c4f989732abf4a337fc73061" }
-dejavu = { git = "https://github.com/doki-land/dejavu-engine.git", rev = "8aba1a0a61ac9d7f2112123a57faec649cf67427" }
+# Sole database.rs dependency ¡ª the `iris` facade. Pin full 40-char rev.
+# Local absolute path overrides belong in `.cargo/config.toml` (facade only).
+iris = { git = "https://github.com/oovm/database.rs.git", rev = "224941598608759e33dc38bf61b4682d921f9b29" }
 
-once_cell = "1"
-clap = { version = "4", features = ["derive"] }
-# The SQLite execution surface is owned by `iris-adapter-sqlite`: upstream
-# `sqlite-provider` / `sqlite-provider-rusqlite` are no longer published.
-rusqlite = { version = "0.37", features = ["bundled"] }
-postgres = "0.19"
-r2d2 = "0.8"
-r2d2_postgres = "0.18"
-mysql = "25"
-redis = "0.27"
-blake3 = "1"
-thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-glob = "0.3"
-sha2 = "0.10"
-
-iris = { path = "projects/iris.rs/crates/iris" }
-iris-types = { path = "projects/iris.rs/crates/iris-types" }
-iris-ir = { path = "projects/iris.rs/crates/iris-ir" }
-# Template families are opt-in per consumer: hosts inherit the umbrella
-# `templates-host` feature, `iris-wasm` enables only `templates-typescript`.
-iris-generator = { path = "projects/iris.rs/crates/iris-generator", default-features = false }
-iris-wasm = { path = "projects/iris.rs/crates/iris-wasm" }
-iris-host = { path = "projects/iris.rs/crates/iris-host" }
-iris-connector-yydb = { path = "projects/iris.rs/crates/iris-connector-yydb" }
-iris-connector-yyds = { path = "projects/iris.rs/crates/iris-connector-yyds" }
-iris-adapter-mysql = { path = "projects/iris.rs/crates/iris-adapter-mysql" }
-iris-adapter-postgres = { path = "projects/iris.rs/crates/iris-adapter-postgres" }
-iris-adapter-sqlite = { path = "projects/iris.rs/crates/iris-adapter-sqlite" }
-iris-adapter-redis = { path = "projects/iris.rs/crates/iris-adapter-redis" }
-iris-adapter-d1 = { path = "projects/iris.rs/crates/iris-adapter-d1" }
 pyo3 = { version = "0.30.1", features = ["extension-module"] }
 napi = { version = "3.12", default-features = false, features = ["napi9"] }
 napi-derive = "3.6"
 napi-build = "2"
-wasm-bindgen = "0.2"
 
 [profile.release]
 lto = true
 opt-level = "s"
+panic = "abort"
