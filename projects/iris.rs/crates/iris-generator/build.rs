@@ -41,7 +41,10 @@ fn main() {
             panic!("AOT parse {}: {e:?}", path.display());
         });
         let ir_path = aot_dir.join(format!("{ir_file}.ir.json"));
-        let json = serde_json::to_string_pretty(&doc).expect("serialize IR");
+        // Compact JSON: this blob is embedded into every consumer (including
+        // `iris-wasm`), and `render_aot_ir` only deserializes it, so the
+        // pretty-printed form sized the browser artifact without buying anything.
+        let json = serde_json::to_string(&doc).expect("serialize IR");
         fs::write(&ir_path, json).expect("write IR JSON");
         match_arms.push_str(&format!(
             "        {stem:?} => render_aot_ir(include_str!(concat!(env!(\"OUT_DIR\"), \"/aot/{ir_file}.ir.json\")), ctx),\n"
