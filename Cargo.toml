@@ -17,7 +17,7 @@ repository = "https://github.com/voml/iris-orm"
 homepage = "https://iris-orm.pages.dev/"
 
 [workspace.dependencies]
-# Sole database.rs dependency ¡ª the `iris` facade. Pin full 40-char rev.
+# Sole database.rs dependency Â· the `iris` facade. Pin full 40-char rev.
 # Local absolute path overrides belong in `.cargo/config.toml` (facade only).
 iris = { git = "https://github.com/oovm/database.rs.git", rev = "224941598608759e33dc38bf61b4682d921f9b29" }
 
