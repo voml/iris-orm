@@ -8,8 +8,8 @@ class IrisError(Exception):
 
     ``kind`` and ``code`` are the author-facing pair produced by the Rust
     session core. ``diagnostic_code`` keeps the internal detail for logs.
-    Session operations do not raise for backend failures: they return the
-    structured envelope described in :class:`iris.SessionResult` instead.
+    Generated clients raise this type for backend failures as well, so authors
+    never see the internal result envelopes.
     """
 
     def __init__(

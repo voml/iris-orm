@@ -25,7 +25,7 @@ with db.transaction() as tx:
     tx.tables.user.create(data={"user_name": "ali"})
 ```
 
-Session plumbing, DSN parsing and adapter selection stay behind the generated
+Connection plumbing, DSN parsing and adapter selection stay behind the generated
 client's `_internal` modules and the Rust session core, and are not part of the
 authoring surface. Generated clients define their own `IrisError`, so a
 generated package named `iris` under `src/generated/` never shadows this
