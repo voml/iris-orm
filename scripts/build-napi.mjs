@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const manifestPath = join(root, "projects/iris.rs/crates/iris-napi/Cargo.toml");
-const napiDir = join(root, "projects/iris.rs/crates/iris-napi");
+const manifestPath = join(root, "projects/iris.rs/iris-napi/Cargo.toml");
+const napiDir = join(root, "projects/iris.rs/iris-napi");
 
 /** @type {Record<string, { packageDir: string; fileName: string }>} */
 const ARTIFACTS = {

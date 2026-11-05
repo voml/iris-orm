@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           out="dist/${{ matrix.short }}"
           mkdir -p "$out"
-          src="projects/iris.rs/crates/iris-napi"
+          src="projects/iris.rs/iris-napi"
           node="$(find "$src" -maxdepth 1 -name '*.node' | head -n 1)"
           if [[ -z "$node" ]]; then
             echo "missing native binary under $src" >&2
@@ -90,47 +90,9 @@ jobs:
           path: dist/${{ matrix.short }}
           if-no-files-found: error
 
-  build-wasm:
-    name: WASM
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-07-20
-          components: rustfmt, clippy
-          targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Build WASM (release)
-        run: node scripts/build-wasm.mjs
-
-      - name: Upload WASM artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: wasm-lib
-          path: projects/iris.ts/platforms/iris-unknown-wasm32/src/lib
-          if-no-files-found: error
-
   publish:
     name: Publish packages
-    needs: [build-native, build-wasm]
+    needs: [build-native]
     runs-on: ubuntu-latest
     environment: NPM_PUBLISH
     steps:
@@ -193,12 +155,6 @@ jobs:
             cp -r "$d"/. "dist/native-flat/$short/"
           done
           find dist/native-flat -type f -print
-
-      - name: Download WASM artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: wasm-lib
-          path: projects/iris.ts/platforms/iris-unknown-wasm32/src/lib
 
       - name: Build TypeScript dist
         run: pnpm build:ts

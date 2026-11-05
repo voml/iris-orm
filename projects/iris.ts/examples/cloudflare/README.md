@@ -26,7 +26,6 @@ Until Iris ships a D1 session, this example keeps:
 
 ```bash
 pnpm install
-pnpm run build:wasm    # @yydb/iris-unknown-wasm32
 pnpm run build:napi    # iris generate (CLI)
 pnpm run examples:generate
 ```

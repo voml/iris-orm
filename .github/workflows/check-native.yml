@@ -7,9 +7,8 @@ on:
     paths:
       - "projects/iris.ts/packages/**"
       - "projects/iris.ts/platforms/iris-*"
-      - "projects/iris.rs/crates/**"
+      - "projects/iris.rs/**"
       - "scripts/build-napi.mjs"
-      - "scripts/build-wasm.mjs"
       - "scripts/resolve-native-artifact.mjs"
       - "scripts/typecheck-ts.mjs"
       - "package.json"
@@ -20,9 +19,8 @@ on:
     paths:
       - "projects/iris.ts/packages/**"
       - "projects/iris.ts/platforms/iris-*"
-      - "projects/iris.rs/crates/**"
+      - "projects/iris.rs/**"
       - "scripts/build-napi.mjs"
-      - "scripts/build-wasm.mjs"
       - "scripts/resolve-native-artifact.mjs"
       - "scripts/typecheck-ts.mjs"
       - "package.json"
@@ -46,10 +44,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-07-20
-          targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -63,9 +57,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
-
-      - name: Build WASM
-        run: node scripts/build-wasm.mjs
 
       - name: Build N-API
         run: node scripts/build-napi.mjs

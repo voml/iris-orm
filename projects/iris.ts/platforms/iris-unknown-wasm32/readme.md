@@ -2,7 +2,7 @@
 
 Browser WebAssembly semantic core for [`@yydb/iris-language`](https://www.npmjs.com/package/@yydb/iris-language). **Not a typical import target** — installed as a dependency of the language layer.
 
-The wasm-bindgen glue (`iris_wasm.js`) and the `iris_wasm_bg.wasm` asset are generated into `src/lib` by `pnpm build:wasm` and copied to `dist/lib` by the package build.
+The wasm-bindgen glue (`iris_wasm.js`) and the `iris_wasm_bg.wasm` asset are produced by the `iris` facade's `iris-wasm` binding and ship committed under `src/lib`; this repository does not carry a local Rust wasm crate. The package build copies them to `dist/lib`.
 
 ## Example
 
