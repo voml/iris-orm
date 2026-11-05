@@ -44,7 +44,7 @@ INTERNAL_SESSION_NAMES = {
 
 class PackageTests(unittest.TestCase):
     def test_public_names_are_exported(self) -> None:
-        self.assertEqual(sorted(iris.__all__), ["IrisError", "contract_version", "version"])
+        self.assertEqual(sorted(iris.__all__), ["IrisError", "contract_version", "generate", "version"])
         for name in iris.__all__:
             self.assertTrue(hasattr(iris, name), name)
 
@@ -58,7 +58,7 @@ class PackageTests(unittest.TestCase):
         declared = {
             node.name for node in ast.parse(stub.read_text(encoding="utf-8")).body if isinstance(node, (ast.ClassDef, ast.FunctionDef))
         }
-        self.assertEqual(declared, {"IrisError", "version", "contract_version"})
+        self.assertEqual(declared, {"IrisError", "version", "contract_version", "generate"})
         self.assertEqual(declared & INTERNAL_SESSION_NAMES, set())
         self.assertEqual(set(iris.__all__) & INTERNAL_SESSION_NAMES, set())
 
@@ -93,6 +93,7 @@ class NativeTests(unittest.TestCase):
                 "version",
                 "contract_version",
                 "capabilities",
+                "generate",
                 "open_memory",
                 "open_sqlite",
                 "open_yydb",

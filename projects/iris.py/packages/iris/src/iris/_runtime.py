@@ -55,6 +55,11 @@ def _raise_native(error: Exception) -> NoReturn:
     ) from error
 
 
+def generate(source: str, target: str, out_dir: str, datasource: str | None = None) -> dict[str, Any]:
+    """Generate a client from VOS schema source through the facade generator."""
+    return _decode(native().generate(source, target, out_dir, datasource))
+
+
 class Session:
     """Session bound to a reference or foreign adapter.
 

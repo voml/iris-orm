@@ -1,9 +1,10 @@
 """Install-state checks for a generated Iris Python client.
 
 Run these against an installed wheel (not a source checkout). The clients in
-``src/generated`` are produced from ``schemas`` by ``iris-python-generate``:
-``generated.iris`` for the SQLite CRUD surface and ``generated.docs`` for the
-YYDB vector surface.
+``src/generated`` are committed artifacts from ``schemas`` (SQLite CRUD in
+``generated.iris``, vector surface in ``generated.docs``). Kernel crates and
+FFI shells do not ship a generate bin; refresh through the installed wheel's
+``iris.generate`` primitive via ``projects/iris.py/scripts/generate.py``.
 """
 
 from __future__ import annotations

@@ -16,7 +16,7 @@ classifiers = [
 ]
 
 [tool.maturin]
-manifest-path = "../../../../projects/iris.rs/crates/iris-pyo3/Cargo.toml"
+manifest-path = "../../../../projects/iris.rs/iris-pyo3/Cargo.toml"
 module-name = "iris_pyo3"
 python-source = "src"
 python-packages = ["iris"]

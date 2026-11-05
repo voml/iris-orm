@@ -6,16 +6,14 @@ on:
     branches: [master, dev]
     paths:
       - "projects/iris.py/**"
-      - "projects/iris.rs/crates/iris-pyo3/**"
-      - "projects/iris.rs/crates/iris-generator/**"
+      - "projects/iris.rs/iris-pyo3/**"
       - "Cargo.toml"
       - ".github/workflows/check-python.yml"
   pull_request:
     branches: [master, dev]
     paths:
       - "projects/iris.py/**"
-      - "projects/iris.rs/crates/iris-pyo3/**"
-      - "projects/iris.rs/crates/iris-generator/**"
+      - "projects/iris.rs/iris-pyo3/**"
       - "Cargo.toml"
       - ".github/workflows/check-python.yml"
 
@@ -94,11 +92,13 @@ jobs:
         run: ${{ matrix.venv-python }} -m unittest discover -s projects/iris.py/packages/iris/tests -v
 
       - name: Generate the example clients
+        # Runs the installed wheel's `iris.generate` primitive through the
+        # product CLI; no Rust bin and no source checkout on the import path.
         run: |
-          cargo run -q -p iris-generator --bin iris-python-generate -- \
+          ${{ matrix.venv-python }} projects/iris.py/scripts/generate.py \
             projects/iris.py/examples/blog/schemas/blog.iris \
             projects/iris.py/examples/blog/src/generated/iris
-          cargo run -q -p iris-generator --bin iris-python-generate -- \
+          ${{ matrix.venv-python }} projects/iris.py/scripts/generate.py \
             projects/iris.py/examples/blog/schemas/docs.iris \
             projects/iris.py/examples/blog/src/generated/docs
 

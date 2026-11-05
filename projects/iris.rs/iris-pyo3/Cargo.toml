@@ -14,5 +14,8 @@ test = false
 doctest = false
 
 [dependencies]
-iris = { workspace = true, features = ["pyo3"] }
+# `generator-aot` is the facade feature that embeds the Dejavu template
+# registry, so `iris::generator` can render every host family at runtime.
+iris = { workspace = true, features = ["pyo3", "generator-aot"] }
 pyo3 = { workspace = true }
+serde_json = { workspace = true }

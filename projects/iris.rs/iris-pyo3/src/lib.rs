@@ -3,9 +3,10 @@
 //! The binding is a thin wrapper over [`iris::host::HostSession`], the same
 //! session core consumed by the Node N-API binding. Both surfaces expose the
 //! same profiles (`memory`, `sqlite`, `yydb`, `postgres`, `mysql`), the same
-//! VOS execution semantics and the same diagnostic codes. This binding does
-//! not parse `.iris` sources, does not accept SQL, and does not define a
-//! second query DSL.
+//! VOS execution semantics and the same diagnostic codes. Session calls do
+//! not parse `.iris` sources, do not accept SQL, and do not define a second
+//! query DSL. Schema parsing for codegen lives in the facade's `generator`
+//! module and is exposed as a separate `generate` primitive.
 //!
 //! Fallible session calls return a structured JSON envelope
 //! (`{"ok": …, "rows": […], "error": {"code": …, "message": …} | null}`) so
@@ -17,10 +18,22 @@
 
 use iris::host::{ErrorEnvelope, ExecuteOutcome, HostSession};
 use pyo3::{exceptions::PyRuntimeError, prelude::*};
+use serde_json::json;
+use std::path::Path;
 
 /// Capability ids exported by this binding.
-const CAPABILITIES: [&str; 9] =
-    ["version", "contract_version", "capabilities", "open_memory", "open_sqlite", "open_yydb", "open_postgres", "open_mysql", "open_dsn"];
+const CAPABILITIES: [&str; 10] = [
+    "version",
+    "contract_version",
+    "capabilities",
+    "generate",
+    "open_memory",
+    "open_sqlite",
+    "open_yydb",
+    "open_postgres",
+    "open_mysql",
+    "open_dsn",
+];
 
 fn raise_open(err: ErrorEnvelope) -> PyErr {
     PyRuntimeError::new_err(err.to_json().to_string())
@@ -138,6 +151,40 @@ impl Session {
     }
 }
 
+/// Generate client bindings (`rust` | `typescript` | `python`) from merged schema source.
+///
+/// Parsing and emission stay in the facade (`iris::generator`); this function
+/// only maps the outcome to the same JSON envelope the Node binding returns.
+/// `datasource` is required for the `rust` target and ignored by the others.
+#[pyfunction]
+#[pyo3(signature = (source, target, out_dir, datasource = None))]
+fn generate(source: &str, target: &str, out_dir: &str, datasource: Option<&str>) -> String {
+    match iris::generator::generate_from_source(source, target, Path::new(out_dir), datasource) {
+        Ok((model, paths)) => {
+            let output_path = match target {
+                "rust" => iris::generator::rust_target_dir(Path::new(out_dir)).display().to_string(),
+                _ => out_dir.to_string(),
+            };
+            json!({
+                "ok": true,
+                "output_path": output_path,
+                "schema_fingerprint": model.schema_fingerprint,
+                "files": paths.iter().map(|path| path.display().to_string()).collect::<Vec<_>>(),
+                "error": null,
+            })
+            .to_string()
+        }
+        Err(err) => json!({
+            "ok": false,
+            "output_path": "",
+            "schema_fingerprint": "",
+            "files": [],
+            "error": err.to_string(),
+        })
+        .to_string(),
+    }
+}
+
 /// Open the reference profile (read-only, unseeded).
 #[pyfunction]
 fn open_memory() -> Session {
@@ -186,6 +233,7 @@ fn iris_pyo3(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(version, module)?)?;
     module.add_function(wrap_pyfunction!(contract_version, module)?)?;
     module.add_function(wrap_pyfunction!(capabilities, module)?)?;
+    module.add_function(wrap_pyfunction!(generate, module)?)?;
     module.add_function(wrap_pyfunction!(open_memory, module)?)?;
     module.add_function(wrap_pyfunction!(open_sqlite, module)?)?;
     module.add_function(wrap_pyfunction!(open_yydb, module)?)?;

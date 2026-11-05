@@ -10,6 +10,7 @@ import iris
 
 iris.version()           # Rust facade version
 iris.contract_version()  # accepted contract envelope format
+iris.generate(source, "python", out_dir)  # build-time client generation
 iris.IrisError           # error type raised by this runtime package
 ```
 
@@ -29,8 +30,10 @@ Connection plumbing, DSN parsing and adapter selection stay behind the generated
 client's `_internal` modules and the Rust session core, and are not part of the
 authoring surface. Generated clients define their own `IrisError`, so a
 generated package named `iris` under `src/generated/` never shadows this
-runtime package. There is no query DSL, no SQL entry and no `.iris` parsing in
-this package.
+runtime package. The session surface has no query DSL and no SQL entry.
+`iris.generate` is a build-time primitive that delegates schema parsing and
+emission to the Rust facade's generator module; nothing re-implements codegen
+in Python.
 
 ## Development
 
