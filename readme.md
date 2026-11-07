@@ -296,6 +296,19 @@ More examples: [`projects/examples/README.md`](./projects/examples/README.md) ·
 
 ---
 
+## 🛠 Local development
+
+The Rust workspace resolves the `iris` facade from the pinned git `rev` in the root `Cargo.toml`
+(`[workspace.dependencies]`), and CI uses exactly that rev. No `[patch]` entry is needed.
+
+For a local build against a `database.rs` checkout, create a gitignored `.cargo/config.toml`
+that patches only the `iris` package and points `path` at a checkout that actually contains
+`projects/facades/iris`. If the checkout no longer has that facade, leave `.cargo/config.toml`
+out and let Cargo resolve the pinned rev; a stale `path` makes every `cargo` command fail before
+compilation starts.
+
+Run `cargo check --workspace` to verify the workspace resolves and compiles.
+
 ## 🧪 Examples
 
 Sample applications (HTTP servers, full-stack frameworks, edge workers) live under [
