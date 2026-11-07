@@ -8,6 +8,8 @@ on:
       - "projects/iris.py/**"
       - "projects/iris.rs/iris-pyo3/**"
       - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/check-python.yml"
   pull_request:
     branches: [master, dev]
@@ -15,6 +17,8 @@ on:
       - "projects/iris.py/**"
       - "projects/iris.rs/iris-pyo3/**"
       - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/check-python.yml"
 
 defaults:

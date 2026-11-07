@@ -13,6 +13,9 @@ on:
       - "scripts/typecheck-ts.mjs"
       - "package.json"
       - "pnpm-lock.yaml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/check-native.yml"
   pull_request:
     branches: [master, dev]
@@ -25,6 +28,9 @@ on:
       - "scripts/typecheck-ts.mjs"
       - "package.json"
       - "pnpm-lock.yaml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
       - ".github/workflows/check-native.yml"
 
 defaults:
