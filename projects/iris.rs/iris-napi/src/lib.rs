@@ -8,8 +8,7 @@ mod session;
 
 use std::path::Path;
 
-use iris::{migrate_plan, migrate_run, project};
-use iris::generator::GenerationModel;
+use iris::{generator::GenerationModel, migrate_plan, migrate_run, project};
 use napi::bindgen_prelude::*;
 use napi_derive::napi;
 use session::MemorySession;
