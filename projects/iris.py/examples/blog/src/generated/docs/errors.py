@@ -3,7 +3,7 @@
 `IrisError` carries the stable author-facing `kind` and `code`
 (`unique_conflict` / `IRIS-UNIQUE-CONFLICT`, `not_found` / `IRIS-NOT-FOUND`,
 …). `diagnostic_code` keeps the internal detail (`IRIS-PLAN-REJECTED`,
-`23505`, `yydb.*`) for logs and tests. A backend error number never becomes
+`23505`, `database.*`) for logs and tests. A backend error number never becomes
 `code`.
 """
 
