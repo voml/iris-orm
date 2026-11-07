@@ -69,7 +69,7 @@ pub struct LoadProjectResult {
 /// Load project config (`iris.von` or materialized `.iris/project.von`) from a config path.
 #[napi]
 pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
-    let (root, project) = project::load_project(Path::new(&config_path)).map_err(|e| Error::from_reason(e))?;
+    let (root, project) = project::load_project(Path::new(&config_path)).map_err(Error::from_reason)?;
     Ok(LoadProjectResult {
         root: root.display().to_string(),
         config: config_path,
@@ -82,7 +82,7 @@ pub fn load_project(config_path: String) -> Result<LoadProjectResult> {
 /// Materialize a JSON project document from `iris.config.ts` to `.iris/project.von`.
 #[napi]
 pub fn materialize_runtime_project(project_dir: String, document_json: String) -> Result<String> {
-    let path = project::materialize_runtime_project(Path::new(&project_dir), &document_json).map_err(|e| Error::from_reason(e))?;
+    let path = project::materialize_runtime_project(Path::new(&project_dir), &document_json).map_err(Error::from_reason)?;
     Ok(path.display().to_string())
 }
 
@@ -90,7 +90,7 @@ pub fn materialize_runtime_project(project_dir: String, document_json: String) -
 #[napi]
 pub fn read_schema(project_root: String, schema_glob: String) -> Result<String> {
     let project = iris::IrisProject { schema: schema_glob, ..Default::default() };
-    project::read_schema(Path::new(&project_root), &project).map_err(|e| Error::from_reason(e))
+    project::read_schema(Path::new(&project_root), &project).map_err(Error::from_reason)
 }
 
 /// Codegen output summary.
@@ -222,13 +222,9 @@ pub fn migrate_run_cmd(config_path: String, source: String, plan_out: Option<Str
             created_tables: report.created_tables,
             error: None,
         }),
-        Err(err) => Ok(MigrateRunResult {
-            ok: false,
-            plan_path: plan_path.display().to_string(),
-            plan_only: plan_only,
-            created_tables: vec![],
-            error: Some(err),
-        }),
+        Err(err) => {
+            Ok(MigrateRunResult { ok: false, plan_path: plan_path.display().to_string(), plan_only, created_tables: vec![], error: Some(err) })
+        }
     }
 }
 
