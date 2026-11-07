@@ -45,7 +45,7 @@ test("wireRowToAuthorRow keeps i64 on the bigint carrier", () => {
 test("wireRowToAuthorRow decodes tagged bytes onto Uint8Array", () => {
     const mapped = wireRowToAuthorRow(
         carrierWireToTs,
-        { seq: 1, payload: { $yydb: "bytes", hex: "6869" }, note: null },
+        { seq: 1, payload: { $database: "bytes", hex: "6869" }, note: null },
         valueCarriers,
     );
     assert.deepEqual(mapped.payload, new Uint8Array([0x68, 0x69]));

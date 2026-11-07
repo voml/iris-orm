@@ -119,9 +119,9 @@ def _encode_carrier(entity: str, field: str, value: Any) -> Any:
             )
         components = [float(component) for component in value]
         hex_components = struct.pack(f"<{len(components)}f", *components).hex()
-        return {"$yydb": "vector", "dimension": len(components), "components": hex_components}
+        return {"$database": "vector", "dimension": len(components), "components": hex_components}
     if isinstance(value, (bytes, bytearray)):
-        return {"$yydb": "bytes", "hex": bytes(value).hex()}
+        return {"$database": "bytes", "hex": bytes(value).hex()}
     return value
 
 
@@ -336,7 +336,7 @@ def _validate_near_args(
 
 
 def _decode_vector_cell(cell: Any, entity: str, field: str) -> list[float]:
-    if isinstance(cell, Mapping) and cell.get("$yydb") == "vector":
+    if isinstance(cell, Mapping) and cell.get("$database") == "vector":
         components = cell.get("components")
         dimension = cell.get("dimension")
         if isinstance(components, str) and isinstance(dimension, int) and dimension > 0:

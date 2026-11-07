@@ -64,7 +64,7 @@ def _descriptor(content: bytes, name: str, media_type: str | None = None) -> dic
     digest = hashlib.sha256(content).hexdigest()
     manifest = hashlib.sha256(content + b"manifest").hexdigest()
     payload: dict[str, object] = {
-        "$yydb": "file",
+        "$database": "file",
         "digest": digest,
         "octets": len(content),
         "name": name,
@@ -224,7 +224,7 @@ class YydbProfileTests(unittest.TestCase):
                 pushed = session.managedPush(DOC_SCHEMA)
                 self.assertTrue(pushed["ok"], pushed)
 
-                parameters = json.dumps({"doc_id": 1, "label": "alpha", "embedding": {"$yydb": "vector", "dimension": 3, "components": VECTOR_THREE}})
+                parameters = json.dumps({"doc_id": 1, "label": "alpha", "embedding": {"$database": "vector", "dimension": 3, "components": VECTOR_THREE}})
                 inserted = session.execute(
                     "Doc::insert({ doc_id: $doc_id, label: $label, embedding: $embedding })",
                     parameters,
@@ -235,7 +235,7 @@ class YydbProfileTests(unittest.TestCase):
                 self.assertTrue(rows["ok"], rows)
                 self.assertEqual(len(rows["rows"]), 1)
                 embedding = rows["rows"][0]["embedding"]
-                self.assertEqual(embedding["$yydb"], "vector")
+                self.assertEqual(embedding["$database"], "vector")
                 self.assertEqual(embedding["dimension"], 3)
                 self.assertEqual(embedding["components"], VECTOR_THREE)
                 session.close()
@@ -267,7 +267,7 @@ class YydbProfileTests(unittest.TestCase):
                 rows = session.query("Asset.collect()")
                 self.assertEqual(len(rows["rows"]), 2)
                 first = rows["rows"][0]
-                self.assertEqual(first["payload"]["$yydb"], "file")
+                self.assertEqual(first["payload"]["$database"], "file")
                 self.assertEqual(first["payload"]["digest"], alpha["digest"])
                 self.assertEqual(first["payload"]["name"], "alpha.bin")
 

@@ -29,7 +29,7 @@ function taggedBytesHex(value: unknown, field: string): string | null {
         return null;
     }
     const record = value as Record<string, unknown>;
-    if (record["$yydb"] !== "bytes") {
+    if (record["$database"] !== "bytes") {
         return null;
     }
     const hex = record["hex"];
@@ -58,13 +58,13 @@ function toExactBigInt(value: unknown, field: string, carrier: string): bigint {
     throw carrierError(field, carrier, `cannot convert ${typeof value} value to bigint`);
 }
 
-/** Tagged payload member of a canonical `$yydb` carrier object. */
+/** Tagged payload member of a canonical `$database` carrier object. */
 function taggedMember(value: unknown, tag: string, field: string, carrier: string): Record<string, unknown> {
     if (typeof value !== "object" || value === null) {
         throw carrierError(field, carrier, `received a value that is not the tagged \`${tag}\` carrier`);
     }
     const record = value as Record<string, unknown>;
-    if (record["$yydb"] !== tag) {
+    if (record["$database"] !== tag) {
         throw carrierError(field, carrier, `received an object that is not the tagged \`${tag}\` carrier`);
     }
     return record;
@@ -185,11 +185,11 @@ function toUint8Array(value: unknown, field: string): Uint8Array {
  * `bytes`, …). Every label must be in the faithful VOS carrier table — unknown
  * labels hard-fail instead of falling back to `unknown`. `i64` accepts exact
  * decimal strings (the wire shape for values past 2^53) or safe numbers.
- * `bytes` accepts the tagged `{"$yydb":"bytes","hex":…}` value, `ArrayBuffer`
+ * `bytes` accepts the tagged `{"$database":"bytes","hex":…}` value, `ArrayBuffer`
  * and views. `vector` accepts the tagged
- * `{"$yydb":"vector","dimension":…,"components":…}` value (little-endian
+ * `{"$database":"vector","dimension":…,"components":…}` value (little-endian
  * `f32` hex) and yields a `Float32Array`. `file` accepts the tagged
- * `{"$yydb":"file",…}` descriptor and yields the inline file carrier shape.
+ * `{"$database":"file",…}` descriptor and yields the inline file carrier shape.
  */
 
 const KNOWN_VOS_LABELS: ReadonlySet<string> = new Set([

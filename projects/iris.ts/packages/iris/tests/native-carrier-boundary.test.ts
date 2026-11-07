@@ -38,34 +38,34 @@ test("`vector` decoding passes a `Float32Array` through as a defensive copy", ()
 
 test("`vector` decoding refuses a missing `components` and a fractional `dimension`", () => {
     assert.throws(
-        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 1 }, "embedding"),
+        () => decodeWireValueByCarrier("vector", { $database: "vector", dimension: 1 }, "embedding"),
         /without a `components` hex string/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 2.5, components: "0000803f" }, "embedding"),
+        () => decodeWireValueByCarrier("vector", { $database: "vector", dimension: 2.5, components: "0000803f" }, "embedding"),
         /non-positive `dimension`: 2.5/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: "2", components: "0000803f" }, "embedding"),
+        () => decodeWireValueByCarrier("vector", { $database: "vector", dimension: "2", components: "0000803f" }, "embedding"),
         /non-positive `dimension`/,
     );
 });
 
 test("`file` decoding refuses a missing `octets` and non-string identity members", () => {
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
         /without an `octets` number/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: 123, octets: 1, manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: 123, octets: 1, manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
         /without a `digest` string/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 1, manifest: { hash: 7, size: 1 } }, "photo"),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, octets: 1, manifest: { hash: 7, size: 1 } }, "photo"),
         /whose `manifest.hash` is not a string/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 1, mediaType: " ", manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, octets: 1, mediaType: " ", manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
         /`mediaType` is not a non-blank string/,
     );
 });
@@ -73,14 +73,14 @@ test("`file` decoding refuses a missing `octets` and non-string identity members
 test("`file` decoding accepts exact decimal text and rejects beyond-2^53 numbers", () => {
     const decoded = decodeWireValueByCarrier(
         "file",
-        { $yydb: "file", digest: DIGEST, octets: "9223372036854775807", manifest: { hash: MANIFEST_HASH, size: "123456789012345678" } },
+        { $database: "file", digest: DIGEST, octets: "9223372036854775807", manifest: { hash: MANIFEST_HASH, size: "123456789012345678" } },
         "photo",
     ) as { octets: bigint; manifest: { size: bigint } };
     assert.equal(decoded.octets, 9223372036854775807n);
     assert.equal(decoded.manifest.size, 123456789012345678n);
 
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: UNSAFE_NUMBER, manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, octets: UNSAFE_NUMBER, manifest: { hash: MANIFEST_HASH, size: 1 } }, "photo"),
         /beyond the 2\^53 exact range/,
     );
 });
@@ -98,7 +98,7 @@ test("an unknown carrier label hard-fails instead of degrading to `unknown`", ()
 });
 
 test("plain text is never reinterpreted as a native carrier", () => {
-    const lookalike = '{"$yydb":"vector","dimension":2,"components":"0000803f00000040"}';
+    const lookalike = '{"$database":"vector","dimension":2,"components":"0000803f00000040"}';
     assert.equal(decodeWireValueByCarrier("utf8", lookalike, "note"), lookalike);
     assert.equal(decodeWireValueByCarrier(undefined, lookalike, "note"), lookalike);
     assert.equal(decodeWireValueByCarrier("vector", null, "embedding"), null);
@@ -150,10 +150,10 @@ test("an object that only looks like a descriptor is not encoded as a file", () 
 });
 
 test("tagged-looking parameter text stays text through encoding", () => {
-    const lookalike = `{"$yydb":"file","digest":"${DIGEST}","octets":10}`;
+    const lookalike = `{"$database":"file","digest":"${DIGEST}","octets":10}`;
     const encoded = stringifyOperationParameters({ p_note: lookalike });
     assert.deepEqual(JSON.parse(encoded), { p_note: lookalike });
-    assert.match(encoded, /^\{"p_note":"\{\\"\$yydb\\"/);
+    assert.match(encoded, /^\{"p_note":"\{\\"\$database\\"/);
 });
 
 test("`exactI64Text` guards the `i64` endpoints", () => {
@@ -168,7 +168,7 @@ test("`exactI64Text` guards the `i64` endpoints", () => {
 test("a three-component `vector` round trips exactly through the tagged hex carrier", () => {
     const encoded = stringifyOperationParameters({ p_embedding: new Float32Array([1.5, -2, 0.25]) });
     const parsed = JSON.parse(encoded) as { p_embedding: unknown };
-    assert.deepEqual(parsed.p_embedding, { $yydb: "vector", dimension: 3, components: "0000c03f000000c00000803e" });
+    assert.deepEqual(parsed.p_embedding, { $database: "vector", dimension: 3, components: "0000c03f000000c00000803e" });
     const decoded = decodeWireValueByCarrier("vector", parsed.p_embedding, "embedding");
     assert.ok(decoded instanceof Float32Array);
     assert.deepEqual(Array.from(decoded as Float32Array), [1.5, -2, 0.25]);
@@ -203,6 +203,6 @@ test("request encoding splices tagged vector text into the session payload", () 
             { p_embedding: new Float32Array([1, 2]) },
         ),
     );
-    assert.match(encoded, /"p_embedding":\{"\$yydb":"vector","dimension":2,"components":"0000803f00000040"\}/);
+    assert.match(encoded, /"p_embedding":\{"\$database":"vector","dimension":2,"components":"0000803f00000040"\}/);
     assert.match(encoded, /"kind":"declared-vos"/);
 });

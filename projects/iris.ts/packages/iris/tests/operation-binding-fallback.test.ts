@@ -52,7 +52,7 @@ test("session fallback without `executeOperation` refuses non declared-vos opera
 });
 
 test("session fallback runs declared-vos through `query` with tagged parameters", async () => {
-    const rows = wire(true, '[{"embedding":{"$yydb":"vector","dimension":2,"components":"0000803f00000040"}}]');
+    const rows = wire(true, '[{"embedding":{"$database":"vector","dimension":2,"components":"0000803f00000040"}}]');
     const { session, queries } = queryOnlySession(rows);
     const executor = createOperationExecutorFromSession(session, {
         wireNamesByEntity: { Search: { embedding: "embedding" } },
@@ -75,7 +75,7 @@ test("session fallback runs declared-vos through `query` with tagged parameters"
 
     assert.equal(queries.length, 1);
     assert.equal(queries[0]?.source, "search($p_embedding)");
-    assert.equal(queries[0]?.parametersJson, '{"p_embedding":{"$yydb":"vector","dimension":2,"components":"0000803f00000040"}}');
+    assert.equal(queries[0]?.parametersJson, '{"p_embedding":{"$database":"vector","dimension":2,"components":"0000803f00000040"}}');
 });
 
 test("string wire results and failures become envelopes", async () => {

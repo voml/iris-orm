@@ -60,7 +60,7 @@ test("parameter encoding keeps i64 as exact decimal digits", () => {
 
 test("parameter encoding carries bytes as the canonical tagged hex value", () => {
     const encoded = stringifyOperationParameters({ p_payload: new Uint8Array([1, 2, 3]) });
-    assert.equal(encoded, '{"p_payload":{"$yydb":"bytes","hex":"010203"}}');
+    assert.equal(encoded, '{"p_payload":{"$database":"bytes","hex":"010203"}}');
     assert.equal(JSON.stringify({ p_payload: new Uint8Array([1, 2, 3]) }), '{"p_payload":{"0":1,"1":2,"2":3}}');
 });
 
@@ -69,7 +69,7 @@ test("every `bytes` parameter round trips through the tagged hex carrier", () =>
         const encoded = stringifyOperationParameters({ p_payload: bytes });
         assert.equal(
             encoded,
-            `{"p_payload":{"$yydb":"bytes","hex":${JSON.stringify(lowercaseHex(bytes))}}}`,
+            `{"p_payload":{"$database":"bytes","hex":${JSON.stringify(lowercaseHex(bytes))}}}`,
             label,
         );
         const parsed = JSON.parse(encoded) as { p_payload: unknown };
@@ -82,11 +82,11 @@ test("every `bytes` parameter round trips through the tagged hex carrier", () =>
 
 test("`bytes` decoding rejects every non-canonical shape", () => {
     assert.throws(
-        () => decodeWireValueByCarrier("bytes", { $yydb: "bytes", hex: "ABCD" }),
+        () => decodeWireValueByCarrier("bytes", { $database: "bytes", hex: "ABCD" }),
         /canonical lowercase hex/,
     );
-    assert.throws(() => decodeWireValueByCarrier("bytes", { $yydb: "bytes", hex: "0" }), /canonical lowercase hex/);
-    assert.throws(() => decodeWireValueByCarrier("bytes", { $yydb: "bytes" }), /without a `hex` string/);
+    assert.throws(() => decodeWireValueByCarrier("bytes", { $database: "bytes", hex: "0" }), /canonical lowercase hex/);
+    assert.throws(() => decodeWireValueByCarrier("bytes", { $database: "bytes" }), /without a `hex` string/);
     assert.throws(() => decodeWireValueByCarrier("bytes", { hex: "00" }), /not the tagged `bytes` carrier/);
     assert.throws(() => decodeWireValueByCarrier("bytes", "AQID"), /cannot convert string value to Uint8Array/);
     assert.equal(decodeWireValueByCarrier("bytes", null), null);
@@ -118,12 +118,12 @@ test("request encoding splices exact parameters into the session payload", () =>
     };
     assert.equal(parsed.operation.kind, "declared-vos");
     assert.equal(parsed.parameters.p_seq, "9223372036854775807");
-    assert.deepEqual(parsed.parameters.p_payload, { $yydb: "bytes", hex: "ff" });
+    assert.deepEqual(parsed.parameters.p_payload, { $database: "bytes", hex: "ff" });
     assert.match(encoded, /"p_seq":9223372036854775807/);
 });
 
 test("session executor binds bigint and bytes parameters without demoting them", async () => {
-    const rows = '[{"metric_id":"m1","seq":"9223372036854775807","payload":{"$yydb":"bytes","hex":"010203"}}]';
+    const rows = '[{"metric_id":"m1","seq":"9223372036854775807","payload":{"$database":"bytes","hex":"010203"}}]';
     const { session, requests } = recordingSession(rows);
     const executor = createOperationExecutorFromSession(session, {
         wireNamesByEntity: { Metric: { metricId: "metric_id", seq: "seq", payload: "payload" } },
@@ -143,13 +143,13 @@ test("session executor binds bigint and bytes parameters without demoting them",
 
     const sent = requests[0]!;
     assert.match(sent, /"p_seq":9223372036854775807/);
-    assert.match(sent, /"p_payload":\{"\$yydb":"bytes","hex":"010203"\}/);
+    assert.match(sent, /"p_payload":\{"\$database":"bytes","hex":"010203"\}/);
 });
 
 test("session executor keeps every `bytes` result byte for byte", async () => {
     for (const [label, bytes] of BYTE_CASES) {
         const rows = JSON.stringify([
-            { metric_id: "m1", seq: "1", payload: { $yydb: "bytes", hex: lowercaseHex(bytes) } },
+            { metric_id: "m1", seq: "1", payload: { $database: "bytes", hex: lowercaseHex(bytes) } },
         ]);
         const { session } = recordingSession(rows);
         const executor = createOperationExecutorFromSession(session, {
@@ -181,7 +181,7 @@ test("session executor reports an out-of-range bigint as a structured diagnostic
     assert.match(result.diagnostics[0]?.message ?? "", /outside the VOS `i64` range/);
 });
 
-const VECTOR_HEX = '{"$yydb":"vector","dimension":2,"components":"0000803f00000040"}';
+const VECTOR_HEX = '{"$database":"vector","dimension":2,"components":"0000803f00000040"}';
 
 test("parameter encoding carries vector as the canonical tagged little-endian hex value", () => {
     const encoded = stringifyOperationParameters({ p_embedding: new Float32Array([1, 2]) });
@@ -198,15 +198,15 @@ test("vector round trips through the tagged carrier with exact components", () =
 
 test("vector decoding refuses a dimension mismatch and a malformed hex payload", () => {
     assert.throws(
-        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 3, components: "0000803f" }),
+        () => decodeWireValueByCarrier("vector", { $database: "vector", dimension: 3, components: "0000803f" }),
         /octets for dimension 3/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 0, components: "" }),
+        () => decodeWireValueByCarrier("vector", { $database: "vector", dimension: 0, components: "" }),
         /non-positive `dimension`/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("vector", { $yydb: "vector", dimension: 1, components: "0" }),
+        () => decodeWireValueByCarrier("vector", { $database: "vector", dimension: 1, components: "0" }),
         /canonical lowercase hex/,
     );
     assert.throws(() => decodeWireValueByCarrier("vector", { hex: "00" }), /not the tagged `vector` carrier/);
@@ -214,7 +214,7 @@ test("vector decoding refuses a dimension mismatch and a malformed hex payload",
 
 const DIGEST = "a".repeat(63) + "3";
 const MANIFEST_HASH = "b".repeat(63) + "4";
-const FILE_JSON = `{"$yydb":"file","digest":"${DIGEST}","octets":10,"name":"note.txt","mediaType":"text/plain","manifest":{"hash":"${MANIFEST_HASH}","size":128}}`;
+const FILE_JSON = `{"$database":"file","digest":"${DIGEST}","octets":10,"name":"note.txt","mediaType":"text/plain","manifest":{"hash":"${MANIFEST_HASH}","size":128}}`;
 
 test("parameter encoding carries a file descriptor as the canonical tagged value", () => {
     const encoded = stringifyOperationParameters({
@@ -222,7 +222,7 @@ test("parameter encoding carries a file descriptor as the canonical tagged value
     });
     assert.equal(encoded, `{"p_photo":${FILE_JSON}}`);
     const minimal = stringifyOperationParameters({ p_photo: { digest: DIGEST, octets: 0, manifest: { hash: MANIFEST_HASH, size: 0 } } });
-    assert.equal(minimal, `{"p_photo":{"$yydb":"file","digest":"${DIGEST}","octets":0,"manifest":{"hash":"${MANIFEST_HASH}","size":0}}}`);
+    assert.equal(minimal, `{"p_photo":{"$database":"file","digest":"${DIGEST}","octets":0,"manifest":{"hash":"${MANIFEST_HASH}","size":0}}}`);
 });
 
 test("file descriptor round trips through the tagged carrier with exact identity", () => {
@@ -238,13 +238,13 @@ test("file descriptor round trips through the tagged carrier with exact identity
 });
 
 test("file decoding refuses a broken descriptor instead of guessing", () => {
-    assert.throws(() => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 10 }), /without a `manifest` object/);
+    assert.throws(() => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, octets: 10 }), /without a `manifest` object/);
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 10, name: "  ", manifest: { hash: MANIFEST_HASH, size: 1 } }),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, octets: 10, name: "  ", manifest: { hash: MANIFEST_HASH, size: 1 } }),
         /`name` is not a non-blank string/,
     );
     assert.throws(
-        () => decodeWireValueByCarrier("file", { $yydb: "file", digest: DIGEST, octets: 10, manifest: { hash: MANIFEST_HASH } }),
+        () => decodeWireValueByCarrier("file", { $database: "file", digest: DIGEST, octets: 10, manifest: { hash: MANIFEST_HASH } }),
         /`manifest\.size` is missing/,
     );
     assert.throws(() => decodeWireValueByCarrier("file", "tagged"), /not the tagged `file` carrier/);
@@ -276,6 +276,6 @@ test("session executor keeps vector and file parameters and results on their typ
     assert.equal(photo.name, "note.txt");
 
     const sent = requests[0]!;
-    assert.match(sent, /"p_embedding":\{"\$yydb":"vector","dimension":2,"components":"0000803f00000040"\}/);
-    assert.match(sent, /"p_photo":\{"\$yydb":"file","digest":"/);
+    assert.match(sent, /"p_embedding":\{"\$database":"vector","dimension":2,"components":"0000803f00000040"\}/);
+    assert.match(sent, /"p_photo":\{"\$database":"file","digest":"/);
 });

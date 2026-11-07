@@ -10,14 +10,14 @@
  *   tokens so the Rust side keeps every bit.
  * - `bytes` author values are `Uint8Array`; `JSON.stringify` would turn them
  *   into `{"0":…}` objects, which the binder rejects. They are emitted as the
- *   canonical tagged `{"$yydb":"bytes","hex":"<lowercase hex>"}` value, which
+ *   canonical tagged `{"$database":"bytes","hex":"<lowercase hex>"}` value, which
  *   a typed-value backend binds directly instead of reading as text.
  * - `vector` author values are `Float32Array`; they are emitted as the
- *   canonical tagged `{"$yydb":"vector","dimension":…,"components":…}` value
+ *   canonical tagged `{"$database":"vector","dimension":…,"components":…}` value
  *   with little-endian `f32` hex.
  * - `file` author values are the inline descriptor shape
  *   (`{digest, octets, name?, mediaType?, manifest}`); they are emitted as
- *   the canonical tagged `{"$yydb":"file",…}` value.
+ *   the canonical tagged `{"$database":"file",…}` value.
  *
  * Anything else is a scalar VOS literal (`null`, `bool`, number, string).
  * Nested objects are rejected instead of being silently stringified.
@@ -93,7 +93,7 @@ function encodeVectorCarrier(name: string, value: Float32Array): string {
     copy.set(value);
     const octets = new Uint8Array(copy.buffer as ArrayBuffer);
     const dimension = u64Token(copy.length, `parameter \`${name}\` dimension`);
-    return `{"$yydb":"vector","dimension":${dimension},"components":${JSON.stringify(encodeHex(octets))}}`;
+    return `{"$database":"vector","dimension":${dimension},"components":${JSON.stringify(encodeHex(octets))}}`;
 }
 
 function fileCarrierMembers(value: object): Record<string, unknown> | null {
@@ -127,7 +127,7 @@ function encodeFileCarrier(name: string, record: Record<string, unknown>): strin
     };
     const manifest = record["manifest"] as Record<string, unknown>;
     const manifestText = `{"hash":${JSON.stringify(manifest["hash"])},"size":${u64Token(manifest["size"], `${subject} \`manifest.size\``)}}`;
-    const parts = [`"$yydb":"file"`, `"digest":${JSON.stringify(record["digest"])}`, `"octets":${octets}`];
+    const parts = [`"$database":"file"`, `"digest":${JSON.stringify(record["digest"])}`, `"octets":${octets}`];
     const labelName = label("name");
     if (labelName !== null) {
         parts.push(`"name":${labelName}`);
@@ -148,7 +148,7 @@ function encodeParameterValue(name: string, value: unknown): string | undefined 
         return encodeVectorCarrier(name, value);
     }
     if (isBytes(value)) {
-        return JSON.stringify({ $yydb: "bytes", hex: encodeHex(toBytes(value)) });
+        return JSON.stringify({ $database: "bytes", hex: encodeHex(toBytes(value)) });
     }
     if (typeof value === "object" && value !== null) {
         const record = fileCarrierMembers(value);

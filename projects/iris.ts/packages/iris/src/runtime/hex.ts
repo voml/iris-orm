@@ -2,7 +2,7 @@
  * Lowercase hex codec for the tagged `bytes` carrier.
  *
  * YYDB's canonical tagged wire spells `bytes` as
- * `{"$yydb":"bytes","hex":"<lowercase hex>"}`, so parameter encoding and row
+ * `{"$database":"bytes","hex":"<lowercase hex>"}`, so parameter encoding and row
  * decoding share this single codec. Encoding always emits lowercase hex and
  * decoding rejects anything that is not, instead of accepting a second byte
  * shape.
