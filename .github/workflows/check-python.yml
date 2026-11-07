@@ -55,6 +55,7 @@ jobs:
           toolchain: nightly
           components: rustfmt
 
+      - run: rustc --version && cargo --version
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:

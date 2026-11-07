@@ -78,6 +78,7 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown
 
+      - run: rustc --version && cargo --version
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
@@ -94,3 +95,9 @@ jobs:
 
       - name: Test
         run: cargo test --workspace
+  toolchain-health:
+    name: toolchain health
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: rustup show active-toolchain && rustc -vV

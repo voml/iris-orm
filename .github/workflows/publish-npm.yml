@@ -53,6 +53,7 @@ jobs:
           toolchain: nightly
           components: rustfmt, clippy
 
+      - run: rustc --version && cargo --version
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
