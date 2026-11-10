@@ -19,7 +19,7 @@ homepage = "https://iris-orm.pages.dev/"
 [workspace.dependencies]
 # Sole database.rs dependency · the `iris` facade. Pin full 40-char rev.
 # Local absolute path overrides belong in `.cargo/config.toml` (facade only).
-iris = { git = "https://github.com/oovm/database.rs.git", rev = "33e03f68c596bfc7ba9cc37d42e2c359abca5dd4" }
+iris = { git = "https://github.com/oovm/database.rs.git", rev = "6913c5e485950616bfb45fa48fcaf2870bb7537d" }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
