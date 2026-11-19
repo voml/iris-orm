@@ -52,3 +52,6 @@ iris.lock
 projects/examples/**/src/generated/
 projects/examples/**/generated/
 e2e/yyds/.generated/
+
+# npm secrets (nifty)
+.secrets/
